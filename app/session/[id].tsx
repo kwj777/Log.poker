@@ -6,7 +6,7 @@
  * rather than during play — writing prose at a table is not a thing anyone does.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +35,7 @@ import {
   useSessionById,
 } from '../../src/store/useLogStore';
 import { colors, radius, resultColor, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,16 +45,26 @@ export default function SessionDetailScreen() {
   const updateNotes = useLogStore((state) => state.updateSessionNotes);
   const deleteSession = useLogStore((state) => state.deleteSession);
 
-  const [notes, setNotes] = useState(session?.notes ?? '');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  useEffect(() => {
-    setNotes(session?.notes ?? '');
-  }, [session?.notes]);
+  /**
+   * The notes field is a draft seeded from the stored value. It is re-seeded
+   * when the screen moves to a different session — adjusted during render, per
+   * React's guidance, rather than synced in an effect, which would cost an
+   * extra render pass and could clobber what the player is typing after an
+   * unrelated store refresh.
+   */
+  const [draft, setDraft] = useState({ id: session?.id ?? null, notes: session?.notes ?? '' });
+  if (session && draft.id !== session.id) {
+    setDraft({ id: session.id, notes: session.notes ?? '' });
+  }
+  const notes = draft.notes;
+  const setNotes = (value: string) => setDraft((current) => ({ ...current, notes: value }));
 
   if (!session) {
     return (
       <Screen>
+        <PageMeta title="Session · Log" />
         <View style={styles.missing}>
           <Text variant="heading" centre>
             Session not found
@@ -79,6 +90,7 @@ export default function SessionDetailScreen() {
 
   return (
     <Screen>
+      <PageMeta title="Session · Log" />
       <View style={styles.topBar}>
         <Button
           label="Back"

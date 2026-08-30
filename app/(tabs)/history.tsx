@@ -24,6 +24,7 @@ import { GAME_TYPES, type GameType } from '../../src/domain/types';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { filterSessions, useLogStore } from '../../src/store/useLogStore';
 import { resultColor, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
 
 type Period = 'all' | '30' | '90' | '365';
 
@@ -49,6 +50,13 @@ export default function HistoryScreen() {
   const [gameType, setGameType] = useState<GameType | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
 
+  /**
+   * The clock is read once, on mount, rather than during render: a "last 30
+   * days" window that slides by milliseconds on every re-render would make the
+   * memo below recompute constantly and the totals flicker at a boundary.
+   */
+  const [openedAt] = useState(() => Date.now());
+
   const venueOptions = useMemo(
     () => [
       { value: null, label: 'All venues' },
@@ -58,19 +66,21 @@ export default function HistoryScreen() {
   );
 
   const filtered = useMemo(() => {
-    const from = period === 'all' ? undefined : Date.now() - Number(period) * DAY;
+    const from = period === 'all' ? undefined : openedAt - Number(period) * DAY;
     return filterSessions(sessions, {
       ...(from === undefined ? {} : { from }),
       ...(gameType === null ? {} : { gameType }),
       ...(venueId === null ? {} : { venueId }),
     });
-  }, [sessions, period, gameType, venueId]);
+  }, [sessions, period, gameType, venueId, openedAt]);
 
   const summary = useMemo(() => totals(filtered), [filtered]);
   const filtersActive = period !== 'all' || gameType !== null || venueId !== null;
 
   return (
     <Screen>
+      <PageMeta title="Sessions · Log" />
+
       <View style={styles.header}>
         <Text variant="title">Sessions</Text>
       </View>

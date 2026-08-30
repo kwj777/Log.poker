@@ -26,6 +26,7 @@ import { VenuePicker } from '../../src/features/sessions/VenuePicker';
 import { buyInPresets, deriveDefaults } from '../../src/features/sessions/defaults';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
 
 const GAME_OPTIONS = GAME_TYPES.map((value) => ({
   value,
@@ -85,6 +86,7 @@ export default function NewSessionScreen() {
         </View>
       }
     >
+      <PageMeta title="New session · Log" />
       <View style={styles.header}>
         <Text variant="title">New session</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>

@@ -35,6 +35,7 @@ import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
+import { APP_DESCRIPTION, PageMeta } from '../../src/components/PageMeta';
 
 type Breakdown = 'stakes' | 'venue' | 'game';
 
@@ -77,6 +78,7 @@ export default function DashboardScreen() {
   if (sessions.length === 0) {
     return (
       <Screen>
+        <PageMeta title="Log — the session log that keeps you off tilt" description={APP_DESCRIPTION} />
         <View style={styles.brandHeader}>
           <Text variant="title">Log</Text>
           <Text color={colors.textSecondary}>The session log that keeps you off tilt.</Text>
@@ -106,6 +108,7 @@ export default function DashboardScreen() {
         )
       }
     >
+      <PageMeta title="Log — the session log that keeps you off tilt" description={APP_DESCRIPTION} />
       <View style={styles.brandHeader}>
         <Text variant="overline" color={colors.textTertiary}>
           Bankroll

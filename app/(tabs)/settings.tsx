@@ -20,6 +20,7 @@ import { seedDemoData } from '../../src/data/seed';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
 
 export default function SettingsScreen() {
   const venues = useLogStore((state) => state.venues);
@@ -61,6 +62,8 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
+      <PageMeta title="Settings · Log" />
+
       <View style={styles.header}>
         <Text variant="title">Settings</Text>
       </View>

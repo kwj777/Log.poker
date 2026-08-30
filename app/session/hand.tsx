@@ -30,6 +30,7 @@ import {
 import { CardPicker } from '../../src/features/hands/CardPicker';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
 
 const POSITION_OPTIONS = POSITIONS.map((value) => ({ value, label: value }));
 const TAG_OPTIONS = HAND_TAGS.map((value) => ({ value, label: HAND_TAG_LABELS[value] }));
@@ -49,6 +50,7 @@ export default function LogHandScreen() {
   if (!session) {
     return (
       <Screen>
+        <PageMeta title="Log a hand · Log" />
         <View style={styles.empty}>
           <Text variant="heading" centre>
             No session running
@@ -99,6 +101,7 @@ export default function LogHandScreen() {
         </View>
       }
     >
+      <PageMeta title="Log a hand · Log" />
       <View style={styles.header}>
         <Text variant="title">Log a hand</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>

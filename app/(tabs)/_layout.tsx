@@ -13,11 +13,19 @@ import { colors } from '../../src/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const icon =
-  (active: IconName, inactive: IconName) =>
-  ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => (
-    <Ionicons name={focused ? active : inactive} color={color} size={size} />
-  );
+const icon = (active: IconName, inactive: IconName) => {
+  const TabIcon = ({
+    color,
+    focused,
+    size,
+  }: {
+    color: ColorValue;
+    focused: boolean;
+    size: number;
+  }) => <Ionicons name={focused ? active : inactive} color={color} size={size} />;
+  TabIcon.displayName = `TabIcon(${active})`;
+  return TabIcon;
+};
 
 export default function TabsLayout() {
   return (

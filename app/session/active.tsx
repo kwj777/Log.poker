@@ -30,6 +30,7 @@ import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
 
 export default function ActiveSessionScreen() {
   const session = useLogStore((state) => state.activeSession);
@@ -44,7 +45,7 @@ export default function ActiveSessionScreen() {
   const [endMood, setEndMood] = useState<MoodScore | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const elapsed = useElapsed(session?.startedAt ?? Date.now());
+  const elapsed = useElapsed(session?.startedAt ?? null);
   const invested = useMemo(
     () => (session ? totalInvested(session, session.rebuys) : 0),
     [session],
@@ -55,6 +56,7 @@ export default function ActiveSessionScreen() {
     // player somewhere real rather than rendering an empty shell.
     return (
       <Screen>
+        <PageMeta title="Live session · Log" />
         <View style={styles.empty}>
           <Text variant="heading" centre>
             No session running
@@ -115,6 +117,7 @@ export default function ActiveSessionScreen() {
           />
         }
       >
+        <PageMeta title="Live session · Log" />
         <View style={styles.header}>
           <View style={styles.liveRow}>
             <View style={styles.liveDot} />

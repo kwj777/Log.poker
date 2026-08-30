@@ -10,7 +10,12 @@ import { useEffect, useState } from 'react';
 
 import { formatDuration } from '../../domain/stats';
 
-export const useElapsed = (startedAt: number): number => {
+/**
+ * Milliseconds since `startedAt`, or 0 when there is no session. Accepts null so
+ * a caller can invoke the hook unconditionally — as the rules of hooks require —
+ * without inventing a start time by reading the clock during render.
+ */
+export const useElapsed = (startedAt: number | null): number => {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -18,7 +23,9 @@ export const useElapsed = (startedAt: number): number => {
     return () => clearInterval(interval);
   }, []);
 
+  if (startedAt === null) return 0;
   return Math.max(0, now - startedAt);
 };
 
-export const useElapsedLabel = (startedAt: number): string => formatDuration(useElapsed(startedAt));
+export const useElapsedLabel = (startedAt: number | null): string =>
+  formatDuration(useElapsed(startedAt));

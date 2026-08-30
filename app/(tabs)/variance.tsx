@@ -35,6 +35,7 @@ import { openHandOff, untiltHandOff } from '../../src/features/family/hooks';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
 import type { StretchVerdict } from '../../src/domain/variance';
+import { PageMeta } from '../../src/components/PageMeta';
 
 const RECENT_SESSIONS = 10;
 
@@ -97,6 +98,7 @@ export default function VarianceScreen() {
   if (!estimate.reliable) {
     return (
       <Screen>
+        <PageMeta title="Variance · Log" />
         <View style={styles.header}>
           <Text variant="title">Variance</Text>
         </View>
@@ -116,6 +118,7 @@ export default function VarianceScreen() {
 
   return (
     <Screen>
+      <PageMeta title="Variance · Log" />
       <View style={styles.header}>
         <Text variant="title">Variance</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>

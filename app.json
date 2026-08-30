@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Log",
+    "slug": "log-poker",
+    "version": "0.1.0",
+    "scheme": "logpoker",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0E1311",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0E1311"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "poker.log.app"
+    },
+    "android": {
+      "package": "poker.log.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E1311",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Log",
+      "shortName": "Log",
+      "themeColor": "#0E1311",
+      "backgroundColor": "#0E1311",
+      "description": "The session log that keeps you off tilt."
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

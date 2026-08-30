@@ -1,0 +1,144 @@
+/**
+ * Start a session.
+ *
+ * Everything on this screen is pre-filled from the player's last session, so the
+ * common path is: open, glance, Start. The primary button carries the full
+ * summary of what is about to be logged, which is what makes tapping it without
+ * reading the rest of the screen safe.
+ */
+
+import { useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+
+import { AmountInput } from '../../src/components/AmountInput';
+import { Button } from '../../src/components/Button';
+import { ChipGroup } from '../../src/components/Chip';
+import { MoodPicker } from '../../src/components/MoodPicker';
+import { Screen } from '../../src/components/Screen';
+import { SectionHeader } from '../../src/components/SectionHeader';
+import { Text } from '../../src/components/Text';
+import { successFeedback } from '../../src/components/haptics';
+import { formatMoney, formatStakes, parseAmount } from '../../src/domain/money';
+import { GAME_TYPES, type GameType, type MoodScore, type Stakes } from '../../src/domain/types';
+import { StakesPicker } from '../../src/features/sessions/StakesPicker';
+import { VenuePicker } from '../../src/features/sessions/VenuePicker';
+import { buyInPresets, deriveDefaults } from '../../src/features/sessions/defaults';
+import { useLogStore } from '../../src/store/useLogStore';
+import { colors, spacing } from '../../src/theme';
+import { PageMeta } from '../../src/components/PageMeta';
+
+const GAME_OPTIONS = GAME_TYPES.map((value) => ({
+  value,
+  label: value === 'OTHER' ? 'Other' : value,
+}));
+
+export default function NewSessionScreen() {
+  const venues = useLogStore((state) => state.venues);
+  const sessions = useLogStore((state) => state.sessions);
+  const createVenue = useLogStore((state) => state.createVenue);
+  const startSession = useLogStore((state) => state.startSession);
+
+  const defaults = useMemo(() => deriveDefaults(sessions), [sessions]);
+
+  const [venueId, setVenueId] = useState<string | null>(
+    defaults.venueId ?? venues[0]?.id ?? null,
+  );
+  const [gameType, setGameType] = useState<GameType>(defaults.gameType);
+  const [stakes, setStakes] = useState<Stakes>(defaults.stakes);
+  const [buyIn, setBuyIn] = useState(String(defaults.buyIn / 100));
+  const [mood, setMood] = useState<MoodScore | null>(null);
+  const [starting, setStarting] = useState(false);
+
+  const buyInCents = parseAmount(buyIn);
+  const canStart = venueId !== null && buyInCents !== null && buyInCents > 0 && !starting;
+
+  const start = async () => {
+    if (!canStart || venueId === null || buyInCents === null) return;
+    setStarting(true);
+    try {
+      await startSession({ venueId, gameType, stakes, buyIn: buyInCents, mood });
+      successFeedback();
+      // Replace rather than push: backing out of a live session into the "start
+      // a session" screen would be a dead end.
+      router.replace('/session/active');
+    } catch {
+      setStarting(false);
+    }
+  };
+
+  return (
+    <Screen
+      footer={
+        <View style={styles.footer}>
+          <Button
+            label={
+              canStart
+                ? `Start ${formatStakes(stakes)} · ${formatMoney(buyInCents ?? 0)}`
+                : 'Start session'
+            }
+            onPress={() => void start()}
+            disabled={!canStart}
+            loading={starting}
+            accessibilityHint="Begins timing the session and records your buy-in"
+          />
+          <Button label="Cancel" variant="ghost" size="medium" onPress={() => router.back()} />
+        </View>
+      }
+    >
+      <PageMeta title="New session · Log" />
+      <View style={styles.header}>
+        <Text variant="title">New session</Text>
+        <Text color={colors.textSecondary} style={styles.subtitle}>
+          Everything below is set to your last session. Change what’s different, then start.
+        </Text>
+      </View>
+
+      <SectionHeader title="Where" />
+      <VenuePicker
+        venues={venues}
+        value={venueId}
+        onChange={setVenueId}
+        onCreate={createVenue}
+      />
+
+      <SectionHeader title="Game" />
+      <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} />
+
+      <SectionHeader title="Stakes" />
+      <StakesPicker value={stakes} onChange={setStakes} />
+
+      <SectionHeader title="Buy-in" />
+      <AmountInput
+        value={buyIn}
+        onChangeText={setBuyIn}
+        currency={stakes.currency}
+        presets={buyInPresets(stakes)}
+        accessibilityLabel="Buy-in amount"
+      />
+
+      <SectionHeader title="How are you feeling? (optional)" />
+      <MoodPicker value={mood} onChange={setMood} />
+      <Text variant="caption" color={colors.textTertiary} style={styles.moodHint}>
+        Logged alongside your result. Skip it — it’s never required.
+      </Text>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    paddingTop: spacing.xl,
+  },
+  subtitle: {
+    marginTop: spacing.xs,
+    lineHeight: 22,
+  },
+  moodHint: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  footer: {
+    gap: spacing.sm,
+  },
+});

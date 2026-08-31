@@ -83,6 +83,29 @@ triangle is the shape that does not deform under load, three of them share one
 baseline, and the thing is braced rather than merely nested. It is a diagram of
 the sentence above.
 
+### Three true things about logs, and the third one is the argument
+
+They are not competing images. They are the same object under three conditions,
+and each one earns its keep:
+
+| | |
+|---|---|
+| **A loose log is carried off** | What happens with neither of the other two apps. This is the honest starting position, not a strawman. |
+| **A propped log stays put** | The math and the ground. The river runs past it. |
+| **A jammed log stops the river** | Enough log, wedged right, and the water does not go anywhere at all. |
+
+The third one is doing more work than it looks. The whole risk in this coinage
+is the reading where stillness means weakness, and a log jam is the flat refusal
+of that: **holding back an entire river is not inertness, it is load bearing.**
+Reach for it whenever somebody objects that the log sounds passive. It is the
+answer, and it is a better answer than any amount of insisting.
+
+**But it never becomes copy.** *Jam the river* is already a poker sentence and
+it means shoving all in on fifth street, which is maximum aggression and the
+precise opposite action. The collision is total and it cannot be written around.
+Keep the jam as reasoning, in this document and in conversation, and off every
+surface.
+
 ### The rule that keeps it from meaning the opposite
 
 English already has *sitting there like a log* and *a bump on a log*, and poker
@@ -96,10 +119,38 @@ that actually does the work:
 | | |
 |---|---|
 | **Pair it with what was supposed to move it** | The current, or the provocation: the two-outer, the needle, the shown bluff. A log alone is inert. A log that did not move when something tried to move it is composed. |
-| **The definite article** | "The log", never "a log". A definite article implies a known archetype, which is what a coinage needs; the indefinite one is an insult. |
+| **The definite article, for the state** | "Be the log", never "be a log". A definite article implies a known archetype, which is what a coinage needs; the indefinite one is an insult. This binds only when *log* means the state or the person. In its record sense the indefinite article is correct and load bearing, which is exactly what "Keep a log. Be the log." is built on: the shift from *a* to *the* is the transformation. |
 | **An instruction, not a label** | You aspire to be the log. You never call somebody a log. The moment it is applied to a person it has become a slur for a bad player. |
 | **Never announced** | No copy anywhere says "we call this being the log". A coinage that explains itself is dead on arrival. Use it as though it is already a thing. |
 | **A state, never a style of play** | This is the safety rail. The log describes your face and your pulse. It never describes your betting. Nothing in any app should imply that playing passively is the goal. |
+
+### One word, three nouns
+
+The reason the two clause lines work is that *log* is three different nouns in
+this family, and a line can ride any two of them at once:
+
+| Sense | Example |
+|---|---|
+| **The record** | Keep a log |
+| **The app** | Get the log |
+| **The state** | Be the log |
+
+That yields the two lines worth having, and they are not competing because they
+do different jobs:
+
+> **Keep a log. Be the log.**
+> **Get the log. Be the log.**
+
+**"Keep a log" explains. "Get the log" converts.** The first says what the
+product does and turns *a* into *the*, which is the transformation the whole
+idea rests on, so it is the positioning line: home page, App Store subtitle,
+anywhere somebody is deciding what this is. The second puts the same article on
+both halves, which makes the app and the state read as one noun, and it is a
+button: the `/chip` landing, the install prompt, anywhere somebody has already
+decided and needs somewhere to press.
+
+Neither is a replacement for **Be the log** on its own, which is what goes on
+the object.
 
 ### The variants
 
@@ -122,7 +173,8 @@ the first place.
 
 | Line | Where |
 |---|---|
-| **Keep a log. Be the log.** | The best of all of them. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle, the `/chip` landing. |
+| **Keep a log. Be the log.** | The positioning line. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle. |
+| **Get the log. Be the log.** | The same device as a call to action. The `/chip` landing, the install prompt, and anywhere the next thing is a press rather than a thought. |
 | **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
 | **Nothing carries off a propped log.** | The compressed cut. |
 | **Ground the log.** | Two words, and it names Untilt's verb. The Log to Untilt hand-off on the variance view. |
@@ -140,6 +192,10 @@ stops. "Be the log" survives on the aspirational verb frame; two syllables
 aimed at somebody's face does not.
 
 **"Don't be a log"** flips the whole thing into the passive-player reading. Never.
+
+**"Jam the river", and every cut of it.** True about logs, unusable in poker,
+where jamming a river is shoving all in. See [Three true things about
+logs](#three-true-things-about-logs-and-the-third-one-is-the-argument).
 
 **Anything resting on a log outlasting a current unaided.** Logs float. If the
 current is in the sentence, so is whatever is holding the log, or the sentence

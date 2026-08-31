@@ -114,7 +114,7 @@ const networkFirstShell = async (request) => {
     const cached = (await cache.match(SHELL_URL)) ?? (await cache.match('/'));
     if (cached) return cached;
     return new Response(
-      '<!doctype html><meta charset="utf-8"><title>Log</title><body style="background:#0E1311;color:#F2F5F4;font-family:system-ui;padding:2rem"><h1>Log</h1><p>Open Log once while online and it will work offline from then on.</p></body>',
+      '<!doctype html><meta charset="utf-8"><title>Log</title><body style="background:#1c211f;color:#e8e4da;font-family:system-ui;padding:2rem"><h1>Log</h1><p>Open Log once while online and it will work offline from then on.</p></body>',
       { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 200 },
     );
   }

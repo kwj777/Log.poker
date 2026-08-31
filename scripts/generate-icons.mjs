@@ -8,7 +8,13 @@
  * re-run rather than a round trip through a design tool.
  *
  * The mark: three ascending bars — the bankroll curve, and the same shape as the
- * Dashboard tab icon — in felt green on the app's charcoal.
+ * Dashboard tab icon — on the family's charcoal.
+ *
+ * The bars climb forest, sage, gold: the same three colours as the family's
+ * nested-triangle mark, in the same order, so the icon rhymes with it. It is
+ * not that mark, which BRAND.md makes canonical and which app icons are meant
+ * to derive from. Replacing the geometry is a separate decision, because these
+ * bars are also the Dashboard tab icon.
  *
  * Run with: node scripts/generate-icons.mjs
  */
@@ -20,11 +26,11 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const BACKGROUND = [0x0e, 0x13, 0x11];
+const BACKGROUND = [0x1c, 0x21, 0x1f];
 const BAR_COLORS = [
-  [0x17, 0x75, 0x54],
-  [0x1f, 0xa9, 0x7a],
-  [0x37, 0xd3, 0x99],
+  [0x3d, 0x4a, 0x44],
+  [0x6b, 0x7a, 0x5e],
+  [0xc9, 0xa8, 0x6a],
 ];
 
 // ------------------------------------------------------------------ PNG

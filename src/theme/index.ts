@@ -1,45 +1,62 @@
 /**
  * The Log design system.
  *
- * Dark, low-chroma charcoal with felt green as the single accent — the palette
- * the whole app family shares. The constraint that shapes it: this is read at a
- * poker table, often in dim light, one-handed, by someone who does not want to
- * look like they are studying a spreadsheet. So: high contrast, big targets,
- * almost no chrome, and colour reserved for money and mood.
+ * These are the family's tokens, not Log's own. `BRAND.md` is the source of
+ * truth and `src/theme/__tests__/palette.test.ts` parses it and fails if this
+ * file drifts from it, because a player who scans a card protector lands on
+ * log.poker/chip and reaches this app one tap later, and those two surfaces
+ * being different products is the whole thing the shared palette prevents.
+ *
+ * The constraint that shapes the rest: this is read at a poker table, often in
+ * dim light, one-handed, by someone who does not want to look like they are
+ * studying a spreadsheet. So high contrast, big targets, almost no chrome, and
+ * colour reserved for money and mood.
+ *
+ * Which is why the accent is gold rather than the felt green it was. Green is
+ * what a win is. The old accent sat two degrees of hue from `profit`, so a
+ * control and an up session were the same colour to anybody glancing at the
+ * screen; gold is 119 degrees away and leaves green meaning money and nothing
+ * else. It reads better too, at 7.2:1 on the background against the 6.3:1 it
+ * replaced.
  */
 
 export const colors = {
-  /** Page background — near-black with a green cast, not pure #000. */
-  background: '#0E1311',
+  /** Page background. The family ground: charcoal with a green cast. */
+  background: '#1c211f',
   /** Cards and sheets. */
-  surface: '#161D1A',
+  surface: '#232a27',
   /** Raised elements on a surface: inputs, chips. */
-  surfaceRaised: '#1F2926',
-  /** Pressed / selected state. */
-  surfaceActive: '#2A3733',
-  border: '#2A3733',
-  borderStrong: '#3A4A45',
+  surfaceRaised: '#2b332f',
+  /** Pressed / selected state. The brand's ring. */
+  surfaceActive: '#333f39',
+  /** The brand's rim. */
+  border: '#2e3a35',
+  /** The brand's forest, which is also the mark's outer stroke. */
+  borderStrong: '#3d4a44',
 
-  /** Felt green — the family accent. */
-  accent: '#1FA97A',
-  accentMuted: '#17755480',
-  accentDim: '#0F3D2E',
-  accentText: '#062018',
+  /** Gold — the family accent, and never a semantic. */
+  accent: '#c9a86a',
+  accentMuted: '#c9a86a80',
+  accentDim: '#3a3323',
+  accentText: '#1c211f',
 
-  text: '#F2F5F4',
-  textSecondary: '#9DAAA5',
-  textTertiary: '#6B7A75',
+  text: '#e8e4da',
+  textSecondary: '#b7c0ba',
+  textTertiary: '#828e89',
 
-  /** Money. Green for up, a warm red for down — never for anything else. */
+  /**
+   * Money. Green for up, a warm red for down — never for anything else, which
+   * is a promise the accent used to break and now keeps.
+   */
   profit: '#37D399',
   loss: '#F0616B',
-  neutral: '#9DAAA5',
+  neutral: '#b7c0ba',
 
-  /** Tilt meter, 1 (calm) → 5 (tilted). */
+  /** Tilt meter, 1 (calm) → 5 (tilted). Semantic, so it stays as it was. */
   mood: ['#37D399', '#8FD16A', '#E8C55C', '#F0964E', '#F0616B'] as const,
 
   danger: '#F0616B',
-  overlay: 'rgba(6, 10, 9, 0.82)',
+  overlay: 'rgba(12, 15, 14, 0.84)',
 } as const;
 
 /** 4pt grid. Names describe intent so screens stay consistent. */

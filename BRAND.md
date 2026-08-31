@@ -134,6 +134,7 @@ this family, and a line can ride any two of them at once:
 | **The record** | Keep a log |
 | **The app** | Get the log |
 | **The state** | Be the log |
+| **The logarithm** | Think in logs, and see [below](#logarithm-which-is-mostly-a-feature) |
 
 That yields the two lines worth having, and they are not competing because they
 do different jobs:
@@ -151,6 +152,45 @@ decided and needs somewhere to press.
 
 Neither is a replacement for **Be the log** on its own, which is what goes on
 the object.
+
+### Logarithm, which is mostly a feature
+
+The fourth sense is real and it is not decorative. **A bankroll is a
+multiplicative process, and a logarithm is how a multiplicative process is
+read.** The Kelly criterion maximizes the expected logarithm of bankroll, which
+is the foundational result in the subject this app is about, and a bankroll
+curve drawn on a log axis is the honest one: a $500 swing at 1/2 and the same
+swing at 25/50 are one event rendered at wildly different heights on the linear
+chart Log draws today.
+
+**It still does not belong in the copy**, and it is the first sense that does
+not. It yields no imperative, since *be the logarithm* is nothing. *Logarithm*
+is close to the least emotional word available. And TiltProof's audience is
+beginners and live players, so a logarithm on a front door excludes exactly the
+people the door is for.
+
+Where it belongs is the product, where it would make two features better rather
+than one page cleverer:
+
+| | |
+|---|---|
+| **A log scale on the bankroll curve** | A toggle, not a default. Proportional growth is the true shape of a roll over years, and a linear axis flatters the early sessions and terrifies during the late ones. |
+| **Kelly under bankroll goals** | The roadmap already wants target roll, stop loss, and a move up prompt. Kelly is the arithmetic all three are approximating by hand, and it is the same logarithm. |
+
+One line survives, for an advanced surface only:
+
+> **Think in logs.**
+
+Proportions rather than dollars. It is the discipline that stops both moving up
+too fast and tilting at a number, it is meaningless to somebody in their first
+month, and it belongs on the variance view or beside bankroll goals and nowhere
+near the front.
+
+**And a caution, because this is where the counting stops.** Four senses is the
+edge. Three reads as found and five reads as a bit, and the moment an audience
+can feel the wordplay being worked the whole thing turns from a coinage into a
+pun. Nobody repeats a pun at a table. Nothing further gets added to the list
+above.
 
 ### The other L-O-G
 
@@ -219,6 +259,7 @@ the first place.
 | **Keep a log. Be the log.** | The positioning line. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle. |
 | **Get the log. Be the log.** | The same device as a call to action. The install prompt, and anywhere the next thing is a press rather than a thought. |
 | **Be logical. Be observant. Be grounded. Be the log.** | The full stack, and the only place all three faculties are named. The `/chip` landing at full size, and the about page. Never the first three without the fourth. |
+| **Think in logs.** | Proportions rather than dollars. The variance view and bankroll goals only, and never the front door. |
 | **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
 | **Nothing carries off a propped log.** | The compressed cut. |
 | **Ground the log.** | Two words, and it names Untilt's verb. The Log to Untilt hand-off on the variance view. |

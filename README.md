@@ -200,6 +200,28 @@ just looked at the object, and the object is charcoal and gold. See `BRAND.md`.
 
 ---
 
+## The palette
+
+`src/theme` implements the family's tokens rather than its own, and
+`src/theme/__tests__/palette.test.ts` parses the table in `BRAND.md` and fails
+if the two drift. That is worth a test because the failure mode is silent and
+embarrassing: a player scans a card protector, lands on `/chip`, and reaches the
+app one tap later, so the two surfaces being visibly different products is the
+exact thing the shared palette exists to prevent.
+
+**The accent is gold, and it used to be felt green.** The reason is not brand
+tidiness — the old accent sat *two degrees of hue* from `profit`, so a control
+and a winning session were the same colour to anybody glancing at the screen in
+a dim room. Gold is 119 degrees away, which leaves green meaning money and
+nothing else, and it reads better besides: 7.2:1 on the background against the
+6.3:1 it replaced. The test asserts both the hue separation and the contrast
+floors, so neither can quietly come back.
+
+Semantic colours — profit, loss, the tilt meter — are deliberately *not* pinned
+to `BRAND.md`. They mean something rather than brand something.
+
+---
+
 ## Architecture
 
 ```

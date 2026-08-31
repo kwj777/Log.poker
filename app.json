@@ -7,12 +7,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0E1311",
+    "backgroundColor": "#1c211f",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0E1311"
+      "backgroundColor": "#1c211f"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,7 +21,7 @@
     "android": {
       "package": "poker.log.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0E1311",
+        "backgroundColor": "#1c211f",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -34,8 +34,8 @@
       "favicon": "./assets/favicon.png",
       "name": "Log",
       "shortName": "Log",
-      "themeColor": "#0E1311",
-      "backgroundColor": "#0E1311",
+      "themeColor": "#1c211f",
+      "backgroundColor": "#1c211f",
       "description": "The session log that keeps you off tilt."
     },
     "plugins": [

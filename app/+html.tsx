@@ -31,7 +31,7 @@ if ('serviceWorker' in navigator) {
  * connection shows Log's charcoal rather than a white flash.
  */
 const BASE_STYLE = `
-html, body, #root { background-color: #0E1311; }
+html, body, #root { background-color: #1c211f; }
 body { overscroll-behavior-y: none; }
 #root { display: flex; flex: 1 1 auto; min-height: 100%; }
 `;
@@ -55,7 +55,7 @@ export default function Root({ children }: { children: ReactNode }) {
             first — which is the manager's. */}
 
         <link rel="manifest" href="/manifest.webmanifest" />
-        <meta name="theme-color" content="#0E1311" />
+        <meta name="theme-color" content="#1c211f" />
         <meta name="color-scheme" content="dark" />
 
         <meta name="apple-mobile-web-app-capable" content="yes" />

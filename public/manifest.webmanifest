@@ -8,8 +8,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "theme_color": "#0E1311",
-  "background_color": "#0E1311",
+  "theme_color": "#1c211f",
+  "background_color": "#1c211f",
   "categories": ["sports", "utilities", "productivity"],
   "icons": [
     {

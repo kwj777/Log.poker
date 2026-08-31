@@ -32,12 +32,23 @@ is printed.** See [Open items](#open-items).
 | Sage | `#6b7a5e` | The mark's middle stroke |
 | Forest | `#3d4a44` | The mark's outer stroke |
 | Cream | `#e8e4da` | Body text |
-| Muted | `#b7c0ba` / `#7a8681` | Secondary and tertiary text |
+| Muted | `#b7c0ba` / `#828e89` | Secondary and tertiary text |
 
 Serif in the Georgia class for wordmarks and headers, a clean sans for UI.
 
 The category is full of cluttered apps. Restraint is the differentiator, which
 means the gold is worth more the less of it there is.
+
+**The tertiary was `#7a8681` and is now `#828e89`.** It measured 4.32:1 on the
+ground, under the 4.5:1 that small text needs, and it is the token Log leans on
+hardest at forty-odd usages. The new value is 4.80:1 and is the smallest nudge
+that clears it.
+
+**Log implements this palette**, and `src/theme/__tests__/palette.test.ts`
+parses the table above and fails if the app drifts from it. Somebody who scans
+a card protector lands on `/chip` and reaches the app one tap later, and the two
+being visibly different products is the thing this table exists to prevent.
+Untilt and TiltProof have not been brought across yet.
 
 ---
 

@@ -152,6 +152,49 @@ decided and needs somewhere to press.
 Neither is a replacement for **Be the log** on its own, which is what goes on
 the object.
 
+### The other L-O-G
+
+The acronym runs twice, in two registers, and the second one had been sitting
+there unused:
+
+| | The apps do the verbs | The player becomes the adjectives |
+|---|---|---|
+| **L** | Learn | **Log**ical |
+| **O** | Observe | Observant |
+| **G** | Ground | Grounded |
+
+**The word is inside the first one.** *Logical* carries *log* in its opening
+three letters, which is what makes the set read as found rather than
+constructed, and it is the only one of the six that does it.
+
+The three of them also run head, eyes, body, which is why they do not read as a
+list of synonyms. Logical is the arithmetic, observant is what you watch,
+grounded is what your pulse does. Three different faculties, one per app.
+
+So they stack, and the stack is the point:
+
+> Be logical. Be observant. Be grounded.
+>
+> **Be the log.**
+
+The first three build the fourth. That is the shape for the `/chip` landing
+page, which is the one surface whose whole job is to open with the philosophy at
+full size, and for the about page.
+
+**It is not the headline.** Three imperatives is dilute where one is sharp, and
+the triad carries no wordplay of its own except the one buried in *logical*. It
+explains **Be the log**; it does not replace it, and it should never appear
+without it underneath.
+
+**One wrinkle, flagged rather than fixed.** *Be observant* drifts. In the family
+it means watch yourself, which is what Log is for; at a table it lands as watch
+your opponents, which is a different virtue and a perfectly good one. The truer
+word for Log is **objective**, since an honest answer to *am I running bad or
+playing bad* is exactly what the variance view sells. It is refused anyway:
+*objective* sits in the same cold register as *logical*, so the triad would
+spend two of its three words on the same note and lose the head, eyes, body
+progression that makes it work. Keep observant, and know what it is doing.
+
 ### The variants
 
 Ranked, with where each earns its place. Two families, because the face and the
@@ -174,7 +217,8 @@ the first place.
 | Line | Where |
 |---|---|
 | **Keep a log. Be the log.** | The positioning line. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle. |
-| **Get the log. Be the log.** | The same device as a call to action. The `/chip` landing, the install prompt, and anywhere the next thing is a press rather than a thought. |
+| **Get the log. Be the log.** | The same device as a call to action. The install prompt, and anywhere the next thing is a press rather than a thought. |
+| **Be logical. Be observant. Be grounded. Be the log.** | The full stack, and the only place all three faculties are named. The `/chip` landing at full size, and the about page. Never the first three without the fourth. |
 | **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
 | **Nothing carries off a propped log.** | The compressed cut. |
 | **Ground the log.** | Two words, and it names Untilt's verb. The Log to Untilt hand-off on the variance view. |

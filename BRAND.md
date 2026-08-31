@@ -153,6 +153,36 @@ decided and needs somewhere to press.
 Neither is a replacement for **Be the log** on its own, which is what goes on
 the object.
 
+### The lockup
+
+**Be the LOG. Learn, Observe, Ground.**
+
+This is the one to build everything else around, because it carries its own key.
+Three letters do three jobs at once, the state and the app and the acronym, and
+the second sentence decodes the third without ever announcing that a decoding is
+happening.
+
+Two things about the order matter. **The imperative comes first**, because it is
+the half anybody will repeat and the explanation is only there for the first
+reading. And **the expansion uses the canonical naming**, so the lockup binds the
+new line to vocabulary the family already had rather than adding more.
+
+**Capitalization is a lockup rule, not a prose rule.** LOG is set in capitals
+only inside the lockup, and anywhere else the acronym is the point. In running
+prose it is lowercase, always: *be the log*. All capitals in a sentence is
+shouting, and the pun does not need volume.
+
+This is what goes on the `/chip` landing at full size and on the about page. It
+supersedes the four line adjective stack on those two surfaces, for the reason
+that stack already conceded: three imperatives is dilute where one is sharp, and
+this is one.
+
+**And it changes the chip.** LEARN, OBSERVE and GROUND are already set in
+capitals around the QR on the back, so a line reading *Be the LOG* in mixed case
+turns those three words into its own expansion. The object teaches the acronym
+without printing it twice, and mixed case is the more legible setting at 1.9mm
+besides.
+
 ### Logarithm, which is mostly a feature
 
 The fourth sense is real and it is not decorative. **A bankroll is a
@@ -258,7 +288,8 @@ the first place.
 |---|---|
 | **Keep a log. Be the log.** | The positioning line. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle. |
 | **Get the log. Be the log.** | The same device as a call to action. The install prompt, and anywhere the next thing is a press rather than a thought. |
-| **Be logical. Be observant. Be grounded. Be the log.** | The full stack, and the only place all three faculties are named. The `/chip` landing at full size, and the about page. Never the first three without the fourth. |
+| **Be the LOG. Learn, Observe, Ground.** | The lockup, and the primary. It carries its own key. The `/chip` landing at full size, the about page, and the back of the chip in its short form. |
+| **Be logical. Be observant. Be grounded. Be the log.** | The faculties, for longer form copy rather than as a lockup. Demoted by the line above, which does the same job in nine words instead of thirteen and names the apps while it does it. Never the first three without the fourth. |
 | **Think in logs.** | Proportions rather than dollars. The variance view and bankroll goals only, and never the front door. |
 | **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
 | **Nothing carries off a propped log.** | The compressed cut. |
@@ -295,8 +326,10 @@ LEARN and GROUND in the side channels, OBSERVE directly under the QR because
 that is the app the QR opens, and the `log.poker` wordmark in gold beneath it.
 Something has to give.
 
-**Give the wordmark.** `BE THE LOG` takes its slot, in gold, at the same ~1.9mm
-cap height, and stays the second-loudest element after the QR.
+**Give the wordmark.** `Be the LOG` takes its slot, in gold, at the same ~1.9mm
+cap height, and stays the second-loudest element after the QR. Mixed case rather
+than all capitals, so that LOG picks up the three words already set around the
+QR and the face expands its own acronym.
 
 The wordmark's job on the back was to say where to go, and the QR two
 millimeters above it already does that better and more accurately: nobody types
@@ -306,7 +339,7 @@ buys the back's most valuable line: the one that makes somebody want to scan at
 all.
 
 It fits with room. At that position the inner ring leaves about 35mm of channel,
-and `BE THE LOG` letterspaced at 1.9mm cap sets to roughly 20mm. Everything on
+and `Be the LOG` letterspaced at 1.9mm cap sets to roughly 17mm. Everything on
 the face stays above the 1.5mm floor.
 
 The alternate, if the wordmark has to stay: put the line on the **front**, below

@@ -15,6 +15,11 @@ Log is the hub of a three-app family:
 | [Untilt.poker](https://untilt.poker) | How it felt — mental game work |
 | [TiltProof](https://tiltproof.com) | What to do differently — odds and spot training |
 
+How the three are priced together — speculatively, and the short version is that
+Log stays free — is worked out in
+[FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md),
+over in Untilt beside the monetization document it extends.
+
 ---
 
 ## What's in the MVP

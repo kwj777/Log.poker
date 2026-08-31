@@ -10,6 +10,31 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# The card protector campaign, and the one route in here that is a promise
+# rather than a convenience. Chips are permanent objects in the wild, so
+# `/chip` has to resolve for as long as any of them exist, through every later
+# rewrite of the app. It is a static file rather than a client route for
+# exactly that reason, and these rules sit above the single-page catch-all
+# because Netlify takes the first matching rule and the catch-all matches
+# everything. `src/campaign/__tests__/chip.test.ts` asserts that ordering, so
+# the guarantee survives somebody reorganising this file.
+[[redirects]]
+  from = "/chip"
+  to = "/chip.html"
+  status = 200
+
+[[redirects]]
+  from = "/chip/"
+  to = "/chip.html"
+  status = 200
+
+# The scan counter. Optional by design: the landing page renders and works
+# with this returning nothing at all.
+[[redirects]]
+  from = "/api/chip-scan"
+  to = "/.netlify/functions/chip-scan"
+  status = 200
+
 # Every route is served by the single-page shell; the client router takes it
 # from there. Must come after any more specific rules.
 [[redirects]]
@@ -26,6 +51,13 @@
 
 [[headers]]
   for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# A permanent URL on a permanent object: a returning visitor has to get the
+# current page rather than the one cached when their chip was new.
+[[headers]]
+  for = "/chip.html"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 

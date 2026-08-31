@@ -164,6 +164,42 @@ resolves deep links, and reads and writes sessions, rebuys and hands.
 
 ---
 
+## The chip campaign
+
+`log.poker/chip` is the landing a ceramic card protector points at, and it is
+the one route in this repo that is a promise rather than a convenience. Chips
+are permanent objects: once one is on a felt, that URL has to resolve for as
+long as it exists, through every later rewrite of the app.
+
+So it is deliberately the least clever thing here — `public/chip.html`, a single
+static document under 9KB with **no bundle, no framework, and not one external
+request, not even a font**. It renders with scripting turned off, and it renders
+immediately on one bar of signal, which is the condition it will actually meet:
+card rooms are windowless basements.
+
+- **`src/campaign/chip.ts`** is the single source of truth for the printed URL.
+  `chipUrl('qr')` is the exact string to encode, and the medium is a parameter
+  so an NFC batch later needs no change anywhere else.
+- **`netlify.toml`** rewrites `/chip` to the file *above* the single-page
+  catch-all, because Netlify takes the first matching rule and `/*` matches
+  everything.
+- **`netlify/functions/chip-scan.mjs`** counts scans: two integers, one per
+  medium, no row per scan and nothing about the visitor. It fails open in every
+  direction, and the page renders identically when it is not deployed at all.
+- **`src/campaign/__tests__/chip.test.ts`** asserts the guarantee rather than
+  the implementation — that it resolves, resolves without the network, reads
+  L then O then G, and never quotes a price.
+
+That last one is not a joke. `app.json` sets `web.output: "static"`, so the
+export prerenders each route to its own file at the site root: an Expo route at
+`/chip` would emit `dist/chip.html` and silently replace the landing page. The
+test fails if one appears.
+
+**The page carries the brand palette, not `src/theme`.** Somebody arriving here
+just looked at the object, and the object is charcoal and gold. See `BRAND.md`.
+
+---
+
 ## Architecture
 
 ```

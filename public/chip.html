@@ -149,10 +149,14 @@
     <div class="wrap">
       <header class="hero">
         <svg class="mark" viewBox="0 0 200 112" role="img" aria-label="Three nested triangles sharing a baseline">
-          <g fill="none" stroke-width="5" stroke-linejoin="round">
-            <path d="M10 100 L190 100 L100 20 Z" stroke="#3d4a44" />
-            <path d="M40 100 L160 100 L100 47 Z" stroke="#6b7a5e" />
-            <path d="M70 100 L130 100 L100 73 Z" stroke="#c9a86a" />
+          <!-- One baseline, three peaks. The outer triangle is closed and
+               carries the line; the two inside it stand on it. Gold outermost,
+               because that stroke is the silhouette and forest measures 1.76:1
+               on this ground. See BRAND.md. -->
+          <g fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M10 100 L190 100 L100 20 Z" stroke="#c9a86a" />
+            <path d="M40 100 L100 47 L160 100" stroke="#6b7a5e" />
+            <path d="M70 100 L100 73 L130 100" stroke="#55665e" />
           </g>
         </svg>
         <h1>Be the <span class="caps">LOG</span>.</h1>

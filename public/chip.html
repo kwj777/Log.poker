@@ -1,0 +1,217 @@
+<!doctype html>
+<!--
+  log.poker/chip
+
+  The landing the ceramic card protector points at. Two properties are
+  load-bearing and neither is negotiable.
+
+  It must never 404. Chips are permanent objects in the wild: once one is on a
+  felt, this URL is a promise with no expiry date, and it outlives any rewrite
+  of the app. So this is a static file with no build step, no bundle, no
+  framework and no network dependency beyond itself. It renders with scripting
+  turned off.
+
+  And it must be fast on bad reception. Card rooms are windowless basements.
+  This page is a single document under 10KB with no external requests at all,
+  not even a font: "Georgia-class serif" is spelled as a font stack rather than
+  fetched, which is what makes the first paint immediate on one bar of signal.
+
+  It carries the brand palette rather than the app's, deliberately. Somebody
+  arriving here just looked at the object, and the object is charcoal and gold.
+  See BRAND.md, and note that src/theme is a different system today.
+
+  No price appears on this page, ever. A person who has used none of the three
+  apps has no way to value one, and a number here prices the family before it
+  has earned anything. There is a test that enforces this.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Be the LOG</title>
+    <meta name="description" content="Learn, Observe, Ground. Three poker apps: odds drills, a session log, and mental game work." />
+    <link rel="canonical" href="https://log.poker/chip" />
+    <meta name="theme-color" content="#1c211f" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Log" />
+    <meta property="og:title" content="Be the LOG" />
+    <meta property="og:description" content="Learn, Observe, Ground. Three poker apps: odds drills, a session log, and mental game work." />
+    <meta property="og:url" content="https://log.poker/chip" />
+    <style>
+      :root {
+        --ground: #1c211f;
+        --raised: #232a27;
+        --rim: #2e3a35;
+        --ring: #333f39;
+        --gold: #c9a86a;
+        --sage: #6b7a5e;
+        --forest: #3d4a44;
+        --cream: #e8e4da;
+        --muted: #b7c0ba;
+        --dim: #7a8681;
+        --serif: Georgia, "Times New Roman", "Nimbus Roman", serif;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--cream);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 34rem;
+        margin: 0 auto;
+        padding: clamp(2rem, 8vw, 3.5rem) clamp(1.25rem, 6vw, 2rem) 3rem;
+        display: flex;
+        flex-direction: column;
+        gap: clamp(2rem, 7vw, 3rem);
+      }
+      .hero { display: flex; flex-direction: column; align-items: center; gap: 1.1rem; text-align: center; }
+      .mark { width: 76px; height: auto; }
+      h1 {
+        font-family: var(--serif);
+        font-size: clamp(2.1rem, 11vw, 3rem);
+        line-height: 1.05;
+        margin: 0;
+        font-weight: normal;
+      }
+      h1 .caps { color: var(--gold); letter-spacing: .02em; }
+      .verbs {
+        font-family: var(--sans);
+        font-size: clamp(.78rem, 3.6vw, .9rem);
+        letter-spacing: .28em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0;
+      }
+      .lede { color: var(--muted); margin: 0; max-width: 30rem; }
+      .apps { display: flex; flex-direction: column; gap: .75rem; }
+      .app {
+        display: block;
+        border: 1px solid var(--rim);
+        border-radius: 3px;
+        background: var(--raised);
+        padding: 1rem 1.1rem;
+        text-decoration: none;
+        color: inherit;
+      }
+      .app:hover, .app:focus-visible { border-color: var(--ring); }
+      .app .verb {
+        font-size: .68rem;
+        letter-spacing: .22em;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: .3rem;
+      }
+      .app.l .verb { color: var(--gold); }
+      .app.o .verb { color: var(--sage); }
+      .app.g .verb { color: var(--dim); }
+      .app .name { font-family: var(--serif); font-size: 1.2rem; display: block; }
+      .app .what { color: var(--muted); font-size: .88rem; display: block; margin-top: .15rem; }
+      .cta { display: flex; flex-direction: column; align-items: center; gap: .75rem; text-align: center; }
+      .btn {
+        display: inline-block;
+        background: var(--gold);
+        color: #1c211f;
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: .01em;
+        text-decoration: none;
+        padding: .8rem 2rem;
+        border-radius: 3px;
+      }
+      .btn:hover, .btn:focus-visible { background: #d8ba80; }
+      .cta .sub { font-family: var(--serif); color: var(--muted); margin: 0; font-size: 1.02rem; }
+      a { color: var(--gold); }
+      :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      footer {
+        border-top: 1px solid var(--rim);
+        padding-top: 1.4rem;
+        color: var(--dim);
+        font-size: .8rem;
+        line-height: 1.55;
+        display: flex;
+        flex-direction: column;
+        gap: .7rem;
+      }
+      footer strong { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <svg class="mark" viewBox="0 0 200 112" role="img" aria-label="Three nested triangles sharing a baseline">
+          <g fill="none" stroke-width="5" stroke-linejoin="round">
+            <path d="M10 100 L190 100 L100 20 Z" stroke="#3d4a44" />
+            <path d="M40 100 L160 100 L100 47 Z" stroke="#6b7a5e" />
+            <path d="M70 100 L130 100 L100 73 Z" stroke="#c9a86a" />
+          </g>
+        </svg>
+        <h1>Be the <span class="caps">LOG</span>.</h1>
+        <p class="verbs">Learn &middot; Observe &middot; Ground</p>
+        <p class="lede">
+          Nothing shows on a log, and a propped one does not move. Three apps,
+          one state: the math props it, the ground holds it, and the river goes
+          past.
+        </p>
+      </header>
+
+      <div class="apps">
+        <a class="app l" href="https://tiltproof.poker">
+          <span class="verb">Learn</span>
+          <span class="name">TiltProof</span>
+          <span class="what">Count your outs, price the pot, feel a percentage. Every answer marked against a real hand evaluator.</span>
+        </a>
+        <a class="app o" href="/">
+          <span class="verb">Observe</span>
+          <span class="name">Log</span>
+          <span class="what">Sessions, hands and results in seconds, and an honest answer to whether you are running bad or playing bad.</span>
+        </a>
+        <a class="app g" href="https://untilt.poker">
+          <span class="verb">Ground</span>
+          <span class="name">Untilt</span>
+          <span class="what">Short guided meditations for before the session, between the hands, and after the last one.</span>
+        </a>
+      </div>
+
+      <div class="cta">
+        <a class="btn" href="/">Get the log</a>
+        <p class="sub">Free, offline, and no account. Your log never leaves your device.</p>
+      </div>
+
+      <footer>
+        <p>
+          Log is a record keeping tool, not gambling advice. If poker has
+          stopped being a choice: in the US, the National Problem Gambling
+          Helpline is <strong>1-800-522-4700</strong>, 24/7, free and
+          confidential. Anywhere else,
+          <a href="https://gamblingtherapy.org">Gambling Therapy</a> is free,
+          answers in any language, and is not a phone call.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      // One count, no identifier, no timestamp, and nothing about the visitor.
+      // It reports which way the chip was read so a later NFC batch can be
+      // compared against the printed code, and nothing else. It is wrapped
+      // because the page has to work when this fails, when it is blocked, and
+      // when the function is not deployed at all: the count is the optional
+      // part and the page is not.
+      try {
+        var medium = new URLSearchParams(location.search).get('utm_medium');
+        if ((medium === 'qr' || medium === 'nfc') && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/chip-scan?m=' + medium);
+        }
+      } catch (e) {}
+    </script>
+  </body>
+</html>

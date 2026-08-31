@@ -183,6 +183,27 @@ turns those three words into its own expansion. The object teaches the acronym
 without printing it twice, and mixed case is the more legible setting at 1.9mm
 besides.
 
+### The eye in the sky
+
+Worth recording because it will come up again, and because half of it is good.
+
+Casinos call their surveillance **the eye in the sky**, so an eye above a table
+is poker's own furniture rather than only occult iconography, and Log inverts it
+in a way that describes the product exactly: the eye is normally the house
+watching you, and this one is you watching yourself.
+
+**Two reasons it stays a note rather than a line.** It is spatially an argument
+for putting OBSERVE at the top of the chip, which costs the acronym, and that
+trade is settled above. And the nearest visual, an eye at the apex of a
+triangle, is heavily loaded: it is the dollar bill, the Masonic emblem and every
+conspiracy graphic since. This family's whole asset is being the poker app that
+prints the helpline and takes no rake, and hanging Illuminati furniture next to
+that is a strange thing to spend credibility on for a joke.
+
+If it is used at all, it is a Log line about self-observation and never a
+graphic, and it needs the inversion said out loud or it reads as surveillance
+rather than as honesty.
+
 ### Logarithm, which is mostly a feature
 
 The fourth sense is real and it is not decorative. **A bankroll is a
@@ -322,11 +343,35 @@ is conceding the drift on purpose.
 ## Where the line goes on the chip
 
 The back is already full: mark at the top, QR on a cream tile at the center,
-LEARN and GROUND in the side channels, OBSERVE directly under the QR because
-that is the app the QR opens, and the `log.poker` wordmark in gold beneath it.
-Something has to give.
+two words in the side channels, one under the QR, and the `log.poker` wordmark
+in gold beneath it. Something has to give.
 
-**Give the wordmark.** `Be the LOG` takes its slot, in gold, at the same ~1.9mm
+**And the words were in the wrong places.** With LEARN on the left, GROUND on
+the right and OBSERVE underneath, a left, right, down scan reads *Learn,
+Ground, Observe*. That was cosmetic until the gold line went mixed case, and
+then it was a defect: **Be the LOG** points at those three words, and they were
+spelling L-G-O.
+
+So **OBSERVE and GROUND swap**. GROUND takes the bottom, because **the ground is
+the bottom**, which is decodable by anybody holding the chip for the first time.
+The placement it replaces, OBSERVE under the QR because the QR is what opens
+Log, only decodes for somebody who already knows that Observe means Log, and
+that is nobody meeting the object cold.
+
+The cost is real and worth naming: OBSERVE is the longest of the three words and
+it now sits in the narrowest slot, at about 1.5mm of margin with its tracking
+tightened. Reading order gets first call on position and typography gets second,
+which is the right way round here, and OBSERVE's margins are the first thing to
+check on a printed proof.
+
+**A version that was considered and refused.** OBSERVE at the top reads well and
+is spatially true, since observing happens from above, and it lands near the
+casino's own name for the thing that watches a room. It puts O first. The face
+would spell O-L-G, which breaks the mechanism this whole section exists to
+protect, so it loses on the one criterion that is not aesthetic. See [The eye in
+the sky](#the-eye-in-the-sky) for the part of it worth keeping.
+
+**Then give the wordmark.** `Be the LOG` takes its slot, in gold, at the same ~1.9mm
 cap height, and stays the second-loudest element after the QR. Mixed case rather
 than all capitals, so that LOG picks up the three words already set around the
 QR and the face expands its own acronym.

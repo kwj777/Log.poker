@@ -62,6 +62,35 @@ describe('the app implements the family palette', () => {
   });
 });
 
+describe('the generated icons draw the family mark', () => {
+  const script = readFileSync(
+    join(__dirname, '..', '..', '..', 'scripts', 'generate-icons.mjs'),
+    'utf8',
+  );
+  /** MARK_COLORS, outermost first, as `#rrggbb`. */
+  const markColours = [
+    ...script.slice(script.indexOf('const MARK_COLORS')).matchAll(/\[(0x[0-9a-f]{2}(?:, 0x[0-9a-f]{2}){2})\]/g),
+  ]
+    .slice(0, 3)
+    .map((m) => `#${m[1].split(', ').map((b) => b.slice(2)).join('')}`);
+
+  it('takes its outer two strokes straight from the table', () => {
+    expect(markColours[0]).toBe(brandColor('gold'));
+    expect(markColours[1]).toBe(brandColor('sage'));
+  });
+
+  it('lifts the inner stroke off forest, which is a border colour', () => {
+    expect(markColours[2]).not.toBe(brandColor('forest'));
+    expect(markColours[2]).toBe('#55665e');
+  });
+
+  it('draws one baseline rather than three', () => {
+    // Three coincident bases stripe the line into three colours. Only the
+    // outermost triangle is closed; see BRAND.md.
+    expect(script).toContain('if (i === 0) segments.push([...left, ...right]);');
+  });
+});
+
 describe('colour still means one thing', () => {
   /** Relative luminance, per WCAG. */
   const luminance = (hex: string): number => {

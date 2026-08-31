@@ -7,14 +7,26 @@
  * also means the icon is diffable, and a palette change is a one-line edit and a
  * re-run rather than a round trip through a design tool.
  *
- * The mark: three ascending bars — the bankroll curve, and the same shape as the
- * Dashboard tab icon — on the family's charcoal.
+ * The mark is the family's, per BRAND.md: three nested triangles sharing a
+ * common baseline, stroked and never filled, smallest to largest reading
+ * Learn, Observe, Ground. It replaced three ascending bars that were this
+ * app's alone.
  *
- * The bars climb forest, sage, gold: the same three colours as the family's
- * nested-triangle mark, in the same order, so the icon rhymes with it. It is
- * not that mark, which BRAND.md makes canonical and which app icons are meant
- * to derive from. Replacing the geometry is a separate decision, because these
- * bars are also the Dashboard tab icon.
+ * Two things about how it is drawn are decisions rather than transcription.
+ *
+ * The baseline is drawn once. "Sharing a common baseline" means one line, not
+ * three coincident ones: stacking three bases on the same pixels stripes it
+ * into three colours and reads as a mistake at any size. So the outer triangle
+ * is closed and the two inside it are open chevrons standing on it. The line
+ * they stand on is gold, which is Ground, which is the point.
+ *
+ * Gold is the outermost stroke and not the innermost. That reverses what this
+ * repo recommended before rasterising anything, and the reason is measured:
+ * forest on the family ground is 1.76:1, so the outer stroke, the one that
+ * gives the mark its silhouette, was invisible at icon sizes. Gold is 7.22:1.
+ * Putting the brightest stroke on the defining edge also restores the original
+ * design brief's own order, forest to sage to gold reading inward to outward,
+ * which was one of the two contradictory specs BRAND.md had recorded as open.
  *
  * Run with: node scripts/generate-icons.mjs
  */
@@ -27,10 +39,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const BACKGROUND = [0x1c, 0x21, 0x1f];
-const BAR_COLORS = [
-  [0x3d, 0x4a, 0x44],
-  [0x6b, 0x7a, 0x5e],
+// Outermost to innermost. The inner stroke is forest lifted to #55665e: plain
+// forest is a border colour, correct at 1.76:1 for a border and absent at that
+// ratio as a stroke, and #55665e is 2.71:1 while staying the dimmest of three.
+const MARK_COLORS = [
   [0xc9, 0xa8, 0x6a],
+  [0x6b, 0x7a, 0x5e],
+  [0x55, 0x66, 0x5e],
 ];
 
 // ------------------------------------------------------------------ PNG
@@ -123,9 +138,11 @@ const blend = (rgba, index, color, alpha) => {
  * @param size          output edge length in pixels
  * @param transparent   true for a logo on transparent ground (Android adaptive
  *                      foreground); false for a full-bleed square
- * @param inset         fraction of the canvas the mark occupies — 0.62 keeps the
- *                      bars inside the maskable safe zone that Android and iOS
- *                      crop to
+ * @param inset         the mark's width as a fraction of the canvas. Its
+ *                      bounding circle is 1.2x that, which is what the cropped
+ *                      icons below are sized against: a maskable icon is cropped
+ *                      to 80% of the canvas, so the mark can be up to 0.66 wide,
+ *                      and an Android adaptive foreground to 61%, so up to 0.50
  * @param cornerRadius  fraction of the size; 0 for a square (maskable icons are
  *                      cropped by the platform and must fill the canvas)
  */
@@ -144,26 +161,56 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0 })
     }
   }
 
-  // Three ascending bars, centred, with the tallest on the right.
-  const markSize = size * inset;
-  const originX = (size - markSize) / 2;
-  const originY = (size - markSize) / 2;
-  const gap = markSize * 0.12;
-  const barWidth = (markSize - gap * 2) / 3;
-  const heights = [0.46, 0.72, 1];
-  const barRadius = barWidth * 0.28;
+  // The mark. A triangle of half-base h has height 4h/3, so the whole thing is
+  // `markWidth` across and two thirds of that tall, and the widest points are
+  // the two base corners. That makes its bounding circle 1.2x the width, which
+  // is what the insets below are chosen against for the icons a platform crops.
+  const markWidth = size * inset;
+  const halfBase = markWidth / 2;
+  const centreX = size / 2;
+  const baseY = size / 2 + (halfBase * 4) / 3 / 2;
+  const halfStroke = (markWidth * 0.058) / 2;
 
-  for (let i = 0; i < 3; i += 1) {
-    const barHeight = markSize * heights[i];
-    const x = originX + i * (barWidth + gap);
-    const y = originY + (markSize - barHeight);
-    const color = BAR_COLORS[i];
+  /** Distance from a point to a segment, which is all a stroke needs. */
+  const distanceToSegment = (px, py, ax, ay, bx, by) => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lengthSquared = dx * dx + dy * dy;
+    const t =
+      lengthSquared === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSquared));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  };
 
-    for (let py = Math.floor(y); py < Math.ceil(y + barHeight); py += 1) {
-      for (let px = Math.floor(x); px < Math.ceil(x + barWidth); px += 1) {
-        if (px < 0 || py < 0 || px >= size || py >= size) continue;
-        const coverage = roundedRectCoverage(px, py, x, y, barWidth, barHeight, barRadius);
-        if (coverage > 0) blend(rgba, (py * size + px) * 4, color, coverage);
+  // Outermost first. Each is [colour, segments], and only the outer one carries
+  // the base, because all three stand on the same line rather than each having
+  // one. Round joins fall out of taking the minimum distance across segments.
+  const strokes = [1, 2 / 3, 1 / 3].map((scale, i) => {
+    const h = halfBase * scale;
+    const left = [centreX - h, baseY];
+    const right = [centreX + h, baseY];
+    const apex = [centreX, baseY - (h * 4) / 3];
+    const segments = [
+      [...left, ...apex],
+      [...apex, ...right],
+    ];
+    if (i === 0) segments.push([...left, ...right]);
+    return { colour: MARK_COLORS[i], segments };
+  });
+
+  for (const { colour, segments } of strokes) {
+    for (let py = 0; py < size; py += 1) {
+      for (let px = 0; px < size; px += 1) {
+        let nearest = Infinity;
+        for (const [ax, ay, bx, by] of segments) {
+          nearest = Math.min(nearest, distanceToSegment(px + 0.5, py + 0.5, ax, ay, bx, by));
+          if (nearest <= halfStroke - 0.5) break;
+        }
+        // Half a pixel of feathering either side of the edge is the whole of
+        // the anti-aliasing, and it is exact rather than sampled.
+        const coverage = Math.max(0, Math.min(1, halfStroke + 0.5 - nearest));
+        if (coverage > 0) blend(rgba, (py * size + px) * 4, colour, coverage);
       }
     }
   }
@@ -182,17 +229,17 @@ const size = (buffer) => `${Math.round(buffer.length / 102.4) / 10}KB`;
 
 const OUTPUTS = [
   // Native app icons.
-  ['assets/icon.png', { size: 1024, cornerRadius: 0 }],
-  ['assets/splash-icon.png', { size: 512, transparent: true, inset: 0.5 }],
-  ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.42 }],
-  ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.42 }],
-  ['assets/favicon.png', { size: 64, inset: 0.7, cornerRadius: 0.16 }],
+  ['assets/icon.png', { size: 1024, inset: 0.7, cornerRadius: 0 }],
+  ['assets/splash-icon.png', { size: 512, transparent: true, inset: 0.58 }],
+  ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.48 }],
+  ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.48 }],
+  ['assets/favicon.png', { size: 64, inset: 0.74, cornerRadius: 0.16 }],
 
   // PWA icons. `maskable` fills the canvas because the platform crops it.
-  ['public/icons/icon-192.png', { size: 192, inset: 0.66, cornerRadius: 0.22 }],
-  ['public/icons/icon-512.png', { size: 512, inset: 0.66, cornerRadius: 0.22 }],
-  ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.52, cornerRadius: 0 }],
-  ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.66, cornerRadius: 0 }],
+  ['public/icons/icon-192.png', { size: 192, inset: 0.72, cornerRadius: 0.22 }],
+  ['public/icons/icon-512.png', { size: 512, inset: 0.72, cornerRadius: 0.22 }],
+  ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.62, cornerRadius: 0 }],
+  ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.72, cornerRadius: 0 }],
 ];
 
 for (const [path, options] of OUTPUTS) {

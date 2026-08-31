@@ -18,8 +18,36 @@ family is named in and the order a player moves through.
 The mark is canonical on the card protector, and app icons, favicons and empty
 states derive from the same geometry rather than redrawing it.
 
-**Two things about it are unsettled, and both should be settled before anything
-is printed.** See [Open items](#open-items).
+### How it is drawn
+
+Two decisions, both made by rasterising it rather than by looking at it, and
+both now settled.
+
+**The baseline is drawn once.** Sharing a common baseline means one line, not
+three coincident ones. Stacking three bases on the same pixels stripes the line
+into three colors and reads as a mistake at every size. So the outer triangle is
+closed and carries the line, and the two inside it are open chevrons standing on
+it. The line they stand on is gold, which is Ground, which is the point.
+
+**Gold is the outermost stroke.** This reverses what this document recommended
+before anything was drawn, and the reason is measured rather than aesthetic:
+
+| Stroke on the ground | Ratio |
+|---|---|
+| Gold `#c9a86a` | **7.22:1** |
+| Sage `#6b7a5e` | 3.55:1 |
+| Forest `#3d4a44` | 1.76:1 |
+
+Forest on the outside meant the stroke that gives the mark its silhouette was
+the one nobody could see. Gold on the outside is the brightest color on the
+defining edge, and it happens to restore the original brief's own order, forest
+to sage to gold reading inward to outward, which was one of the two
+contradictory specs recorded here.
+
+**The innermost stroke is forest lifted to `#55665e`**, 2.71:1. Plain forest
+stays what it is: a border color, where 1.76:1 is correct because a border
+should be quiet. It is simply not a stroke color on this ground, and the mark
+needs its third line to exist.
 
 ## The palette
 
@@ -407,28 +435,26 @@ better after the QR has been scanned.
 
 ## Open items
 
-Three, all of them cheap to settle and expensive to discover after a print run.
+~~**1. The mark's color order is specified two ways.**~~ **Settled.** Gold
+outermost, sage in the middle, lifted forest innermost, which is the original
+brief's order. See [How it is drawn](#how-it-is-drawn) for the measurement that
+decided it.
 
-**1. The mark's color order is specified two ways.** One brief has forest as the
-innermost and smallest stroke, the other has it outermost and largest. Both
-agree that smallest to largest reads Learn, Observe, Ground, so only the color
-assignment is in question.
+~~**2. Forest on Ground is close to invisible.**~~ **Settled, and it was not a
+chip-only problem.** It bit the app icon first, at 1.76:1, and the fix is one
+value rather than a per-surface deviation: the mark's inner stroke is `#55665e`
+and plain forest stays a border color.
 
-Recommended: **gold innermost, sage in the middle, forest outermost.** A small
-mark needs a focal point at its optical center, and gold is the only color in
-the palette that gives it one.
+**3. Two remain.**
 
-**2. Forest on Ground is close to invisible.** `#3d4a44` against `#1c211f` is
-roughly a 1.9:1 contrast ratio. At 5mm on a printed chip, a hairline stroke at
-that ratio does not survive. Whichever verb ends up wearing forest, the outer
-triangle disappears.
-
-Recommended for the physical piece: lighten the outer stroke to about `#4e5f57`,
-or drop to a two-tone mark in sage and gold. On screen it holds at larger sizes,
-so this can be a chip-only deviation rather than a token change.
-
-**3. There are two golds.** This document and the design brief say `#c9a86a`.
+**Two golds.** This document and the design brief say `#c9a86a`.
 Untilt's shipped code declares `#c9a227` in all three places its copy test
 checks: the app, the gate, and the server pages. They are visibly different, one
 tan and one saturated yellow. One has to give before the mark ships across the
 family, and the answer decides a passing test in that repo either way.
+
+**Empty states have no mark.** BRAND.md says app icons, favicons and empty
+states all derive from the same geometry. The first two do now. Log's
+`EmptyState` is type only, and giving it the mark means a drawn component and
+therefore a dependency the app does not have, which is a decision rather than a
+transcription.

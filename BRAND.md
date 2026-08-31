@@ -445,16 +445,42 @@ chip-only problem.** It bit the app icon first, at 1.76:1, and the fix is one
 value rather than a per-surface deviation: the mark's inner stroke is `#55665e`
 and plain forest stays a border color.
 
-**3. Two remain.**
+~~**3. There are two golds.**~~ **Settled, and it went this way.** Untilt moved
+to `#c9a86a` across all 39 files that carried the old one, and its own notes had
+already argued for it: the chip's design README asks for a dull antique rather
+than a bright yellow, and this is that. It reads better on Untilt's felt too,
+8.20:1 against 7.66:1.
 
-**Two golds.** This document and the design brief say `#c9a86a`.
-Untilt's shipped code declares `#c9a227` in all three places its copy test
-checks: the app, the gate, and the server pages. They are visibly different, one
-tan and one saturated yellow. One has to give before the mark ships across the
-family, and the answer decides a passing test in that repo either way.
+Three things in that repo would have shipped broken from a search and replace,
+and they are worth knowing because two of them generalise. The five legal pages
+share one inline style block admitted by a single CSP hash, so a color change
+unstyles them in production with no error anywhere. The social card's test
+identifies the mark by pixel range and its blue ceiling fitted only the old
+gold. And the iOS app icon was a hand copied duplicate that nothing kept in
+sync, so it drifted the moment the color moved. **Anywhere a color is pinned by
+a hash, a pixel test, or a copy, it is not one edit.**
 
-**Empty states have no mark.** BRAND.md says app icons, favicons and empty
+**One remains.**
+
+**Empty states have no mark.** This document says app icons, favicons and empty
 states all derive from the same geometry. The first two do now. Log's
 `EmptyState` is type only, and giving it the mark means a drawn component and
 therefore a dependency the app does not have, which is a decision rather than a
 transcription.
+
+---
+
+## What is aligned, and what is not
+
+The gold is now one color in all three apps. Nothing else is.
+
+| | Ground | Accent | Mark |
+|---|---|---|---|
+| **Log** | `#1c211f` | `#c9a86a` | The nested triangles |
+| **Untilt** | `#0d1512` | `#c9a86a` | A chip on water |
+| **TiltProof** | `#0B100E` | not yet | not yet |
+
+Untilt's ground and mark are its own and were never claimed by this document.
+Whether they come across is a larger question than a hex swap, on a product that
+is selling, and it should be asked as a question rather than answered by a
+migration.

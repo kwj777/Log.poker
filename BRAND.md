@@ -1,0 +1,204 @@
+# The L-O-G brand
+
+The shared identity across the three apps, kept here because Log is the hub and
+because `log.poker/chip` is the route the physical object points at. Untilt and
+TiltProof consume this rather than restating it.
+
+Written without en or em dashes, and in American spellings, because two of the
+three repos enforce that in CI and copy gets lifted verbatim out of this file.
+
+---
+
+## The mark
+
+Three nested triangles sharing a common baseline. Stroked, never filled.
+Smallest to largest reads **Learn, Observe, Ground**, which is the order the
+family is named in and the order a player moves through.
+
+The mark is canonical on the card protector, and app icons, favicons and empty
+states derive from the same geometry rather than redrawing it.
+
+**Two things about it are unsettled, and both should be settled before anything
+is printed.** See [Open items](#open-items).
+
+## The palette
+
+| Token | Hex | Where |
+|---|---|---|
+| Ground | `#1c211f` | Background, all three apps |
+| Rim | `#2e3a35` | Borders |
+| Ring | `#333f39` | Subtle dividers |
+| Gold | `#c9a86a` | The accent, spent sparingly |
+| Sage | `#6b7a5e` | The mark's middle stroke |
+| Forest | `#3d4a44` | The mark's outer stroke |
+| Cream | `#e8e4da` | Body text |
+| Muted | `#b7c0ba` / `#7a8681` | Secondary and tertiary text |
+
+Serif in the Georgia class for wordmarks and headers, a clean sans for UI.
+
+The category is full of cluttered apps. Restraint is the differentiator, which
+means the gold is worth more the less of it there is.
+
+---
+
+## The line
+
+**Be the log.**
+
+Nothing shows on a log, and a propped one does not move. Those are two ideas
+rather than one, they are both true, and between them they are the whole
+family.
+
+The pun is load-bearing rather than decorative. A log is the thing you write in
+and the thing that gives nothing away, and poker supplied the rest for free,
+because *the river* is already the game's word for the card that decides the
+pot.
+
+### What holds it, which turns out to be the other two apps
+
+The obvious river line is wrong. **Logs float.** A river carries a log off,
+which is what driftwood is, so anything built on a log simply outlasting a
+current is bad physics that a player will spot in two seconds.
+
+What fixes it is not a better adjective, it is the rest of the family. **A log
+does not hold itself.** Propped by the math and held by the ground, it does not
+go anywhere, and the river runs past it:
+
+> **The math props it. The ground holds it. The river goes past.**
+
+Which resolves the one thing that looked like a flaw in the whole idea. The
+coinage seemed to point at the wrong app, since Log is the *Observe* app and
+log-as-composure is a *Ground* idea. It does not point anywhere wrong. **Log is
+the log**: the record, and the player keeping it. The other two are what stop it
+being carried off.
+
+| | | |
+|---|---|---|
+| **Learn** | TiltProof | the math that props it |
+| **Observe** | Log | the log itself |
+| **Ground** | Untilt | what holds it down |
+
+The mark already says this, and nobody had noticed it was saying anything. A
+triangle is the shape that does not deform under load, three of them share one
+baseline, and the thing is braced rather than merely nested. It is a diagram of
+the sentence above.
+
+### The rule that keeps it from meaning the opposite
+
+English already has *sitting there like a log* and *a bump on a log*, and poker
+has *calling station*, *rock* and *loose-passive*. So the bad reading of "be the
+log" is *be the player who checks and calls and never does anything*, which is
+the exact opposite of the intent.
+
+Five rules hold the line on the right side of that, and the fifth is the one
+that actually does the work:
+
+| | |
+|---|---|
+| **Pair it with what was supposed to move it** | The current, or the provocation: the two-outer, the needle, the shown bluff. A log alone is inert. A log that did not move when something tried to move it is composed. |
+| **The definite article** | "The log", never "a log". A definite article implies a known archetype, which is what a coinage needs; the indefinite one is an insult. |
+| **An instruction, not a label** | You aspire to be the log. You never call somebody a log. The moment it is applied to a person it has become a slur for a bad player. |
+| **Never announced** | No copy anywhere says "we call this being the log". A coinage that explains itself is dead on arrival. Use it as though it is already a thing. |
+| **A state, never a style of play** | This is the safety rail. The log describes your face and your pulse. It never describes your betting. Nothing in any app should imply that playing passively is the goal. |
+
+### The variants
+
+Ranked, with where each earns its place. Two families, because the face and the
+long run are different ideas and merging them is what produced the bad line in
+the first place.
+
+**The face.**
+
+| Line | Where |
+|---|---|
+| **Be the log.** | The ethos. The chip, the about page, anywhere the context already supplies the provocation. |
+| **A log doesn't flinch.** | The defended version, and the one to reach for wherever the passive reading is a live risk. It puts the line on the face rather than on the betting, which is the whole distinction. |
+| **You can't read a log.** | The same idea from the opponent's side of the table. |
+| **Two outs got there. Be the log.** | The Log hand journal, on a hand tagged *bad beat* or *cooler*. |
+| **He shows the bluff. Be the log.** | The needle, which is the provocation nobody writes copy for and everybody meets. |
+| **Thirty-five seconds to be the log again.** | Untilt, on the at-the-table resets. |
+
+**The long run.**
+
+| Line | Where |
+|---|---|
+| **Keep a log. Be the log.** | The best of all of them. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle, the `/chip` landing. |
+| **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
+| **Nothing carries off a propped log.** | The compressed cut. |
+| **Ground the log.** | Two words, and it names Untilt's verb. The Log to Untilt hand-off on the variance view. |
+| **The river hit him. Nothing hit you.** | Session end in Log, after a losing session inside the confidence band. |
+| **Logged. Now be the log.** | The save confirmation on a hand or a session. Says what happened and what to do next. |
+| **Know the math. Be the log.** | TiltProof. Keeps that app's existing two-clause shape and swaps the family line into the second half. |
+
+### What not to say
+
+**"Log face" is out.** Three reasons, escalating. It is a derivative
+construction, so it arrives sounding like a lesser version of *poker face*. It
+is a noun pointed at a person, which makes it an insult by default. And *log*
+is also a turd, which at a poker table gets that joke inside a week and never
+stops. "Be the log" survives on the aspirational verb frame; two syllables
+aimed at somebody's face does not.
+
+**"Don't be a log"** flips the whole thing into the passive-player reading. Never.
+
+**Anything resting on a log outlasting a current unaided.** Logs float. If the
+current is in the sentence, so is whatever is holding the log, or the sentence
+is conceding the drift on purpose.
+
+---
+
+## Where the line goes on the chip
+
+The back is already full: mark at the top, QR on a cream tile at the center,
+LEARN and GROUND in the side channels, OBSERVE directly under the QR because
+that is the app the QR opens, and the `log.poker` wordmark in gold beneath it.
+Something has to give.
+
+**Give the wordmark.** `BE THE LOG` takes its slot, in gold, at the same ~1.9mm
+cap height, and stays the second-loudest element after the QR.
+
+The wordmark's job on the back was to say where to go, and the QR two
+millimeters above it already does that better and more accurately: nobody types
+a URL off a card protector when there is a code right there. The front still
+carries `log.poker` at full size, so the object is not anonymous. That trade
+buys the back's most valuable line: the one that makes somebody want to scan at
+all.
+
+It fits with room. At that position the inner ring leaves about 35mm of channel,
+and `BE THE LOG` letterspaced at 1.9mm cap sets to roughly 20mm. Everything on
+the face stays above the 1.5mm floor.
+
+The alternate, if the wordmark has to stay: put the line on the **front**, below
+the wordmark, at 1.6mm. It is quieter and it costs a second reading of the
+object, since the front is the face somebody sees first and the line lands
+better after the QR has been scanned.
+
+---
+
+## Open items
+
+Three, all of them cheap to settle and expensive to discover after a print run.
+
+**1. The mark's color order is specified two ways.** One brief has forest as the
+innermost and smallest stroke, the other has it outermost and largest. Both
+agree that smallest to largest reads Learn, Observe, Ground, so only the color
+assignment is in question.
+
+Recommended: **gold innermost, sage in the middle, forest outermost.** A small
+mark needs a focal point at its optical center, and gold is the only color in
+the palette that gives it one.
+
+**2. Forest on Ground is close to invisible.** `#3d4a44` against `#1c211f` is
+roughly a 1.9:1 contrast ratio. At 5mm on a printed chip, a hairline stroke at
+that ratio does not survive. Whichever verb ends up wearing forest, the outer
+triangle disappears.
+
+Recommended for the physical piece: lighten the outer stroke to about `#4e5f57`,
+or drop to a two-tone mark in sage and gold. On screen it holds at larger sizes,
+so this can be a chip-only deviation rather than a token change.
+
+**3. There are two golds.** This document and the design brief say `#c9a86a`.
+Untilt's shipped code declares `#c9a227` in all three places its copy test
+checks: the app, the gate, and the server pages. They are visibly different, one
+tan and one saturated yellow. One has to give before the mark ships across the
+family, and the answer decides a passing test in that repo either way.

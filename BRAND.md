@@ -134,6 +134,7 @@ this family, and a line can ride any two of them at once:
 | **The record** | Keep a log |
 | **The app** | Get the log |
 | **The state** | Be the log |
+| **The logarithm** | Think in logs, and see [below](#logarithm-which-is-mostly-a-feature) |
 
 That yields the two lines worth having, and they are not competing because they
 do different jobs:
@@ -151,6 +152,139 @@ decided and needs somewhere to press.
 
 Neither is a replacement for **Be the log** on its own, which is what goes on
 the object.
+
+### The lockup
+
+**Be the LOG. Learn, Observe, Ground.**
+
+This is the one to build everything else around, because it carries its own key.
+Three letters do three jobs at once, the state and the app and the acronym, and
+the second sentence decodes the third without ever announcing that a decoding is
+happening.
+
+Two things about the order matter. **The imperative comes first**, because it is
+the half anybody will repeat and the explanation is only there for the first
+reading. And **the expansion uses the canonical naming**, so the lockup binds the
+new line to vocabulary the family already had rather than adding more.
+
+**Capitalization is a lockup rule, not a prose rule.** LOG is set in capitals
+only inside the lockup, and anywhere else the acronym is the point. In running
+prose it is lowercase, always: *be the log*. All capitals in a sentence is
+shouting, and the pun does not need volume.
+
+This is what goes on the `/chip` landing at full size and on the about page. It
+supersedes the four line adjective stack on those two surfaces, for the reason
+that stack already conceded: three imperatives is dilute where one is sharp, and
+this is one.
+
+**And it changes the chip.** LEARN, OBSERVE and GROUND are already set in
+capitals around the QR on the back, so a line reading *Be the LOG* in mixed case
+turns those three words into its own expansion. The object teaches the acronym
+without printing it twice, and mixed case is the more legible setting at 1.9mm
+besides.
+
+### The eye in the sky
+
+Worth recording because it will come up again, and because half of it is good.
+
+Casinos call their surveillance **the eye in the sky**, so an eye above a table
+is poker's own furniture rather than only occult iconography, and Log inverts it
+in a way that describes the product exactly: the eye is normally the house
+watching you, and this one is you watching yourself.
+
+**Two reasons it stays a note rather than a line.** It is spatially an argument
+for putting OBSERVE at the top of the chip, which costs the acronym, and that
+trade is settled above. And the nearest visual, an eye at the apex of a
+triangle, is heavily loaded: it is the dollar bill, the Masonic emblem and every
+conspiracy graphic since. This family's whole asset is being the poker app that
+prints the helpline and takes no rake, and hanging Illuminati furniture next to
+that is a strange thing to spend credibility on for a joke.
+
+If it is used at all, it is a Log line about self-observation and never a
+graphic, and it needs the inversion said out loud or it reads as surveillance
+rather than as honesty.
+
+### Logarithm, which is mostly a feature
+
+The fourth sense is real and it is not decorative. **A bankroll is a
+multiplicative process, and a logarithm is how a multiplicative process is
+read.** The Kelly criterion maximizes the expected logarithm of bankroll, which
+is the foundational result in the subject this app is about, and a bankroll
+curve drawn on a log axis is the honest one: a $500 swing at 1/2 and the same
+swing at 25/50 are one event rendered at wildly different heights on the linear
+chart Log draws today.
+
+**It still does not belong in the copy**, and it is the first sense that does
+not. It yields no imperative, since *be the logarithm* is nothing. *Logarithm*
+is close to the least emotional word available. And TiltProof's audience is
+beginners and live players, so a logarithm on a front door excludes exactly the
+people the door is for.
+
+Where it belongs is the product, where it would make two features better rather
+than one page cleverer:
+
+| | |
+|---|---|
+| **A log scale on the bankroll curve** | A toggle, not a default. Proportional growth is the true shape of a roll over years, and a linear axis flatters the early sessions and terrifies during the late ones. |
+| **Kelly under bankroll goals** | The roadmap already wants target roll, stop loss, and a move up prompt. Kelly is the arithmetic all three are approximating by hand, and it is the same logarithm. |
+
+One line survives, for an advanced surface only:
+
+> **Think in logs.**
+
+Proportions rather than dollars. It is the discipline that stops both moving up
+too fast and tilting at a number, it is meaningless to somebody in their first
+month, and it belongs on the variance view or beside bankroll goals and nowhere
+near the front.
+
+**And a caution, because this is where the counting stops.** Four senses is the
+edge. Three reads as found and five reads as a bit, and the moment an audience
+can feel the wordplay being worked the whole thing turns from a coinage into a
+pun. Nobody repeats a pun at a table. Nothing further gets added to the list
+above.
+
+### The other L-O-G
+
+The acronym runs twice, in two registers, and the second one had been sitting
+there unused:
+
+| | The apps do the verbs | The player becomes the adjectives |
+|---|---|---|
+| **L** | Learn | **Log**ical |
+| **O** | Observe | Observant |
+| **G** | Ground | Grounded |
+
+**The word is inside the first one.** *Logical* carries *log* in its opening
+three letters, which is what makes the set read as found rather than
+constructed, and it is the only one of the six that does it.
+
+The three of them also run head, eyes, body, which is why they do not read as a
+list of synonyms. Logical is the arithmetic, observant is what you watch,
+grounded is what your pulse does. Three different faculties, one per app.
+
+So they stack, and the stack is the point:
+
+> Be logical. Be observant. Be grounded.
+>
+> **Be the log.**
+
+The first three build the fourth. That is the shape for the `/chip` landing
+page, which is the one surface whose whole job is to open with the philosophy at
+full size, and for the about page.
+
+**It is not the headline.** Three imperatives is dilute where one is sharp, and
+the triad carries no wordplay of its own except the one buried in *logical*. It
+explains **Be the log**; it does not replace it, and it should never appear
+without it underneath.
+
+**One wrinkle, flagged rather than fixed.** *Be observant* drifts. In the family
+it means watch yourself, which is what Log is for; at a table it lands as watch
+your opponents, which is a different virtue and a perfectly good one. The truer
+word for Log is **objective**, since an honest answer to *am I running bad or
+playing bad* is exactly what the variance view sells. It is refused anyway:
+*objective* sits in the same cold register as *logical*, so the triad would
+spend two of its three words on the same note and lose the head, eyes, body
+progression that makes it work. Keep observant, and know what it is doing.
 
 ### The variants
 
@@ -174,7 +308,10 @@ the first place.
 | Line | Where |
 |---|---|
 | **Keep a log. Be the log.** | The positioning line. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle. |
-| **Get the log. Be the log.** | The same device as a call to action. The `/chip` landing, the install prompt, and anywhere the next thing is a press rather than a thought. |
+| **Get the log. Be the log.** | The same device as a call to action. The install prompt, and anywhere the next thing is a press rather than a thought. |
+| **Be the LOG. Learn, Observe, Ground.** | The lockup, and the primary. It carries its own key. The `/chip` landing at full size, the about page, and the back of the chip in its short form. |
+| **Be logical. Be observant. Be grounded. Be the log.** | The faculties, for longer form copy rather than as a lockup. Demoted by the line above, which does the same job in nine words instead of thirteen and names the apps while it does it. Never the first three without the fourth. |
+| **Think in logs.** | Proportions rather than dollars. The variance view and bankroll goals only, and never the front door. |
 | **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
 | **Nothing carries off a propped log.** | The compressed cut. |
 | **Ground the log.** | Two words, and it names Untilt's verb. The Log to Untilt hand-off on the variance view. |
@@ -206,12 +343,38 @@ is conceding the drift on purpose.
 ## Where the line goes on the chip
 
 The back is already full: mark at the top, QR on a cream tile at the center,
-LEARN and GROUND in the side channels, OBSERVE directly under the QR because
-that is the app the QR opens, and the `log.poker` wordmark in gold beneath it.
-Something has to give.
+two words in the side channels, one under the QR, and the `log.poker` wordmark
+in gold beneath it. Something has to give.
 
-**Give the wordmark.** `BE THE LOG` takes its slot, in gold, at the same ~1.9mm
-cap height, and stays the second-loudest element after the QR.
+**And the words were in the wrong places.** With LEARN on the left, GROUND on
+the right and OBSERVE underneath, a left, right, down scan reads *Learn,
+Ground, Observe*. That was cosmetic until the gold line went mixed case, and
+then it was a defect: **Be the LOG** points at those three words, and they were
+spelling L-G-O.
+
+So **OBSERVE and GROUND swap**. GROUND takes the bottom, because **the ground is
+the bottom**, which is decodable by anybody holding the chip for the first time.
+The placement it replaces, OBSERVE under the QR because the QR is what opens
+Log, only decodes for somebody who already knows that Observe means Log, and
+that is nobody meeting the object cold.
+
+The cost is real and worth naming: OBSERVE is the longest of the three words and
+it now sits in the narrowest slot, at about 1.5mm of margin with its tracking
+tightened. Reading order gets first call on position and typography gets second,
+which is the right way round here, and OBSERVE's margins are the first thing to
+check on a printed proof.
+
+**A version that was considered and refused.** OBSERVE at the top reads well and
+is spatially true, since observing happens from above, and it lands near the
+casino's own name for the thing that watches a room. It puts O first. The face
+would spell O-L-G, which breaks the mechanism this whole section exists to
+protect, so it loses on the one criterion that is not aesthetic. See [The eye in
+the sky](#the-eye-in-the-sky) for the part of it worth keeping.
+
+**Then give the wordmark.** `Be the LOG` takes its slot, in gold, at the same ~1.9mm
+cap height, and stays the second-loudest element after the QR. Mixed case rather
+than all capitals, so that LOG picks up the three words already set around the
+QR and the face expands its own acronym.
 
 The wordmark's job on the back was to say where to go, and the QR two
 millimeters above it already does that better and more accurately: nobody types
@@ -221,7 +384,7 @@ buys the back's most valuable line: the one that makes somebody want to scan at
 all.
 
 It fits with room. At that position the inner ring leaves about 35mm of channel,
-and `BE THE LOG` letterspaced at 1.9mm cap sets to roughly 20mm. Everything on
+and `Be the LOG` letterspaced at 1.9mm cap sets to roughly 17mm. Everything on
 the face stays above the 1.5mm floor.
 
 The alternate, if the wordmark has to stay: put the line on the **front**, below

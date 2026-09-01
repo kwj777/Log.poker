@@ -379,6 +379,32 @@ is conceding the drift on purpose.
 
 ---
 
+## The chip
+
+**There is one, and it is this one.** Untilt has its own 47mm ceramic artwork in
+`design/chip/`, worked out before the family had a shared identity. It stays as
+exploration and is not being ordered: two ceramic discs in the same gold on the
+same near-black is one object twice, the setup fee is per design rather than per
+order, and this one does more work, since it carries a scannable code, lands on
+the free app, and names all three apps on its back.
+
+The sourcing from that exploration transfers unchanged, because it is the same
+object from the same supplier, and it is the only part of this whose numbers are
+somebody else's:
+
+| | |
+|---|---|
+| The chip | Custom Made Casino / American Gaming Supply, Pro Poker ceramic. 47mm, 14g, no metal slug, fired rather than a stuck-on inlay. |
+| 100 chips | $125, and 100 is the minimum |
+| Setup | $75 one-time, per **design** rather than per order |
+| **Total** | **$200**, shipping free |
+| Lead time | 3 to 5 weeks after proof approval |
+| Finish | Matte, and only matte at 47mm |
+
+Free and worth taking: a different image on each face, text on the edge, and the
+border being optional. The per-design setup is the line item that settled one
+chip rather than two.
+
 ## Where the line goes on the chip
 
 The back is already full: mark at the top, QR on a cream tile at the center,

@@ -82,10 +82,15 @@ const fromVenue = (venue: Venue): VenueRecord => ({
 const toSession = (record: SessionRecord): Session => ({
   id: record.id,
   venueId: record.venueId,
+  format: record.format,
   gameType: record.gameType,
-  stakes: { ...record.stakes },
+  stakes: record.stakes === null ? null : { ...record.stakes },
+  currency: record.currency,
   buyIn: record.buyIn,
+  fee: record.fee,
   cashOut: record.cashOut,
+  entrants: record.entrants,
+  finishPosition: record.finishPosition,
   startedAt: record.startedAt,
   endedAt: record.endedAt === OPEN_SESSION_ENDED_AT ? null : record.endedAt,
   notes: record.notes,
@@ -97,10 +102,15 @@ const toSession = (record: SessionRecord): Session => ({
 const fromSession = (session: Session): SessionRecord => ({
   id: session.id,
   venueId: session.venueId,
+  format: session.format,
   gameType: session.gameType,
-  stakes: { ...session.stakes },
+  stakes: session.stakes === null ? null : { ...session.stakes },
+  currency: session.currency,
   buyIn: session.buyIn,
+  fee: session.fee,
   cashOut: session.cashOut,
+  entrants: session.entrants,
+  finishPosition: session.finishPosition,
   startedAt: session.startedAt,
   endedAt: session.endedAt ?? OPEN_SESSION_ENDED_AT,
   notes: session.notes,
@@ -280,6 +290,9 @@ export class DexieRepository implements Repository {
 
     if (filter.venueId !== undefined) {
       records = records.filter((record) => record.venueId === filter.venueId);
+    }
+    if (filter.format !== undefined) {
+      records = records.filter((record) => record.format === filter.format);
     }
     if (filter.gameType !== undefined) {
       records = records.filter((record) => record.gameType === filter.gameType);

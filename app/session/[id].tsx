@@ -17,7 +17,8 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
-import { formatMoney, formatStakes } from '../../src/domain/money';
+import { formatEntry, formatMoney, formatStakes } from '../../src/domain/money';
+import { formatFinish } from '../../src/domain/tournaments';
 import {
   durationMs,
   formatDuration,
@@ -75,7 +76,8 @@ export default function SessionDetailScreen() {
     );
   }
 
-  const currency = session.stakes.currency;
+  const { currency } = session;
+  const tournament = session.format === 'tournament';
   const invested = totalInvested(session, session.rebuys);
   const net = netResult(session, session.rebuys);
   const hourly = hourlyRate(session, session.rebuys);
@@ -110,8 +112,12 @@ export default function SessionDetailScreen() {
           {live ? 'In progress' : formatMoney(net ?? 0, { currency, signed: true })}
         </Text>
         <Text color={colors.textSecondary}>
-          {session.venue?.name ?? 'Unknown venue'} · {formatStakes(session.stakes)} ·{' '}
-          {session.gameType}
+          {session.venue?.name ?? 'Unknown venue'} ·{' '}
+          {tournament
+            ? formatEntry(session.buyIn, session.fee, currency)
+            : session.stakes === null
+              ? session.gameType
+              : `${formatStakes(session.stakes, currency)} · ${session.gameType}`}
         </Text>
       </View>
 
@@ -125,15 +131,42 @@ export default function SessionDetailScreen() {
       </View>
       <View style={styles.tiles}>
         <StatTile
-          label="Bought in"
+          label={tournament ? 'Entry cost' : 'Bought in'}
           value={formatMoney(invested, { currency })}
-          hint={session.rebuys.length > 0 ? `incl. ${session.rebuys.length} rebuy` : 'no rebuys'}
+          hint={
+            session.rebuys.length > 0
+              ? `incl. ${session.rebuys.length} ${tournament ? 're-entry' : 'rebuy'}`
+              : tournament && session.fee
+                ? `incl. ${formatMoney(session.fee, { currency })} fee`
+                : tournament
+                  ? 'one entry'
+                  : 'no rebuys'
+          }
         />
         <StatTile
-          label="Cashed out"
+          label={tournament ? 'Prize' : 'Cashed out'}
           value={session.cashOut === null ? '--' : formatMoney(session.cashOut, { currency })}
         />
       </View>
+
+      {tournament && formatFinish(session.finishPosition, session.entrants) !== null ? (
+        <View style={styles.tiles}>
+          <StatTile
+            label="Finished"
+            value={formatFinish(session.finishPosition, session.entrants) as string}
+            hint={
+              session.finishPosition !== null && session.entrants
+                ? `top ${Math.max(1, Math.round((session.finishPosition / session.entrants) * 100))}%`
+                : undefined
+            }
+          />
+          <StatTile
+            label="Result"
+            value={net === null ? '--' : formatMoney(net, { currency, signed: true })}
+            valueColor={resultColor(net)}
+          />
+        </View>
+      ) : null}
 
       {live ? (
         <Button

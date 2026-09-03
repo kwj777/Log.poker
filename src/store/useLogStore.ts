@@ -21,6 +21,7 @@ import {
 import type {
   GameType,
   Hand,
+  SessionFormat,
   HandTag,
   MoodEntry,
   MoodPhase,
@@ -37,13 +38,25 @@ export type Status = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface StartSessionInput {
   venueId: string;
+  /** Defaults to a cash game. */
+  format?: SessionFormat;
   gameType: GameType;
-  stakes: Stakes;
+  /** Null for a tournament, which has no blinds. */
+  stakes?: Stakes | null;
+  currency?: string;
   buyIn: number;
+  /** Tournament entry fee. */
+  fee?: number | null;
   /** Defaults to now; set when back-filling a session logged after the fact. */
   startedAt?: number;
   /** Recorded as a `start` mood entry when provided. */
   mood?: MoodScore | null;
+}
+
+/** What a tournament knows at the end that a cash game does not. */
+export interface EndSessionResult {
+  entrants?: number | null;
+  finishPosition?: number | null;
 }
 
 /** What an import did, for the message the screen shows afterwards. */
@@ -88,7 +101,12 @@ interface LogState {
   startSession: (input: StartSessionInput) => Promise<Session>;
   addRebuy: (sessionId: string, amount: number) => Promise<Rebuy>;
   removeRebuy: (id: string) => Promise<void>;
-  endSession: (sessionId: string, cashOut: number, mood?: MoodScore | null) => Promise<void>;
+  endSession: (
+    sessionId: string,
+    cashOut: number,
+    mood?: MoodScore | null,
+    result?: EndSessionResult,
+  ) => Promise<void>;
   updateSessionNotes: (sessionId: string, notes: string | null) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
 
@@ -167,14 +185,27 @@ export const useLogStore = create<LogState>((set, get) => ({
     await get().refresh();
   },
 
-  startSession: async ({ venueId, gameType, stakes, buyIn, startedAt, mood }) => {
+  startSession: async ({
+    venueId,
+    format,
+    gameType,
+    stakes,
+    currency,
+    buyIn,
+    fee,
+    startedAt,
+    mood,
+  }) => {
     const repository = await getRepository();
     const at = startedAt ?? Date.now();
     const session = await repository.createSession({
       venueId,
+      format,
       gameType,
       stakes,
+      currency,
       buyIn,
+      fee,
       startedAt: at,
     });
     if (mood != null) {
@@ -198,10 +229,18 @@ export const useLogStore = create<LogState>((set, get) => ({
     await get().refresh();
   },
 
-  endSession: async (sessionId, cashOut, mood) => {
+  endSession: async (sessionId, cashOut, mood, result) => {
     const repository = await getRepository();
     const endedAt = Date.now();
     await repository.endSession(sessionId, cashOut, endedAt);
+    // A second write rather than a wider `endSession`: cashing out is the same
+    // operation for both formats, and only a tournament has anywhere it came.
+    if (result && (result.entrants != null || result.finishPosition != null)) {
+      await repository.updateSession(sessionId, {
+        ...(result.entrants == null ? {} : { entrants: result.entrants }),
+        ...(result.finishPosition == null ? {} : { finishPosition: result.finishPosition }),
+      });
+    }
     if (mood != null) {
       await repository.createMoodEntry({ sessionId, phase: 'end', score: mood, at: endedAt });
     }

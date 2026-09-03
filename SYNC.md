@@ -86,9 +86,9 @@ who deletes a mis-entered session on the phone watches it reappear on the
 laptop, and then watches their bankroll curve disagree with itself.
 
 **Every table gets `deleted_at`, and `delete*` writes a tombstone instead of
-removing the row.** Migration v3 on SQLite. On Dexie it turned out to need no
-migration at all: IndexedDB stores whole objects, so an unindexed property needs
-no version bump and a record written by an earlier build simply has no
+removing the row.** A numbered migration on SQLite. On Dexie it turned out to
+need no version at all: IndexedDB stores whole objects, so an unindexed property
+needs no bump and a record written by an earlier build simply has no
 `deletedAt` and reads as live. Consequences worth naming before they are
 discovered:
 
@@ -281,9 +281,9 @@ order is chosen so that the riskiest work is done before anything depends on it.
 
 ### What phase 0 actually landed
 
-Migration v3 adds `deleted_at` to all five tables; the Dexie side needs no
-migration at all, because IndexedDB stores whole objects and a record written by
-an earlier build simply has no property and reads as live. Every read in both
+A numbered migration adds `deleted_at` to all five tables; the Dexie side needs
+none, because IndexedDB stores whole objects and a record written by an earlier
+build simply has no property and reads as live. Every read in both
 repositories filters tombstones, `delete*` writes them, children take the
 parent's stamp, and tombstoning a session clears its `importKey` so that a
 deleted import stays re-importable. `clearAll` remains a truncate.

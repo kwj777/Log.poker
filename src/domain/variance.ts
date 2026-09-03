@@ -35,8 +35,18 @@ export interface SessionObservation {
 
 /**
  * Reduce sessions to (result in bb, hours) pairs, oldest first.
- * Sessions with no measurable duration or a zero big blind are dropped: they
- * carry a result that cannot be attributed to any amount of time.
+ *
+ * Three kinds of session are dropped, all for the same reason -- they carry a
+ * result that cannot be expressed as big blinds per hour:
+ *
+ * - **Tournaments.** Their blinds move every level, so there is no big blind to
+ *   divide by, and their results are not the roughly symmetric distribution this
+ *   model assumes: a tournament player loses their entry most nights and is
+ *   carried by a handful of scores. Running that through a Gaussian random walk
+ *   would produce a confidence band that looks authoritative and is wrong. See
+ *   `tournaments.ts` for what is honest to say about them instead.
+ * - Sessions whose blinds were never recorded.
+ * - Sessions with no measurable duration.
  */
 export const toObservations = (
   sessions: readonly SessionWithChildren[],
@@ -44,6 +54,7 @@ export const toObservations = (
   sessions
     .filter(isComplete)
     .map((session) => {
+      if (session.format !== 'cash' || session.stakes === null) return null;
       const net = netResult(session, session.rebuys);
       const hours = durationHours(session);
       const bigBlind = session.stakes.bigBlind;

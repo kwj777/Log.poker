@@ -90,6 +90,25 @@ export const MIGRATIONS: readonly Migration[] = [
     ],
   },
   {
+    // Tournaments. Existing rows are cash games, which is what the default says.
+    //
+    // `small_blind` and `big_blind` stay NOT NULL: SQLite cannot relax a column
+    // constraint without rebuilding the table, and rebuilding one that three
+    // other tables hold foreign keys into is a great deal of risk for a column
+    // that has a perfectly good sentinel available. A session with no stakes
+    // stores 0/0, which is not a poker game anybody has ever played, and
+    // `toSession` maps it back to null. Same trick as `OPEN_SESSION_ENDED_AT`
+    // on the IndexedDB side, for the same reason.
+    version: 3,
+    statements: [
+      `ALTER TABLE sessions ADD COLUMN format TEXT NOT NULL DEFAULT 'cash'`,
+      `ALTER TABLE sessions ADD COLUMN fee INTEGER`,
+      `ALTER TABLE sessions ADD COLUMN entrants INTEGER`,
+      `ALTER TABLE sessions ADD COLUMN finish_position INTEGER`,
+      `CREATE INDEX IF NOT EXISTS idx_sessions_format ON sessions(format)`,
+    ],
+  },
+  {
     // Tombstones, and the reason for them is not local at all.
     //
     // A deleted row stops being a removed row and becomes one carrying
@@ -104,7 +123,7 @@ export const MIGRATIONS: readonly Migration[] = [
     // it narrows nothing, and every query that filters on it is already ordered
     // by an indexed column. A composite index would help and is not worth
     // carrying before there is a sync to profile it against.
-    version: 3,
+    version: 4,
     statements: [
       `ALTER TABLE venues ADD COLUMN deleted_at INTEGER`,
       `ALTER TABLE sessions ADD COLUMN deleted_at INTEGER`,

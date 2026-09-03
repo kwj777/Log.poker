@@ -27,10 +27,15 @@ describe('parseSessionCsv', () => {
       const [first] = parseSessionCsv(csv).sessions;
       expect(first.venueName).toBe('PokerStars');
       expect(first.draft).toEqual({
+        format: 'cash',
         gameType: 'NLHE',
-        stakes: { smallBlind: 25, bigBlind: 50, currency: 'USD' },
+        stakes: { smallBlind: 25, bigBlind: 50 },
+        currency: 'USD',
         buyIn: 5000,
+        fee: null,
         cashOut: 8825,
+        entrants: null,
+        finishPosition: null,
         startedAt: local(2024, 1, 15, 20, 0),
         endedAt: local(2024, 1, 15, 20, 0) + 3.5 * HOUR,
         notes: 'Good table',
@@ -244,12 +249,118 @@ describe('parseSessionCsv', () => {
 
     it('takes the currency from the money cells when there is no currency column', () => {
       const csv = 'Date,Buyin,Cashout\n2024-01-15,£50,£88\n';
-      expect(parseSessionCsv(csv).sessions[0].draft.stakes.currency).toBe('GBP');
+      expect(parseSessionCsv(csv).sessions[0].draft.currency).toBe('GBP');
     });
 
     it('prefers an explicit currency column', () => {
       const csv = 'Date,Currency,Buyin,Cashout\n2024-01-15,EUR,50,88\n';
-      expect(parseSessionCsv(csv).sessions[0].draft.stakes.currency).toBe('EUR');
+      expect(parseSessionCsv(csv).sessions[0].draft.currency).toBe('EUR');
+    });
+
+    it('takes the currency from the stakes cell when nothing else names one', () => {
+      const csv = 'Date,Limit,Result\n2024-01-15,€1/€2,120\n';
+      expect(parseSessionCsv(csv).sessions[0].draft.currency).toBe('EUR');
+    });
+  });
+
+  describe('tournaments', () => {
+    const csv = [
+      'Date,Site,Format,Buyin,Fee,Prize,Entrants,Place,Duration',
+      '2024-01-15 18:00,PokerStars,Tournament,$100,$10,$0,210,88,3:30',
+      '2024-01-16 18:00,PokerStars,Tournament,$100,$10,$1250,188,3,9:00',
+    ].join('\n');
+
+    it('reads the tournament fields off the row', () => {
+      const [first] = parseSessionCsv(csv).sessions;
+      expect(first.draft).toMatchObject({
+        format: 'tournament',
+        buyIn: 10_000,
+        fee: 1_000,
+        cashOut: 0,
+        entrants: 210,
+        finishPosition: 88,
+      });
+    });
+
+    it('gives a tournament no stakes at all', () => {
+      expect(parseSessionCsv(csv).sessions[0].draft.stakes).toBeNull();
+    });
+
+    it('reads a prize column as the cash-out', () => {
+      expect(parseSessionCsv(csv).sessions[1].draft.cashOut).toBe(125_000);
+    });
+
+    it('says what it did, since tournaments miss the variance view', () => {
+      expect(messages(parseSessionCsv(csv))).toContain('2 rows read as a tournament');
+    });
+
+    it('infers a tournament from a field size when no format column says so', () => {
+      const inferred = 'Date,Buyin,Prize,Entrants\n2024-01-15,$100,$0,210\n';
+      expect(parseSessionCsv(inferred).sessions[0].draft.format).toBe('tournament');
+    });
+
+    it('infers one from an entry fee alone', () => {
+      const inferred = 'Date,Buyin,Fee,Prize\n2024-01-15,$100,$10,$0\n';
+      expect(parseSessionCsv(inferred).sessions[0].draft.format).toBe('tournament');
+    });
+
+    it('reads the words these files actually use', () => {
+      const mixed = [
+        'Date,Format,Buyin,Result',
+        '2024-01-15,MTT,100,-100',
+        '2024-01-16,Sit & Go,50,120',
+        '2024-01-17,Cash,300,45',
+        '2024-01-18,Zoom,100,-20',
+      ].join('\n');
+      expect(parseSessionCsv(mixed).sessions.map((s) => s.draft.format)).toEqual([
+        'tournament',
+        'tournament',
+        'cash',
+        'cash',
+      ]);
+    });
+
+    it('leaves a cash row without a fee, a field or a finish', () => {
+      const mixed = 'Date,Format,Buyin,Fee,Result,Entrants\n2024-01-15,Cash,300,10,45,9\n';
+      expect(parseSessionCsv(mixed).sessions[0].draft).toMatchObject({
+        format: 'cash',
+        fee: null,
+        entrants: null,
+        finishPosition: null,
+      });
+    });
+
+    it('does not warn about missing stakes on a tournament, which has none', () => {
+      expect(messages(parseSessionCsv(csv))).not.toContain('no readable stakes');
+    });
+
+    it('keys a tournament apart from a cash session on the same day', () => {
+      const both = [
+        'Date,Format,Buyin,Result',
+        '2024-01-15,Tournament,100,-100',
+        '2024-01-15,Cash,100,-100',
+      ].join('\n');
+      const keys = parseSessionCsv(both).sessions.map((session) => session.importKey);
+      expect(new Set(keys).size).toBe(2);
+      expect(keys[0]).toContain('tournament');
+    });
+
+    it('keeps the frozen cash key shape, so an earlier import is not redone', () => {
+      // Byte-for-byte what the version before tournaments wrote, including the
+      // 0/0 it used for a cash session whose blinds it could not read.
+      const [withStakes] = parseSessionCsv(
+        'Date,Site,Limit,Buyin,Cashout\n2024-01-15,PokerStars,$1/$2,300,450\n',
+      ).sessions;
+      expect(withStakes.importKey).toBe(
+        `csv|${withStakes.draft.startedAt}|pokerstars|USD:100/200|30000|45000`,
+      );
+
+      const [without] = parseSessionCsv(
+        'Date,Site,Buyin,Cashout\n2024-01-15,PokerStars,300,450\n',
+      ).sessions;
+      expect(without.importKey).toBe(
+        `csv|${without.draft.startedAt}|pokerstars|USD:0/0|30000|45000`,
+      );
     });
   });
 
@@ -259,7 +370,7 @@ describe('parseSessionCsv', () => {
       const result = parseSessionCsv(csv, { dateOrder: 'dmy' });
       expect(result.delimiter).toBe(';');
       expect(result.sessions[0].draft.cashOut).toBe(123_456);
-      expect(result.sessions[0].draft.stakes.bigBlind).toBe(50);
+      expect(result.sessions[0].draft.stakes?.bigBlind).toBe(50);
     });
 
     it('reads a tab-separated paste', () => {

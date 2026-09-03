@@ -59,7 +59,7 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
     const newVenue = (name_ = 'Bellagio', isHomeGame = false) =>
       repository.createVenue({ name: name_, isHomeGame });
 
-    const stakes = { smallBlind: 100, bigBlind: 200, currency: 'USD' };
+    const stakes = { smallBlind: 100, bigBlind: 200 };
 
     const newSession = async (overrides: Partial<Parameters<Repository['createSession']>[0]> = {}) => {
       const venueId = overrides.venueId ?? (await newVenue()).id;
@@ -169,16 +169,16 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
 
       it('preserves an optional ante on the stakes', async () => {
         const session = await newSession({
-          stakes: { smallBlind: 200, bigBlind: 500, ante: 500, currency: 'USD' },
+          stakes: { smallBlind: 200, bigBlind: 500, ante: 500 },
         });
         const loaded = await repository.getSession(session.id);
-        expect(loaded?.stakes.ante).toBe(500);
+        expect(loaded?.stakes?.ante).toBe(500);
       });
 
       it('omits ante entirely when the game has none', async () => {
         const session = await newSession();
         const loaded = await repository.getSession(session.id);
-        expect(loaded?.stakes.ante).toBeUndefined();
+        expect(loaded?.stakes?.ante).toBeUndefined();
       });
 
       it('rejects a session for a venue that does not exist', async () => {
@@ -300,6 +300,101 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
 
         expect(await repository.getSession(keep.id)).not.toBeNull();
         expect(await repository.listHands(keep.id)).toHaveLength(1);
+      });
+    });
+
+    describe('tournaments', () => {
+      const newTournament = async (overrides: Record<string, unknown> = {}) => {
+        const venueId = (await newVenue('Aria')).id;
+        return repository.createSession({
+          venueId,
+          format: 'tournament',
+          gameType: 'NLHE',
+          buyIn: 10_000,
+          fee: 1_000,
+          entrants: 210,
+          finishPosition: 12,
+          startedAt: T0,
+          ...overrides,
+        });
+      };
+
+      it('round-trips every tournament field through storage', async () => {
+        const created = await newTournament();
+        expect(await repository.getSession(created.id)).toMatchObject({
+          format: 'tournament',
+          buyIn: 10_000,
+          fee: 1_000,
+          entrants: 210,
+          finishPosition: 12,
+        });
+      });
+
+      it('gives a tournament no stakes, even when the caller sends some', async () => {
+        const created = await newTournament({ stakes });
+        expect(created.stakes).toBeNull();
+        expect((await repository.getSession(created.id))?.stakes).toBeNull();
+      });
+
+      it('gives a cash game no fee, field or finish, even when the caller sends them', async () => {
+        const venueId = (await newVenue()).id;
+        const created = await repository.createSession({
+          venueId,
+          gameType: 'NLHE',
+          stakes,
+          buyIn: 30_000,
+          fee: 1_000,
+          entrants: 210,
+          finishPosition: 12,
+          startedAt: T0,
+        });
+        expect(created).toMatchObject({ fee: null, entrants: null, finishPosition: null });
+      });
+
+      it('defaults a session with no format to a cash game', async () => {
+        expect((await newSession()).format).toBe('cash');
+      });
+
+      it('keeps a cash session with no stakes null rather than zeroed', async () => {
+        const venueId = (await newVenue()).id;
+        const created = await repository.createSession({
+          venueId,
+          gameType: 'NLHE',
+          buyIn: 30_000,
+          startedAt: T0,
+        });
+        expect(created.stakes).toBeNull();
+        expect((await repository.getSession(created.id))?.stakes).toBeNull();
+      });
+
+      it('stores the currency on the session rather than inside the stakes', async () => {
+        const created = await newSession({ currency: 'GBP' });
+        const loaded = await repository.getSession(created.id);
+        expect(loaded?.currency).toBe('GBP');
+        expect(loaded?.stakes).not.toHaveProperty('currency');
+      });
+
+      it('defaults the currency when the caller names none', async () => {
+        expect((await newSession()).currency).toBe('USD');
+      });
+
+      it('patches a finish onto a tournament after it ends', async () => {
+        const created = await newTournament({ entrants: null, finishPosition: null });
+        await repository.endSession(created.id, 25_000, T0 + HOUR);
+        const updated = await repository.updateSession(created.id, {
+          entrants: 188,
+          finishPosition: 4,
+        });
+        expect(updated).toMatchObject({ entrants: 188, finishPosition: 4, cashOut: 25_000 });
+      });
+
+      it('filters sessions by format', async () => {
+        const venueId = (await newVenue('Wynn')).id;
+        await newSession({ venueId });
+        await newTournament({ venueId });
+        expect(await repository.listSessions({ format: 'tournament' })).toHaveLength(1);
+        expect(await repository.listSessions({ format: 'cash' })).toHaveLength(1);
+        expect(await repository.listSessions()).toHaveLength(2);
       });
     });
 

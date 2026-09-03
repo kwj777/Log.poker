@@ -3,7 +3,7 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { colors, radius, spacing } from '../theme';
 import { Text } from './Text';
 
-interface StatTileProps {
+export interface StatTileProps {
   label: string;
   value: string;
   /** Colors the value -- used for money, which is green or red or neither. */

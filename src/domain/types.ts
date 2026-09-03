@@ -16,6 +16,23 @@ export type Timestamp = number;
 /** Money in whole cents. Always an integer; may be negative. */
 export type Cents = number;
 
+/**
+ * Cash game or tournament.
+ *
+ * The two are different games for every purpose this app has. A cash session
+ * has blinds that stay still and chips you can walk away with; a tournament has
+ * an entry fee, a field, a finish, and a result that is zero most of the time.
+ * They share a venue, a clock and a bankroll, and almost nothing else -- which
+ * is why this is a discriminator on the record rather than a tag on the side.
+ */
+export const SESSION_FORMATS = ['cash', 'tournament'] as const;
+export type SessionFormat = (typeof SESSION_FORMATS)[number];
+
+export const SESSION_FORMAT_LABELS: Record<SessionFormat, string> = {
+  cash: 'Cash game',
+  tournament: 'Tournament',
+};
+
 export const GAME_TYPES = ['NLHE', 'PLO', 'OTHER'] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 
@@ -65,13 +82,16 @@ export interface Venue {
  * Stakes are stored as the two blind values in cents plus an optional straddle /
  * ante, rather than a display string, so that "profit by stakes" can group
  * numerically and the same 1/2 game reads identically no matter how it was typed.
+ *
+ * No currency here: a session has one currency and its blinds are numbers in it,
+ * so it lives on `Session` where a tournament -- which has no blinds at all --
+ * can still say what its money was in.
  */
 export interface Stakes {
   smallBlind: Cents;
   bigBlind: Cents;
   /** Optional bring-in for games with a mandatory ante (common in home games). */
   ante?: Cents;
-  currency: string;
 }
 
 export interface Rebuy {
@@ -86,11 +106,30 @@ export interface Rebuy {
 export interface Session {
   id: string;
   venueId: string;
+  format: SessionFormat;
   gameType: GameType;
-  stakes: Stakes;
+  /**
+   * Null for a tournament, whose blinds move every level and mean nothing
+   * afterwards -- and null for a cash session whose blinds were never recorded,
+   * which an import can produce. Both cases are the same to everything
+   * downstream: there is no big blind to measure a result in.
+   */
+  stakes: Stakes | null;
+  currency: string;
   buyIn: Cents;
-  /** Null while the session is still running. */
+  /**
+   * The tournament entry fee -- the "+10" in "$100+$10". Kept apart from the
+   * buy-in because that is how every tournament is advertised and how players
+   * think about them, and because a year of rake is worth being able to total.
+   * Null for a cash game, which has no such thing.
+   */
+  fee: Cents | null;
+  /** Null while the session is still running. For a tournament, the prize won. */
   cashOut: Cents | null;
+  /** Tournament field size. Null when unknown, and for cash games. */
+  entrants: number | null;
+  /** Where the player finished, 1 being the win. Null when unknown, and for cash. */
+  finishPosition: number | null;
   startedAt: Timestamp;
   /** Null while the session is still running. */
   endedAt: Timestamp | null;
@@ -148,11 +187,22 @@ export interface MoodEntry {
 
 /** Fields the caller supplies; ids and timestamps are filled in by the repository. */
 export type NewVenue = Pick<Venue, 'name' | 'isHomeGame'>;
-export type NewSession = Pick<
-  Session,
-  'venueId' | 'gameType' | 'stakes' | 'buyIn' | 'startedAt'
-> &
-  Partial<Pick<Session, 'notes' | 'cashOut' | 'endedAt' | 'importKey'>>;
+export type NewSession = Pick<Session, 'venueId' | 'gameType' | 'buyIn' | 'startedAt'> &
+  Partial<
+    Pick<
+      Session,
+      | 'format'
+      | 'stakes'
+      | 'currency'
+      | 'fee'
+      | 'notes'
+      | 'cashOut'
+      | 'endedAt'
+      | 'entrants'
+      | 'finishPosition'
+      | 'importKey'
+    >
+  >;
 export type NewRebuy = Pick<Rebuy, 'sessionId' | 'amount' | 'at'>;
 export type NewHand = Pick<Hand, 'sessionId' | 'at'> &
   Partial<Pick<Hand, 'holeCards' | 'position' | 'note' | 'tags' | 'amount'>>;

@@ -1,0 +1,314 @@
+/**
+ * Upgrading a database that already has a player's history in it.
+ *
+ * The contract suite opens both engines at the current version on an empty
+ * store, which never exercises an upgrade. That is the one path where a mistake
+ * is unrecoverable: a fresh install that reads wrong can be reinstalled, and a
+ * migration that drops a year of sessions cannot be undone. So each engine is
+ * built here at the *previous* version, filled with rows in the shape that
+ * version wrote, and then opened by the shipping code.
+ */
+
+import 'fake-indexeddb/auto';
+
+import { Dexie } from 'dexie';
+
+import { createDatabase } from '../dexie/db';
+import { DexieRepository } from '../dexie/DexieRepository';
+import { SqlRepository } from '../sql/SqlRepository';
+import { LATEST_VERSION, MIGRATIONS } from '../sql/schema';
+import { NodeSqliteDriver } from './support/nodeSqliteDriver';
+
+const T0 = 1_700_000_000_000;
+
+describe('SQLite: a v2 database upgraded to the current version', () => {
+  let driver: NodeSqliteDriver;
+  let repository: SqlRepository;
+
+  beforeEach(async () => {
+    driver = new NodeSqliteDriver(':memory:');
+
+    // Build the database exactly as the shipped v2 left it.
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 2)) {
+      for (const statement of migration.statements) await driver.execute(statement);
+    }
+    await driver.execute('PRAGMA user_version = 2');
+
+    await driver.run(
+      `INSERT INTO venues (id, name, is_home_game, created_at, updated_at)
+       VALUES ('v1', 'Aria', 0, ?, ?)`,
+      [T0, T0],
+    );
+    // A cash game with real blinds, as the new-session screen wrote them.
+    await driver.run(
+      `INSERT INTO sessions (id, venue_id, game_type, small_blind, big_blind, ante, currency,
+         buy_in, cash_out, started_at, ended_at, notes, import_key, created_at, updated_at)
+       VALUES ('s1', 'v1', 'NLHE', 100, 200, NULL, 'USD', 30000, 45000, ?, ?, NULL, NULL, ?, ?)`,
+      [T0, T0 + 3_600_000, T0, T0],
+    );
+    // A session the importer wrote with 0/0 because it could not read the stakes.
+    await driver.run(
+      `INSERT INTO sessions (id, venue_id, game_type, small_blind, big_blind, ante, currency,
+         buy_in, cash_out, started_at, ended_at, notes, import_key, created_at, updated_at)
+       VALUES ('s2', 'v1', 'NLHE', 0, 0, NULL, 'EUR', 0, 12000, ?, ?, NULL, 'csv|1', ?, ?)`,
+      [T0, T0, T0, T0],
+    );
+
+    repository = new SqlRepository(driver);
+    await repository.init();
+  });
+
+  afterEach(async () => {
+    await driver.close();
+  });
+
+  it('walks the database to the current version', async () => {
+    // Read from the schema rather than written down again, so that adding a
+    // migration cannot leave this quietly asserting an old version.
+    const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
+    expect(row.user_version).toBe(LATEST_VERSION);
+  });
+
+  it('reads everything already stored as live rather than as deleted', async () => {
+    // The tombstone column decides whether a row is visible at all, so a
+    // migration landing it as anything but null would hide a player's entire
+    // history behind an upgrade, with nothing erroring.
+    const rows = await driver.all<{ deleted_at: number | null }>(
+      `SELECT deleted_at FROM sessions UNION ALL SELECT deleted_at FROM venues`,
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row.deleted_at).toBeNull();
+  });
+
+  it('reports them all as changed since the beginning of time, and none as gone', async () => {
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
+    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
+  });
+
+  it('can tombstone a migrated session, which frees its import key', async () => {
+    await repository.deleteSession('s2');
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual([]);
+  });
+
+  it('keeps every session', async () => {
+    expect(await repository.listSessions()).toHaveLength(2);
+  });
+
+  it('reads records written without the tombstone property as live', async () => {
+    // The asymmetry with SQLite: no migration added anything here, so these
+    // rows carry no `deletedAt` at all rather than a null one, and absent has
+    // to mean live or an upgrade hides the whole log.
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
+    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
+  });
+
+  it('can tombstone a migrated session, which frees its import key', async () => {
+    await repository.deleteSession('s2');
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual([]);
+  });
+
+  it('reads existing sessions as cash games', async () => {
+    const session = await repository.getSession('s1');
+    expect(session?.format).toBe('cash');
+    expect(session?.fee).toBeNull();
+    expect(session?.entrants).toBeNull();
+    expect(session?.finishPosition).toBeNull();
+  });
+
+  it('keeps the stakes and lifts the currency onto the session', async () => {
+    const session = await repository.getSession('s1');
+    expect(session?.stakes).toEqual({ smallBlind: 100, bigBlind: 200 });
+    expect(session?.currency).toBe('USD');
+  });
+
+  it('reads a 0/0 session as having no stakes at all', async () => {
+    const session = await repository.getSession('s2');
+    expect(session?.stakes).toBeNull();
+    expect(session?.currency).toBe('EUR');
+  });
+
+  it('keeps the import keys, so a re-import still skips what it has', async () => {
+    expect(await repository.listImportKeys()).toEqual(['csv|1']);
+  });
+
+  it('can write a tournament afterwards', async () => {
+    const created = await repository.createSession({
+      venueId: 'v1',
+      format: 'tournament',
+      gameType: 'NLHE',
+      buyIn: 10_000,
+      fee: 1_000,
+      entrants: 210,
+      finishPosition: 12,
+      startedAt: T0,
+    });
+    const loaded = await repository.getSession(created.id);
+    expect(loaded).toMatchObject({
+      format: 'tournament',
+      stakes: null,
+      fee: 1_000,
+      entrants: 210,
+      finishPosition: 12,
+    });
+  });
+});
+
+describe('IndexedDB: a v2 database upgraded to the current version', () => {
+  const name = 'log-poker-upgrade-test';
+  let repository: DexieRepository;
+  let db: ReturnType<typeof createDatabase>;
+
+  beforeEach(async () => {
+    // A hand-built v2 database: the stores as they were, and the currency still
+    // living inside the nested stakes object.
+    const legacy = new Dexie(name);
+    legacy.version(1).stores({
+      venues: 'id, name, createdAt',
+      sessions: 'id, venueId, gameType, startedAt, endedAt',
+      rebuys: 'id, sessionId, at',
+      hands: 'id, sessionId, at',
+      moodEntries: 'id, sessionId, phase, at',
+    });
+    legacy.version(2).stores({
+      venues: 'id, name, createdAt',
+      sessions: 'id, venueId, gameType, startedAt, endedAt, &importKey',
+      rebuys: 'id, sessionId, at',
+      hands: 'id, sessionId, at',
+      moodEntries: 'id, sessionId, phase, at',
+    });
+    await legacy.open();
+    await legacy.table('venues').add({
+      id: 'v1',
+      name: 'Aria',
+      isHomeGame: 0,
+      createdAt: T0,
+      updatedAt: T0,
+    });
+    await legacy.table('sessions').bulkAdd([
+      {
+        id: 's1',
+        venueId: 'v1',
+        gameType: 'NLHE',
+        stakes: { smallBlind: 100, bigBlind: 200, currency: 'USD' },
+        buyIn: 30_000,
+        cashOut: 45_000,
+        startedAt: T0,
+        endedAt: T0 + 3_600_000,
+        notes: null,
+        createdAt: T0,
+        updatedAt: T0,
+      },
+      {
+        id: 's2',
+        venueId: 'v1',
+        gameType: 'NLHE',
+        stakes: { smallBlind: 0, bigBlind: 0, currency: 'EUR' },
+        buyIn: 0,
+        cashOut: 12_000,
+        startedAt: T0,
+        endedAt: T0,
+        notes: null,
+        importKey: 'csv|1',
+        createdAt: T0,
+        updatedAt: T0,
+      },
+    ]);
+    legacy.close();
+
+    db = createDatabase(name);
+    repository = new DexieRepository(db);
+    await repository.init();
+  });
+
+  afterEach(async () => {
+    db.close();
+    await db.delete();
+  });
+
+  it('keeps every session', async () => {
+    expect(await repository.listSessions()).toHaveLength(2);
+  });
+
+  it('reads records written without the tombstone property as live', async () => {
+    // The asymmetry with SQLite: no migration added anything here, so these
+    // rows carry no `deletedAt` at all rather than a null one, and absent has
+    // to mean live or an upgrade hides the whole log.
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
+    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
+  });
+
+  it('can tombstone a migrated session, which frees its import key', async () => {
+    await repository.deleteSession('s2');
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual([]);
+  });
+
+  it('reads existing sessions as cash games', async () => {
+    const session = await repository.getSession('s1');
+    expect(session?.format).toBe('cash');
+    expect(session?.fee).toBeNull();
+  });
+
+  it('moves the currency out of the stakes object and onto the session', async () => {
+    const session = await repository.getSession('s1');
+    expect(session?.stakes).toEqual({ smallBlind: 100, bigBlind: 200 });
+    expect(session?.currency).toBe('USD');
+  });
+
+  it('reads a 0/0 session as having no stakes at all', async () => {
+    const session = await repository.getSession('s2');
+    expect(session?.stakes).toBeNull();
+    expect(session?.currency).toBe('EUR');
+  });
+
+  it('keeps the import keys, so a re-import still skips what it has', async () => {
+    expect(await repository.listImportKeys()).toEqual(['csv|1']);
+  });
+
+  it('can write a tournament afterwards', async () => {
+    const created = await repository.createSession({
+      venueId: 'v1',
+      format: 'tournament',
+      gameType: 'NLHE',
+      buyIn: 10_000,
+      fee: 1_000,
+      entrants: 210,
+      finishPosition: 12,
+      startedAt: T0,
+    });
+    const loaded = await repository.getSession(created.id);
+    expect(loaded).toMatchObject({
+      format: 'tournament',
+      stakes: null,
+      fee: 1_000,
+      entrants: 210,
+      finishPosition: 12,
+    });
+  });
+});
+
+describe('the migration list', () => {
+  it('is append only, and every shipped version still says what it said', () => {
+    // A device that ran version 3 last month will never run it again, so
+    // editing one changes nothing there and everything on a fresh install, and
+    // the two stop agreeing without anything erroring.
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4]);
+    expect(MIGRATIONS[1].statements).toEqual([
+      'ALTER TABLE sessions ADD COLUMN import_key TEXT',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)',
+    ]);
+  });
+
+  it('puts the tombstone column on every table that syncs', () => {
+    const tombstones = MIGRATIONS[3].statements;
+    expect(tombstones).toHaveLength(5);
+    for (const table of ['venues', 'sessions', 'rebuys', 'hands', 'mood_entries']) {
+      expect(tombstones).toContain(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
+    }
+  });
+});

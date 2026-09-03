@@ -926,6 +926,124 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
       });
     });
 
+    describe('applying what the sync layer hands back', () => {
+      const change = <T>(record: T, deletedAt: number | null = null) => ({ record, deletedAt });
+      const set = (parts: Partial<Record<string, unknown[]>>) => ({
+        venues: [], sessions: [], rebuys: [], hands: [], moodEntries: [], ...parts,
+      }) as Parameters<Repository['applyChanges']>[0];
+
+      /** A record as another device would have written it: already stamped. */
+      const foreignVenue = (id: string, updatedAt: number) => ({
+        id, name: id, isHomeGame: false, sessionCount: 0, createdAt: T0, updatedAt,
+      });
+
+      it('writes a record this device has never seen', async () => {
+        await repository.applyChanges(set({ venues: [change(foreignVenue('v-remote', T0))] }));
+        const venues = await repository.listVenues();
+        expect(venues.map((venue) => venue.id)).toEqual(['v-remote']);
+      });
+
+      it('does not re-stamp it, or every incoming record would push straight back', async () => {
+        context.tick(HOUR);
+        await repository.applyChanges(set({ venues: [change(foreignVenue('v-remote', T0))] }));
+        const { venues } = await repository.listChangedSince(0);
+        expect(venues[0].record.updatedAt).toBe(T0);
+      });
+
+      it('overwrites a record this device already had', async () => {
+        const venue = await newVenue('Before');
+        await repository.applyChanges(set({
+          venues: [change({ ...venue, name: 'After', updatedAt: T0 + HOUR })],
+        }));
+        expect((await repository.getVenue(venue.id))?.name).toBe('After');
+      });
+
+      it('applies a tombstone, so a delete on one device lands on this one', async () => {
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id });
+        await repository.applyChanges(set({
+          sessions: [change({ ...session, updatedAt: T0 + HOUR }, T0 + HOUR)],
+        }));
+        expect(await repository.listSessions()).toEqual([]);
+        expect(await repository.getSession(session.id)).toBeNull();
+      });
+
+      it('brings a record back when the server says it is live again', async () => {
+        // The venue-tombstone rule can do exactly this: a delete that lost.
+        const venue = await newVenue();
+        await repository.deleteVenue(venue.id);
+        expect(await repository.listVenues()).toEqual([]);
+
+        await repository.applyChanges(set({
+          venues: [change({ ...venue, updatedAt: T0 + HOUR })],
+        }));
+        expect((await repository.listVenues()).map((v) => v.id)).toEqual([venue.id]);
+      });
+
+      it('skips a session whose venue has not arrived, rather than failing the sync', async () => {
+        // Foreign keys are on. One inconsistent row should cost that row.
+        const orphan = {
+          id: 'orphan', venueId: 'never-seen', format: 'cash', gameType: 'NLHE',
+          stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 1,
+          fee: null, cashOut: null, entrants: null, finishPosition: null,
+          startedAt: T0, endedAt: null, notes: null, importKey: null,
+          createdAt: T0, updatedAt: T0,
+        };
+        await expect(repository.applyChanges(set({ sessions: [change(orphan)] })))
+          .resolves.toBeUndefined();
+        expect(await repository.listSessions()).toEqual([]);
+      });
+
+      it('takes a venue and the session on it in one call', async () => {
+        // Parents first, within the one call, or the session would be skipped.
+        await repository.applyChanges(set({
+          venues: [change(foreignVenue('v-remote', T0))],
+          sessions: [change({
+            id: 's-remote', venueId: 'v-remote', format: 'cash', gameType: 'NLHE',
+            stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 30_000,
+            fee: null, cashOut: null, entrants: null, finishPosition: null,
+            startedAt: T0, endedAt: null, notes: null, importKey: null,
+            createdAt: T0, updatedAt: T0,
+          })],
+        }));
+        const sessions = await repository.listSessions();
+        expect(sessions.map((session) => session.id)).toEqual(['s-remote']);
+        expect(sessions[0].venue?.id).toBe('v-remote');
+      });
+
+      it('takes hands onto a session that arrived in the same call', async () => {
+        await repository.applyChanges(set({
+          venues: [change(foreignVenue('v-remote', T0))],
+          sessions: [change({
+            id: 's-remote', venueId: 'v-remote', format: 'cash', gameType: 'NLHE',
+            stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 30_000,
+            fee: null, cashOut: null, entrants: null, finishPosition: null,
+            startedAt: T0, endedAt: null, notes: null, importKey: null,
+            createdAt: T0, updatedAt: T0,
+          })],
+          hands: [change({
+            id: 'h-remote', sessionId: 's-remote', holeCards: 'AsKd', position: null,
+            note: null, tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0,
+          })],
+        }));
+        const hands = await repository.listHands();
+        expect(hands.map((hand) => hand.id)).toEqual(['h-remote']);
+        expect(hands[0].holeCards).toBe('AsKd');
+      });
+
+      it('is safe to apply the same change twice', async () => {
+        const changes = set({ venues: [change(foreignVenue('v-remote', T0))] });
+        await repository.applyChanges(changes);
+        await repository.applyChanges(changes);
+        expect((await repository.listVenues()).length).toBe(1);
+      });
+
+      it('does nothing at all when handed nothing', async () => {
+        await expect(repository.applyChanges(set({}))).resolves.toBeUndefined();
+        expect(await repository.listVenues()).toEqual([]);
+      });
+    });
+
     describe('maintenance', () => {
       it('clears every table', async () => {
         const session = await newSession();

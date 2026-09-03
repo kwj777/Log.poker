@@ -619,6 +619,39 @@ it to ask which addresses have bought. A screen that said *check your inbox*
 would throw that away on the client, where no review of the server would catch
 it. So the confirmation is conditional and the refusal never guesses why.
 
+### Cross-device history
+
+Off unless somebody signs in, and unbuilt in the sense that matters until
+`GATE_SECRET` is set on this site: the endpoint answers 503 to everything
+without it, and `ALLOW_SIGN_IN` stays `__DEV__` until it is set.
+
+**One round trip does both halves.** A device sends what it changed and what it
+last saw; it gets back everything it has not seen. `netlify/functions/sync.mts`
+is the thin part around `src/sync/bundle.ts`, and it is TypeScript rather than
+`.mjs` precisely so it can import that file: two implementations of a merge is
+two merges that disagree in a year.
+
+- **The server merges.** A device that has been in a drawer for a month has a
+  month-old view of the world and possibly a wrong clock, so resolving there
+  would make the answer depend on which device asked. One place holds the
+  outcome and every device converges on it.
+- **Delta on the wire, bundle at rest.** One object per person in Netlify
+  Blobs, keyed by an HMAC of the subject so the store never holds a customer id.
+- **Two cursors, not one.** `pulled` is what the server has told this device
+  about; `pushed` is what this device has sent. They look like one number and
+  are not: the server's cursor moves past stamps this device wrote and never
+  sent, and collapsing them loses exactly those records.
+- **Both comparisons read one millisecond back.** A record written in the very
+  millisecond of the last sync is otherwise invisible forever, and a venue and
+  the session started on it are routinely the same millisecond. Re-sending a
+  millisecond is free, because applying a record twice is a no-op.
+- **Writes never wait on it.** Everything commits locally and returns; the push
+  happens after. A card room has no wifi and that is the normal case.
+
+`src/data/index.ts` is where the wrapper is composed in, which is what keeps all
+of this out of every feature folder: a screen asks for a repository and gets
+one, and whether it talks to a server is not a question it can ask.
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -627,18 +660,19 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 27 passed
-Tests:       739 passed
+Test Suites: 32 passed
+Tests:       844 passed
 
-  sqlRepository      86   the SQLite path, against real SQLite
-  dexieRepository    86   the IndexedDB path, against real IndexedDB
+  sqlRepository      96   the SQLite path, against real SQLite
+  dexieRepository    96   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   stats              45   P/L, rebuys, duration, win rate, groupings
   values             36   money, dates, durations, stakes, formats, counts
-  site               35   the marketing/app split, the PWA, the sitemap
+  site               37   the marketing/app split, the PWA, the sitemap
   variance           35   win rate, σ, confidence bands, verdicts
   merge              28   the rules for when two devices both have a say
+  bundle             27   the server-side merge, order and repeats included
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   tournaments        26   ROI, cash rate, dry runs, finishes
@@ -648,13 +682,17 @@ Tests:       739 passed
   money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
   token              16   the family token grammar, against signed fixtures
-  copy               13   what the sign-in is allowed to say
+  verify             16   checking a token, and every way past it that must not work
+  copy               18   what the sign-in and the sync are allowed to say
   seed               13   the demo dataset stays coherent
+  syncingRepository  13   two devices and one server, no fakes in between
+  client             12   the sync client, against a fake fetch
   session            12   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
+  endpoint            9   the client and the function agreeing where it is
   tokenStore.web      8   localStorage missing, blocked, and working
   columns             7   header matching
 ```
@@ -841,7 +879,8 @@ Ordered roughly by how much each is worth against how much it costs.
    id and an `updatedAt`, and the one feature the family pass adds to this app.
    **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
    starting: three quarters of the server already exists in Untilt.
-   **Phase 0 has landed** -- deletes are tombstones, the merge rules are written
+   **Phases 0, 1 and 2 have landed**; see
+   [Cross-device history](#cross-device-history). Deletes are tombstones, the merge rules are written
    and tested, and `listChangedSince` is the seam the engine plugs into. See
    [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
    has landed too**, in `src/auth`; see

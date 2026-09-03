@@ -206,6 +206,48 @@ export class DexieRepository implements Repository {
     };
   }
 
+  /** Sync's write. Upserts verbatim, parents first, skipping orphans. */
+  async applyChanges(changes: ChangeSet): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      [this.db.venues, this.db.sessions, this.db.rebuys, this.db.hands, this.db.moodEntries],
+      async () => {
+        for (const { record, deletedAt } of changes.venues) {
+          await this.db.venues.put({ ...fromVenue(record), deletedAt });
+        }
+
+        // No foreign keys here to throw, but the same skip: a session whose
+        // venue never arrived would render with no venue at all, which is a
+        // worse outcome than one row waiting for the next sync.
+        const known = new Set((await this.db.venues.toArray()).map((venue) => venue.id));
+        const stored = new Set<string>();
+        for (const { record, deletedAt } of changes.sessions) {
+          if (!known.has(record.venueId)) continue;
+          await this.db.sessions.put({ ...fromSession(record), deletedAt });
+          stored.add(record.id);
+        }
+
+        const sessions = new Set([
+          ...stored,
+          ...(await this.db.sessions.toArray()).map((session) => session.id),
+        ]);
+
+        for (const { record, deletedAt } of changes.rebuys) {
+          if (!sessions.has(record.sessionId)) continue;
+          await this.db.rebuys.put({ ...record, deletedAt });
+        }
+        for (const { record, deletedAt } of changes.hands) {
+          if (!sessions.has(record.sessionId)) continue;
+          await this.db.hands.put({ ...record, tags: [...record.tags], deletedAt });
+        }
+        for (const { record, deletedAt } of changes.moodEntries) {
+          if (!sessions.has(record.sessionId)) continue;
+          await this.db.moodEntries.put({ ...record, deletedAt });
+        }
+      },
+    );
+  }
+
   // ---------------------------------------------------------------- venues
 
   /** Session counts come from one grouped pass rather than a query per venue. */

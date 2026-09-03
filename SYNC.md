@@ -276,7 +276,7 @@ order is chosen so that the riskiest work is done before anything depends on it.
 |---|---|---|---|
 | **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
 | **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Done**, behind `ALLOW_SIGN_IN` | 3 to 4 days, most of it in Untilt |
-| **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | The feature | 5 to 8 days |
+| **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | **Built.** Waiting on one env var | 5 to 8 days |
 | **3** | RevenueCat `log_plus`, the offering, the both-singles rule, store review | The purchase | 3 to 5 days |
 
 ### What phase 0 actually landed
@@ -388,6 +388,43 @@ because that needs the gate secret and a secret shipped inside a downloadable
 app is not one: a claim read on this side decides what to show and what is worth
 sending, never what is allowed, and the server re-derives on every request.
 
+### What phase 2 landed
+
+**The endpoint is on Log, not on the host that mints the token.** The web app is
+served from `log.poker/app` and this answers on `log.poker`, which is one
+origin, so unlike the family sign-in there is nothing to allowlist and no
+preflight to answer. Native sends no `Origin` at all. Deciding to make it
+cross-origin later should be a decision rather than a discovery.
+
+`netlify/functions/sync.mts` is the thin part: a token, a blob, the merge, the
+blob back. It is TypeScript rather than the `.mjs` the scan counter is written
+in, precisely so it can import `src/sync/bundle.ts`. **Two implementations of a
+merge is two merges that disagree in a year.**
+
+The bundle is one object per person in Netlify Blobs, keyed by an HMAC of the
+subject so the store never holds a customer id, and the wire carries deltas
+against it. The cursor is `updatedAt` and the comparison is `>=`, which costs
+one millisecond of re-sent records per sync and closes a hole that would
+otherwise lose a record roughly once a year, unreproducibly.
+
+**Two bugs came out of the two-device test and neither would have come out of
+anything else.** A write that landed while a push was in flight was never sent,
+because joining an in-flight run is not the same as being sent by it. And one
+cursor cannot do both jobs: the server's cursor moves past stamps this device
+wrote and never sent, so `pulled` and `pushed` are now two numbers and the
+second is taken from the records actually sent rather than from a clock. Both
+were silent, both lost data, and both were found by asking the question a player
+would ask rather than the question a unit test asks.
+
+**What is left is an environment variable.** `GATE_SECRET` has to be set on
+Log's Netlify site, the same value Untilt signs with, and then `ALLOW_SIGN_IN`
+flips. Until that is true the endpoint answers 503 to everything, which is the
+state to leave it in.
+
+Still not built: **collecting tombstones.** They accumulate, and a heavy
+deleter's database grows where it used to shrink. It is now the oldest thing on
+this list.
+
 Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
 no dependency on each other and can be built in either order or at once.
 
@@ -433,14 +470,17 @@ quietly during work like this.
 2. **Does the first release sync Log only, or is the shared account across all
    three apps a launch requirement?** Log-only is smaller and can use the same
    token without the App User ID work landing anywhere else.
-3. **Netlify Blobs, or a real database?** The bundle-at-rest shape fits Blobs and
-   keeps the family on one piece of infrastructure. A player with ten years of
-   history and a device that has been offline for a month is the case that would
-   argue otherwise, and it is not a case anybody has yet.
-4. **How much of the merge is server-side?** This document puts per-record
-   last-write-wins on the server, next to the store, so a device that has been
-   away does not have to be trusted to resolve. Client-side is also defensible
-   and would keep the endpoint a dumb blob store.
+3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
+   bundle-at-rest shape fits them and keeps the family on one piece of
+   infrastructure. A player with ten years of history and a device that has been
+   offline for a month is still the case that would argue otherwise, and still
+   not a case anybody has.
+4. ~~**How much of the merge is server-side?**~~ **Settled: all of it.** A
+   device that has been in a drawer for a month has a month-old view of the
+   world and possibly a wrong clock, so resolving there would make the answer
+   depend on which device asked. One place holds the outcome, every device
+   converges on it, and the rules are exercised by one test suite rather than by
+   however many app versions are still installed.
 
 ---
 

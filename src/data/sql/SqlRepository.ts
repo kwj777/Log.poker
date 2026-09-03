@@ -285,6 +285,94 @@ export class SqlRepository implements Repository {
     };
   }
 
+  /**
+   * Sync's write. Upserts verbatim, parents first, skipping orphans.
+   *
+   * `INSERT OR REPLACE` rather than an update, because most of what arrives is
+   * a row this device has never seen, and the ones it has seen are being
+   * overwritten wholesale anyway: these records were already resolved.
+   */
+  async applyChanges(changes: ChangeSet): Promise<void> {
+    await this.driver.transaction(async () => {
+      for (const { record, deletedAt } of changes.venues) {
+        await this.driver.run(
+          `INSERT OR REPLACE INTO venues (id, name, is_home_game, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [record.id, record.name, bool(record.isHomeGame), record.createdAt, record.updatedAt, deletedAt],
+        );
+      }
+
+      // A session naming a venue that is still missing is skipped rather than
+      // thrown on: foreign keys are on, and one inconsistent row should cost
+      // that row rather than the whole sync.
+      const known = new Set(
+        (await this.driver.all<{ id: string }>(`SELECT id FROM venues`)).map((row) => row.id),
+      );
+      const stored = new Set<string>();
+      for (const { record, deletedAt } of changes.sessions) {
+        if (!known.has(record.venueId)) continue;
+        await this.driver.run(
+          `INSERT OR REPLACE INTO sessions (
+             id, venue_id, format, game_type, small_blind, big_blind, ante, currency,
+             buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
+             notes, import_key, created_at, updated_at, deleted_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            record.id, record.venueId, record.format, record.gameType,
+            record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
+            record.stakes?.ante ?? null, record.currency, record.buyIn, record.fee,
+            record.cashOut, record.entrants, record.finishPosition, record.startedAt,
+            record.endedAt, record.notes, record.importKey, record.createdAt,
+            record.updatedAt, deletedAt,
+          ],
+        );
+        stored.add(record.id);
+      }
+
+      const sessions = new Set([
+        ...stored,
+        ...(await this.driver.all<{ id: string }>(`SELECT id FROM sessions`)).map((row) => row.id),
+      ]);
+
+      for (const { record, deletedAt } of changes.rebuys) {
+        if (!sessions.has(record.sessionId)) continue;
+        await this.driver.run(
+          `INSERT OR REPLACE INTO rebuys (id, session_id, amount, at, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [record.id, record.sessionId, record.amount, record.at, record.createdAt, record.updatedAt, deletedAt],
+        );
+      }
+
+      for (const { record, deletedAt } of changes.hands) {
+        if (!sessions.has(record.sessionId)) continue;
+        await this.driver.run(
+          `INSERT OR REPLACE INTO hands (
+             id, session_id, hole_cards, position, note, tags, amount, at,
+             created_at, updated_at, deleted_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            record.id, record.sessionId, record.holeCards, record.position, record.note,
+            JSON.stringify(record.tags ?? []), record.amount, record.at,
+            record.createdAt, record.updatedAt, deletedAt,
+          ],
+        );
+      }
+
+      for (const { record, deletedAt } of changes.moodEntries) {
+        if (!sessions.has(record.sessionId)) continue;
+        await this.driver.run(
+          `INSERT OR REPLACE INTO mood_entries (
+             id, session_id, phase, score, at, created_at, updated_at, deleted_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            record.id, record.sessionId, record.phase, record.score, record.at,
+            record.createdAt, record.updatedAt, deletedAt,
+          ],
+        );
+      }
+    });
+  }
+
   // ---------------------------------------------------------------- venues
 
   async listVenues(): Promise<Venue[]> {

@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { SignInFailure } from '../../../auth/signin';
-import { CODE_SENT, NOTHING_LEAVES, describeSession, messageFor } from '../copy';
+import { CODE_SENT, NOTHING_LEAVES, describeSession, describeSync, messageFor } from '../copy';
 
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
@@ -92,6 +92,37 @@ describe('what it says once somebody is signed in', () => {
   });
 });
 
+describe('what it says about the sync itself', () => {
+  const state = (over: Partial<Parameters<typeof describeSync>[0]> = {}) =>
+    describeSync({ lastSyncedAt: null, pending: 0, problem: null, running: false, ...over });
+
+  it('says nothing has synced yet before anything has', () => {
+    expect(state()).toMatch(/[Nn]ot synced yet/);
+  });
+
+  it('is quiet when it worked', () => {
+    expect(state({ lastSyncedAt: 1 })).toMatch(/[Uu]p to date/);
+  });
+
+  it('says nothing is lost when it could not reach the server', () => {
+    // The player's whole log is on this device either way, and a failure that
+    // did not say so would read as one.
+    const said = state({ problem: 'unreachable', pending: 3 });
+    expect(said).toMatch(/nothing is lost/);
+    expect(said).toMatch(/3 changes/);
+  });
+
+  it('counts one change as one rather than as 1 changes', () => {
+    expect(state({ problem: 'unreachable', pending: 1 })).toMatch(/1 change is waiting/);
+  });
+
+  it('asks for a sign-in when that is what is wrong, and does not blame the network', () => {
+    const said = state({ problem: 'unauthorized' });
+    expect(said).toMatch(/sign in again/);
+    expect(said).not.toMatch(/connection|reach/i);
+  });
+});
+
 describe('where the card is wired up', () => {
   const settings = read('app', '(tabs)', 'settings.tsx');
   const config = read('src', 'config.ts');
@@ -114,5 +145,13 @@ describe('where the card is wired up', () => {
     const card = read('src', 'features', 'account', 'SignInCard.tsx');
     expect(card).toContain('signOut()');
     expect(card).not.toMatch(/clearAll|deleteSession|deleteAll/);
+  });
+
+  it('tells the data layer to compose again on both sides of a session', () => {
+    // The repository was built before there was a token, so it is holding the
+    // plain local one. Without this, signing in appears to work and syncs
+    // nothing, which is the worst of the three possible outcomes.
+    const card = read('src', 'features', 'account', 'SignInCard.tsx');
+    expect([...card.matchAll(/recomposeRepository\(\)/g)]).toHaveLength(2);
   });
 });

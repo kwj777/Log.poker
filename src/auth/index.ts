@@ -13,6 +13,7 @@ import { tokenStore, TOKEN_STORE } from './tokenStore';
 let manager: SessionManager = new SessionManager(tokenStore);
 
 export const getSession = () => manager.current();
+export const getToken = () => manager.token();
 export const signIn = (token: string) => manager.signIn(token);
 export const signOut = () => manager.signOut();
 

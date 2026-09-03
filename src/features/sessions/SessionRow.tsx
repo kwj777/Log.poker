@@ -8,7 +8,8 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '../../components/Text';
-import { formatMoney, formatStakes } from '../../domain/money';
+import { formatEntry, formatMoney, formatStakes } from '../../domain/money';
+import { formatFinish } from '../../domain/tournaments';
 import { durationMs, formatDuration, netResult } from '../../domain/stats';
 import type { SessionWithChildren } from '../../domain/types';
 import { Card } from '../../components/Card';
@@ -25,7 +26,17 @@ interface SessionRowProps {
 export const SessionRow = ({ session, onPress, standalone = false }: SessionRowProps) => {
   const net = netResult(session, session.rebuys);
   const live = session.endedAt === null;
-  const currency = session.stakes.currency;
+  const { currency } = session;
+  // A tournament describes itself by what it cost and where it finished; a cash
+  // game by its stakes. Neither reads as the other, so they do not share a line.
+  const descriptor =
+    session.format === 'tournament'
+      ? [formatEntry(session.buyIn, session.fee, currency), formatFinish(session.finishPosition, session.entrants)]
+          .filter((part): part is string => part !== null)
+          .join(' · ')
+      : session.stakes === null
+        ? session.gameType
+        : `${formatStakes(session.stakes, currency)} · ${session.gameType}`;
 
   const content = (
     <View style={styles.row}>
@@ -34,8 +45,8 @@ export const SessionRow = ({ session, onPress, standalone = false }: SessionRowP
           {session.venue?.name ?? 'Unknown venue'}
         </Text>
         <Text variant="caption" color={colors.textTertiary} numberOfLines={1}>
-          {formatRelativeDay(session.startedAt)} · {formatStakes(session.stakes)} ·{' '}
-          {session.gameType} · {formatDuration(durationMs(session))}
+          {formatRelativeDay(session.startedAt)} · {descriptor} ·{' '}
+          {formatDuration(durationMs(session))}
         </Text>
       </View>
 

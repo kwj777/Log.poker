@@ -157,7 +157,7 @@ export default function LogHandScreen() {
         <AmountInput
           value={amount}
           onChangeText={setAmount}
-          currency={session.stakes.currency}
+          currency={session.currency}
           placeholder="0"
           accessibilityLabel="Pot swing amount"
         />

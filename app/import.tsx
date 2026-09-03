@@ -61,7 +61,7 @@ export default function ImportScreen() {
         (sum, session) => sum + session.draft.cashOut - session.draft.buyIn,
         0,
       ),
-      currency: reading.sessions[0].draft.stakes.currency,
+      currency: reading.sessions[0].draft.currency,
       from: Math.min(...starts),
       to: Math.max(...starts),
       venues: Array.from(new Set(reading.sessions.map((session) => session.venueName))),

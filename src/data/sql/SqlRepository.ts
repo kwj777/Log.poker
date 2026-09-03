@@ -9,6 +9,7 @@ import {
   GAME_TYPES,
   HAND_TAGS,
   MOOD_PHASES,
+  SESSION_FORMATS,
   type GameType,
   type Hand,
   type HandTag,
@@ -23,7 +24,9 @@ import {
   type Position,
   type Rebuy,
   type Session,
+  type SessionFormat,
   type SessionWithChildren,
+  type Stakes,
   type Timestamp,
   type Venue,
 } from '../../domain/types';
@@ -62,13 +65,17 @@ interface VenueRow {
 interface SessionRow {
   id: string;
   venue_id: string;
+  format: string;
   game_type: string;
   small_blind: number;
   big_blind: number;
   ante: number | null;
   currency: string;
   buy_in: number;
+  fee: number | null;
   cash_out: number | null;
+  entrants: number | null;
+  finish_position: number | null;
   started_at: number;
   ended_at: number | null;
   notes: string | null;
@@ -140,25 +147,45 @@ const toVenue = (row: VenueRow): Venue => ({
   updatedAt: row.updated_at,
 });
 
-const toSession = (row: SessionRow): Session => ({
-  id: row.id,
-  venueId: row.venue_id,
-  gameType: isGameType(row.game_type) ? row.game_type : 'OTHER',
-  stakes: {
+const isSessionFormat = (value: string): value is SessionFormat =>
+  (SESSION_FORMATS as readonly string[]).includes(value);
+
+/**
+ * 0/0 is the stored form of "no stakes" -- see the v3 migration. It is a total
+ * encoding rather than a guess: no poker game has ever been played with both
+ * blinds at zero, so nothing real can collide with it.
+ */
+const toStakes = (row: SessionRow): Stakes | null => {
+  if (row.small_blind === 0 && row.big_blind === 0) return null;
+  return {
     smallBlind: row.small_blind,
     bigBlind: row.big_blind,
     ...(row.ante === null ? {} : { ante: row.ante }),
+  };
+};
+
+const toSession = (row: SessionRow): Session => {
+  const format = isSessionFormat(row.format) ? row.format : 'cash';
+  return {
+    id: row.id,
+    venueId: row.venue_id,
+    format,
+    gameType: isGameType(row.game_type) ? row.game_type : 'OTHER',
+    stakes: format === 'tournament' ? null : toStakes(row),
     currency: row.currency,
-  },
-  buyIn: row.buy_in,
-  cashOut: row.cash_out,
-  startedAt: row.started_at,
-  endedAt: row.ended_at,
-  notes: row.notes,
-  importKey: row.import_key ?? null,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
+    buyIn: row.buy_in,
+    fee: row.fee,
+    cashOut: row.cash_out,
+    entrants: row.entrants,
+    finishPosition: row.finish_position,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    notes: row.notes,
+    importKey: row.import_key ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
 
 const toRebuy = (row: RebuyRow): Rebuy => ({
   id: row.id,
@@ -278,6 +305,10 @@ export class SqlRepository implements Repository {
     if (filter.venueId !== undefined) {
       clauses.push('venue_id = ?');
       params.push(filter.venueId);
+    }
+    if (filter.format !== undefined) {
+      clauses.push('format = ?');
+      params.push(filter.format);
     }
     if (filter.gameType !== undefined) {
       clauses.push('game_type = ?');
@@ -402,19 +433,24 @@ export class SqlRepository implements Repository {
   private async insertSession(session: Session): Promise<void> {
     await this.driver.run(
       `INSERT INTO sessions (
-         id, venue_id, game_type, small_blind, big_blind, ante, currency, buy_in,
-         cash_out, started_at, ended_at, notes, import_key, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         id, venue_id, format, game_type, small_blind, big_blind, ante, currency,
+         buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
+         notes, import_key, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.id,
         session.venueId,
+        session.format,
         session.gameType,
-        session.stakes.smallBlind,
-        session.stakes.bigBlind,
-        session.stakes.ante ?? null,
-        session.stakes.currency,
+        session.stakes?.smallBlind ?? 0,
+        session.stakes?.bigBlind ?? 0,
+        session.stakes?.ante ?? null,
+        session.currency,
         session.buyIn,
+        session.fee,
         session.cashOut,
+        session.entrants,
+        session.finishPosition,
         session.startedAt,
         session.endedAt,
         session.notes,
@@ -436,18 +472,23 @@ export class SqlRepository implements Repository {
 
   private async writeSession(session: Session): Promise<void> {
     await this.driver.run(
-      `UPDATE sessions SET venue_id = ?, game_type = ?, small_blind = ?, big_blind = ?,
-         ante = ?, currency = ?, buy_in = ?, cash_out = ?, started_at = ?, ended_at = ?,
+      `UPDATE sessions SET venue_id = ?, format = ?, game_type = ?, small_blind = ?,
+         big_blind = ?, ante = ?, currency = ?, buy_in = ?, fee = ?, cash_out = ?,
+         entrants = ?, finish_position = ?, started_at = ?, ended_at = ?,
          notes = ?, updated_at = ? WHERE id = ?`,
       [
         session.venueId,
+        session.format,
         session.gameType,
-        session.stakes.smallBlind,
-        session.stakes.bigBlind,
-        session.stakes.ante ?? null,
-        session.stakes.currency,
+        session.stakes?.smallBlind ?? 0,
+        session.stakes?.bigBlind ?? 0,
+        session.stakes?.ante ?? null,
+        session.currency,
         session.buyIn,
+        session.fee,
         session.cashOut,
+        session.entrants,
+        session.finishPosition,
         session.startedAt,
         session.endedAt,
         session.notes,

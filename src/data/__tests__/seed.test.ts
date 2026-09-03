@@ -6,7 +6,8 @@
 
 import { estimatePlayer, toObservations } from '../../domain/variance';
 import { bankrollCurve, totals } from '../../domain/stats';
-import { DEMO_SESSION_COUNT, seedDemoData } from '../seed';
+import { tournamentTotals } from '../../domain/tournaments';
+import { DEMO_SESSION_COUNT, DEMO_TOURNAMENT_COUNT, seedDemoData } from '../seed';
 import { SqlRepository } from '../sql/SqlRepository';
 import type { Repository } from '../repository';
 import { NodeSqliteDriver } from './support/nodeSqliteDriver';
@@ -28,12 +29,43 @@ describe('demo dataset', () => {
     await driver.close();
   });
 
-  it('seeds 20 completed sessions across four venues', async () => {
+  it('seeds every planned session across four venues, all finished', async () => {
     const sessions = await repository.listSessions();
     expect(sessions).toHaveLength(DEMO_SESSION_COUNT);
-    expect(DEMO_SESSION_COUNT).toBe(20);
+    expect(DEMO_SESSION_COUNT).toBe(27);
     expect(sessions.every((session) => session.endedAt !== null)).toBe(true);
     expect(await repository.listVenues()).toHaveLength(4);
+  });
+
+  it('seeds both formats, so every screen has something to show', async () => {
+    const sessions = await repository.listSessions();
+    const tournaments = sessions.filter((session) => session.format === 'tournament');
+    expect(tournaments).toHaveLength(DEMO_TOURNAMENT_COUNT);
+    expect(DEMO_TOURNAMENT_COUNT).toBe(7);
+    expect(sessions.filter((session) => session.format === 'cash')).toHaveLength(20);
+  });
+
+  it('gives tournaments the shape tournaments actually have', async () => {
+    const result = tournamentTotals(await repository.listSessions());
+    // Mostly losses, carried by one deep run: the shape the copy describes.
+    expect(result.cashes).toBe(2);
+    expect(result.entries).toBe(7);
+    expect(result.net).toBeGreaterThan(0);
+    expect(result.bestFinish).toBe(3);
+    expect(result.fees).toBeGreaterThan(0);
+  });
+
+  it('keeps tournaments out of the cash-game variance estimate', async () => {
+    const sessions = await repository.listSessions();
+    const observed = toObservations(sessions);
+    expect(observed).toHaveLength(20);
+    expect(
+      observed.every((observation) =>
+        sessions.some(
+          (session) => session.id === observation.sessionId && session.format === 'cash',
+        ),
+      ),
+    ).toBe(true);
   });
 
   it('leaves no session running, so the app opens on the dashboard', async () => {

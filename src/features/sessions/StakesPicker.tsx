@@ -43,7 +43,7 @@ export const StakesPicker = ({ value, onChange }: StakesPickerProps) => {
             selected={!custom && stakesEqual(preset, value)}
             onPress={() => {
               setCustom(false);
-              onChange({ ...preset, currency: value.currency });
+              onChange({ ...preset });
             }}
           />
         ))}

@@ -8,7 +8,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -22,14 +22,15 @@ import { Sheet } from '../../src/components/Sheet';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { successFeedback, warningFeedback } from '../../src/components/haptics';
-import { formatMoney, formatStakes, parseAmount } from '../../src/domain/money';
+import { formatEntry, formatMoney, formatStakes, parseAmount } from '../../src/domain/money';
+import { parseCount } from '../../src/domain/import/values';
 import { formatDuration, totalInvested } from '../../src/domain/stats';
 import type { MoodScore } from '../../src/domain/types';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
-import { colors, resultColor, spacing } from '../../src/theme';
+import { colors, radius, resultColor, spacing, typography } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
 
 export default function ActiveSessionScreen() {
@@ -43,6 +44,8 @@ export default function ActiveSessionScreen() {
   const [cashOutOpen, setCashOutOpen] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState('');
   const [endMood, setEndMood] = useState<MoodScore | null>(null);
+  const [finishPosition, setFinishPosition] = useState('');
+  const [entrants, setEntrants] = useState('');
   const [busy, setBusy] = useState(false);
 
   const elapsed = useElapsed(session?.startedAt ?? null);
@@ -71,7 +74,11 @@ export default function ActiveSessionScreen() {
     );
   }
 
-  const currency = session.stakes.currency;
+  const { currency } = session;
+  const tournament = session.format === 'tournament';
+  // A tournament is re-entered, not rebought. The word on the button is the
+  // whole difference between the two screens, so it is worth getting right.
+  const rebuyWord = tournament ? 'Re-entry' : 'Rebuy';
   const cashOutCents = parseAmount(cashOutAmount);
   const projected = cashOutCents === null ? null : cashOutCents - invested;
 
@@ -93,7 +100,10 @@ export default function ActiveSessionScreen() {
     if (cashOutCents === null || cashOutCents < 0 || busy) return;
     setBusy(true);
     try {
-      await endSession(session.id, cashOutCents, endMood);
+      await endSession(session.id, cashOutCents, endMood, {
+        finishPosition: parseCount(finishPosition),
+        entrants: parseCount(entrants),
+      });
       warningFeedback();
       setCashOutOpen(false);
       router.replace(`/session/${session.id}`);
@@ -127,15 +137,19 @@ export default function ActiveSessionScreen() {
           </View>
           <Text variant="display">{formatDuration(elapsed)}</Text>
           <Text color={colors.textSecondary}>
-            {session.venue?.name ?? 'Unknown venue'} · {formatStakes(session.stakes)} ·{' '}
-            {session.gameType}
+            {session.venue?.name ?? 'Unknown venue'} ·{' '}
+            {tournament
+              ? formatEntry(session.buyIn, session.fee, currency)
+              : session.stakes === null
+                ? session.gameType
+                : `${formatStakes(session.stakes, currency)} · ${session.gameType}`}
           </Text>
         </View>
 
         <View style={styles.tiles}>
           <StatTile label="On the table" value={formatMoney(invested, { currency })} />
           <StatTile
-            label="Rebuys"
+            label={tournament ? 'Re-entries' : 'Rebuys'}
             value={String(session.rebuys.length)}
             hint={
               session.rebuys.length > 0
@@ -148,7 +162,7 @@ export default function ActiveSessionScreen() {
 
         <View style={styles.actions}>
           <Button
-            label="Rebuy"
+            label={tournament ? 'Re-enter' : 'Rebuy'}
             variant="secondary"
             size="medium"
             style={styles.action}
@@ -188,12 +202,12 @@ export default function ActiveSessionScreen() {
 
         {session.rebuys.length > 0 ? (
           <>
-            <SectionHeader title="Rebuys" />
+            <SectionHeader title={tournament ? 'Re-entries' : 'Rebuys'} />
             <Card>
               {session.rebuys.map((rebuy, index) => (
                 <View key={rebuy.id} style={styles.rebuyRow}>
                   <Text color={colors.textSecondary}>
-                    Rebuy {index + 1} ·{' '}
+                    {tournament ? 'Re-entry' : 'Rebuy'} {index + 1} ·{' '}
                     {formatDuration(rebuy.at - session.startedAt)} in
                   </Text>
                   <Text variant="bodyStrong">{formatMoney(rebuy.amount, { currency })}</Text>
@@ -204,17 +218,21 @@ export default function ActiveSessionScreen() {
         ) : null}
       </Screen>
 
-      <Sheet visible={rebuyOpen} onClose={() => setRebuyOpen(false)} title="Add a rebuy">
+      <Sheet
+        visible={rebuyOpen}
+        onClose={() => setRebuyOpen(false)}
+        title={tournament ? 'Add a re-entry' : 'Add a rebuy'}
+      >
         <AmountInput
           value={rebuyAmount}
           onChangeText={setRebuyAmount}
           currency={currency}
           presets={[session.buyIn / 2, session.buyIn, session.buyIn * 2].map(Math.round)}
           autoFocus
-          accessibilityLabel="Rebuy amount"
+          accessibilityLabel={`${rebuyWord} amount`}
         />
         <Button
-          label="Add rebuy"
+          label={tournament ? 'Add re-entry' : 'Add rebuy'}
           onPress={() => void commitRebuy()}
           style={styles.sheetAction}
           disabled={(parseAmount(rebuyAmount) ?? 0) <= 0}
@@ -222,10 +240,19 @@ export default function ActiveSessionScreen() {
         />
       </Sheet>
 
-      <Sheet visible={cashOutOpen} onClose={() => setCashOutOpen(false)} title="Cash out">
+      <Sheet
+        visible={cashOutOpen}
+        onClose={() => setCashOutOpen(false)}
+        title={tournament ? 'Finish up' : 'Cash out'}
+      >
         <Text color={colors.textSecondary} style={styles.sheetHint}>
-          Count your chips. You put {formatMoney(invested, { currency })} on the table over{' '}
-          {formatDuration(elapsed)}.
+          {tournament
+            ? `Enter what you won, or leave it at zero. The entry cost ${formatMoney(invested, {
+                currency,
+              })} over ${formatDuration(elapsed)}.`
+            : `Count your chips. You put ${formatMoney(invested, {
+                currency,
+              })} on the table over ${formatDuration(elapsed)}.`}
         </Text>
         <AmountInput
           value={cashOutAmount}
@@ -233,8 +260,37 @@ export default function ActiveSessionScreen() {
           currency={currency}
           placeholder="0"
           autoFocus
-          accessibilityLabel="Cash-out amount"
+          accessibilityLabel={tournament ? 'Prize won' : 'Cash-out amount'}
         />
+
+        {tournament ? (
+          <>
+            <Text variant="overline" color={colors.textTertiary} style={styles.sheetLabel}>
+              Where did you finish? (optional)
+            </Text>
+            <View style={styles.finishRow}>
+              <TextInput
+                value={finishPosition}
+                onChangeText={setFinishPosition}
+                placeholder="Place"
+                placeholderTextColor={colors.textTertiary}
+                inputMode="numeric"
+                accessibilityLabel="Finishing position"
+                style={styles.finishInput}
+              />
+              <Text color={colors.textTertiary}>of</Text>
+              <TextInput
+                value={entrants}
+                onChangeText={setEntrants}
+                placeholder="Entrants"
+                placeholderTextColor={colors.textTertiary}
+                inputMode="numeric"
+                accessibilityLabel="Number of entrants"
+                style={styles.finishInput}
+              />
+            </View>
+          </>
+        ) : null}
 
         {projected !== null ? (
           <Text variant="heading" color={resultColor(projected)} style={styles.projection}>
@@ -248,7 +304,7 @@ export default function ActiveSessionScreen() {
         <MoodPicker value={endMood} onChange={setEndMood} compact />
 
         <Button
-          label="End session"
+          label={tournament ? 'End tournament' : 'End session'}
           onPress={() => void commitCashOut()}
           style={styles.sheetAction}
           disabled={cashOutCents === null || cashOutCents < 0}
@@ -274,6 +330,23 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.accent,
+  },
+  finishRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  finishInput: {
+    ...typography.body,
+    flex: 1,
+    color: colors.text,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   tiles: {
     flexDirection: 'row',

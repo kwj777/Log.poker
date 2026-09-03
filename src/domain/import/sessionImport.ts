@@ -17,26 +17,33 @@
  *    never null. A session with a null `endedAt` is what Log calls the *active*
  *    session, and it allows exactly one; importing 200 rows that each claim to
  *    be live would break the app rather than fill it.
- * 2. **Nothing is invented.** A row with no stakes gets zero blinds, not a
+ * 2. **Nothing is invented.** A row with no stakes gets no stakes, not a
  *    plausible-looking `$1/$2`; a row with no duration ends when it started.
  *    Both degrade honestly: `toObservations` in `variance.ts` already drops
- *    sessions with no measurable duration or a zero big blind, so they count
- *    toward the bankroll curve and stay out of a win-rate estimate they would
- *    poison. Every one of those rows produces a warning saying so.
+ *    sessions with no measurable duration and sessions with no blinds, so they
+ *    count toward the bankroll curve and stay out of a win-rate estimate they
+ *    would poison. Every one of those rows produces a warning saying so.
+ *
+ * Tournaments come in through the same door. A row is read as one when the file
+ * says so or when it carries something only a tournament has -- an entry fee, a
+ * field size, a finishing position -- and it lands with no stakes at all, which
+ * keeps it out of the cash-game variance model by the same rule.
  */
 
 import { DEFAULT_CURRENCY, stakesKey } from '../money';
-import type { Cents, GameType, Stakes, Timestamp } from '../types';
+import type { Cents, GameType, SessionFormat, Stakes, Timestamp } from '../types';
 import { cellAt, parseCsv, type CsvRow } from './csv';
 import { resolveColumns, type ColumnMap } from './columns';
 import {
   detectDateOrder,
   durationUnitFromHeader,
   hasAmbiguousDateShape,
+  parseCount,
   parseCurrency,
   parseDurationMs,
   parseGameType,
   parseMoney,
+  parseSessionFormat,
   parseStakes,
   parseTimestamp,
   type DateOrder,
@@ -56,10 +63,15 @@ export interface ImportWarning {
  * because venues are created from the names in the file at import time.
  */
 export interface ImportedSessionDraft {
+  format: SessionFormat;
   gameType: GameType;
-  stakes: Stakes;
+  stakes: Stakes | null;
+  currency: string;
   buyIn: Cents;
+  fee: Cents | null;
   cashOut: Cents;
+  entrants: number | null;
+  finishPosition: number | null;
   startedAt: Timestamp;
   endedAt: Timestamp;
   notes: string | null;
@@ -106,15 +118,36 @@ export interface SessionImportResult {
   skipped: number;
 }
 
-const importKeyFor = (venueName: string, draft: ImportedSessionDraft): string =>
-  [
-    'csv',
-    draft.startedAt,
-    venueName.trim().toLowerCase().replace(/\|/g, '/'),
-    stakesKey(draft.stakes),
-    draft.buyIn,
-    draft.cashOut,
-  ].join('|');
+/**
+ * The cash-game shape here is frozen.
+ *
+ * Every session imported before tournaments existed carries a key in exactly
+ * this form, and a key that no longer matches turns the next import of an
+ * unchanged file into a file full of new sessions -- the one failure this key
+ * exists to prevent. So a cash row still writes the `<currency>:0/0` that those
+ * versions wrote for a session whose blinds could not be read, even though the
+ * blinds are now honestly null rather than zero.
+ *
+ * Tournaments are new, so they are free to say what they are.
+ */
+const importKeyFor = (venueName: string, draft: ImportedSessionDraft): string => {
+  const venue = venueName.trim().toLowerCase().replace(/\|/g, '/');
+  if (draft.format === 'tournament') {
+    return [
+      'csv',
+      'tournament',
+      draft.startedAt,
+      venue,
+      draft.currency,
+      draft.buyIn,
+      draft.fee ?? 0,
+      draft.cashOut,
+    ].join('|');
+  }
+  const level =
+    draft.stakes === null ? `${draft.currency}:0/0` : stakesKey(draft.stakes, draft.currency);
+  return ['csv', draft.startedAt, venue, level, draft.buyIn, draft.cashOut].join('|');
+};
 
 const isBlankRow = (row: CsvRow): boolean => row.cells.every((cell) => cell.trim() === '');
 
@@ -205,6 +238,7 @@ export const parseSessionCsv = (
   let noStakes = 0;
   let noDuration = 0;
   let missingBuyIn = 0;
+  let tournaments = 0;
 
   for (const row of table.rows) {
     if (isBlankRow(row)) continue;
@@ -220,13 +254,26 @@ export const parseSessionCsv = (
     const buyInCell = parseMoney(cellAt(row, indexes.buyIn));
     const cashOutCell = parseMoney(cellAt(row, indexes.cashOut));
     const resultCell = parseMoney(cellAt(row, indexes.result));
+    const feeCell = parseMoney(cellAt(row, indexes.fee));
+    const stakesCell = cellAt(row, indexes.stakes);
 
     const currency =
       parseCurrency(cellAt(row, indexes.currency)) ??
       buyInCell?.currency ??
       cashOutCell?.currency ??
       resultCell?.currency ??
+      parseCurrency(stakesCell) ??
       defaultCurrency;
+
+    const entrants = parseCount(cellAt(row, indexes.entrants));
+    const finishPosition = parseCount(cellAt(row, indexes.finishPosition));
+
+    // What the file says, and failing that what it implies: an entry fee, a
+    // field size or a finishing position only mean anything in a tournament.
+    const format: SessionFormat =
+      parseSessionFormat(cellAt(row, indexes.format)) ??
+      (feeCell !== null || entrants !== null || finishPosition !== null ? 'tournament' : 'cash');
+    const tournament = format === 'tournament';
 
     // A cash-out column is the direct measurement; a result column is derived
     // from one, so it only fills in where the first is absent.
@@ -270,19 +317,27 @@ export const parseSessionCsv = (
       noDuration += 1;
     }
 
-    const stakesCell = cellAt(row, indexes.stakes);
-    const stakes = parseStakes(stakesCell, currency);
-    if (stakes === null) noStakes += 1;
+    // A tournament has no blinds, so an unreadable stakes cell is only worth
+    // counting against a cash game -- where it is the difference between
+    // reaching the variance view and not.
+    const stakes = tournament ? null : parseStakes(stakesCell);
+    if (!tournament && stakes === null) noStakes += 1;
+    if (tournament) tournaments += 1;
 
     const venueCell = cellAt(row, indexes.venue);
     const venueName = venueCell === '' ? defaultVenue : venueCell;
     const notes = cellAt(row, indexes.notes);
 
     const draft: ImportedSessionDraft = {
+      format,
       gameType: parseGameType(cellAt(row, indexes.gameType)) ?? 'OTHER',
-      stakes: stakes ?? { smallBlind: 0, bigBlind: 0, currency },
+      stakes,
+      currency,
       buyIn,
+      fee: tournament ? (feeCell?.cents ?? null) : null,
       cashOut,
+      entrants: tournament ? entrants : null,
+      finishPosition: tournament ? finishPosition : null,
       startedAt,
       endedAt,
       notes: notes === '' ? null : notes,
@@ -313,7 +368,13 @@ export const parseSessionCsv = (
   if (noStakes > 0) {
     warn(
       null,
-      `${plural(noStakes, 'session')} had no readable stakes. They count toward profit and the bankroll curve, but the variance view skips them: it works in big blinds and cannot place a session without them.`,
+      `${plural(noStakes, 'cash session')} had no readable stakes. They count toward profit and the bankroll curve, but the variance view skips them: it works in big blinds and cannot place a session without them.`,
+    );
+  }
+  if (tournaments > 0) {
+    warn(
+      null,
+      `${plural(tournaments, 'row')} read as a tournament. Tournaments land in your bankroll and in the tournament figures, and stay out of the cash-game variance view: their results are the wrong shape for it.`,
     );
   }
   if (noDuration > 0) {

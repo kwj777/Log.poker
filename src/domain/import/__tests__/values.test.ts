@@ -194,40 +194,31 @@ describe('durationUnitFromHeader', () => {
 
 describe('parseStakes', () => {
   it('reads two blinds with or without symbols', () => {
-    expect(parseStakes('$0.25/$0.50', 'USD')).toEqual({
-      smallBlind: 25,
-      bigBlind: 50,
-      currency: 'USD',
-    });
-    expect(parseStakes('1/2', 'USD')).toEqual({ smallBlind: 100, bigBlind: 200, currency: 'USD' });
+    expect(parseStakes('$0.25/$0.50')).toEqual({ smallBlind: 25, bigBlind: 50 });
+    expect(parseStakes('1/2')).toEqual({ smallBlind: 100, bigBlind: 200 });
   });
 
-  it('reads European decimals and the currency in the cell', () => {
-    expect(parseStakes('0,25/0,50 EUR', 'USD')).toEqual({
-      smallBlind: 25,
-      bigBlind: 50,
-      currency: 'EUR',
-    });
+  it('reads European decimals', () => {
+    expect(parseStakes('0,25/0,50 EUR')).toEqual({ smallBlind: 25, bigBlind: 50 });
   });
 
   it('reads an ante when the cell names one', () => {
-    expect(parseStakes('50/100 ante 12', 'USD')).toEqual({
+    expect(parseStakes('50/100 ante 12')).toEqual({
       smallBlind: 5000,
       bigBlind: 10_000,
       ante: 1200,
-      currency: 'USD',
     });
   });
 
-  it('falls back to the given currency', () => {
-    expect(parseStakes('1/2', 'GBP')?.currency).toBe('GBP');
+  it('carries no currency: a session has one, its blinds do not', () => {
+    expect(parseStakes('$1/$2')).not.toHaveProperty('currency');
   });
 
   it('refuses shorthand that does not name both blinds', () => {
-    expect(parseStakes('NL50', 'USD')).toBeNull();
-    expect(parseStakes('$2', 'USD')).toBeNull();
-    expect(parseStakes('', 'USD')).toBeNull();
-    expect(parseStakes('0/0', 'USD')).toBeNull();
+    expect(parseStakes('NL50')).toBeNull();
+    expect(parseStakes('$2')).toBeNull();
+    expect(parseStakes('')).toBeNull();
+    expect(parseStakes('0/0')).toBeNull();
   });
 });
 

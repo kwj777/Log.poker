@@ -15,7 +15,7 @@
  */
 
 import { toCents } from '../money';
-import type { Cents, GameType, Stakes } from '../types';
+import type { Cents, GameType, SessionFormat, Stakes } from '../types';
 
 // ------------------------------------------------------------------- money
 
@@ -297,7 +297,7 @@ const ANTE = /(?:ante|straddle|bring[- ]?in)\D{0,3}(\d[\d.,]*)/i;
  * different things on different sites. Inventing `$0.25/$0.50` from it would be
  * a guess dressed as a measurement, and the caller has a warning for that.
  */
-export const parseStakes = (input: string, fallbackCurrency: string): Stakes | null => {
+export const parseStakes = (input: string): Stakes | null => {
   const text = input.trim();
   if (text === '') return null;
 
@@ -316,8 +316,40 @@ export const parseStakes = (input: string, fallbackCurrency: string): Stakes | n
     smallBlind: smallBlind.cents,
     bigBlind: bigBlind.cents,
     ...(ante !== null && ante.cents > 0 ? { ante: ante.cents } : {}),
-    currency: parseCurrency(text) ?? fallbackCurrency,
   };
+};
+
+// ------------------------------------------------------- format and counts
+
+/**
+ * Cash game or tournament, from whatever the file called it.
+ *
+ * Returns null rather than guessing at an unfamiliar word, so the caller can
+ * fall back to what the other columns imply -- a row with a field size and a
+ * finishing position is a tournament whatever its format cell says.
+ */
+export const parseSessionFormat = (input: string): SessionFormat | null => {
+  const text = input.trim().toLowerCase();
+  if (text === '') return null;
+  if (/tournament|tourney|\bmtt\b|\bsng\b|sit\s*(?:&|and|n)?\s*go|\bspin\b|freeroll|satellite/.test(text)) {
+    return 'tournament';
+  }
+  if (/cash|\bring\b|zoom|\brush\b|snap|fast\s*forward/.test(text)) return 'cash';
+  return null;
+};
+
+/**
+ * A whole-number count: a field size, a finishing position. Accepts `1,240`,
+ * `12th` and `#12`, and refuses anything that is not a positive whole number --
+ * a zero-th place finish is a typo, not a result.
+ */
+export const parseCount = (input: string): number | null => {
+  const text = input.trim();
+  if (text === '' || !/\d/.test(text)) return null;
+  const digits = text.replace(/[^\d]/g, '');
+  if (digits === '') return null;
+  const value = Number(digits);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
 };
 
 // ---------------------------------------------------------------- game type

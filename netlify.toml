@@ -89,6 +89,14 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
+# The blog is generated from content/blog at build time, so a post only exists
+# once a deploy has happened. These pages must revalidate or a returning
+# visitor keeps reading an index that has not heard about it.
+[[headers]]
+  for = "/blog/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 [[headers]]
   for = "/manifest.webmanifest"
   [headers.values]

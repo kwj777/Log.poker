@@ -19,6 +19,10 @@
  * `experiments.baseUrl` in app.json is the other half: it makes the export
  * reference its own bundle at /app/_expo rather than /_expo, which is where
  * this script then puts it.
+ *
+ * The Log Blog is generated last, by scripts/build-blog.mjs, and it is
+ * generated *after* the move for exactly the reason above: anything written
+ * into dist before the move would be swept under /app with the bundle.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, renameSync, rmSync, existsSync } from 'node:fs';
@@ -55,6 +59,11 @@ renameSync(join(DIST, HOME), join(DIST, 'index.html'));
 if (!existsSync(join(APP, 'index.html'))) {
   throw new Error('the export produced no app/index.html');
 }
+
+// After the move, so /blog stays at the root rather than following the export
+// under /app. It also rewrites dist/sitemap.xml, adding the posts to the two
+// URLs public/sitemap.xml maintains by hand.
+execFileSync('node', [join(ROOT, 'scripts', 'build-blog.mjs'), DIST], { cwd: ROOT, stdio: 'inherit' });
 
 console.log(`\n${moved.length} bundler outputs moved under /app: ${moved.join(', ')}`);
 console.log(`${HOME} is now the site index; ${[...fromPublic].length} public files stayed at the root`);

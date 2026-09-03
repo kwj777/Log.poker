@@ -65,6 +65,15 @@ describe('the front door', () => {
     for (const card of cards) expect(card).toMatch(/\bfree\b/i);
   });
 
+  it('claims no server, which is true until sync ships', () => {
+    // A tripwire rather than a fact worth asserting for its own sake. Roadmap
+    // items 2 and 3 give this app a server, at which point the honest sentence
+    // becomes "nothing leaves your device unless you turn this on" and this
+    // test is what stops the old one going out beside the new feature.
+    // See SYNC.md, "What must not break".
+    expect(home).toContain('Log has no server to send anything to.');
+  });
+
   it('and where the line falls, in words rather than in a number', () => {
     expect(home).toContain('Free at the table, paid away from it.');
     // Cross-device history is the one paid thing in this app, so the page says

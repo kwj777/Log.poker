@@ -73,7 +73,8 @@ history**, and that is the only thing in Log that will ever be paid for: it
 comes with owning the other two apps rather than carrying a price of its own.
 The line falls there because a second device needs an identity to sync to, and
 paying is what creates one, which makes it an honest conversion moment rather
-than a hostage situation. It is unbuilt today, and it is roadmap items 2 and 3.
+than a hostage situation. It is unbuilt today, and it is roadmap items 2 and 3;
+[SYNC.md](SYNC.md) scopes what building it takes.
 
 The numbers themselves live in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
@@ -524,7 +525,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 21 passed
-Tests:       618 passed
+Tests:       619 passed
 
   sqlRepository      75   the SQLite path, against real SQLite
   dexieRepository    75   the IndexedDB path, against real IndexedDB
@@ -532,14 +533,14 @@ Tests:       618 passed
   sessionImport      52   reading a session-summary export
   stats              45   P/L, rebuys, duration, win rate, groupings
   values             36   money, dates, durations, stakes, formats, counts
+  site               35   the marketing/app split, the PWA, the sitemap
   variance           35   win rate, σ, confidence bands, verdicts
-  site               34   the marketing/app split, the PWA, the sitemap
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   tournaments        26   ROI, cash rate, dry runs, finishes
   csv                19   quoting, delimiters, line endings
-  money              18   cents arithmetic, parsing, formatting
   chip               18   /chip resolves, offline, and never quotes a price
+  money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
   migrations         13   a filled v2 database opened at v3, both engines
   seed               13   the demo dataset stays coherent
@@ -729,6 +730,10 @@ Ordered roughly by how much each is worth against how much it costs.
    Wants a share sheet on native and a download on web.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
    id and an `updatedAt`, and the one feature the family pass adds to this app.
+   **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
+   starting: three quarters of the server already exists in Untilt, and the work
+   that does not is mostly that nothing here records a delete, so a merge
+   resurrects every session anybody removed.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

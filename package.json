@@ -9,6 +9,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "node scripts/build-web.mjs",
+    "build:blog": "node scripts/build-blog.mjs",
+    "build:content": "node scripts/build-content.mjs",
+    "build:og": "node scripts/build-og.mjs",
     "test": "npm run check:prose && jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
@@ -39,6 +42,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.20.1",
     "@types/react": "~19.2.2",

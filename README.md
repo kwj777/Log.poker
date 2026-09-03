@@ -15,10 +15,11 @@ Log is the hub of a three-app family:
 | [Untilt.poker](https://untilt.poker) | How it felt -- mental game work |
 | [TiltProof](https://tiltproof.com) | What to do differently -- odds and spot training |
 
-How the three are priced together -- speculatively, and the short version is that
-Log stays free -- is worked out in
+How the three are priced together is worked out in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md),
-over in Untilt beside the monetization document it extends.
+over in Untilt beside the monetization document it extends. The short version
+for this repo: **Log is free in its entirety and has no standalone price.** See
+[What is free, and what is not](#what-is-free-and-what-is-not).
 
 ---
 
@@ -57,6 +58,45 @@ log never leaves your device.
 
 ---
 
+## What is free, and what is not
+
+**Everything above is free, permanently, and none of it needs an account.** Log
+is the one app in the family with no standalone price, and that is a decision
+rather than an oversight. What is valuable in a tracker is the player's own
+record, so an app whose entire pitch is *am I running bad or playing bad* cannot
+also charge rent for the answer. It is also the app that gets talked about,
+which is how anybody arrives at the other two.
+
+The paid side of the family is the longer material in TiltProof and Untilt, sold
+as one payment rather than a subscription. **What it adds here is cross-device
+history**, and that is the only thing in Log that will ever be paid for: it
+comes with owning the other two apps rather than carrying a price of its own.
+The line falls there because a second device needs an identity to sync to, and
+paying is what creates one, which makes it an honest conversion moment rather
+than a hostage situation. It is unbuilt today, and it is roadmap items 2 and 3.
+
+The numbers themselves live in
+[FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
+and are deliberately not repeated here or anywhere in this repo. Three copies of
+a price is three chances for two of them to go stale.
+
+### The copy rule, and its second half
+
+**No price appears anywhere on log.poker.** Not on the front door, not on the
+four guides, not on `/chip`. Somebody who has used none of the three has no way
+to value one, and a number in front of them prices the family before it has
+earned anything; the pass is sold inside each app at the moment of need instead.
+`src/site/__tests__` and `src/campaign/__tests__` enforce that on all six pages.
+
+Carrying no number is not the same as saying nothing about money, though, and
+that is the half that is easy to lose: **every page says how much of each app is
+free.** All of Log, the early levels and the glossary in TiltProof, the
+at-the-table resets in Untilt. Without it a page that only ever says *free*
+makes a promise on behalf of two apps that do not keep it, and the front door
+had been doing exactly that. Tested alongside the rule it qualifies.
+
+---
+
 ## Running it
 
 Requires Node 22+.
@@ -77,10 +117,11 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test            # house style, then 523 unit tests
+npm test            # house style, then the unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
 npm run check:prose # house style on its own
+npm run build:content -- --check  # the guides match their generator
 ```
 
 `npm test` runs the house-style check first and stops if it fails. It reads
@@ -119,6 +160,8 @@ the build.
 |---|---|
 | `/` | `public/home.html`, renamed to `index.html` at build time. Static, no bundle, no external request of any kind. |
 | `/app` | Log. The whole Expo export, moved wholesale into `dist/app`. |
+| `/running-bad`, `/bankroll`, `/pot-odds`, `/tilt` | The guides. See [The guides](#the-guides). |
+| `/blog` | The Log Blog, generated from `content/blog`. See [The blog](#the-blog). |
 | `/chip` | The card protector landing. See [The chip campaign](#the-chip-campaign). |
 | `/apps` | 301 to `/`, which now lists the family. |
 
@@ -147,6 +190,113 @@ asserts them:
   served from `/` may only claim because `netlify.toml` sends
   `Service-Worker-Allowed: /app/`. Without that header the registration throws
   and offline disappears without a trace.
+
+## The blog
+
+There is no back office. **A post is a Markdown file in `content/blog`, and
+publishing one is committing it.** `scripts/build-blog.mjs` reads that
+directory and generates the index, the post pages, an RSS feed and the sitemap
+entries, so nothing about a post is written down in two places.
+
+Name the file `<YYYY-MM-DD>-<slug>.md`: the date orders the directory and dates
+the post, and the rest of the name is the URL.
+
+```markdown
+---
+title: I flopped a straight flush in a bomb pot. He had a boat.
+description: One sentence. It is the index line, the search result and the feed summary.
+---
+
+The body starts here. Headings start at `##`, because the title is the h1.
+```
+
+| Front matter | |
+|---|---|
+| `title` | Required. |
+| `description` | Required, and it is doing three jobs: the index line, the meta description, and the feed summary. |
+| `updated` | Optional `YYYY-MM-DD`, for a post edited after it went out. |
+| `draft` | `draft: true` keeps it out of the index, the feed, the sitemap and the build entirely. |
+
+The Markdown is a deliberate subset: headings from `##` down, paragraphs, `-`
+and `1.` lists, `>` quotes, fenced code, `---`, and inline `**bold**`,
+`*italic*`, `` `code` `` and `[links](/here)`. There are also two block
+directives:
+
+```
+::: figure bomb-pot-hand
+A caption, which is optional.
+:::
+
+::: stat 1 in 34,700
+The line under the number, which is also optional.
+:::
+```
+
+A figure inlines `content/blog/figures/<name>.svg` into the page, so an
+illustration costs no request either. Hand diagrams are drawn by
+`scripts/draw-hand.mjs` from a short spec (`2d!` is the two of diamonds with
+the gold edge that marks a card as part of the hand, `?s` is a spade whose rank
+nobody remembers, `??` is face down), so every hand on the blog is drawn the
+same way. The SVG is the artefact and is committed with the post; run
+`node scripts/draw-hand.mjs` after changing a spec, which a test then checks. Everything outside the subset throws at
+build time rather than reaching a live page, and raw HTML in a post is escaped
+rather than passed through, so a stray `<` in prose can never eat a paragraph.
+
+To read a draft before it ships, without waiting for the app export:
+
+```bash
+npm run build:blog -- .preview
+npx serve .preview          # then open /blog
+```
+
+What a build produces:
+
+| | |
+|---|---|
+| `/blog` | The index, newest first. |
+| `/blog/<slug>` | A post. Written as `blog/<slug>/index.html`, so the URL carries no `.html` and needs no redirect rule. |
+| `/blog/feed.xml` | RSS 2.0, with the full post in `content:encoded`. |
+| `/sitemap.xml` | `public/sitemap.xml`, which stays the hand-written truth for the front door and the app, plus one entry per post. |
+
+Three things are worth knowing before changing any of it:
+
+- **The blog is generated after the export has been moved under `/app`.**
+  Generated before, the move loop would sweep every page of it under `/app`
+  with the bundle and `/blog` would 404 with nothing erroring.
+- **The pages fetch nothing.** No bundle, no stylesheet, no font: the same
+  promise `public/home.html` makes, and asserted the same way.
+- **Share cards are drawn ahead of time, not by the site build.** Nothing an
+  unfurl shows can be an SVG, so `scripts/build-og.mjs` draws a 1200x630 PNG
+  per post into `public/og` and commits it. `build-blog.mjs` only points
+  `og:image` at what it finds there, so a deploy never depends on a
+  rasterizer being installable, and a post with no card yet falls back to the
+  app icon rather than to a hole.
+
+### Share cards
+
+```bash
+npm run build:og            # public/og/<slug>.png, and og/blog.png for the index
+```
+
+The card opens on the hand the post is about: the cards its figure marks as
+played, the two that were mine and then what the board gave, drawn by the same
+code as the diagram in the post. A post with no figure gets its title alone.
+
+Run it after adding a post and commit the PNG. It needs `@resvg/resvg-js`,
+which is a dev dependency and deliberately nothing the deploy touches.
+
+Fonts are the one part not fully in the repository's hands: the card asks for
+the site's own stack, Georgia first, and a Linux machine renders it in
+Liberation Serif, which is metric compatible with Times New Roman and already
+second in that stack. Two machines can draw very slightly different cards,
+which is another reason the PNG is committed rather than generated on the way
+to production.
+
+`src/site/__tests__/blog.test.ts` runs the real script twice, over
+`content/blog` and again over fixtures, so what the grammar refuses is asserted
+rather than assumed.
+
+---
 
 ## Deploying to Netlify
 
@@ -219,6 +369,44 @@ resolves deep links, and reads and writes sessions, rebuys and hands.
 
 ---
 
+## The guides
+
+Four pages that answer a question somebody actually types into a search engine,
+each one linked from the front door and from the other three:
+
+| | |
+|---|---|
+| `/running-bad` | What an ordinary downswing looks like, and the chance a winning player is behind after a given number of hours. |
+| `/bankroll` | Risk of ruin, and what the 20 buy-in rule is really a claim about. |
+| `/pot-odds` | Outs, exact equities, and the two ways the rule of 2 and 4 misleads. |
+| `/tilt` | What tilt costs, what it is, and what works at the table. |
+
+They are generated rather than hand-written:
+
+```bash
+npm run build:content            # write public/<slug>.html
+npm run build:content -- --check # fail if any committed page is out of date
+```
+
+`scripts/build-content.mjs` holds the copy, and the reason it exists is the
+same reason the icon script does. The four pages share a head, a mark, a nav,
+a footer and about a hundred lines of CSS, and every page here paints with no
+external request of any kind, not even a font, so that CSS has to be inline on
+each of them. Four copies of it is four chances to change three.
+
+**Every number in every table is computed, never typed.** A poker page that
+gets its own arithmetic wrong is worse than no page.
+`src/site/__tests__/content.test.ts` reads the published HTML back and checks
+each figure against `src/domain/variance.ts` and against plain combinatorics,
+so a table is verified as published rather than as intended. It checks the
+sentences that quote the tables too: "one time in six" and "roughly 55 times
+riskier" are claims a reader will divide two cells to check, and both were
+wrong once from rounding alone.
+
+Each page answers its question in full before it mentions an app. A page that
+withholds the answer to make you install something is the genre this is trying
+not to be in.
+
 ## The chip campaign
 
 `log.poker/chip` is the landing a ceramic card protector points at, and it is
@@ -280,6 +468,9 @@ to `BRAND.md`. They mean something rather than brand something.
 ## Architecture
 
 ```
+content/blog/             the blog, one Markdown file per post
+  figures/                hand diagrams, drawn by scripts/draw-hand.mjs
+public/og/                share cards, drawn by scripts/build-og.mjs
 app/                      Expo Router routes
   _layout.tsx             opens the database, then renders the navigator
   +html.tsx               web document shell (PWA wiring)
@@ -332,21 +523,23 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 19 passed
-Tests:       523 passed
+Test Suites: 21 passed
+Tests:       612 passed
 
   sqlRepository      75   the SQLite path, against real SQLite
   dexieRepository    75   the IndexedDB path, against real IndexedDB
+  content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   stats              39   P/L, rebuys, duration, hourly rate, groupings
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
-  site               29   the marketing front door
+  site               34   the marketing/app split, the PWA, the sitemap
+  blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   tournaments        26   ROI, cash rate, dry runs, finishes
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
-  chip               17   /chip resolves, offline, and never quotes a price
+  chip               18   /chip resolves, offline, and never quotes a price
   handNotation       16   parse, round-trip, hand classes
   migrations         13   a filled v2 database opened at v3, both engines
   seed               13   the demo dataset stays coherent
@@ -521,14 +714,27 @@ Ordered roughly by how much each is worth against how much it costs.
    timestamped, money is integer cents, and hands are in a portable notation.
    Wants a share sheet on native and a download on web.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
-   id and an `updatedAt`. A syncing repository wraps the existing one behind the
-   same interface, and `src/data/index.ts` is the single place it gets composed
-   in; no feature folder changes. Last-write-wins per record to start, with the
-   timestamps already in place to do better later.
-3. **RevenueCat cross-platform subscriptions** -- entitlements gate features at
-   the store layer, not inside screens, so the free build and the paid build
-   stay one codebase. Web entitlements via Stripe through the same RevenueCat
-   account.
+   id and an `updatedAt`, and the one feature the family pass adds to this app.
+   A syncing repository wraps the existing one behind the same interface, and
+   `src/data/index.ts` is the single place it gets composed in; no feature
+   folder changes. Last-write-wins per record to start, with the timestamps
+   already in place to do better later. The sign-in is the genuinely new part:
+   anonymous ids do not merge across apps, so all three have to derive the same
+   id for the same person, and Untilt's existing magic-link endpoint is what
+   that is promoted from. **The free tier never goes behind it** -- Log stays
+   usable forever by somebody who never types an email address.
+3. **RevenueCat entitlements, which are not subscriptions** -- one
+   non-consumable, `log_plus`, checked at the store layer rather than inside
+   screens, so the free build and the paid build stay one codebase. Log's
+   offering sells the family pass alone, because Log has nothing to sell by
+   itself, and every app checks only its own entitlement: which SKU paid for it
+   is a fact about billing that no screen needs to know. Web entitlements via
+   Stripe through the same RevenueCat account. One mapping detail is load
+   bearing, because the front door promises it in words: the pass grants
+   `log_plus`, and so does holding both single-app entitlements at once. Nobody
+   will ever buy two singles when the pass costs less than that, but *own the
+   other two and your history follows you* has to be true however somebody got
+   there, or the page is lying in an edge case.
 4. **Online session support** -- [importing a session summary](#importing-an-online-history)
    and [tournaments](#tournaments) are the halves of this that already ship, and
    `sessions` has its `format` discriminator. What is left is multi-table

@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { FAMILY_LINKS, FAMILY_HOME } from '../../config';
+import { FAMILY_LINKS, FAMILY_HOME, GUIDES } from '../../config';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
@@ -53,6 +53,24 @@ describe('the front door', () => {
   it('quotes no price', () => {
     // Somebody who has used none of the three has no way to value one.
     expect(home).not.toMatch(/\$\s*\d/);
+  });
+
+  it('but still says how much of each app is free', () => {
+    // The other half of the same rule, and the one that had been lost: two of
+    // the three are paid past a point, so a page that says "free" once at the
+    // bottom is making a promise on behalf of the two that do not keep it.
+    const apps = home.slice(home.indexOf('<div class="apps">'), home.indexOf('</section>'));
+    const cards = apps.split('<a class="app').slice(1);
+    expect(cards).toHaveLength(3);
+    for (const card of cards) expect(card).toMatch(/\bfree\b/i);
+  });
+
+  it('and where the line falls, in words rather than in a number', () => {
+    expect(home).toContain('Free at the table, paid away from it.');
+    // Cross-device history is the one paid thing in this app, so the page says
+    // so before it exists rather than after somebody has years of log in it.
+    expect(home).toMatch(/own the other two/i);
+    expect(home).toMatch(/One payment rather than\s+a subscription/);
   });
 
   it('has a 404 that is a page rather than a wall', () => {
@@ -141,8 +159,19 @@ describe('the site is findable', () => {
     expect(robots).toContain('Allow: /');
   });
 
-  it('lists the front door and the app, and nothing that duplicates them', () => {
-    expect(locs).toEqual(['https://log.poker/', 'https://log.poker/app']);
+  it('lists the front door, the app and the guides, and nothing else', () => {
+    // The guides earn their place by answering four different questions;
+    // src/site/__tests__/content.test.ts is where that is held to. What this
+    // one guards is the boundary: no near-duplicate slipping in beside them,
+    // and no /chip, /apps or per-route /app page.
+    expect(locs).toEqual([
+      'https://log.poker/',
+      'https://log.poker/app',
+      'https://log.poker/running-bad',
+      'https://log.poker/bankroll',
+      'https://log.poker/pot-odds',
+      'https://log.poker/tilt',
+    ]);
   });
 
   it('dates every entry, in the past', () => {
@@ -168,6 +197,35 @@ describe('the site is findable', () => {
 
   it('and the front door out of nobody\'s way', () => {
     expect(home).not.toMatch(/name="robots"[^>]*noindex/);
+  });
+});
+
+describe('the app links out to the guides', () => {
+  const variance = read('app', '(tabs)', 'variance.tsx');
+  const button = read('src', 'components', 'Button.tsx');
+
+  it('at the address the site actually serves', () => {
+    // A typo here is a 404 for everybody who taps it, and nothing in the app
+    // would notice: the link opens a browser and the app carries on.
+    expect(GUIDES.runningBad).toBe('https://log.poker/running-bad');
+    expect(existsSync(join(ROOT, 'public', 'running-bad.html'))).toBe(true);
+    expect(netlify).toContain('from = "/running-bad"');
+  });
+
+  it('from the variance screen, which is the screen the guide is about', () => {
+    expect(variance).toContain('GUIDES.runningBad');
+    // Both branches: the empty state, where somebody most wants to know what
+    // this page will eventually tell them, and the one with a real estimate.
+    expect([...variance.matchAll(/\{guide\}/g)]).toHaveLength(2);
+  });
+
+  it('as a real anchor on web rather than a scripted pop-up', () => {
+    // react-native-web turns an href into an <a>, which can be middle-clicked,
+    // copied and followed by a crawler. It also leaves the press handlers
+    // firing, so the button skips onPress on web or the page opens twice.
+    expect(button).toContain('href');
+    expect(button).toContain("accessibilityRole={href === undefined ? 'button' : 'link'}");
+    expect(button).toContain("if (href !== undefined && Platform.OS === 'web') return;");
   });
 });
 

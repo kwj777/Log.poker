@@ -23,3 +23,18 @@ export const FAMILY_LINKS = {
 
 /** The marketing site, for a link that means the family rather than the app. */
 export const FAMILY_HOME = 'https://log.poker';
+
+/**
+ * The guides on the marketing site, for a screen that wants to hand somebody
+ * the long version of what it is showing them.
+ *
+ * Absolute rather than relative, because this app also runs natively, where
+ * "/running-bad" means nothing. On web the app is under /app on the same
+ * origin, so these stay same-site there too.
+ *
+ * `/bankroll`, `/pot-odds` and `/tilt` exist as well, and go here when a
+ * screen has a reason to link one.
+ */
+export const GUIDES = {
+  runningBad: `${FAMILY_HOME}/running-bad`,
+} as const;

@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Two URLs, which is the whole site: the front door and the app.
+  The hand-written half: the front door, the app, and the four guides.
+
+  scripts/build-blog.mjs appends /blog and every post to a copy of this file on
+  the way into dist, so the deployed sitemap is this plus the posts and nothing
+  here needs editing when one is published.
 
   Everything else is deliberately absent rather than forgotten. The prerendered
   routes under /app are one document with one description repeated, so they
-  canonicalise onto /app instead of appearing here. /chip is noindex. /apps is
-  a 301. A sitemap listing near-duplicates asks to be judged on them.
+  canonicalize onto /app instead of appearing here. /chip is noindex. /apps is
+  a 301. A sitemap listing near-duplicates asks to be judged on them, which is
+  also the standard the guides have to meet: each one is here because it
+  answers a different question, not because it is another page.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -19,5 +25,29 @@
     <lastmod>2026-09-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://log.poker/running-bad</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://log.poker/bankroll</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://log.poker/pot-odds</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://log.poker/tilt</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

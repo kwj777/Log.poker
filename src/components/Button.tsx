@@ -1,5 +1,12 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { colors, layout, radius, spacing, typography } from '../theme';
 import { tapFeedback } from './haptics';
@@ -20,6 +27,12 @@ interface ButtonProps {
   style?: ViewStyle;
   /** Announced to screen readers when the label alone is not enough. */
   accessibilityHint?: string;
+  /**
+   * On web, renders a real anchor rather than a scripted navigation, so the
+   * link can be middle-clicked, copied, and followed by a crawler. Ignored on
+   * native, where `onPress` is the whole story.
+   */
+  href?: string;
 }
 
 export const Button = ({
@@ -32,17 +45,24 @@ export const Button = ({
   leading,
   style,
   accessibilityHint,
+  href,
 }: ButtonProps) => {
   const inactive = disabled || loading;
 
   return (
     <Pressable
-      accessibilityRole="button"
+      {...(href === undefined ? {} : { href })}
+      accessibilityRole={href === undefined ? 'button' : 'link'}
       accessibilityState={{ disabled: inactive, busy: loading }}
       accessibilityHint={accessibilityHint}
       disabled={inactive}
       onPress={() => {
         tapFeedback();
+        // With an href, react-native-web renders a real <a> and lets the press
+        // handlers run as well, so doing both would open the page twice: once
+        // in the tab, once in a pop-up. The anchor is the web path and
+        // `onPress` is the native one.
+        if (href !== undefined && Platform.OS === 'web') return;
         onPress();
       }}
       style={({ pressed }) => [

@@ -152,7 +152,11 @@ export default async (request: Request): Promise<Response> => {
   const body = await bodyOf(request);
   if (body === null || typeof body !== 'object') return json({ error: 'refused' }, 400);
 
-  const { since, changes } = body as { since?: unknown; changes?: unknown };
+  const { since, changes, device } = body as {
+    since?: unknown;
+    changes?: unknown;
+    device?: unknown;
+  };
   // A cursor that is not a number reads as a device that has never synced,
   // which costs one full answer and cannot corrupt anything.
   const from = typeof since === 'number' && Number.isFinite(since) && since > 0 ? since : 0;
@@ -167,7 +171,17 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: 'unreachable' }, 503);
   }
 
-  const merged = mergeIntoBundle(stored, changes, from, now);
+  // A device that names itself is recorded, so its tombstones are not collected
+  // out from under it. One that does not is served without being counted, which
+  // is strictly safer: an unnamed device holds nothing up and is protected by
+  // the retention window alone.
+  const merged = mergeIntoBundle(
+    stored,
+    changes,
+    from,
+    now,
+    typeof device === 'string' ? device : null,
+  );
 
   try {
     await store.setJSON(bucket, merged.bundle);
@@ -176,7 +190,15 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: 'unreachable' }, 503);
   }
 
-  return json({ cursor: merged.cursor, changes: merged.changes, version: BUNDLE_VERSION }, 200);
+  return json(
+    {
+      cursor: merged.cursor,
+      changes: merged.changes,
+      collectedThrough: merged.collectedThrough,
+      version: BUNDLE_VERSION,
+    },
+    200,
+  );
 };
 
 export const config = { path: '/api/sync' };

@@ -1044,6 +1044,95 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
       });
     });
 
+    describe('collecting tombstones', () => {
+      const DAY = 24 * HOUR;
+
+      it('removes a tombstone older than the line, and its children with it', async () => {
+        const session = await newSession();
+        await repository.addRebuy({ sessionId: session.id, amount: 100, at: T0 });
+        await repository.createHand({ sessionId: session.id, at: T0 });
+        await repository.deleteSession(session.id);
+
+        const removed = await repository.collectTombstones(T0 + DAY);
+        expect(removed).toBe(3);
+
+        // Gone for real, not merely invisible: the sync layer's own read is
+        // the only way to tell the two apart.
+        const { sessions, hands, rebuys } = await repository.listChangedSince(0);
+        expect(sessions).toEqual([]);
+        expect(hands).toEqual([]);
+        expect(rebuys).toEqual([]);
+      });
+
+      it('leaves a tombstone newer than the line exactly where it is', async () => {
+        const session = await newSession();
+        context.tick(HOUR);
+        await repository.deleteSession(session.id);
+
+        expect(await repository.collectTombstones(T0)).toBe(0);
+        const { sessions } = await repository.listChangedSince(0);
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0].deletedAt).toBe(T0 + HOUR);
+      });
+
+      it('never touches a live record, however old', async () => {
+        const session = await newSession();
+        expect(await repository.collectTombstones(T0 + 10 * 365 * DAY)).toBe(0);
+        expect((await repository.getSession(session.id))?.id).toBe(session.id);
+      });
+
+      it('keeps a venue while anything still points at it', async () => {
+        // Foreign keys are on. A session whose venue was collected is a broken
+        // read, and a tombstoned session still names its venue.
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id });
+        await repository.deleteSession(session.id);
+        await repository.deleteVenue(venue.id);
+
+        // The session goes; the venue waits for it to be gone.
+        expect(await repository.collectTombstones(T0 + DAY)).toBe(2);
+        expect((await repository.listChangedSince(0)).venues).toEqual([]);
+      });
+
+      it('and keeps one a live session points at, whatever the line says', async () => {
+        // The shape a merge produces: one device deleted the venue, another
+        // logged a session on it, and the session won. The tombstone is still
+        // sitting here locally and must not be collected out from under it.
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id });
+        await repository.applyChanges({
+          venues: [{ record: { ...venue, updatedAt: T0 }, deletedAt: T0 }],
+          sessions: [], rebuys: [], hands: [], moodEntries: [],
+        });
+
+        expect(await repository.collectTombstones(T0 + DAY)).toBe(0);
+        // And the session that saved it is still readable, venue and all.
+        expect((await repository.getSession(session.id))?.id).toBe(session.id);
+      });
+
+      it('is safe to run when there is nothing to collect', async () => {
+        expect(await repository.collectTombstones(T0 + DAY)).toBe(0);
+        await newSession();
+        expect(await repository.collectTombstones(T0 + DAY)).toBe(0);
+      });
+
+      it('is safe to run twice', async () => {
+        const session = await newSession();
+        await repository.deleteSession(session.id);
+        expect(await repository.collectTombstones(T0 + DAY)).toBe(1);
+        expect(await repository.collectTombstones(T0 + DAY)).toBe(0);
+      });
+
+      it('frees a collected session to be imported again', async () => {
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id, importKey: 'k' });
+        await repository.deleteSession(session.id);
+        await repository.collectTombstones(T0 + DAY);
+        const again = await newSession({ venueId: venue.id, importKey: 'k' });
+        expect(again.id).not.toBe(session.id);
+      });
+    });
+
     describe('maintenance', () => {
       it('clears every table', async () => {
         const session = await newSession();

@@ -373,6 +373,39 @@ export class SqlRepository implements Repository {
     });
   }
 
+  /** Collect tombstones older than `before`. See the contract for the rule. */
+  async collectTombstones(before: Timestamp): Promise<number> {
+    let removed = 0;
+    await this.driver.transaction(async () => {
+      // Children first: a session cannot go while its rows still point at it.
+      for (const table of ['mood_entries', 'hands', 'rebuys', 'sessions']) {
+        const before_ = await this.count(table);
+        await this.driver.run(
+          `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < ?`,
+          [before],
+        );
+        removed += before_ - (await this.count(table));
+      }
+
+      // And a venue only when nothing references it at all, live or tombstoned.
+      // Foreign keys are on, so the alternative is a throw halfway through.
+      const venues = await this.count('venues');
+      await this.driver.run(
+        `DELETE FROM venues
+         WHERE deleted_at IS NOT NULL AND deleted_at < ?
+           AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.venue_id = venues.id)`,
+        [before],
+      );
+      removed += venues - (await this.count('venues'));
+    });
+    return removed;
+  }
+
+  private async count(table: string): Promise<number> {
+    const row = await first<{ n: number }>(this.driver, `SELECT COUNT(*) AS n FROM ${table}`);
+    return row?.n ?? 0;
+  }
+
   // ---------------------------------------------------------------- venues
 
   async listVenues(): Promise<Venue[]> {

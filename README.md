@@ -652,6 +652,34 @@ two merges that disagree in a year.
 of this out of every feature folder: a screen asks for a repository and gets
 one, and whether it talks to a server is not a question it can ask.
 
+#### Tombstones are collected, carefully
+
+A tombstone is kept for **ninety days**, and then only goes if nobody is still
+waiting to hear about it. **Collecting one too early resurrects the record**: a
+device still holding the live row meets a server with nothing left to refuse it,
+pushes, and a session somebody deleted in March is back on every device in June.
+
+Time alone is a guess at that, so the bundle counts. It holds a map of device to
+last-seen, and the line is the earlier of *ninety days ago* and *the least
+recently seen device*. A device unseen for **a hundred and eighty** days is
+presumed gone -- sold, or replaced -- because one lost phone should not freeze
+collection for the rest of somebody's life. Twice the window rather than once,
+or the rule would be decorative: every remembered device would be newer than the
+window and the minimum would never bind.
+
+That leaves one hole and one backstop. A device gone longer than the forget
+threshold comes back holding rows whose tombstones are gone, so **a record the
+server has never seen, older than everything it has collected, is refused.**
+That can lose a record such a device really did create and never sent, which is
+the worse thing to lose and much the rarer: it takes six months offline and a
+write that never left. The alternative is a deleted session reappearing on every
+device, which takes only the six months.
+
+A device that never signs in collects on the window alone, having nothing to
+disagree with. One that does sync never collects further back than the server
+says it has: the server draws that line from every device, and this one only
+knows about itself.
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -661,10 +689,10 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 32 passed
-Tests:       844 passed
+Tests:       879 passed
 
-  sqlRepository      96   the SQLite path, against real SQLite
-  dexieRepository    96   the IndexedDB path, against real IndexedDB
+  sqlRepository     104   the SQLite path, against real SQLite
+  dexieRepository   104   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   stats              45   P/L, rebuys, duration, win rate, groupings
@@ -672,7 +700,7 @@ Tests:       844 passed
   site               37   the marketing/app split, the PWA, the sitemap
   variance           35   win rate, σ, confidence bands, verdicts
   merge              28   the rules for when two devices both have a say
-  bundle             27   the server-side merge, order and repeats included
+  bundle             39   the server-side merge, collection, order and repeats
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   tournaments        26   ROI, cash rate, dry runs, finishes
@@ -685,14 +713,14 @@ Tests:       844 passed
   verify             16   checking a token, and every way past it that must not work
   copy               18   what the sign-in and the sync are allowed to say
   seed               13   the demo dataset stays coherent
-  syncingRepository  13   two devices and one server, no fakes in between
-  client             12   the sync client, against a fake fetch
+  syncingRepository  16   two devices and one server, no fakes in between
+  client             14   the sync client, against a fake fetch
   session            12   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
-  endpoint            9   the client and the function agreeing where it is
+  endpoint           11   the client and the function agreeing where it is
   tokenStore.web      8   localStorage missing, blocked, and working
   columns             7   header matching
 ```

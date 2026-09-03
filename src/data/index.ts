@@ -17,7 +17,7 @@ import { getSession, getToken } from '../auth';
 import { cursorStore } from '../sync/cursorStore';
 import { SyncingRepository } from './SyncingRepository';
 import { createRepository, STORAGE_ENGINE } from './repositoryFactory';
-import type { Repository } from './repository';
+import { TOMBSTONE_RETENTION_MS, type Repository } from './repository';
 
 let pending: Promise<Repository> | null = null;
 
@@ -32,9 +32,20 @@ const compose = async (): Promise<Repository> => {
   const local = await createRepository();
   try {
     const session = await getSession();
-    if (session === null || !session.syncs) return local;
-    const token = await getToken();
-    return token === null ? local : new SyncingRepository(local, token, cursorStore);
+    const token = session !== null && session.syncs ? await getToken() : null;
+    if (token === null) {
+      // Nothing to disagree with, so this device collects on the window alone.
+      // Without it, an app that never signs in keeps every tombstone forever
+      // and grows where it used to shrink. Failing is not worth a launch.
+      void local
+        .collectTombstones(Date.now() - TOMBSTONE_RETENTION_MS)
+        .catch(() => undefined);
+      return local;
+    }
+    // A syncing device does not decide this for itself: the server draws the
+    // line from every device it has heard from, and this one only knows about
+    // itself. See `SyncingRepository`.
+    return new SyncingRepository(local, token, cursorStore);
   } catch {
     return local;
   }

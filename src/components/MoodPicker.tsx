@@ -2,7 +2,7 @@
  * The tilt meter.
  *
  * One tap, five states, always skippable. Mood data is only useful if logging it
- * costs nothing — the moment it feels like homework, players stop, and the
+ * costs nothing -- the moment it feels like homework, players stop, and the
  * correlation between mood and results (the reason it exists) never materialises.
  */
 

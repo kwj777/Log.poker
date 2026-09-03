@@ -15,7 +15,7 @@ interface ButtonProps {
   size?: Size;
   disabled?: boolean;
   loading?: boolean;
-  /** Rendered before the label — an icon or a small badge. */
+  /** Rendered before the label -- an icon or a small badge. */
   leading?: ReactNode;
   style?: ViewStyle;
   /** Announced to screen readers when the label alone is not enough. */

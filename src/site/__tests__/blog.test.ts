@@ -3,7 +3,7 @@
  * build-time property: a post is a file, and `scripts/build-blog.mjs` turns
  * the directory of them into the index, the pages, the feed and the sitemap.
  *
- * These tests run that script — the real one, the one Netlify runs — rather
+ * These tests run that script, the real one that Netlify runs, rather
  * than a copy of its rules, twice over. Once against `content/blog`, which is
  * what actually ships, and once against fixtures written into a temp
  * directory, which is the only way to assert what the grammar *refuses*: a

@@ -95,11 +95,21 @@ export interface Session {
   /** Null while the session is still running. */
   endedAt: Timestamp | null;
   notes: string | null;
+  /**
+   * Provenance for a session that came from a file rather than from a player
+   * tapping Start: a stable key derived from the imported row.
+   *
+   * Null for everything logged in the app. Unique across the table where it is
+   * set, which is what makes re-importing last month's export add the three new
+   * sessions on the end and silently skip the rest -- a duplicated bankroll being
+   * exactly the kind of failure nobody notices until it has compounded.
+   */
+  importKey: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
-/** A session with its child records resolved — what the UI almost always wants. */
+/** A session with its child records resolved -- what the UI almost always wants. */
 export interface SessionWithChildren extends Session {
   rebuys: Rebuy[];
   venue: Venue | null;
@@ -109,7 +119,7 @@ export interface Hand {
   id: string;
   sessionId: string;
   /**
-   * Stable, parseable notation for the hole cards — e.g. `"AsKd"`, `"Th9h"`.
+   * Stable, parseable notation for the hole cards -- e.g. `"AsKd"`, `"Th9h"`.
    * Two characters per card: rank (`23456789TJQKA`) then suit (`shdc`).
    * Null when the player logged a hand without recording cards.
    *
@@ -142,7 +152,7 @@ export type NewSession = Pick<
   Session,
   'venueId' | 'gameType' | 'stakes' | 'buyIn' | 'startedAt'
 > &
-  Partial<Pick<Session, 'notes' | 'cashOut' | 'endedAt'>>;
+  Partial<Pick<Session, 'notes' | 'cashOut' | 'endedAt' | 'importKey'>>;
 export type NewRebuy = Pick<Rebuy, 'sessionId' | 'amount' | 'at'>;
 export type NewHand = Pick<Hand, 'sessionId' | 'at'> &
   Partial<Pick<Hand, 'holeCards' | 'position' | 'note' | 'tags' | 'amount'>>;

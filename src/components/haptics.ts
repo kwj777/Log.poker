@@ -18,14 +18,14 @@ const safely = (run: () => Promise<unknown>): void => {
   });
 };
 
-/** A tap landed — chips, toggles, card picks. */
+/** A tap landed -- chips, toggles, card picks. */
 export const tapFeedback = (): void =>
   safely(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
 
-/** Something meaningful happened — session started, hand saved. */
+/** Something meaningful happened -- session started, hand saved. */
 export const successFeedback = (): void =>
   safely(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
 
-/** A destructive or high-stakes action — ending a session, deleting. */
+/** A destructive or high-stakes action -- ending a session, deleting. */
 export const warningFeedback = (): void =>
   safely(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));

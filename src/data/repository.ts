@@ -4,7 +4,7 @@
  * Two implementations satisfy it: `SqlRepository` (SQLite via expo-sqlite on
  * iOS/Android) and `DexieRepository` (IndexedDB on web). Nothing above this
  * interface knows which one it is talking to, which is what makes the same
- * screens run on all three targets — and what will make a syncing
+ * screens run on all three targets -- and what will make a syncing
  * implementation droppable later without touching a feature folder.
  *
  * Every method is async even where an implementation could answer synchronously,
@@ -63,6 +63,20 @@ export interface Repository {
   /** The single running session, if one exists. Log allows only one at a time. */
   getActiveSession(): Promise<SessionWithChildren | null>;
   createSession(input: NewSession): Promise<Session>;
+  /**
+   * Create many sessions in one transaction -- the session-summary import.
+   *
+   * All-or-nothing. A file that names a venue that does not exist, or that
+   * duplicates a session already imported, writes nothing: a half-imported
+   * bankroll is worse than a failed import, because only one of the two is
+   * obvious to the person looking at it.
+   */
+  createSessions(inputs: readonly NewSession[]): Promise<Session[]>;
+  /**
+   * Every import key already stored. The importer diffs a file against this, so
+   * re-importing last month's export adds the new sessions and skips the rest.
+   */
+  listImportKeys(): Promise<string[]>;
   updateSession(id: string, patch: SessionPatch): Promise<Session>;
   /** Cash out and stamp the end time in one write. */
   endSession(id: string, cashOut: number, endedAt: Timestamp): Promise<Session>;

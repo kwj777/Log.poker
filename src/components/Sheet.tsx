@@ -1,7 +1,7 @@
 /**
  * A bottom sheet built on RN's `Modal`, which is the one overlay primitive that
  * behaves the same on iOS, Android and web. Used for the flows that must not
- * lose the screen behind them — cash-out, rebuy — where a full navigation push
+ * lose the screen behind them -- cash-out, rebuy -- where a full navigation push
  * would break the player's sense of "I am still in this session".
  */
 

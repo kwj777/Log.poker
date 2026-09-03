@@ -1,5 +1,5 @@
 /**
- * expo-sqlite driver — used on iOS and Android only.
+ * expo-sqlite driver -- used on iOS and Android only.
  *
  * This is the single file in the data layer that imports a native module, which
  * is why the web build never reaches it: `src/data/index.ts` resolves to the

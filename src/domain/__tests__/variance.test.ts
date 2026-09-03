@@ -285,7 +285,7 @@ describe('probabilityOfLoss', () => {
     expect(long).toBeGreaterThanOrEqual(0);
   });
 
-  it('is still meaningfully above zero over a short stretch — the reassuring bit', () => {
+  it('is still meaningfully above zero over a short stretch, the reassuring bit', () => {
     const estimate = estimatePlayer(history);
     expect(probabilityOfLoss(estimate, 20)!).toBeGreaterThan(0.2);
   });

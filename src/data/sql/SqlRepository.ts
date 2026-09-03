@@ -1,5 +1,5 @@
 /**
- * SQLite-backed repository — the native (iOS/Android) implementation.
+ * SQLite-backed repository -- the native (iOS/Android) implementation.
  *
  * Talks to a `SqlDriver` rather than to expo-sqlite directly, which keeps it
  * testable in Node against a real SQLite engine.
@@ -38,6 +38,7 @@ import {
 } from '../repository';
 import {
   applyPatch,
+  assertImportKeysAvailable,
   buildHand,
   buildMoodEntry,
   buildRebuy,
@@ -71,6 +72,7 @@ interface SessionRow {
   started_at: number;
   ended_at: number | null;
   notes: string | null;
+  import_key: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -153,6 +155,7 @@ const toSession = (row: SessionRow): Session => ({
   startedAt: row.started_at,
   endedAt: row.ended_at,
   notes: row.notes,
+  importKey: row.import_key ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -194,7 +197,7 @@ const bool = (value: boolean): number => (value ? 1 : 0);
 export class SqlRepository implements Repository {
   private readonly driver: SqlDriver;
   private readonly ctx: RepositoryContext;
-  private initialised = false;
+  private initialized = false;
 
   constructor(driver: SqlDriver, ctx: RepositoryContext = defaultContext()) {
     this.driver = driver;
@@ -202,9 +205,9 @@ export class SqlRepository implements Repository {
   }
 
   async init(): Promise<void> {
-    if (this.initialised) return;
+    if (this.initialized) return;
     await migrate(this.driver);
-    this.initialised = true;
+    this.initialized = true;
   }
 
   // ---------------------------------------------------------------- venues
@@ -319,7 +322,7 @@ export class SqlRepository implements Repository {
 
   /**
    * Resolve rebuys and venues for a page of sessions in two queries rather than
-   * two per session — the history list would otherwise fan out badly once a
+   * two per session -- the history list would otherwise fan out badly once a
    * player has a few hundred sessions.
    */
   private async attachChildren(sessions: Session[]): Promise<SessionWithChildren[]> {
@@ -356,13 +359,52 @@ export class SqlRepository implements Repository {
   async createSession(input: NewSession): Promise<Session> {
     const venue = await this.getVenue(input.venueId);
     if (!venue) throw new NotFoundError('Venue', input.venueId);
+    if (input.importKey != null) {
+      assertImportKeysAvailable([input], new Set(await this.listImportKeys()));
+    }
 
     const session = buildSession(input, this.ctx);
+    await this.insertSession(session);
+    return session;
+  }
+
+  async createSessions(inputs: readonly NewSession[]): Promise<Session[]> {
+    if (inputs.length === 0) return [];
+
+    const venueIds = Array.from(new Set(inputs.map((input) => input.venueId)));
+    const known = new Set(
+      (
+        await this.driver.all<{ id: string }>(
+          `SELECT id FROM venues WHERE id IN (${venueIds.map(() => '?').join(',')})`,
+          venueIds,
+        )
+      ).map((row) => row.id),
+    );
+    for (const venueId of venueIds) {
+      if (!known.has(venueId)) throw new NotFoundError('Venue', venueId);
+    }
+    assertImportKeysAvailable(inputs, new Set(await this.listImportKeys()));
+
+    return this.driver.transaction(async () => {
+      const sessions = inputs.map((input) => buildSession(input, this.ctx));
+      for (const session of sessions) await this.insertSession(session);
+      return sessions;
+    });
+  }
+
+  async listImportKeys(): Promise<string[]> {
+    const rows = await this.driver.all<{ import_key: string }>(
+      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL`,
+    );
+    return rows.map((row) => row.import_key);
+  }
+
+  private async insertSession(session: Session): Promise<void> {
     await this.driver.run(
       `INSERT INTO sessions (
          id, venue_id, game_type, small_blind, big_blind, ante, currency, buy_in,
-         cash_out, started_at, ended_at, notes, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         cash_out, started_at, ended_at, notes, import_key, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.id,
         session.venueId,
@@ -376,11 +418,11 @@ export class SqlRepository implements Repository {
         session.startedAt,
         session.endedAt,
         session.notes,
+        session.importKey,
         session.createdAt,
         session.updatedAt,
       ],
     );
-    return session;
   }
 
   async updateSession(id: string, patch: SessionPatch): Promise<Session> {

@@ -13,9 +13,9 @@ I have played live $1/$2 in Texas for years. I have flopped quads twice and I ha
 
 ## What a bomb pot is, if you have never sat in one
 
-Every so often — usually after a dealer change, sometimes every orbit if the table votes for it — everybody at the table antes the same amount and the dealer skips preflop entirely. No raises, no folding, no reading anybody. Just an ante from all nine seats and then a flop.
+Every so often (usually after a dealer change, sometimes every orbit if the table votes for it) everybody at the table antes the same amount and the dealer skips preflop entirely. No raises, no folding, no reading anybody. Just an ante from all nine seats and then a flop.
 
-In a **double-board bomb pot** the dealer puts out two complete boards instead of one, and the pot gets split between whoever wins each. Betting runs normally on the flop, turn and river, but every bet is for two chances at once. Win one board and you get half. Win both — scoop it — and you take the whole thing.
+In a **double-board bomb pot** the dealer puts out two complete boards instead of one, and the pot gets split between whoever wins each. Betting runs normally on the flop, turn and river, but every bet is for two chances at once. Win one board and you get half. Win both, scoop it, and you take the whole thing.
 
 That is the game I was in. Nine players, $20 each in the middle before a single card came out, and two boards to come.
 
@@ -25,7 +25,7 @@ Every card in the hand. Gold edges mark the ones that made mine.
 
 ## Both boards, street by street
 
-**The flop.** Board one came 3♦ 5♦ 6♦ and I was already there: 2-3-4-5-6, all diamonds, a six-high straight flush. Board two came J-3-5, offsuit, no diamonds. Same two hole cards, and now I had a wrap on that one too — the three and the five paired with my two and four, so any ace or any six would complete a straight.
+**The flop.** Board one came 3♦ 5♦ 6♦ and I was already there: 2-3-4-5-6, all diamonds, a six-high straight flush. Board two came J-3-5, offsuit, no diamonds. Same two hole cards, and now I had a wrap on that one too: the three and the five paired with my two and four, so any ace or any six would complete a straight.
 
 Seven outs, not eight. The six of diamonds was face up on the other board.
 
@@ -33,13 +33,13 @@ That is the thing about double boards that people forget at the table: it is one
 
 **The turn.** Board one bricked with a jack. Board two came a six.
 
-So now I had the identical hand twice — 2-3-4-5-6 on both boards, once in diamonds and once in four suits. Somebody bet, I raised, and a guy two seats to my left came along on both.
+So now I had the identical hand twice: 2-3-4-5-6 on both boards, once in diamonds and once in four suits. Somebody bet, I raised, and a guy two seats to my left came along on both.
 
 **The river.** Board one paired the six. Board two ran out something I could not tell you if you paid me, because by then I was counting his stack.
 
 He moved in. I called before his chips had settled.
 
-He turned over J6 and said "boat" before he saw my hand, which is fair, because on board one he had sixes full of jacks — trip sixes with the pair of jacks alongside — and on board two the same six had given him jacks and sixes. He had improved on both boards, on the same card, and lost more money because of it.
+He turned over J6 and said "boat" before he saw my hand, which is fair, because on board one he had sixes full of jacks (trip sixes with the pair of jacks alongside), and on board two the same six had given him jacks and sixes. He had improved on both boards, on the same card, and lost more money because of it.
 
 ## The math, which took a while to believe
 
@@ -52,7 +52,7 @@ A straight flush on one board and a straight on the other, in the same double-bo
 Some of the rest of it:
 
 - **A straight flush on at least one board: about 1 in 1,620.** Rarer than most people guess and far more common than the version I got, because a straight flush on one board says nothing about what you have on the other.
-- **Flopping it with exactly 2♦4♦: 1 in 9,800.** There are 19,600 flops you can be dealt once your own two cards are known, and precisely two of them finish that hand on the spot — 3♦5♦6♦, or A♦3♦5♦ for the steel wheel. Two flops. Out of nineteen thousand six hundred.
+- **Flopping it with exactly 2♦4♦: 1 in 9,800.** There are 19,600 flops you can be dealt once your own two cards are known, and precisely two of them finish that hand on the spot: 3♦5♦6♦, or A♦3♦5♦ for the steel wheel. Two flops. Out of nineteen thousand six hundred.
 - **The two boards are not independent.** Multiply the probabilities as though they were and you get about 1 in 37,000, which is wrong in my favour. The boards share my hole cards, so a hand shaped like a straight on one is more likely to be shaped like a straight on the other. Correlation moved it from 37,000 to 34,700.
 
 Two more things I noticed only when I laid the hand out to draw it:
@@ -65,7 +65,7 @@ And every six in the deck was face up in that hand. The flop on board one, the r
 
 I want to be clear that he played it fine.
 
-Put yourself in his seat on that river. He holds J6. Board one shows 3♦ 5♦ 6♦ J 6, and he has sixes full of jacks — a hand that beats every straight, every flush, every set, and every other boat except the one made of jacks. Board two shows J-3-5-6 and he has two pair, which is decent on a board where nobody has represented anything, because nobody could: there was no preflop betting to tell him a single thing about a single opponent.
+Put yourself in his seat on that river. He holds J6. Board one shows 3♦ 5♦ 6♦ J 6, and he has sixes full of jacks, a hand that beats every straight, every flush, every set, and every other boat except the one made of jacks. Board two shows J-3-5-6 and he has two pair, which is decent on a board where nobody has represented anything, because nobody could: there was no preflop betting to tell him a single thing about a single opponent.
 
 The only hand on earth that scoops him is 2♦4♦, or the A♦ version of it. On board one he was drawing dead from the moment the flop hit the felt, and he had no way of knowing, because everything that happened afterwards made his hand better.
 
@@ -75,7 +75,7 @@ That is the cruelty of it. The turn gave him a pair of jacks. The river gave him
 
 Here is my confession.
 
-I was so far gone — shaking hands, table on its feet, a guy filming from two seats down — that I did not write anything down. Not the ante, not the board, not the stack sizes. I stacked his chips and played another four hours and drove home.
+I was so far gone (shaking hands, table on its feet, a guy filming from two seats down) that I did not write anything down. Not the ante, not the board, not the stack sizes. I stacked his chips and played another four hours and drove home.
 
 Two days later I tried to tell it properly and could not remember whether board two's flop had the jack first or the five, whether the river had come before or after he checked, how much was actually in the middle. I had the hand. I had lost the shape of it. I rebuilt it that week from the ante size, the seat count, the photograph somebody sent me, and a receipt with a timestamp on it that told me how long I had been sitting there.
 
@@ -83,7 +83,7 @@ I got it back. I got lucky twice.
 
 The hands worth telling are always the ones you are too wired to record, and the sessions worth understanding are the ordinary ones you would never think to. Fifteen seconds at the time is the whole difference between a story you can prove and a story that starts with "I think it was a jack."
 
-That is the entire reason Log exists. A session in under ten seconds, a hand in fifteen, and then it is there in a year when you want to know what actually happened — or whether the last three months were bad luck or bad play, which is the same question in a different mood.
+That is the entire reason Log exists. A session in under ten seconds, a hand in fifteen, and then it is there in a year when you want to know what actually happened, or whether the last three months were bad luck or bad play, which is the same question in a different mood.
 
 [It is free, it works with no signal, and it never sends your log anywhere](/app), which matters in a card room where the only reliable thing about the wifi is that there is none.
 

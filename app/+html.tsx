@@ -2,11 +2,11 @@
  * The web page shell.
  *
  * Expo Router renders every route into this document on web, so it is the one
- * place to put the PWA wiring: the manifest link, the theme colour that paints
+ * place to put the PWA wiring: the manifest link, the theme color that paints
  * the browser and status bar to match the app, and the service-worker
  * registration.
  *
- * This file only ever runs on web — it is not part of the native bundle.
+ * This file only ever runs on web -- it is not part of the native bundle.
  */
 
 import type { ReactNode } from 'react';
@@ -56,7 +56,7 @@ export default function Root({ children }: { children: ReactNode }) {
         {/* The title and description are set per screen via `PageMeta`, which
             goes through expo-router's head manager. Declaring them here as well
             would produce two `<title>` elements, and the browser reads the
-            first — which is the manager's. */}
+            first -- which is the manager's. */}
 
         {/* Every route under /app is the same document with the same
             description, so they collapse onto one URL rather than competing as
@@ -74,7 +74,7 @@ export default function Root({ children }: { children: ReactNode }) {
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="icon" href="/icons/icon-192.png" type="image/png" />
 
-        <meta property="og:title" content="Log — the session log that keeps you off tilt" />
+        <meta property="og:title" content="Log: the session log that keeps you off tilt" />
         <meta
           property="og:description"
           content="Poker session tracking and a hand journal for live cash players, with a variance view that tells you when a downswing is just variance."

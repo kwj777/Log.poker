@@ -4,7 +4,7 @@
  * One store rather than several: every screen in Log reads some mixture of
  * sessions, hands and mood, and splitting them would mean coordinating refreshes
  * across stores for no benefit at this size. The whole dataset is held in memory
- * — a heavy live player logs a few hundred sessions a year, which is trivial —
+ * -- a heavy live player logs a few hundred sessions a year, which is trivial --
  * and the repository stays the source of truth, re-read after every write.
  */
 
@@ -12,6 +12,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 
 import { getRepository } from '../data';
+import { planImport, venueNameKey, type ImportedSession } from '../domain/import';
 import {
   selectHandsForSession,
   selectMoodForSession,
@@ -43,6 +44,15 @@ export interface StartSessionInput {
   startedAt?: number;
   /** Recorded as a `start` mood entry when provided. */
   mood?: MoodScore | null;
+}
+
+/** What an import did, for the message the screen shows afterwards. */
+export interface ImportSummary {
+  imported: number;
+  /** Rows already in the log, skipped rather than written twice. */
+  duplicates: number;
+  /** Names of venues the import had to create. */
+  venuesCreated: string[];
 }
 
 export interface LogHandInput {
@@ -81,6 +91,8 @@ interface LogState {
   endSession: (sessionId: string, cashOut: number, mood?: MoodScore | null) => Promise<void>;
   updateSessionNotes: (sessionId: string, notes: string | null) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
+
+  importSessions: (sessions: readonly ImportedSession[]) => Promise<ImportSummary>;
 
   logHand: (input: LogHandInput) => Promise<Hand>;
   updateHand: (id: string, patch: Partial<LogHandInput>) => Promise<void>;
@@ -209,6 +221,61 @@ export const useLogStore = create<LogState>((set, get) => ({
     await get().refresh();
   },
 
+  /**
+   * Write a parsed session-summary import.
+   *
+   * Rows already carrying a stored import key are dropped before anything is
+   * written, so running the same file again next month adds only what is new.
+   * The sessions themselves go in as one all-or-nothing batch; the venues they
+   * name cannot, since creating a venue is its own write -- so a failure after
+   * that point deletes the rooms this import invented rather than leaving them
+   * in the picker for a session that never landed.
+   */
+  importSessions: async (sessions) => {
+    const repository = await getRepository();
+    const venues = await repository.listVenues();
+    const plan = planImport(
+      sessions,
+      new Set(await repository.listImportKeys()),
+      venues.map((venue) => venue.name),
+    );
+
+    if (plan.writes.length === 0) {
+      return { imported: 0, duplicates: plan.duplicates, venuesCreated: [] };
+    }
+
+    const byName = new Map(venues.map((venue) => [venueNameKey(venue.name), venue.id]));
+    const created: Venue[] = [];
+
+    try {
+      for (const name of plan.venuesToCreate) {
+        const venue = await repository.createVenue({ name, isHomeGame: false });
+        byName.set(venueNameKey(venue.name), venue.id);
+        created.push(venue);
+      }
+
+      await repository.createSessions(
+        plan.writes.map((session) => ({
+          ...session.draft,
+          venueId: byName.get(venueNameKey(session.venueName)) as string,
+          importKey: session.importKey,
+        })),
+      );
+    } catch (error) {
+      for (const venue of created) {
+        await repository.deleteVenue(venue.id).catch(() => undefined);
+      }
+      throw error;
+    }
+
+    await get().refresh();
+    return {
+      imported: plan.writes.length,
+      duplicates: plan.duplicates,
+      venuesCreated: created.map((venue) => venue.name),
+    };
+  },
+
   logHand: async (input) => {
     const repository = await getRepository();
     const hand = await repository.createHand({
@@ -265,7 +332,7 @@ export const useLogStore = create<LogState>((set, get) => ({
  * `useLogStore`.
  *
  * Zustand compares the selector's result by reference, so a selector that builds
- * a new array on every call reports a change on every render — which is an
+ * a new array on every call reports a change on every render -- which is an
  * infinite render loop, not merely a wasted render. Subscribing to the stored
  * array (a stable reference) and deriving inside `useMemo` keeps the comparison
  * honest.

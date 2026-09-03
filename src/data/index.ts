@@ -3,7 +3,7 @@
  *
  * Everything above this file asks for `getRepository()` and gets whichever
  * implementation the platform provides. When cloud sync arrives, a syncing
- * repository is wrapped here — no feature folder needs to change.
+ * repository is wrapped here -- no feature folder needs to change.
  */
 
 import { createRepository, STORAGE_ENGINE } from './repositoryFactory';

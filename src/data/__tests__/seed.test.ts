@@ -1,5 +1,5 @@
 /**
- * The demo dataset is a product surface — it is the first thing a new user sees
+ * The demo dataset is a product surface -- it is the first thing a new user sees
  * with the dev flag on, and the fixture every screenshot is taken against. These
  * assert it stays coherent and stays useful.
  */
@@ -60,7 +60,7 @@ describe('demo dataset', () => {
     expect(estimate.stdDevBbPerHour).toBeGreaterThan(0);
   });
 
-  it('derives cash-outs so every session’s maths ties out to its plan', async () => {
+  it('derives cash-outs so every session’s math ties out to its plan', async () => {
     const sessions = await repository.listSessions();
     for (const session of sessions) {
       const invested = session.buyIn + session.rebuys.reduce((sum, r) => sum + r.amount, 0);

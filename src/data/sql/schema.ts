@@ -4,7 +4,7 @@
  * Versioned through `PRAGMA user_version`: each migration is applied in order
  * and the pragma is bumped, so an app updated months from now walks a device
  * forward from whatever version it is on. Adding a migration means appending to
- * `MIGRATIONS` — never editing an entry that has shipped.
+ * `MIGRATIONS` -- never editing an entry that has shipped.
  */
 
 import type { SqlDriver } from './driver';
@@ -77,6 +77,16 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_hands_session ON hands(session_id)`,
       `CREATE INDEX IF NOT EXISTS idx_hands_at ON hands(at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_mood_session ON mood_entries(session_id)`,
+    ],
+  },
+  {
+    // Session-summary import. The index is UNIQUE so a re-import cannot double a
+    // bankroll even if the check above it is ever bypassed; SQLite treats NULLs
+    // as distinct, so the column stays free for every hand-logged session.
+    version: 2,
+    statements: [
+      `ALTER TABLE sessions ADD COLUMN import_key TEXT`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)`,
     ],
   },
 ];

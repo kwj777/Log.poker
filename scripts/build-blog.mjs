@@ -4,7 +4,7 @@
  * There is no back office and no database, because a blog that publishes a few
  * times a month needs neither and both would outlive their usefulness. A post
  * is a file. Publishing is adding one and deploying, and every URL the blog
- * owns — the index, the posts, the feed, the sitemap entries — is derived from
+ * owns (the index, the posts, the feed, the sitemap entries) is derived from
  * that directory rather than written down a second time somewhere else.
  *
  * The pages obey the same rule as `public/home.html`: **no bundle and no
@@ -18,12 +18,12 @@
  *
  *     npm run build:blog -- .preview && npx serve .preview
  *
- * The Markdown is a deliberate subset — headings from `##` down, paragraphs,
+ * The Markdown is a deliberate subset: headings from `##` down, paragraphs,
  * `-` and `1.` lists, `>` quotes, fenced code, `---`, the two `:::` blocks
  * below, and inline `**bold**`, `*italic*`, `` `code` `` and `[links](/here)`.
  * Raw HTML in a post is escaped rather than passed through, so a stray `<` in
  * prose can never silently eat a paragraph, and anything the grammar does not
- * recognise throws at build time rather than reaching a live page.
+ * recognize throws at build time rather than reaching a live page.
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -38,7 +38,7 @@ const OUT = resolve(process.argv[2] ?? join(ROOT, 'dist'));
 /**
  * Where the posts are read from. A second argument points the build at some
  * other directory, which is how `src/site/__tests__/blog.test.ts` runs this
- * renderer over fixtures — the grammar that ships is the grammar the tests
+ * renderer over fixtures, so the grammar that ships is the grammar the tests
  * exercise, rather than a second copy of it that agrees with itself.
  */
 const POSTS = resolve(process.argv[3] ?? join(ROOT, 'content', 'blog'));
@@ -90,7 +90,7 @@ const feedDate = (date) => {
  * Inline Markdown, over already-escaped text.
  *
  * Code spans come out first and go back last, so nothing between backticks is
- * read as emphasis — which is the entire reason anybody writes `**` inside a
+ * read as emphasis, which is the entire reason anybody writes `**` inside a
  * post about Markdown.
  */
 const inline = (text, where) => {
@@ -131,7 +131,7 @@ const stat = (headline, note, where) => `<aside class="stat">
           ${note ? `<p class="stat-note">${inline(note, where)}</p>` : ''}
         </aside>`;
 
-/** The block grammar. Anything it does not recognise is a paragraph. */
+/** The block grammar. Anything it does not recognize is a paragraph. */
 const renderMarkdown = (markdown, where) => {
   const out = [];
   let paragraph = [];
@@ -431,7 +431,7 @@ const HELPLINE = `        <p>
 
 /**
  * `og:image` is the app icon rather than a drawing from the post. A share card
- * has to be a raster — the crawlers do not render SVG — and nothing in this
+ * has to be a raster (the crawlers do not render SVG) and nothing in this
  * build makes one, so the honest choice is the mark, which is at least the
  * right brand rather than a broken preview.
  */
@@ -538,7 +538,7 @@ const postPage = (post) => `<!doctype html>
 -->
 <html lang="en">
 ${head({
-  title: `${post.title} — ${TITLE}`,
+  title: `${post.title} · ${TITLE}`,
   description: post.description,
   canonical: post.url,
   ogType: 'article',

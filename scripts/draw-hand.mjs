@@ -65,7 +65,7 @@ const street = (x, y, text) =>
   `  <text x="${x}" y="${y}" font-family="${SANS}" font-size="9.5" letter-spacing="1.8"
     text-anchor="middle" fill="${DIM}">${text}</text>`;
 
-/** "ME — straight flush, six high": who, and what they were holding by the end. */
+/** "ME" and then "Straight flush, six high": who, and what they ended up with. */
 const outcome = (y, who, what, ink) =>
   `  <text x="${W / 2}" y="${y}" text-anchor="middle" font-family="${SERIF}" font-size="14" fill="${INK[ink]}">` +
   `<tspan font-family="${SANS}" font-size="10" letter-spacing="1.8" fill="${DIM}">${who} </tspan>${what}</text>`;
@@ -89,16 +89,16 @@ const card = (x, y, spec) => {
 
   const played = spec.endsWith('!');
   const [rank, suit] = (played ? spec.slice(0, -1) : spec).split(/(?=[dhsc]$)/);
-  const colour = suit === 'd' || suit === 'h' ? RED : BLACK;
+  const color = suit === 'd' || suit === 'h' ? RED : BLACK;
   const unknown = rank === '?';
   return `  <g>
     <title>${unknown ? `A ${NAMES[suit].slice(0, -1)}, and I could not tell you which` : `${SPOKEN[rank] ?? rank} of ${NAMES[suit]}`}</title>
     <rect x="${x}" y="${y}" width="${CARD.w}" height="${CARD.h}" rx="${CARD.r}"
       fill="${CREAM}" stroke="${played ? GOLD : RIM}" stroke-width="${played ? 2 : 1}"${unknown ? ' stroke-dasharray="4 3"' : ''} />
     <text x="${x + 7}" y="${y + 22}" font-family="${SERIF}" font-size="19"
-      fill="${unknown ? '#8f8a80' : colour}">${rank}</text>
+      fill="${unknown ? '#8f8a80' : color}">${rank}</text>
     <text x="${x + CARD.w / 2}" y="${y + 58}" font-family="${PIP_FONT}" font-size="27"
-      text-anchor="middle" fill="${colour}">${SUITS[suit]}</text>
+      text-anchor="middle" fill="${color}">${SUITS[suit]}</text>
   </g>`;
 };
 
@@ -124,11 +124,11 @@ const draw = (name, { title, desc, rows }) => {
 
     const groups = row.type === 'hands' ? row.groups : [{ label: row.label, cards: row.cards }];
     if (row.type === 'hands') {
-      const centres = groups.length === 1 ? [W / 2] : [W * 0.29, W * 0.71];
+      const centers = groups.length === 1 ? [W / 2] : [W * 0.29, W * 0.71];
       groups.forEach((group, index) => {
-        const centre = centres[index];
-        const start = centre - (CARD.w * group.cards.length + GAP * (group.cards.length - 1)) / 2;
-        parts.push(label(centre, y + LABEL, group.label));
+        const center = centers[index];
+        const start = center - (CARD.w * group.cards.length + GAP * (group.cards.length - 1)) / 2;
+        parts.push(label(center, y + LABEL, group.label));
         group.cards.forEach((spec, position) =>
           parts.push(card(start + position * (CARD.w + GAP), y + CARD_TOP, spec)));
       });

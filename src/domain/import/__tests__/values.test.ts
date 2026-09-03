@@ -1,0 +1,253 @@
+import {
+  detectDateOrder,
+  durationUnitFromHeader,
+  hasAmbiguousDateShape,
+  parseCurrency,
+  parseDurationMs,
+  parseGameType,
+  parseMoney,
+  parseStakes,
+  parseTimestamp,
+} from '../values';
+
+/** Local-time epoch, computed the same way the parser does, so the suite is timezone-independent. */
+const local = (y: number, m: number, d: number, h = 0, min = 0, s = 0): number =>
+  new Date(y, m - 1, d, h, min, s, 0).getTime();
+
+describe('parseCurrency', () => {
+  it('reads three-letter codes and symbols', () => {
+    expect(parseCurrency('1.234,56 EUR')).toBe('EUR');
+    expect(parseCurrency('£40')).toBe('GBP');
+    expect(parseCurrency('€30')).toBe('EUR');
+    expect(parseCurrency('$40')).toBe('USD');
+  });
+
+  it('prefers an explicit code over a bare dollar sign', () => {
+    expect(parseCurrency('$40 CAD')).toBe('CAD');
+  });
+
+  it('returns null when nothing names a currency', () => {
+    expect(parseCurrency('40')).toBeNull();
+    expect(parseCurrency('')).toBeNull();
+  });
+});
+
+describe('parseMoney', () => {
+  it('reads plain and signed amounts', () => {
+    expect(parseMoney('120')?.cents).toBe(12_000);
+    expect(parseMoney('12.50')?.cents).toBe(1250);
+    expect(parseMoney('-40')?.cents).toBe(-4000);
+    expect(parseMoney('0')?.cents).toBe(0);
+  });
+
+  it('reads currency symbols and reports them', () => {
+    expect(parseMoney('$1,240.50')).toEqual({ cents: 124_050, currency: 'USD' });
+    expect(parseMoney('-$40')).toEqual({ cents: -4000, currency: 'USD' });
+    expect(parseMoney('£12')).toEqual({ cents: 1200, currency: 'GBP' });
+  });
+
+  it('reads accounting parentheses as negative', () => {
+    expect(parseMoney('(52.50)')?.cents).toBe(-5250);
+    expect(parseMoney('($1,200)')?.cents).toBe(-120_000);
+  });
+
+  it('reads a European decimal comma', () => {
+    expect(parseMoney('1.234,56')?.cents).toBe(123_456);
+    expect(parseMoney('12,50 EUR')?.cents).toBe(1250);
+    expect(parseMoney('-1,5')?.cents).toBe(-150);
+  });
+
+  it('reads commas and dots as thousands separators when they cannot be decimals', () => {
+    expect(parseMoney('1,234')?.cents).toBe(123_400);
+    expect(parseMoney('1,234,567')?.cents).toBe(123_456_700);
+    expect(parseMoney('1.234.567')?.cents).toBe(123_456_700);
+  });
+
+  it('does not read the dashes in a date as a minus sign', () => {
+    expect(parseMoney('2024-01-15')?.cents).toBeGreaterThan(0);
+  });
+
+  it('reads a minus that follows the currency symbol', () => {
+    expect(parseMoney('$-40')?.cents).toBe(-4000);
+    expect(parseMoney('USD -40')?.cents).toBe(-4000);
+  });
+
+  it('returns null for anything with no digits in it', () => {
+    expect(parseMoney('')).toBeNull();
+    expect(parseMoney('  ')).toBeNull();
+    expect(parseMoney('-')).toBeNull();
+    expect(parseMoney('n/a')).toBeNull();
+    expect(parseMoney('$')).toBeNull();
+  });
+});
+
+describe('detectDateOrder', () => {
+  it('settles a column from a day past the twelfth', () => {
+    expect(detectDateOrder(['03/04/2024', '13/04/2024'])).toBe('dmy');
+    expect(detectDateOrder(['03/04/2024', '04/13/2024'])).toBe('mdy');
+  });
+
+  it('gives up when the column proves both or neither', () => {
+    expect(detectDateOrder(['13/04/2024', '04/13/2024'])).toBe('unknown');
+    expect(detectDateOrder(['03/04/2024', '05/06/2024'])).toBe('unknown');
+    expect(detectDateOrder([])).toBe('unknown');
+  });
+
+  it('takes no evidence from ISO dates', () => {
+    expect(detectDateOrder(['2024-01-15', '2024-12-31'])).toBe('unknown');
+  });
+});
+
+describe('hasAmbiguousDateShape', () => {
+  it('is true only for non-ISO numeric dates', () => {
+    expect(hasAmbiguousDateShape(['03/04/2024'])).toBe(true);
+    expect(hasAmbiguousDateShape(['2024-01-15', '2024-01-16'])).toBe(false);
+    expect(hasAmbiguousDateShape(['not a date'])).toBe(false);
+  });
+});
+
+describe('parseTimestamp', () => {
+  it('reads ISO dates as local time', () => {
+    expect(parseTimestamp('2024-01-15')).toBe(local(2024, 1, 15));
+    expect(parseTimestamp('2024-01-15 20:14')).toBe(local(2024, 1, 15, 20, 14));
+    expect(parseTimestamp('2024-01-15T20:14:32')).toBe(local(2024, 1, 15, 20, 14, 32));
+  });
+
+  it('honors an explicit offset', () => {
+    expect(parseTimestamp('2024-01-15T20:14:32Z')).toBe(Date.UTC(2024, 0, 15, 20, 14, 32));
+    expect(parseTimestamp('2024-01-15T20:14:32+02:00')).toBe(Date.UTC(2024, 0, 15, 18, 14, 32));
+    expect(parseTimestamp('2024-01-15T20:14:32+0200')).toBe(Date.UTC(2024, 0, 15, 18, 14, 32));
+  });
+
+  it('reads slash dates in the order it is given', () => {
+    expect(parseTimestamp('03/04/2024', 'mdy')).toBe(local(2024, 3, 4));
+    expect(parseTimestamp('03/04/2024', 'dmy')).toBe(local(2024, 4, 3));
+    expect(parseTimestamp('15.01.2024', 'dmy')).toBe(local(2024, 1, 15));
+  });
+
+  it('reads the PokerStars date shape and ignores a zone abbreviation', () => {
+    expect(parseTimestamp('2024/01/15 20:14:32 ET')).toBe(local(2024, 1, 15, 20, 14, 32));
+  });
+
+  it('reads a twelve-hour clock', () => {
+    expect(parseTimestamp('01/15/2024 8:14 PM')).toBe(local(2024, 1, 15, 20, 14));
+    expect(parseTimestamp('01/15/2024 12:30 AM')).toBe(local(2024, 1, 15, 0, 30));
+    expect(parseTimestamp('01/15/2024 12:30 PM')).toBe(local(2024, 1, 15, 12, 30));
+  });
+
+  it('expands two-digit years around 1970', () => {
+    expect(parseTimestamp('01/15/24', 'mdy')).toBe(local(2024, 1, 15));
+    expect(parseTimestamp('01/15/98', 'mdy')).toBe(local(1998, 1, 15));
+  });
+
+  it('reads bare epoch seconds and milliseconds', () => {
+    expect(parseTimestamp('1705348800')).toBe(1_705_348_800_000);
+    expect(parseTimestamp('1705348800000')).toBe(1_705_348_800_000);
+  });
+
+  it('rejects impossible and unreadable dates', () => {
+    expect(parseTimestamp('2024-02-30')).toBeNull();
+    expect(parseTimestamp('2024-13-01')).toBeNull();
+    expect(parseTimestamp('2024-01-15 25:00')).toBeNull();
+    expect(parseTimestamp('last Tuesday')).toBeNull();
+    expect(parseTimestamp('')).toBeNull();
+  });
+});
+
+describe('parseDurationMs', () => {
+  const HOUR = 3_600_000;
+
+  it('reads clock form', () => {
+    expect(parseDurationMs('3:45')).toBe(3 * HOUR + 45 * 60_000);
+    expect(parseDurationMs('3:45:20')).toBe(3 * HOUR + 45 * 60_000 + 20_000);
+    expect(parseDurationMs('12:00')).toBe(12 * HOUR);
+  });
+
+  it('reads spelled form', () => {
+    expect(parseDurationMs('3h 45m')).toBe(3 * HOUR + 45 * 60_000);
+    expect(parseDurationMs('3h')).toBe(3 * HOUR);
+    expect(parseDurationMs('90m')).toBe(90 * 60_000);
+    expect(parseDurationMs('2 hours 30 minutes')).toBe(2 * HOUR + 30 * 60_000);
+  });
+
+  it('reads a bare number in the unit the header named', () => {
+    expect(parseDurationMs('3.5', 'hours')).toBe(3.5 * HOUR);
+    expect(parseDurationMs('210', 'minutes')).toBe(210 * 60_000);
+    expect(parseDurationMs('5400', 'seconds')).toBe(5_400_000);
+  });
+
+  it('returns null for anything with no number in it', () => {
+    expect(parseDurationMs('')).toBeNull();
+    expect(parseDurationMs('a while')).toBeNull();
+  });
+});
+
+describe('durationUnitFromHeader', () => {
+  it('takes the unit from the column name', () => {
+    expect(durationUnitFromHeader('Duration (minutes)')).toBe('minutes');
+    expect(durationUnitFromHeader('Mins')).toBe('minutes');
+    expect(durationUnitFromHeader('Seconds played')).toBe('seconds');
+    expect(durationUnitFromHeader('Duration')).toBe('hours');
+    expect(durationUnitFromHeader('')).toBe('hours');
+  });
+});
+
+describe('parseStakes', () => {
+  it('reads two blinds with or without symbols', () => {
+    expect(parseStakes('$0.25/$0.50', 'USD')).toEqual({
+      smallBlind: 25,
+      bigBlind: 50,
+      currency: 'USD',
+    });
+    expect(parseStakes('1/2', 'USD')).toEqual({ smallBlind: 100, bigBlind: 200, currency: 'USD' });
+  });
+
+  it('reads European decimals and the currency in the cell', () => {
+    expect(parseStakes('0,25/0,50 EUR', 'USD')).toEqual({
+      smallBlind: 25,
+      bigBlind: 50,
+      currency: 'EUR',
+    });
+  });
+
+  it('reads an ante when the cell names one', () => {
+    expect(parseStakes('50/100 ante 12', 'USD')).toEqual({
+      smallBlind: 5000,
+      bigBlind: 10_000,
+      ante: 1200,
+      currency: 'USD',
+    });
+  });
+
+  it('falls back to the given currency', () => {
+    expect(parseStakes('1/2', 'GBP')?.currency).toBe('GBP');
+  });
+
+  it('refuses shorthand that does not name both blinds', () => {
+    expect(parseStakes('NL50', 'USD')).toBeNull();
+    expect(parseStakes('$2', 'USD')).toBeNull();
+    expect(parseStakes('', 'USD')).toBeNull();
+    expect(parseStakes('0/0', 'USD')).toBeNull();
+  });
+});
+
+describe('parseGameType', () => {
+  it('recognizes the two variants Log names', () => {
+    expect(parseGameType("Hold'em No Limit")).toBe('NLHE');
+    expect(parseGameType('NLHE')).toBe('NLHE');
+    expect(parseGameType('Texas Holdem')).toBe('NLHE');
+    expect(parseGameType('Pot Limit Omaha')).toBe('PLO');
+    expect(parseGameType('PLO')).toBe('PLO');
+    expect(parseGameType('Omaha Hi/Lo')).toBe('PLO');
+  });
+
+  it('files fixed-limit hold’em under OTHER rather than mislabelling it', () => {
+    expect(parseGameType("Limit Hold'em")).toBe('OTHER');
+    expect(parseGameType("Fixed Limit Hold'em")).toBe('OTHER');
+  });
+
+  it('files anything else under OTHER, and an empty cell under nothing', () => {
+    expect(parseGameType('Stud')).toBe('OTHER');
+    expect(parseGameType('')).toBeNull();
+  });
+});

@@ -6,7 +6,7 @@
  * produce a URL and the caller opens it; when the apps share an account and a
  * deep link (or a native module), only these functions change.
  *
- * The hand-off payload is the stable notation from `handNotation.ts` — the whole
+ * The hand-off payload is the stable notation from `handNotation.ts` -- the whole
  * reason hands are stored in that format rather than as free text.
  */
 
@@ -26,7 +26,7 @@ export interface DrillHandOff {
 /**
  * "Drill this in TiltProof" for a hand the player flagged as misplayed.
  *
- * Post-MVP this becomes a real hand-off — the drill opens preloaded with the
+ * Post-MVP this becomes a real hand-off -- the drill opens preloaded with the
  * spot. For now it carries the hand class and position as query parameters so
  * the landing page can at least greet the player with the right spot, and so
  * the link shape does not have to change later.

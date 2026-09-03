@@ -13,13 +13,13 @@ type Variant = keyof typeof typography;
 export interface TextProps extends RNTextProps {
   variant?: Variant;
   color?: string;
-  centre?: boolean;
+  center?: boolean;
 }
 
 export const Text = ({
   variant = 'body',
   color,
-  centre,
+  center,
   style,
   ...rest
 }: TextProps) => (
@@ -28,14 +28,14 @@ export const Text = ({
       styles.base,
       typography[variant] as object,
       color ? { color } : null,
-      centre ? styles.centre : null,
+      center ? styles.center : null,
       style,
     ]}
     {...rest}
   />
 );
 
-/** All-caps section label — used above every group of controls. */
+/** All-caps section label -- used above every group of controls. */
 export const Overline = ({ style, ...rest }: TextProps) => (
   <Text
     variant="overline"
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   base: {
     color: colors.text,
   },
-  centre: {
+  center: {
     textAlign: 'center',
   },
   overline: {

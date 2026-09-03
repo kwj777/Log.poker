@@ -1,8 +1,8 @@
 /**
  * `SqlDriver` over Node's built-in SQLite, used only by the test suite.
  *
- * This is what lets the shipped `SqlRepository` — the exact class that runs on
- * iOS and Android — be exercised against a real SQLite engine in CI, instead of
+ * This is what lets the shipped `SqlRepository` -- the exact class that runs on
+ * iOS and Android -- be exercised against a real SQLite engine in CI, instead of
  * a hand-written fake that would agree with whatever the repository does.
  */
 

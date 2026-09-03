@@ -1,9 +1,9 @@
 /**
- * Dexie (IndexedDB) database definition — the web implementation.
+ * Dexie (IndexedDB) database definition -- the web implementation.
  *
  * IndexedDB rather than localStorage because session history is relational and
  * grows for years: localStorage is a synchronous ~5MB string store with no
- * indexes, and querying it would mean deserialising every session on every read.
+ * indexes, and querying it would mean deserializing every session on every read.
  *
  * Rows are stored in the same shape as the domain records, with two exceptions
  * forced by IndexedDB's index rules: booleans and nulls are not indexable, so
@@ -18,7 +18,7 @@ import type { GameType, HandTag, MoodPhase, MoodScore, Position, Stakes } from '
 
 export const DATABASE_NAME = 'log-poker';
 
-/** Sentinel for "no end time" — see the note above about indexing nulls. */
+/** Sentinel for "no end time" -- see the note above about indexing nulls. */
 export const OPEN_SESSION_ENDED_AT = 0;
 
 export interface VenueRecord {
@@ -40,6 +40,16 @@ export interface SessionRecord {
   /** `OPEN_SESSION_ENDED_AT` while the session is running. */
   endedAt: number;
   notes: string | null;
+  /**
+   * Absent -- not null -- for a session logged in the app.
+   *
+   * IndexedDB leaves a record out of an index entirely when the key path does
+   * not resolve, which is the only way a *unique* index can coexist with a
+   * column that is empty on almost every row. Storing `null` here instead would
+   * put every hand-logged session into the index under the same key and the
+   * second one would be rejected.
+   */
+  importKey?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -93,6 +103,16 @@ export const createDatabase = (name: string = DATABASE_NAME): LogDatabase => {
   db.version(1).stores({
     venues: 'id, name, createdAt',
     sessions: 'id, venueId, gameType, startedAt, endedAt',
+    rebuys: 'id, sessionId, at',
+    hands: 'id, sessionId, at',
+    moodEntries: 'id, sessionId, phase, at',
+  });
+  // v2 adds the session-summary import: `&importKey` is unique, so a re-import
+  // cannot double a bankroll. Records written before this version have no
+  // `importKey` property and so are simply not in the index.
+  db.version(2).stores({
+    venues: 'id, name, createdAt',
+    sessions: 'id, venueId, gameType, startedAt, endedAt, &importKey',
     rebuys: 'id, sessionId, at',
     hands: 'id, sessionId, at',
     moodEntries: 'id, sessionId, phase, at',

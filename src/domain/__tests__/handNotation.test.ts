@@ -83,8 +83,8 @@ describe('formatNotation', () => {
   });
 
   it('renders an em dash when no cards were recorded', () => {
-    expect(formatNotation(null)).toBe('—');
-    expect(formatNotation('garbage')).toBe('—');
+    expect(formatNotation(null)).toBe('--');
+    expect(formatNotation('garbage')).toBe('--');
   });
 });
 

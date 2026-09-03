@@ -101,7 +101,7 @@ export default function HistoryScreen() {
         />
         <StatTile
           label="Hourly"
-          value={summary.hourly === null ? '—' : formatMoney(summary.hourly, { signed: true })}
+          value={summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true })}
           valueColor={resultColor(summary.hourly)}
         />
         <StatTile label="Hours" value={String(Math.round(summary.hours))} />
@@ -131,7 +131,7 @@ export default function HistoryScreen() {
           body={
             sessions.length === 0
               ? 'Your sessions will appear here once you log one.'
-              : 'Try widening the filters — or go play some poker.'
+              : 'Try widening the filters, or go play some poker.'
           }
           action={
             sessions.length === 0 ? (

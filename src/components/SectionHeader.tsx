@@ -6,7 +6,7 @@ import { Overline } from './Text';
 
 interface SectionHeaderProps {
   title: string;
-  /** Right-aligned control — a filter, a "see all", a toggle. */
+  /** Right-aligned control -- a filter, a "see all", a toggle. */
   action?: ReactNode;
 }
 

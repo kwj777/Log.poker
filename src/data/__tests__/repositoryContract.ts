@@ -1,8 +1,8 @@
 /**
  * The repository conformance suite.
  *
- * One suite, two implementations. Anything the app relies on — ordering,
- * cascade behaviour, patch semantics, constraint errors — is asserted here once,
+ * One suite, two implementations. Anything the app relies on -- ordering,
+ * cascade behavior, patch semantics, constraint errors -- is asserted here once,
  * so SQLite and IndexedDB cannot quietly diverge and produce a bug that only
  * reproduces on one platform.
  */
@@ -300,6 +300,132 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
 
         expect(await repository.getSession(keep.id)).not.toBeNull();
         expect(await repository.listHands(keep.id)).toHaveLength(1);
+      });
+    });
+
+    describe('imported sessions', () => {
+      const imported = (importKey: string, overrides: Record<string, unknown> = {}) => ({
+        gameType: 'NLHE' as const,
+        stakes,
+        buyIn: 5_000,
+        cashOut: 8_825,
+        startedAt: T0,
+        endedAt: T0 + HOUR,
+        importKey,
+        ...overrides,
+      });
+
+      it('leaves importKey null on a session logged in the app', async () => {
+        const session = await newSession();
+        expect(session.importKey).toBeNull();
+        expect(await repository.listImportKeys()).toEqual([]);
+      });
+
+      it('round-trips an import key through storage', async () => {
+        const venue = await newVenue('PokerStars');
+        const created = await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        expect(created.importKey).toBe('csv|1');
+        expect((await repository.getSession(created.id))?.importKey).toBe('csv|1');
+      });
+
+      it('writes a batch in one call and returns it in order', async () => {
+        const venue = await newVenue('PokerStars');
+        const created = await repository.createSessions([
+          { venueId: venue.id, ...imported('csv|1') },
+          { venueId: venue.id, ...imported('csv|2', { startedAt: T0 + HOUR }) },
+        ]);
+        expect(created.map((session) => session.importKey)).toEqual(['csv|1', 'csv|2']);
+        expect(await repository.listSessions()).toHaveLength(2);
+      });
+
+      it('accepts an empty batch without touching storage', async () => {
+        expect(await repository.createSessions([])).toEqual([]);
+        expect(await repository.listSessions()).toEqual([]);
+      });
+
+      it('lists every import key it holds and nothing else', async () => {
+        const venue = await newVenue('PokerStars');
+        await repository.createSessions([
+          { venueId: venue.id, ...imported('csv|1') },
+          { venueId: venue.id, ...imported('csv|2', { startedAt: T0 + HOUR }) },
+        ]);
+        await newSession({ venueId: venue.id });
+        expect((await repository.listImportKeys()).sort()).toEqual(['csv|1', 'csv|2']);
+      });
+
+      it('refuses a session whose import key is already stored', async () => {
+        const venue = await newVenue('PokerStars');
+        await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        await expect(
+          repository.createSession({ venueId: venue.id, ...imported('csv|1') }),
+        ).rejects.toBeInstanceOf(ConstraintError);
+        expect(await repository.listSessions()).toHaveLength(1);
+      });
+
+      it('refuses a batch that repeats a key within itself', async () => {
+        const venue = await newVenue('PokerStars');
+        await expect(
+          repository.createSessions([
+            { venueId: venue.id, ...imported('csv|1') },
+            { venueId: venue.id, ...imported('csv|1') },
+          ]),
+        ).rejects.toBeInstanceOf(ConstraintError);
+        expect(await repository.listSessions()).toEqual([]);
+      });
+
+      it('writes nothing at all when one row of a batch is rejected', async () => {
+        const venue = await newVenue('PokerStars');
+        await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        await expect(
+          repository.createSessions([
+            { venueId: venue.id, ...imported('csv|2', { startedAt: T0 + HOUR }) },
+            { venueId: venue.id, ...imported('csv|1') },
+          ]),
+        ).rejects.toBeInstanceOf(ConstraintError);
+        expect(await repository.listSessions()).toHaveLength(1);
+      });
+
+      it('rejects a batch naming a venue that does not exist', async () => {
+        await expect(
+          repository.createSessions([{ venueId: 'nope', ...imported('csv|1') }]),
+        ).rejects.toBeInstanceOf(NotFoundError);
+        expect(await repository.listSessions()).toEqual([]);
+      });
+
+      it('keeps many hand-logged sessions alongside imported ones', async () => {
+        // The unique index has to tolerate any number of sessions with no key --
+        // on IndexedDB that only works because the property is absent, not null.
+        const venue = await newVenue('Aria');
+        await newSession({ venueId: venue.id });
+        await newSession({ venueId: venue.id });
+        await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        expect(await repository.listSessions()).toHaveLength(3);
+        expect(await repository.listImportKeys()).toEqual(['csv|1']);
+      });
+
+      it('does not carry an import key onto a session it did not come with', async () => {
+        const venue = await newVenue('PokerStars');
+        const created = await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        const updated = await repository.updateSession(created.id, { notes: 'edited' });
+        expect(updated.importKey).toBe('csv|1');
+        expect((await repository.getSession(created.id))?.importKey).toBe('csv|1');
+      });
+
+      it('frees an import key when the session is deleted, so the row can be imported again', async () => {
+        const venue = await newVenue('PokerStars');
+        const created = await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        await repository.deleteSession(created.id);
+        expect(await repository.listImportKeys()).toEqual([]);
+        await expect(
+          repository.createSession({ venueId: venue.id, ...imported('csv|1') }),
+        ).resolves.toBeDefined();
+      });
+
+      it('clears import keys with everything else', async () => {
+        const venue = await newVenue('PokerStars');
+        await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
+        await repository.clearAll();
+        expect(await repository.listImportKeys()).toEqual([]);
       });
     });
 

@@ -1,4 +1,4 @@
-/** Builders so the maths tests read as poker scenarios, not object literals. */
+/** Builders so the math tests read as poker scenarios, not object literals. */
 
 import type { Rebuy, SessionWithChildren, Stakes, Venue } from '../types';
 
@@ -65,6 +65,7 @@ export const session = (spec: SessionSpec = {}): SessionWithChildren => {
     startedAt,
     endedAt,
     notes: null,
+    importKey: null,
     createdAt: startedAt,
     updatedAt: startedAt,
     rebuys,

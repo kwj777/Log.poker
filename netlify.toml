@@ -23,7 +23,7 @@
 # exactly that reason, and these rules sit above the single-page catch-all
 # because Netlify takes the first matching rule and the catch-all matches
 # everything. `src/campaign/__tests__/chip.test.ts` asserts that ordering, so
-# the guarantee survives somebody reorganising this file.
+# the guarantee survives somebody reorganizing this file.
 [[redirects]]
   from = "/chip"
   to = "/chip.html"

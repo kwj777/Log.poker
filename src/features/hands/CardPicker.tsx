@@ -1,9 +1,9 @@
 /**
- * The card picker — the component the 15-second target lives or dies on.
+ * The card picker -- the component the 15-second target lives or dies on.
  *
  * Two taps per card: rank, then suit. A flat 52-card grid would be one tap
  * fewer, but each target would be ~40pt wide on a phone, which is below what a
- * thumb can hit reliably without looking — and looking is the thing that costs
+ * thumb can hit reliably without looking -- and looking is the thing that costs
  * the seconds. With this layout every target is full-width-ish and the whole
  * hand is four confident taps.
  */
@@ -30,7 +30,7 @@ interface CardPickerProps {
   /** Current notation, e.g. `"AsKd"`. */
   value: string | null;
   onChange: (notation: string | null) => void;
-  /** How many cards to collect — 2 for hold'em, 4 for Omaha. */
+  /** How many cards to collect -- 2 for hold'em, 4 for Omaha. */
   cardCount?: number;
 }
 

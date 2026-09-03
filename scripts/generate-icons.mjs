@@ -2,8 +2,8 @@
  * Generates Log's app and PWA icons.
  *
  * The environment has no image tooling, and a poker tracker shipping the generic
- * Expo template icon is not a finished product — so the mark is drawn here in
- * code and rasterised to PNG directly. Being a script rather than a binary blob
+ * Expo template icon is not a finished product -- so the mark is drawn here in
+ * code and rasterized to PNG directly. Being a script rather than a binary blob
  * also means the icon is diffable, and a palette change is a one-line edit and a
  * re-run rather than a round trip through a design tool.
  *
@@ -12,7 +12,7 @@
  * Learn, Observe, Ground, standing on a trunk.
  *
  * The triangles themselves have never changed. What changed around them is the
- * colour: they used to run gold, sage, forest outward-in, and they now run one
+ * color: they used to run gold, sage, forest outward-in, and they now run one
  * green ramp with the gold moved down to the trunk. That freed gold to mean
  * one thing, which is *this app*, so an icon lights exactly one ring and the
  * family mark lights none.
@@ -21,12 +21,12 @@
  *
  * The baseline is drawn once. "Sharing a common baseline" means one line, not
  * three coincident ones: stacking three bases on the same pixels stripes it
- * into three colours and reads as a mistake at any size. So the outer triangle
+ * into three colors and reads as a mistake at any size. So the outer triangle
  * is closed and the two inside it are open chevrons standing on it. The line
  * they stand on is gold, which is Ground, which is the point.
  *
  * Gold is the outermost stroke and not the innermost. That reverses what this
- * repo recommended before rasterising anything, and the reason is measured:
+ * repo recommended before rasterizing anything, and the reason is measured:
  * forest on the family ground is 1.76:1, so the outer stroke, the one that
  * gives the mark its silhouette, was invisible at icon sizes. Gold is 7.22:1.
  * Putting the brightest stroke on the defining edge also restores the original
@@ -48,7 +48,7 @@ const BACKGROUND = [0x1c, 0x21, 0x1f];
 //
 // The ramp climbs past sage rather than below it, because the palette's own
 // three greens run 1.76:1, 2.68:1 and 3.55:1 on the ground, which is one step
-// and a rumour: the darkest is already invisible. These are 6.79, 4.26 and
+// and a rumor: the darkest is already invisible. These are 6.79, 4.26 and
 // 2.68, evenly spaced at 1.59x, lightest outermost so the silhouette is the
 // strongest line.
 const CANOPY = [
@@ -114,7 +114,7 @@ const encodePng = (width, height, rgba) => {
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // colour type: RGBA
+  ihdr[9] = 6; // color type: RGBA
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;
@@ -131,7 +131,7 @@ const encodePng = (width, height, rgba) => {
 
 /**
  * Coverage of a rounded rectangle at a point, sampled 4×4 for anti-aliasing.
- * Returns 0–1.
+ * Returns 0 to 1.
  */
 const roundedRectCoverage = (px, py, x, y, w, h, r) => {
   let hits = 0;
@@ -192,7 +192,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
   // a half-base of h giving a height of 4h/3. What is new is the trunk under
   // them, which makes the whole thing taller than the canopy alone, so the
   // canopy is sized against the height budget rather than against the width.
-  const centreX = size / 2;
+  const centerX = size / 2;
   const trunkLength = (size * inset) / 3.47;
   const markWidth = size * inset;
   const halfBase = markWidth / 2;
@@ -215,22 +215,22 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
   };
 
   // The trunk first, then the canopy outermost to innermost, and a lit ring
-  // last of all so it sits over its neighbours at any size. Only the outer ring
+  // last of all so it sits over its neighbors at any size. Only the outer ring
   // carries the baseline, because all three stand on the same line rather than
   // each having one, and that line lights with the outer ring since Ground is
   // what a baseline is.
   const strokes = [
     {
-      colour: GOLD,
+      color: GOLD,
       width: trunkStroke,
-      segments: [[centreX, baseY, centreX, baseY + trunkLength]],
+      segments: [[centerX, baseY, centerX, baseY + trunkLength]],
     },
   ];
   [1, 2 / 3, 1 / 3].forEach((scale, i) => {
     const h = halfBase * scale;
-    const left = [centreX - h, baseY];
-    const right = [centreX + h, baseY];
-    const apex = [centreX, baseY - (h * 4) / 3];
+    const left = [centerX - h, baseY];
+    const right = [centerX + h, baseY];
+    const apex = [centerX, baseY - (h * 4) / 3];
     const segments = [
       [...left, ...apex],
       [...apex, ...right],
@@ -238,7 +238,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
     if (i === 0) segments.push([...left, ...right]);
     const isLit = i === lit;
     strokes.push({
-      colour: isLit ? GOLD : CANOPY[i],
+      color: isLit ? GOLD : CANOPY[i],
       width: isLit ? litStroke : canopyStroke,
       segments,
       lit: isLit,
@@ -246,7 +246,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
   });
   strokes.sort((a, b) => (a.lit ? 1 : 0) - (b.lit ? 1 : 0));
 
-  for (const { colour, segments, width } of strokes) {
+  for (const { color, segments, width } of strokes) {
     const halfStroke = width / 2;
     for (let py = 0; py < size; py += 1) {
       for (let px = 0; px < size; px += 1) {
@@ -258,7 +258,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
         // Half a pixel of feathering either side of the edge is the whole of
         // the anti-aliasing, and it is exact rather than sampled.
         const coverage = Math.max(0, Math.min(1, halfStroke + 0.5 - nearest));
-        if (coverage > 0) blend(rgba, (py * size + px) * 4, colour, coverage);
+        if (coverage > 0) blend(rgba, (py * size + px) * 4, color, coverage);
       }
     }
   }
@@ -277,7 +277,7 @@ const size = (buffer) => `${Math.round(buffer.length / 102.4) / 10}KB`;
 
 // Every icon here is Log's own, so every one lights the middle ring. The family
 // mark, with nothing lit, belongs on the marketing surfaces and is drawn there
-// in SVG rather than rasterised.
+// in SVG rather than rasterized.
 const LOG = RINGS.observe;
 
 const OUTPUTS = [

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  The front door, the app, and the four guides.
+  The hand-written half: the front door, the app, and the four guides.
+
+  scripts/build-blog.mjs appends /blog and every post to a copy of this file on
+  the way into dist, so the deployed sitemap is this plus the posts and nothing
+  here needs editing when one is published.
 
   Everything else is deliberately absent rather than forgotten. The prerendered
   routes under /app are one document with one description repeated, so they

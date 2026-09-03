@@ -9,6 +9,9 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
+
+import jsQR from 'jsqr';
 
 import { CHIP_CAMPAIGN, chipUrl } from '../chip';
 
@@ -32,6 +35,135 @@ describe('the printed URL', () => {
 
   it('is what the page claims as canonical', () => {
     expect(page).toContain(`<link rel="canonical" href="${CHIP_CAMPAIGN.url}" />`);
+  });
+});
+
+/* ------------------------------------------------------------------ the art */
+
+/**
+ * Enough of a PNG decoder to hand a scanner its pixels: eight bits a channel,
+ * not interlaced, which is what the rasterizer emits.
+ */
+function pixels(path: string): { data: Uint8ClampedArray; width: number; height: number } {
+  const png = readFileSync(path);
+  const parts: Buffer[] = [];
+  let width = 0;
+  let height = 0;
+  let channels = 0;
+
+  for (let at = 8; at < png.length; ) {
+    const length = png.readUInt32BE(at);
+    const type = png.toString('ascii', at + 4, at + 8);
+    const chunk = png.subarray(at + 8, at + 8 + length);
+    if (type === 'IHDR') {
+      width = chunk.readUInt32BE(0);
+      height = chunk.readUInt32BE(4);
+      channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[chunk[9] as 0 | 2 | 4 | 6] as number;
+    }
+    if (type === 'IDAT') parts.push(chunk);
+    at += 12 + length;
+  }
+
+  const raw = inflateSync(Buffer.concat(parts));
+  const stride = width * channels;
+  const out = Buffer.alloc(stride * height);
+  let at = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[at] as number;
+    at += 1;
+    for (let x = 0; x < stride; x += 1) {
+      const left = x >= channels ? (out[y * stride + x - channels] as number) : 0;
+      const up = y > 0 ? (out[(y - 1) * stride + x] as number) : 0;
+      const upLeft = x >= channels && y > 0 ? (out[(y - 1) * stride + x - channels] as number) : 0;
+      const value = raw[at + x] as number;
+      let restored: number;
+      if (filter === 0) restored = value;
+      else if (filter === 1) restored = value + left;
+      else if (filter === 2) restored = value + up;
+      else if (filter === 3) restored = value + ((left + up) >> 1);
+      else {
+        const estimate = left + up - upLeft;
+        const dl = Math.abs(estimate - left);
+        const du = Math.abs(estimate - up);
+        const dul = Math.abs(estimate - upLeft);
+        restored = value + (dl <= du && dl <= dul ? left : du <= dul ? up : upLeft);
+      }
+      out[y * stride + x] = restored & 0xff;
+    }
+    at += stride;
+  }
+
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    const from = pixel * channels;
+    rgba[pixel * 4] = out[from] as number;
+    rgba[pixel * 4 + 1] = out[from + 1] as number;
+    rgba[pixel * 4 + 2] = out[from + 2] as number;
+    rgba[pixel * 4 + 3] = 255;
+  }
+  return { data: rgba, width, height };
+}
+
+describe('the code that gets fired into the glaze', () => {
+  const generated = readFileSync(join(ROOT, 'design', 'chip', 'qr.js'), 'utf8');
+
+  it('was encoded from the campaign URL and not retyped', () => {
+    // scripts/make-qr.mjs cannot import this module: it is .mjs and this is
+    // TypeScript. So the two are held together here instead of by a comment,
+    // which is the whole reason this assertion exists.
+    expect(generated).toContain(JSON.stringify(chipUrl('qr')));
+  });
+
+  it.each(['log-chip-47mm-side-2.png', 'log-chip-43mm-side-2.png'])(
+    '%s actually scans, and scans to that URL',
+    (file) => {
+      // This reads the artwork the way a phone does, and it catches the ways
+      // the code can be wrong rather than small: a stale matrix, the wrong
+      // URL, a quiet zone eaten by the corner radius, a ground too light to
+      // threshold against.
+      //
+      // It says nothing about millimeters, and it is worth being exact about
+      // that, because the obvious reading is that a decode proves the chip
+      // scans. These artboards are 2000px, so a tile a third of its real size
+      // still lands five pixels per module and decodes happily. The physical
+      // size is arithmetic and it is checked below instead.
+      const image = pixels(join(ROOT, 'design', 'chip', file));
+      const found = jsQR(image.data, image.width, image.height);
+      expect(found?.data).toBe(chipUrl('qr'));
+    },
+  );
+
+  it('leaves each module big enough for a phone to resolve on the real disc', () => {
+    // The assertion the decode above cannot make. A face is authored at 39mm
+    // on a 2000px board standing for 45mm, so 44.44px/mm, and the art is then
+    // rendered at 47mm, which scales every physical size by 47/39. The code
+    // spans the matrix plus its quiet zone on both sides.
+    const back = readFileSync(join(ROOT, 'design', 'chip', 'side-2.html'), 'utf8');
+    const tilePx = Number(/\.qr \{[^}]*?width: (\d+)px/.exec(back)?.[1]);
+    const quiet = Number(/QUIET = (\d+);/.exec(back)?.[1]);
+    const matrix = Number(/size: (\d+),/.exec(generated)?.[1]);
+    // Every one of the three has to be found before any of them is used. A
+    // NaN here would sail through the comparison below as `NaN > 0.4` being
+    // false, which fails for the right reason by accident, and the next one
+    // might not.
+    expect([tilePx, quiet, matrix].every(Number.isFinite)).toBe(true);
+
+    const modules = matrix + quiet * 2;
+    const moduleMm = ((tilePx / (2000 / 45)) * (47 / 39)) / modules;
+
+    // 0.4mm is where a phone camera starts needing a second try, and a second
+    // try at a table is somebody putting the chip back down.
+    expect(moduleMm).toBeGreaterThan(0.4);
+  });
+
+  it('leaves the code the loudest thing on the face', () => {
+    // Cream on the chip's own near-black. A scanner thresholds on luminance,
+    // and this pair is 16:1, so there is no version of a matte fire that
+    // brings them close enough to confuse.
+    const back = readFileSync(join(ROOT, 'design', 'chip', 'side-2.html'), 'utf8');
+    expect(back).toContain('background: var(--cream);');
+    expect(back).toContain('fill="#0d1110"');
   });
 });
 

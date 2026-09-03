@@ -408,6 +408,19 @@ Each page answers its question in full before it mentions an app. A page that
 withholds the answer to make you install something is the genre this is trying
 not to be in.
 
+## The chip
+
+The card protector itself: a 47mm ceramic disc with the family mark over
+`log.poker` on one face and a scannable code on the other. `design/chip/`
+holds the two faces, the proof sheet and its own README; `npm run chip`
+regenerates the code from `chipUrl('qr')` and rasterizes everything.
+
+The code is checked three ways, and the third exists because the first two
+cannot do its job: the matrix is asserted to come from the campaign URL, the
+rendered PNG is decoded by a real scanner, and the physical module size is
+computed in millimeters. A 2000px artboard decodes at any tile size; a 47mm
+disc does not.
+
 ## The chip campaign
 
 `log.poker/chip` is the landing a ceramic card protector points at, and it is

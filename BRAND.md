@@ -410,11 +410,24 @@ is conceding the drift on purpose.
 ## The chip
 
 **There is one, and it is this one.** Untilt has its own 47mm ceramic artwork in
-`design/chip/`, worked out before the family had a shared identity. It stays as
-exploration and is not being ordered: two ceramic discs in the same gold on the
-same near-black is one object twice, the setup fee is per design rather than per
-order, and this one does more work, since it carries a scannable code, lands on
-the free app, and names all three apps on its back.
+that repo's `design/chip/`, worked out before the family had a shared identity.
+It stays as exploration and is not being ordered: two ceramic discs in the same
+gold on the same near-black is one object twice, the setup fee is per design
+rather than per order, and this one does more work, since it carries a scannable
+code, lands on the free app, and names all three apps on its back.
+
+**And it is drawn.** The artwork is `design/chip/` in this repo, rendered by
+`npm run chip`, with the reasoning and the two things to check on a physical
+proof in its own README. What is below stayed prose for a while after it was
+decided, which is why the layout notes read as an argument rather than as a
+specification: they are the argument, and the files are the specification.
+
+The code is generated from `chipUrl('qr')` rather than pasted, and the test
+decodes the rendered face with a real scanner to prove what a phone will get.
+It also checks the module size in millimeters **separately**, because a decode
+cannot: the artboards are 2000px, so a tile a third of its true size still
+decodes on screen while being useless on a disc. At the shipped size the code
+is 18.4mm across at 0.43mm a module.
 
 The sourcing from that exploration transfers unchanged, because it is the same
 object from the same supplier, and it is the only part of this whose numbers are

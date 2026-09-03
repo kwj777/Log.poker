@@ -2,7 +2,7 @@
  * Venue selection, with inline creation.
  *
  * Venues are sorted most-played first, so a regular's room is always the first
- * chip. Adding one never leaves the screen — a player standing at a new table
+ * chip. Adding one never leaves the screen -- a player standing at a new table
  * should not have to navigate into settings to log where they are.
  */
 

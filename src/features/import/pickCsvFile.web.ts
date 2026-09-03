@@ -1,5 +1,5 @@
 /**
- * Reading a file the player chose — the web half.
+ * Reading a file the player chose -- the web half.
  *
  * Metro swaps this in for `pickCsvFile.ts` on the web build, the same way the
  * repository factory picks Dexie over SQLite. A plain `<input type="file">`
@@ -7,7 +7,7 @@
  * for it, and a hidden DOM node living in the tree would be one more thing that
  * has to survive every re-render.
  *
- * The file never leaves the browser — it is read with `FileReader` and parsed in
+ * The file never leaves the browser -- it is read with `FileReader` and parsed in
  * this tab, which is the same promise the rest of Log makes about your data.
  */
 

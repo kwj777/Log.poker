@@ -10,11 +10,11 @@
  * The constraint that shapes the rest: this is read at a poker table, often in
  * dim light, one-handed, by someone who does not want to look like they are
  * studying a spreadsheet. So high contrast, big targets, almost no chrome, and
- * colour reserved for money and mood.
+ * color reserved for money and mood.
  *
  * Which is why the accent is gold rather than the felt green it was. Green is
  * what a win is. The old accent sat two degrees of hue from `profit`, so a
- * control and an up session were the same colour to anybody glancing at the
+ * control and an up session were the same color to anybody glancing at the
  * screen; gold is 119 degrees away and leaves green meaning money and nothing
  * else. It reads better too, at 7.2:1 on the background against the 6.3:1 it
  * replaced.
@@ -34,7 +34,7 @@ export const colors = {
   /** The brand's forest, which is also the mark's outer stroke. */
   borderStrong: '#3d4a44',
 
-  /** Gold — the family accent, and never a semantic. */
+  /** Gold -- the family accent, and never a semantic. */
   accent: '#c9a86a',
   accentMuted: '#c9a86a80',
   accentDim: '#3a3323',
@@ -45,7 +45,7 @@ export const colors = {
   textTertiary: '#828e89',
 
   /**
-   * Money. Green for up, a warm red for down — never for anything else, which
+   * Money. Green for up, a warm red for down -- never for anything else, which
    * is a promise the accent used to break and now keeps.
    */
   profit: '#37D399',
@@ -91,13 +91,13 @@ export const typography = {
 } as const;
 
 /**
- * The web layout is a phone-width column centred on desktop. Anything wider
+ * The web layout is a phone-width column centered on desktop. Anything wider
  * turns a session log into a dashboard, which is the exact aesthetic this app
  * exists to avoid.
  */
 export const layout = {
   maxContentWidth: 480,
-  /** Minimum touch target — deliberately generous for one-handed table use. */
+  /** Minimum touch target -- deliberately generous for one-handed table use. */
   tapTarget: 48,
 } as const;
 
@@ -113,7 +113,7 @@ export const shadow = {
 export const moodColor = (score: number): string =>
   colors.mood[Math.min(4, Math.max(0, Math.round(score) - 1))];
 
-/** Green for a win, red for a loss, grey for exactly nothing. */
+/** Green for a win, red for a loss, gray for exactly nothing. */
 export const resultColor = (cents: number | null): string => {
   if (cents === null || cents === 0) return colors.neutral;
   return cents > 0 ? colors.profit : colors.loss;

@@ -1,5 +1,5 @@
 /**
- * Chart scaling. Pure maths, no rendering — so the pixel positions a chart draws
+ * Chart scaling. Pure math, no rendering -- so the pixel positions a chart draws
  * can be reasoned about (and tested) without a renderer.
  */
 
@@ -96,7 +96,7 @@ export const areaPath = (
   return `${line} L${lastX} ${base} L${firstX} ${base} Z`;
 };
 
-/** A closed band between two series — the confidence envelope. */
+/** A closed band between two series -- the confidence envelope. */
 export const bandPath = (
   upper: readonly Point[],
   lower: readonly Point[],

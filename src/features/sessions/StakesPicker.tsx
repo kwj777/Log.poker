@@ -27,7 +27,7 @@ export const StakesPicker = ({ value, onChange }: StakesPickerProps) => {
   const commit = (nextSmall: string, nextBig: string) => {
     const smallBlind = parseAmount(nextSmall);
     const bigBlind = parseAmount(nextBig);
-    // Only propagate a complete, sane pair — a half-typed "1/" should leave the
+    // Only propagate a complete, sane pair -- a half-typed "1/" should leave the
     // stored stakes untouched rather than briefly writing $1/$0.
     if (smallBlind === null || bigBlind === null || smallBlind <= 0 || bigBlind <= 0) return;
     onChange({ ...value, smallBlind, bigBlind });

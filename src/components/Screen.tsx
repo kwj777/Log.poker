@@ -2,7 +2,7 @@
  * The page frame every screen sits in.
  *
  * On phones it is an edge-to-edge safe-area view. On desktop web the content is
- * capped at phone width and centred — Log is a one-handed app, and a 1400px-wide
+ * capped at phone width and centered -- Log is a one-handed app, and a 1400px-wide
  * session form would be a different (worse) product.
  */
 
@@ -17,7 +17,7 @@ interface ScreenProps {
   children: ReactNode;
   /** Set false for screens that manage their own scrolling (e.g. a FlatList). */
   scroll?: boolean;
-  /** Pinned to the bottom, outside the scroll area — primary actions live here. */
+  /** Pinned to the bottom, outside the scroll area -- primary actions live here. */
   footer?: ReactNode;
   contentStyle?: ViewStyle;
 }
@@ -33,7 +33,7 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
 
   return (
     <View style={styles.root}>
-      <View style={styles.centre}>
+      <View style={styles.center}>
         {scroll ? (
           <ScrollView
             style={styles.scroll}
@@ -65,10 +65,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  centre: {
+  center: {
     flex: 1,
     width: '100%',
-    // `alignSelf: center` plus a max width is what produces the centred column
+    // `alignSelf: center` plus a max width is what produces the centered column
     // on desktop web while staying full-bleed on a phone.
     alignSelf: 'center',
     maxWidth: layout.maxContentWidth,

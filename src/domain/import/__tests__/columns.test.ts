@@ -1,10 +1,10 @@
-import { normaliseHeader, resolveColumns } from '../columns';
+import { normalizeHeader, resolveColumns } from '../columns';
 
-describe('normaliseHeader', () => {
+describe('normalizeHeader', () => {
   it('reduces a header to letters and digits', () => {
-    expect(normaliseHeader('Buy-In ($)')).toBe('buyin');
-    expect(normaliseHeader('  TOTAL  CASHOUT ')).toBe('totalcashout');
-    expect(normaliseHeader('P/L')).toBe('pl');
+    expect(normalizeHeader('Buy-In ($)')).toBe('buyin');
+    expect(normalizeHeader('  TOTAL  CASHOUT ')).toBe('totalcashout');
+    expect(normalizeHeader('P/L')).toBe('pl');
   });
 });
 
@@ -28,7 +28,7 @@ describe('resolveColumns', () => {
     expect(map.duplicates).toEqual([{ header: 'Net', field: 'result' }]);
   });
 
-  it('lists headers it does not recognise and ignores empty ones', () => {
+  it('lists headers it does not recognize and ignores empty ones', () => {
     const map = resolveColumns(['Date', 'Rake', '', 'bb/100']);
     expect(map.unmapped).toEqual(['Rake', 'bb/100']);
   });

@@ -1,7 +1,7 @@
 /**
  * "More from the family".
  *
- * Log, Untilt and TiltProof are three answers to the same problem — Log records
+ * Log, Untilt and TiltProof are three answers to the same problem -- Log records
  * what happened, Untilt deals with how it felt, TiltProof drills what to do
  * differently. The cross-promo is deliberately quiet: one card, no badges, no
  * interstitials. A tracker that nags you to buy the other apps is the exact
@@ -44,7 +44,8 @@ const FAMILY: readonly FamilyEntry[] = [
   {
     key: 'tiltproof',
     name: 'TiltProof',
-    tagline: 'Odds and spot training, so the maths is automatic.',
+    // TiltProof's own tagline, so the two say the same thing about it.
+    tagline: 'Know the math, beat the tilt.',
     url: FAMILY_LINKS.tiltproof,
     icon: 'flash-outline',
   },

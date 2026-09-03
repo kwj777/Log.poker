@@ -1,5 +1,5 @@
 /**
- * Selectable chips — the app's main input control.
+ * Selectable chips -- the app's main input control.
  *
  * Nearly every choice in Log (game type, stakes, position, tag, mood) is a small
  * set of known options, and tapping one chip is faster and far more thumb-friendly
@@ -92,7 +92,7 @@ export const ChipGroup = <T,>({ options, value, onChange, scroll, style }: ChipG
   return <View style={[styles.wrap, style]}>{chips}</View>;
 };
 
-/** Multi-select variant — used for hand tags, where more than one can apply. */
+/** Multi-select variant -- used for hand tags, where more than one can apply. */
 interface ChipMultiGroupProps<T> {
   options: readonly Option<T>[];
   values: readonly T[];

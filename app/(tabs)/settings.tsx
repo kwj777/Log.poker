@@ -3,7 +3,7 @@
  *
  * Short by design. The real controls are venue management, the session-summary
  * import and the dev-only demo seeder; everything else is information about
- * where your data lives — which, with no account and no server, is a question
+ * where your data lives -- which, with no account and no server, is a question
  * worth answering plainly.
  */
 
@@ -118,7 +118,7 @@ export default function SettingsScreen() {
       <SectionHeader title="Your data" />
       <Card>
         <Text color={colors.textSecondary} style={styles.body}>
-          Everything stays on this device. There is no account and no server — Log
+          Everything stays on this device. There is no account and no server: Log
           stores your sessions in {STORAGE_ENGINE} and never sends them anywhere.
         </Text>
         <View style={styles.dataStats}>
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
           <SectionHeader title="Developer" />
           <Card>
             <Text color={colors.textSecondary} style={styles.body}>
-              Load a demo dataset — 20 mixed-result sessions with hands and mood entries,
+              Load a demo dataset: 20 mixed-result sessions with hands and mood entries,
               enough to populate the dashboard and the variance view.
             </Text>
             <Button
@@ -191,10 +191,10 @@ export default function SettingsScreen() {
       <FamilyCrossPromo exclude={['log']} style={styles.family} />
 
       <View style={styles.about}>
-        <Text variant="caption" color={colors.textTertiary} centre>
+        <Text variant="caption" color={colors.textTertiary} center>
           Log · log.poker
         </Text>
-        <Text variant="caption" color={colors.textTertiary} centre>
+        <Text variant="caption" color={colors.textTertiary} center>
           The session log that keeps you off tilt.
         </Text>
       </View>

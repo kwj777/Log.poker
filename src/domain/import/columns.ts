@@ -7,7 +7,7 @@
  * columns by hand before they can see anything is how an import feature goes
  * unused, so the common spellings are listed here and matched automatically.
  *
- * Matching is on an exact normalised string — lowercased, with everything that
+ * Matching is on an exact normalized string -- lowercased, with everything that
  * is not a letter or a digit removed, so `Buy-In ($)` and `buy in` and `BuyIn`
  * are one key. Deliberately not substring matching: `rebuy in` contains `buy in`,
  * and a fuzzy match that silently files rebuys as the buy-in is worse than no
@@ -45,7 +45,7 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   notes: 'Notes',
 };
 
-export const normaliseHeader = (header: string): string =>
+export const normalizeHeader = (header: string): string =>
   header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const ALIASES: Record<ImportField, readonly string[]> = {
@@ -124,7 +124,7 @@ export const resolveColumns = (header: readonly string[]): ColumnMap => {
   const duplicates: { header: string; field: ImportField }[] = [];
 
   header.forEach((text, index) => {
-    const field = FIELD_BY_ALIAS.get(normaliseHeader(text));
+    const field = FIELD_BY_ALIAS.get(normalizeHeader(text));
     if (field === undefined) {
       if (text.trim() !== '') unmapped.push(text);
       return;

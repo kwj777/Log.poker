@@ -1,5 +1,5 @@
 /**
- * Demo dataset — 20 mixed-result sessions, so a fresh install has a dashboard
+ * Demo dataset -- 20 mixed-result sessions, so a fresh install has a dashboard
  * worth looking at and the variance view has enough history to say something.
  *
  * Deterministic: the same seed always produces the same data, which keeps
@@ -10,7 +10,7 @@
 import { HAND_TAGS, type GameType, type HandTag, type MoodScore, type Position, type Stakes } from '../domain/types';
 import type { Repository } from './repository';
 
-/** mulberry32 — small, fast, and identical across every JS engine we ship to. */
+/** mulberry32 -- small, fast, and identical across every JS engine we ship to. */
 const makeRandom = (seed: number) => {
   let state = seed >>> 0;
   return (): number => {
@@ -65,9 +65,9 @@ interface SessionPlan {
 }
 
 /**
- * Hand-authored rather than randomised: the shape of this data is the demo.
+ * Hand-authored rather than randomized: the shape of this data is the demo.
  * It is a modest winner (positive overall) with realistic swings, one brutal
- * night, and a couple of heaters — enough for the variance view to have
+ * night, and a couple of heaters -- enough for the variance view to have
  * something honest to say.
  */
 const PLAN: readonly SessionPlan[] = [
@@ -145,7 +145,7 @@ export const seedDemoData = async (
     const buyIn = plan.buyInDollars * 100;
     const rebuys = (plan.rebuyDollars ?? []).map((amount) => amount * 100);
     const invested = buyIn + rebuys.reduce((sum, amount) => sum + amount, 0);
-    // The plan states the result; cash-out is derived so the maths always ties out.
+    // The plan states the result; cash-out is derived so the math always ties out.
     const cashOut = Math.max(0, invested + plan.resultDollars * 100);
 
     const session = await repository.createSession({
@@ -172,7 +172,7 @@ export const seedDemoData = async (
     });
     moodCount += 1;
 
-    // A mid-session check-in on the longer nights only — the app is deliberately
+    // A mid-session check-in on the longer nights only -- the app is deliberately
     // shy about interrupting a short session.
     if (plan.hours >= 5) {
       await repository.createMoodEntry({

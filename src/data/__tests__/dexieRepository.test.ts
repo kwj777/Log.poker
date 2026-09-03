@@ -1,7 +1,7 @@
 /**
  * The IndexedDB implementation against the shared contract, backed by
- * fake-indexeddb — a real IndexedDB engine running in Node, so Dexie's actual
- * transaction and index behaviour is exercised.
+ * fake-indexeddb -- a real IndexedDB engine running in Node, so Dexie's actual
+ * transaction and index behavior is exercised.
  */
 
 import 'fake-indexeddb/auto';

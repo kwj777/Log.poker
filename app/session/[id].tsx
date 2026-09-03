@@ -3,7 +3,7 @@
  *
  * Result first and large, because that is what the player came to see, then the
  * numbers behind it, then how it felt, then the hands. Notes are editable here
- * rather than during play — writing prose at a table is not a thing anyone does.
+ * rather than during play -- writing prose at a table is not a thing anyone does.
  */
 
 import { useState } from 'react';
@@ -49,7 +49,7 @@ export default function SessionDetailScreen() {
 
   /**
    * The notes field is a draft seeded from the stored value. It is re-seeded
-   * when the screen moves to a different session — adjusted during render, per
+   * when the screen moves to a different session -- adjusted during render, per
    * React's guidance, rather than synced in an effect, which would cost an
    * extra render pass and could clobber what the player is typing after an
    * unrelated store refresh.
@@ -66,7 +66,7 @@ export default function SessionDetailScreen() {
       <Screen>
         <PageMeta title="Session · Log" />
         <View style={styles.missing}>
-          <Text variant="heading" centre>
+          <Text variant="heading" center>
             Session not found
           </Text>
           <Button label="Back" style={styles.missingAction} onPress={() => router.replace('/history')} />
@@ -104,7 +104,7 @@ export default function SessionDetailScreen() {
       <View style={styles.header}>
         <Text variant="overline" color={colors.textTertiary}>
           {formatSessionDate(session.startedAt)} · {formatTimeOfDay(session.startedAt)}
-          {session.endedAt ? ` – ${formatTimeOfDay(session.endedAt)}` : ''}
+          {session.endedAt ? ` - ${formatTimeOfDay(session.endedAt)}` : ''}
         </Text>
         <Text variant="display" color={resultColor(net)}>
           {live ? 'In progress' : formatMoney(net ?? 0, { currency, signed: true })}
@@ -119,7 +119,7 @@ export default function SessionDetailScreen() {
         <StatTile label="Duration" value={formatDuration(elapsed)} />
         <StatTile
           label="Hourly"
-          value={hourly === null ? '—' : formatMoney(hourly, { currency, signed: true })}
+          value={hourly === null ? '--' : formatMoney(hourly, { currency, signed: true })}
           valueColor={resultColor(hourly)}
         />
       </View>
@@ -131,7 +131,7 @@ export default function SessionDetailScreen() {
         />
         <StatTile
           label="Cashed out"
-          value={session.cashOut === null ? '—' : formatMoney(session.cashOut, { currency })}
+          value={session.cashOut === null ? '--' : formatMoney(session.cashOut, { currency })}
         />
       </View>
 

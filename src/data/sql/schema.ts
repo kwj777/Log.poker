@@ -4,7 +4,7 @@
  * Versioned through `PRAGMA user_version`: each migration is applied in order
  * and the pragma is bumped, so an app updated months from now walks a device
  * forward from whatever version it is on. Adding a migration means appending to
- * `MIGRATIONS` — never editing an entry that has shipped.
+ * `MIGRATIONS` -- never editing an entry that has shipped.
  */
 
 import type { SqlDriver } from './driver';

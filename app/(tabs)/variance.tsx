@@ -1,14 +1,14 @@
 /**
- * The variance view — the anti-tilt feature.
+ * The variance view -- the anti-tilt feature.
  *
  * The premise: a losing stretch feels like evidence that something is wrong with
  * your game, and almost always isn't. This screen answers that with the player's
- * own numbers — their win rate, their swings — and shows where their recent run
+ * own numbers -- their win rate, their swings -- and shows where their recent run
  * actually sits inside the range those numbers predict.
  *
  * Two rules govern everything here. It never flatters: a genuine outlier is
  * named as one, and a heater is called a heater so nobody banks on it. And it
- * never claims to know whether someone is playing well — variance maths cannot
+ * never claims to know whether someone is playing well -- variance math cannot
  * see that, and pretending otherwise would make the reassurance worthless.
  */
 
@@ -40,8 +40,8 @@ import { PageMeta } from '../../src/components/PageMeta';
 const RECENT_SESSIONS = 10;
 
 /**
- * Only the true outliers get a colour. A stretch inside the normal band is
- * shown in plain text on purpose — painting an ordinary bad week red is exactly
+ * Only the true outliers get a color. A stretch inside the normal band is
+ * shown in plain text on purpose -- painting an ordinary bad week red is exactly
  * the reflex this screen exists to interrupt.
  */
 const VERDICT_COLORS: Record<StretchVerdict, string> = {
@@ -107,7 +107,7 @@ export default function VarianceScreen() {
           <Text variant="bodyStrong">Why this needs a sample</Text>
           <Text color={colors.textSecondary} style={styles.explainerBody}>
             Every player has a different win rate and a different amount of swing.
-            Comparing your week to someone else’s numbers — or to a textbook average —
+            Comparing your week to someone else’s numbers (or to a textbook average)
             would tell you nothing about your game. So this page waits until it can use
             yours.
           </Text>
@@ -150,7 +150,7 @@ export default function VarianceScreen() {
         </View>
         <Text variant="caption" color={colors.textTertiary} style={styles.chartNote}>
           Cumulative big blinds won over hours played. The shaded area is where 95 out of
-          100 runs like yours would land. Inside it is unremarkable — that is the whole point.
+          100 runs like yours would land. Inside it is unremarkable, and that is the whole point.
         </Text>
       </Card>
 
@@ -178,7 +178,7 @@ export default function VarianceScreen() {
             <Text variant="bodyStrong" color={colors.text}>
               {Math.round(lossChance * 100)}% of the time
             </Text>
-            . Not because of anything you did — that is simply what this much variance
+            . Not because of anything you did: that is simply what this much variance
             looks like over this few hours. Losing stretches are part of a winning
             player’s results, not a departure from them.
           </Text>

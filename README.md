@@ -11,12 +11,12 @@ Log is the hub of a three-app family:
 
 | App | What it's for |
 | --- | --- |
-| **Log** (this repo) | What happened — sessions, hands, results, variance |
-| [Untilt.poker](https://untilt.poker) | How it felt — mental game work |
-| [TiltProof](https://tiltproof.com) | What to do differently — odds and spot training |
+| **Log** (this repo) | What happened -- sessions, hands, results, variance |
+| [Untilt.poker](https://untilt.poker) | How it felt -- mental game work |
+| [TiltProof](https://tiltproof.com) | What to do differently -- odds and spot training |
 
-How the three are priced together — speculatively, and the short version is that
-Log stays free — is worked out in
+How the three are priced together -- speculatively, and the short version is that
+Log stays free -- is worked out in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md),
 over in Untilt beside the monetization document it extends.
 
@@ -24,32 +24,32 @@ over in Untilt beside the monetization document it extends.
 
 ## What's in the MVP
 
-- **Session logging** — start and end a session with stakes, game type, venue
+- **Session logging** -- start and end a session with stakes, game type, venue
   and buy-in; rebuys mid-session; cash-out at the end. Duration, profit/loss and
   hourly rate are computed, never typed. The new-session screen is pre-filled
   from your last session, so the common path is open, glance, Start.
-- **Quick hand journal** — a two-taps-per-card picker, position, one line of
+- **Quick hand journal** -- a two-taps-per-card picker, position, one line of
   note, and tags (*bad beat*, *misplayed?*, *cooler*, *bluff*). Everything is
   optional; the hand saves as soon as anything at all has been entered.
-- **Mood check-in** — an optional one-tap tilt meter at the start and end of a
+- **Mood check-in** -- an optional one-tap tilt meter at the start and end of a
   session, plus a deliberately subtle inline prompt two hours in. Stored
   alongside the result, so "I left three steps more rattled than I arrived" is a
   thing you can see.
-- **Dashboard** — bankroll curve, hourly rate, session count, hours played, and
+- **Dashboard** -- bankroll curve, hourly rate, session count, hours played, and
   profit broken down by stakes, venue or game type.
-- **Variance view** — your own win rate and standard deviation, with your recent
+- **Variance view** -- your own win rate and standard deviation, with your recent
   stretch placed inside the confidence band those numbers predict. See
   [The variance model](#the-variance-model).
-- **Session history** — filter by period, venue and game type; every filter
+- **Session history** -- filter by period, venue and game type; every filter
   recomputes the totals above the list.
-- **Session-summary import** — bring an online history in from a CSV your site
+- **Session-summary import** -- bring an online history in from a CSV your site
   or your tracker exported, rather than typing out a year of sessions. See
   [Importing an online history](#importing-an-online-history).
-- **Family cross-promo** — a shared "More from the family" card, plus two
+- **Family cross-promo** -- a shared "More from the family" card, plus two
   contextual hand-offs: a rough stretch on the variance view offers Untilt, and
   a hand tagged *misplayed?* offers to drill the spot in TiltProof.
 
-Offline throughout. There is no account, no server, and no network call — your
+Offline throughout. There is no account, no server, and no network call -- your
 log never leaves your device.
 
 ---
@@ -74,15 +74,16 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test           # 401 unit tests
-npm run typecheck  # strict TypeScript, app and tests
-npm run lint       # eslint-config-expo
+npm test            # 435 unit tests
+npm run typecheck   # strict TypeScript, app and tests
+npm run lint        # eslint-config-expo
+npm run check:prose # house style: no en or em dashes, American spellings
 ```
 
 ### Demo data
 
 Settings → **Load demo data** seeds 20 mixed-result sessions with hands and mood
-entries — enough to fill the dashboard and give the variance view something to
+entries -- enough to fill the dashboard and give the variance view something to
 say. The control is gated behind `__DEV__`, so it is stripped from production
 builds entirely rather than merely hidden.
 
@@ -159,22 +160,22 @@ npx serve dist      # or any static server with a single-page fallback
 
 ### What `netlify.toml` does
 
-- **SPA fallback** — `/app/*` → `/app/index.html` with status `200`, so a deep
+- **SPA fallback** -- `/app/*` → `/app/index.html` with status `200`, so a deep
   link like `/app/session/<id>` is served the app shell and resolved by the
   client router rather than 404ing. There is deliberately no catch-all at the
   root: an unknown address gets `404.html` rather than quietly resolving to the
   app.
-- **Cache headers** — `index.html`, `sw.js` and the manifest are
+- **Cache headers** -- `index.html`, `sw.js` and the manifest are
   `must-revalidate` so a deploy reaches returning visitors immediately;
   everything under `_expo/` and `assets/` is content-hashed by the bundler and
   cached for a year.
-- **Security headers** — `nosniff`, `SAMEORIGIN`, and a strict referrer policy.
+- **Security headers** -- `nosniff`, `SAMEORIGIN`, and a strict referrer policy.
 
 ---
 
 ## The PWA
 
-The web build is installable and works fully offline — a hard requirement, since
+The web build is installable and works fully offline -- a hard requirement, since
 card rooms are windowless basements with no reception. A player mid-session has
 to be able to add a rebuy and log a hand with the network entirely gone.
 
@@ -182,24 +183,24 @@ That is achievable because Log has no backend: every read and write goes to
 IndexedDB in the browser, so the only thing the network is ever needed for is
 the app shell itself.
 
-- **`public/manifest.webmanifest`** — standalone display, portrait, the charcoal
-  theme colour, 192/512 icons plus a maskable one, and a "Start a session"
+- **`public/manifest.webmanifest`** -- standalone display, portrait, the charcoal
+  theme color, 192/512 icons plus a maskable one, and a "Start a session"
   shortcut. `start_url` and `scope` are `/app`, not `/`: at the root, installing
   Log would install the marketing page.
-- **`public/sw.js`** — network-first for navigations (so a deploy is picked up
+- **`public/sw.js`** -- network-first for navigations (so a deploy is picked up
   promptly) falling back to the cached shell; cache-first for the
   content-hashed bundle and icons; stale-while-revalidate for everything else.
   On install it parses the shell HTML for its script and stylesheet URLs and
   precaches them, so even the *first* offline visit works rather than the
   second. Bump `CACHE_VERSION` to force every client to discard its caches.
-- **`app/+html.tsx`** — the document shell: manifest link, theme colour, Apple
+- **`app/+html.tsx`** -- the document shell: manifest link, theme color, Apple
   touch icon, `viewport-fit=cover` for safe areas, and the service-worker
-  registration (production builds only — a worker in front of the Metro dev
+  registration (production builds only -- a worker in front of the Metro dev
   server would serve yesterday's bundle).
 
 `app.json` sets `web.output: "static"`, which is what makes `+html.tsx` take
 effect. Log's content lives entirely in a local database, so the pre-rendered
-HTML is just the shell — the value is the customised `<head>`, not
+HTML is just the shell -- the value is the customized `<head>`, not
 pre-rendered content.
 
 Verified in a headless Chromium against the real production build: the worker
@@ -216,7 +217,7 @@ the one route in this repo that is a promise rather than a convenience. Chips
 are permanent objects: once one is on a felt, that URL has to resolve for as
 long as it exists, through every later rewrite of the app.
 
-So it is deliberately the least clever thing here — `public/chip.html`, a single
+So it is deliberately the least clever thing here -- `public/chip.html`, a single
 static document under 9KB with **no bundle, no framework, and not one external
 request, not even a font**. It renders with scripting turned off, and it renders
 immediately on one bar of signal, which is the condition it will actually meet:
@@ -232,7 +233,7 @@ card rooms are windowless basements.
   medium, no row per scan and nothing about the visitor. It fails open in every
   direction, and the page renders identically when it is not deployed at all.
 - **`src/campaign/__tests__/chip.test.ts`** asserts the guarantee rather than
-  the implementation — that it resolves, resolves without the network, reads
+  the implementation -- that it resolves, resolves without the network, reads
   L then O then G, and never quotes a price.
 
 That last one is not a joke. `app.json` sets `web.output: "static"`, so the
@@ -255,14 +256,14 @@ app one tap later, so the two surfaces being visibly different products is the
 exact thing the shared palette exists to prevent.
 
 **The accent is gold, and it used to be felt green.** The reason is not brand
-tidiness — the old accent sat *two degrees of hue* from `profit`, so a control
-and a winning session were the same colour to anybody glancing at the screen in
+tidiness -- the old accent sat *two degrees of hue* from `profit`, so a control
+and a winning session were the same color to anybody glancing at the screen in
 a dim room. Gold is 119 degrees away, which leaves green meaning money and
 nothing else, and it reads better besides: 7.2:1 on the background against the
 6.3:1 it replaced. The test asserts both the hue separation and the contrast
 floors, so neither can quietly come back.
 
-Semantic colours — profit, loss, the tilt meter — are deliberately *not* pinned
+Semantic colors -- profit, loss, the tilt meter -- are deliberately *not* pinned
 to `BRAND.md`. They mean something rather than brand something.
 
 ---
@@ -276,10 +277,10 @@ app/                      Expo Router routes
   (tabs)/                 dashboard · sessions · variance · settings
   session/                new · active · [id] · hand
 src/
-  domain/                 pure maths and types — no React, no storage
+  domain/                 pure math and types -- no React, no storage
     types.ts              the data model
     money.ts              integer cents in, formatted strings out
-    handNotation.ts       "AsKd" — the stable hand-off format
+    handNotation.ts       "AsKd" -- the stable hand-off format
     stats.ts              P/L, hourly rate, bankroll curve, groupings
     variance.ts           win rate, standard deviation, confidence bands
   data/
@@ -304,20 +305,20 @@ bundles).
 
 Both are relational stores with indexes, deliberately. Session data is
 relational and grows for years; `AsyncStorage` and `localStorage` are
-synchronous key–value string stores with no indexes, and querying five years of
-sessions through one means deserialising all of them on every read.
+synchronous key-value string stores with no indexes, and querying five years of
+sessions through one means deserializing all of them on every read.
 
 `SqlRepository` talks to a five-method `SqlDriver` rather than to `expo-sqlite`
 directly. `expo-sqlite` implements it on device and `node:sqlite` implements it
-in the test suite — so the class that ships to iOS and Android is the class the
+in the test suite -- so the class that ships to iOS and Android is the class the
 tests exercise, against a real SQLite engine, rather than a fake that would
 agree with whatever the repository happens to do.
 
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
-**both** implementations — real SQLite via `node:sqlite`, real IndexedDB via
-`fake-indexeddb`. Ordering, cascade behaviour, patch semantics and constraint
+**both** implementations -- real SQLite via `node:sqlite`, real IndexedDB via
+`fake-indexeddb`. Ordering, cascade behavior, patch semantics and constraint
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
@@ -355,12 +356,12 @@ Results are treated as a random walk in time: over `h` hours a player with win
 rate `w` (big blinds per hour) and per-hour standard deviation `σ` has a result
 with mean `w·h` and standard deviation `σ·√h`.
 
-Both parameters are estimated from the player's own completed sessions — never
+Both parameters are estimated from the player's own completed sessions -- never
 from a hard-coded "typical" number, which would be a guess dressed up as a
 measurement. Win rate is total big blinds over total hours; the standard
 deviation uses the method-of-moments estimator for a variance that scales with
 time, `σ² = Σ(rᵢ − ŵ·hᵢ)² / Σhᵢ`, with a Bessel-style correction for the one
-parameter estimated from the same data. Results are normalised to big blinds so
+parameter estimated from the same data. Results are normalized to big blinds so
 sessions across different stakes pool into one estimate.
 
 Below eight sessions or twenty hours the view says it doesn't have enough data
@@ -372,7 +373,7 @@ they are "due".
 
 ### Hand notation
 
-Hole cards are stored as `"AsKd"` — rank then suit, two characters per card, the
+Hole cards are stored as `"AsKd"` -- rank then suit, two characters per card, the
 format every other poker tool already speaks. That is what makes the TiltProof
 hand-off possible without a translation layer, and what a CSV export will emit.
 
@@ -381,8 +382,8 @@ hand-off possible without a translation layer, and what a CSV export will emit.
 ## Importing an online history
 
 Log is built for the felt, but plenty of people play both. An online player's
-history already exists in a file — a PokerTracker or Holdem Manager session
-report, a PokerCraft export, a spreadsheet kept by hand for years — and
+history already exists in a file -- a PokerTracker or Holdem Manager session
+report, a PokerCraft export, a spreadsheet kept by hand for years -- and
 **Settings → Import sessions** reads it. On the web there is a file picker; on
 device you paste the rows in. Nothing is uploaded: the file is parsed in the app
 and written to the same local database as everything else.
@@ -392,19 +393,19 @@ and written to the same local database as everything else.
 One row per session, with a header row. It needs a date column and either a
 result column or a buy-in and a cash-out; stakes, site, game, duration and notes
 are used when they are there. Column names are matched against the spellings
-these files actually use — `Date`, `Total Buyin`, `Net Won`, `P/L`, `Limit`,
-`Site` — and the screen shows exactly which column it took for which field before
+these files actually use -- `Date`, `Total Buyin`, `Net Won`, `P/L`, `Limit`,
+`Site` -- and the screen shows exactly which column it took for which field before
 anything is written.
 
 The awkward parts of other people's files are handled rather than assumed:
 quoted fields with commas in them, tabs and semicolons, CRLF and byte-order
 marks, `1.234,56` as well as `1,234.56`, and `(52.50)` for a negative. Day-first
 and month-first dates are told apart by scanning the whole column for a day past
-the twelfth — and when a file never proves it either way, the screen says so and
+the twelfth -- and when a file never proves it either way, the screen says so and
 offers a toggle instead of picking silently.
 
 **It does not read hand histories.** A hand history is an action-level record of
-one hand; Log's `Hand` is a journal entry *about* a hand — hole cards, position,
+one hand; Log's `Hand` is a journal entry *about* a hand -- hole cards, position,
 a note, a tag. There is nothing to import one into. Session summaries are the
 level the two products genuinely share.
 
@@ -414,7 +415,7 @@ A row with no stakes gets zero blinds, not a plausible-looking `$1/$2`; a row
 with no duration ends when it started. Both degrade honestly rather than
 silently: `toObservations` already drops sessions with no measurable duration or
 no big blind, so they count toward profit and the bankroll curve and stay out of
-a win-rate estimate they would poison — and the import warns, in those words,
+a win-rate estimate they would poison -- and the import warns, in those words,
 before you press the button.
 
 Every imported session is complete by construction: `cashOut` and `endedAt` are
@@ -426,7 +427,7 @@ than fill it. A contract test asserts it on both storage engines.
 
 Each imported session stores an `importKey` derived from the row it came from,
 under a unique index. Re-import next month's export and the three new sessions
-land while the rest are skipped — the screen says how many. Delete a session and
+land while the rest are skipped -- the screen says how many. Delete a session and
 its row becomes importable again. That matters more than it sounds: a doubled
 bankroll is a failure nobody notices until it has compounded for months.
 
@@ -436,37 +437,37 @@ bankroll is a failure nobody notices until it has compounded for months.
 
 Ordered roughly by how much each is worth against how much it costs.
 
-1. **CSV export** — the data model is already designed for it: every record is
+1. **CSV export** -- the data model is already designed for it: every record is
    timestamped, money is integer cents, and hands are in a portable notation.
    Wants a share sheet on native and a download on web.
-2. **Cloud sync and auth** — the reason every record carries a client-generated
+2. **Cloud sync and auth** -- the reason every record carries a client-generated
    id and an `updatedAt`. A syncing repository wraps the existing one behind the
    same interface, and `src/data/index.ts` is the single place it gets composed
    in; no feature folder changes. Last-write-wins per record to start, with the
    timestamps already in place to do better later.
-3. **RevenueCat cross-platform subscriptions** — entitlements gate features at
+3. **RevenueCat cross-platform subscriptions** -- entitlements gate features at
    the store layer, not inside screens, so the free build and the paid build
    stay one codebase. Web entitlements via Stripe through the same RevenueCat
    account.
-4. **Online session support** — [importing a session summary](#importing-an-online-history)
+4. **Online session support** -- [importing a session summary](#importing-an-online-history)
    is the half of this that already ships. The rest is multi-table sessions and
    hands per hour, which need `sessions` to grow a `format` discriminator and the
-   hourly-rate maths to become per-table: wall-clock hours stop meaning one thing
+   hourly-rate math to become per-table: wall-clock hours stop meaning one thing
    the moment four tables are open.
-5. **Deep Untilt and TiltProof integration** — the seams already exist in
+5. **Deep Untilt and TiltProof integration** -- the seams already exist in
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
-   real payload — the flagged hand into a TiltProof drill, the rough stretch
-   into the matching Untilt exercise — and eventually share an account across
+   real payload -- the flagged hand into a TiltProof drill, the rough stretch
+   into the matching Untilt exercise -- and eventually share an account across
    the three apps.
-6. **Bankroll goals** — target roll, stop-loss and stop-win per session, and a
+6. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
 
 Also wanted, smaller: tournament support, session photos of the chip stack,
-Apple Health–style weekly summaries, an Apple Watch companion for the timer, and
+Apple Health style weekly summaries, an Apple Watch companion for the timer, and
 per-venue rake tracking.
 
 ---
 
-## Licence
+## License
 
 MIT

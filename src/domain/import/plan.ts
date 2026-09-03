@@ -4,7 +4,7 @@
  * This is the seam between a parsed file and the repository: which rows are new,
  * which venues have to exist first, and how many rows were already in the log.
  * It lives here rather than in the store because it is the part with rules in it
- * — matching venue names, skipping what is already stored — and rules that only
+ * -- matching venue names, skipping what is already stored -- and rules that only
  * exist inside a Zustand action are rules nothing can test.
  */
 

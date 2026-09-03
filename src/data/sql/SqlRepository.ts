@@ -1,5 +1,5 @@
 /**
- * SQLite-backed repository — the native (iOS/Android) implementation.
+ * SQLite-backed repository -- the native (iOS/Android) implementation.
  *
  * Talks to a `SqlDriver` rather than to expo-sqlite directly, which keeps it
  * testable in Node against a real SQLite engine.
@@ -197,7 +197,7 @@ const bool = (value: boolean): number => (value ? 1 : 0);
 export class SqlRepository implements Repository {
   private readonly driver: SqlDriver;
   private readonly ctx: RepositoryContext;
-  private initialised = false;
+  private initialized = false;
 
   constructor(driver: SqlDriver, ctx: RepositoryContext = defaultContext()) {
     this.driver = driver;
@@ -205,9 +205,9 @@ export class SqlRepository implements Repository {
   }
 
   async init(): Promise<void> {
-    if (this.initialised) return;
+    if (this.initialized) return;
     await migrate(this.driver);
-    this.initialised = true;
+    this.initialized = true;
   }
 
   // ---------------------------------------------------------------- venues
@@ -322,7 +322,7 @@ export class SqlRepository implements Repository {
 
   /**
    * Resolve rebuys and venues for a page of sessions in two queries rather than
-   * two per session — the history list would otherwise fan out badly once a
+   * two per session -- the history list would otherwise fan out badly once a
    * player has a few hundred sessions.
    */
   private async attachChildren(sessions: Session[]): Promise<SessionWithChildren[]> {

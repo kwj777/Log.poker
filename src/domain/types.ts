@@ -101,7 +101,7 @@ export interface Session {
    *
    * Null for everything logged in the app. Unique across the table where it is
    * set, which is what makes re-importing last month's export add the three new
-   * sessions on the end and silently skip the rest — a duplicated bankroll being
+   * sessions on the end and silently skip the rest -- a duplicated bankroll being
    * exactly the kind of failure nobody notices until it has compounded.
    */
   importKey: string | null;
@@ -109,7 +109,7 @@ export interface Session {
   updatedAt: Timestamp;
 }
 
-/** A session with its child records resolved — what the UI almost always wants. */
+/** A session with its child records resolved -- what the UI almost always wants. */
 export interface SessionWithChildren extends Session {
   rebuys: Rebuy[];
   venue: Venue | null;
@@ -119,7 +119,7 @@ export interface Hand {
   id: string;
   sessionId: string;
   /**
-   * Stable, parseable notation for the hole cards — e.g. `"AsKd"`, `"Th9h"`.
+   * Stable, parseable notation for the hole cards -- e.g. `"AsKd"`, `"Th9h"`.
    * Two characters per card: rank (`23456789TJQKA`) then suit (`shdc`).
    * Null when the player logged a hand without recording cards.
    *

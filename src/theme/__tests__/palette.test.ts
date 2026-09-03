@@ -7,7 +7,7 @@
  * its own charcoal for a while, so a player scanning a card protector met a
  * gold page and then a green app one tap later.
  *
- * The semantic colours are deliberately not pinned. Profit, loss and the tilt
+ * The semantic colors are deliberately not pinned. Profit, loss and the tilt
  * meter mean something rather than brand something, and BRAND.md does not
  * define them.
  */
@@ -102,7 +102,7 @@ describe('the generated icons draw the family mark', () => {
 
   it('climbs past sage rather than below it', () => {
     // The palette's own three greens run 1.76, 2.68 and 3.55 on the ground,
-    // which is one step and a rumour: the darkest is already invisible.
+    // which is one step and a rumor: the darkest is already invisible.
     expect(onGround(canopy[0])).toBeGreaterThan(onGround(brandColor('sage')));
     expect(canopy).not.toContain(brandColor('forest'));
   });
@@ -121,7 +121,7 @@ describe('the generated icons draw the family mark', () => {
   });
 
   it('draws one baseline rather than three', () => {
-    // Three coincident bases stripe the line into three colours. Only the
+    // Three coincident bases stripe the line into three colors. Only the
     // outermost triangle is closed; see BRAND.md.
     expect(iconScript).toContain('if (i === 0) segments.push([...left, ...right]);');
   });
@@ -150,7 +150,7 @@ describe('the mark reaches the app itself', () => {
   });
 });
 
-describe('colour still means one thing', () => {
+describe('color still means one thing', () => {
   /** Relative luminance, per WCAG. */
   const luminance = (hex: string): number => {
     const channel = (v: number): number => {
@@ -179,9 +179,9 @@ describe('colour still means one thing', () => {
     return Math.min(d, 360 - d);
   };
 
-  it('keeps the accent well clear of the money colours', () => {
+  it('keeps the accent well clear of the money colors', () => {
     // It used to be two degrees from profit, so a control and an up session
-    // were the same colour at a glance. This is the assertion that regression
+    // were the same color at a glance. This is the assertion that regression
     // would have to get past.
     expect(apart(colors.accent, colors.profit)).toBeGreaterThan(60);
     expect(apart(colors.accent, colors.loss)).toBeGreaterThan(30);

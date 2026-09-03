@@ -32,11 +32,11 @@ export default function RootLayout() {
       {/*
         The default document title, set outside the readiness gate below.
         Log's content lives in a local database that is only opened in an
-        effect, so the pre-rendered HTML is just this shell — without a title
+        effect, so the pre-rendered HTML is just this shell -- without a title
         here, the tab (and any crawler) would see an empty one until the app
         booted. Individual screens override it once they mount.
       */}
-      <PageMeta title="Log — the session log that keeps you off tilt" description={APP_DESCRIPTION} />
+      <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
       <StatusBar style="light" />
       {status === 'ready' ? (
         <Stack
@@ -72,13 +72,13 @@ export default function RootLayout() {
           <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
         </Stack>
       ) : (
-        <View style={styles.centre}>
+        <View style={styles.center}>
           {status === 'error' ? (
             <>
-              <Text variant="heading" centre>
+              <Text variant="heading" center>
                 Couldn’t open your log
               </Text>
-              <Text color={colors.textSecondary} centre style={styles.message}>
+              <Text color={colors.textSecondary} center style={styles.message}>
                 {error ?? 'The local database could not be opened.'}
               </Text>
               <Button label="Try again" onPress={() => void hydrate()} style={styles.retry} />
@@ -93,7 +93,7 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  centre: {
+  center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',

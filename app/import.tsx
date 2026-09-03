@@ -2,7 +2,7 @@
  * Import session summaries.
  *
  * Log is a live-poker journal, and an online player's history already exists in
- * a file somewhere — a PokerTracker or Holdem Manager session report, a
+ * a file somewhere -- a PokerTracker or Holdem Manager session report, a
  * PokerCraft export, a spreadsheet they have kept for years. This screen is the
  * one door into the app that does not involve typing a session out by hand.
  *
@@ -107,7 +107,7 @@ export default function ImportScreen() {
       <View style={styles.header}>
         <Text variant="title">Import sessions</Text>
         <Text color={colors.textSecondary} style={styles.lede}>
-          If you play online, your history is already written down — your site or your tracker
+          If you play online, your history is already written down: your site or your tracker
           did it. Export a session summary as CSV and drop it in here.
         </Text>
       </View>
@@ -175,7 +175,7 @@ export default function ImportScreen() {
               </Text>
             </View>
             <Text variant="caption" color={colors.textTertiary} style={styles.range}>
-              {formatDay(totals.from)} – {formatDay(totals.to)} · {totals.venues.join(', ')}
+              {formatDay(totals.from)} - {formatDay(totals.to)} · {totals.venues.join(', ')}
             </Text>
 
             <View style={styles.mapping}>
@@ -255,7 +255,7 @@ export default function ImportScreen() {
             {summary.duplicates > 0 ? (
               <Text variant="caption" color={colors.textSecondary} style={styles.summaryLine}>
                 {summary.duplicates} {summary.duplicates === 1 ? 'was' : 'were'} already in your
-                log and {summary.duplicates === 1 ? 'was' : 'were'} skipped — importing the same
+                log and {summary.duplicates === 1 ? 'was' : 'were'} skipped: importing the same
                 export again only ever adds what is new.
               </Text>
             ) : null}

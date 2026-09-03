@@ -4,7 +4,7 @@
  * The target is fifteen seconds, so the screen is ordered by what a player
  * reaches for first and every field is optional. Cards, position and a tag are
  * all taps; the note is one line by default. Save is enabled from the moment
- * anything at all has been entered — a hand logged as "cooler, no cards" is a
+ * anything at all has been entered -- a hand logged as "cooler, no cards" is a
  * far better outcome than a hand not logged because the form demanded more.
  */
 
@@ -52,10 +52,10 @@ export default function LogHandScreen() {
       <Screen>
         <PageMeta title="Log a hand · Log" />
         <View style={styles.empty}>
-          <Text variant="heading" centre>
+          <Text variant="heading" center>
             No session running
           </Text>
-          <Text color={colors.textSecondary} centre>
+          <Text color={colors.textSecondary} center>
             Hands are logged against a live session. Start one first.
           </Text>
           <Button label="Close" onPress={() => router.back()} style={styles.emptyAction} />

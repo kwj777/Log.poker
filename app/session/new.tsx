@@ -120,7 +120,7 @@ export default function NewSessionScreen() {
       <SectionHeader title="How are you feeling? (optional)" />
       <MoodPicker value={mood} onChange={setMood} />
       <Text variant="caption" color={colors.textTertiary} style={styles.moodHint}>
-        Logged alongside your result. Skip it — it’s never required.
+        Logged alongside your result. Skip it. It’s never required.
       </Text>
     </Screen>
   );

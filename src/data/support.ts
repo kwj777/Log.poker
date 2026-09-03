@@ -1,6 +1,6 @@
 /**
  * Shared record construction. Both repositories build rows through these
- * helpers so a venue created on iOS is byte-identical to one created on web —
+ * helpers so a venue created on iOS is byte-identical to one created on web --
  * which matters now for the shared test suite, and later for sync.
  */
 
@@ -170,5 +170,5 @@ export const applyPatch = <T extends object>(record: T, patch: Partial<T>): T =>
   return next;
 };
 
-/** Newest first — the order every list in the app wants. */
+/** Newest first -- the order every list in the app wants. */
 export const byRecencyDesc = <T extends { at: Timestamp }>(a: T, b: T): number => b.at - a.at;

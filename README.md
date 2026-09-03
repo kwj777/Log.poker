@@ -77,11 +77,17 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test            # 523 unit tests
+npm test            # house style, then 523 unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
-npm run check:prose # house style: no en or em dashes, American spellings
+npm run check:prose # house style on its own
 ```
+
+`npm test` runs the house-style check first and stops if it fails. It reads
+files rather than compiling them, so it costs a fraction of a second and the
+message it prints names the file, the line and the word. `npm run test:watch`
+leaves it out: the tight loop is for the tests, and a half-written comment
+should not interrupt it.
 
 ### Demo data
 
@@ -350,8 +356,10 @@ Tests:       523 passed
   columns             7   header matching
 ```
 
-`npm run check:prose` is a separate pass over the house style (American
-spellings, no en or em dashes). It is not part of `npm test`.
+`npm run check:prose` is the house-style pass (American spellings, no en or em
+dashes) and it runs ahead of Jest as part of `npm test`. It reads tracked files
+*and* new ones that are not yet committed, so a rule nobody checks does not
+quietly become a preference again.
 
 ### Money
 

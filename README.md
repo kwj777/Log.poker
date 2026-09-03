@@ -78,6 +78,7 @@ npm test            # 435 unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
 npm run check:prose # house style: no en or em dashes, American spellings
+npm run build:content -- --check  # the guides match their generator
 ```
 
 ### Demo data
@@ -110,6 +111,7 @@ the build.
 |---|---|
 | `/` | `public/home.html`, renamed to `index.html` at build time. Static, no bundle, no external request of any kind. |
 | `/app` | Log. The whole Expo export, moved wholesale into `dist/app`. |
+| `/running-bad`, `/bankroll`, `/pot-odds`, `/tilt` | The guides. See [The guides](#the-guides). |
 | `/blog` | The Log Blog, generated from `content/blog`. See [The blog](#the-blog). |
 | `/chip` | The card protector landing. See [The chip campaign](#the-chip-campaign). |
 | `/apps` | 301 to `/`, which now lists the family. |
@@ -317,6 +319,44 @@ criteria, and with the network switched off the app boots from a cold reload,
 resolves deep links, and reads and writes sessions, rebuys and hands.
 
 ---
+
+## The guides
+
+Four pages that answer a question somebody actually types into a search engine,
+each one linked from the front door and from the other three:
+
+| | |
+|---|---|
+| `/running-bad` | What an ordinary downswing looks like, and the chance a winning player is behind after a given number of hours. |
+| `/bankroll` | Risk of ruin, and what the 20 buy-in rule is really a claim about. |
+| `/pot-odds` | Outs, exact equities, and the two ways the rule of 2 and 4 misleads. |
+| `/tilt` | What tilt costs, what it is, and what works at the table. |
+
+They are generated rather than hand-written:
+
+```bash
+npm run build:content            # write public/<slug>.html
+npm run build:content -- --check # fail if any committed page is out of date
+```
+
+`scripts/build-content.mjs` holds the copy, and the reason it exists is the
+same reason the icon script does. The four pages share a head, a mark, a nav,
+a footer and about a hundred lines of CSS, and every page here paints with no
+external request of any kind, not even a font, so that CSS has to be inline on
+each of them. Four copies of it is four chances to change three.
+
+**Every number in every table is computed, never typed.** A poker page that
+gets its own arithmetic wrong is worse than no page.
+`src/site/__tests__/content.test.ts` reads the published HTML back and checks
+each figure against `src/domain/variance.ts` and against plain combinatorics,
+so a table is verified as published rather than as intended. It checks the
+sentences that quote the tables too: "one time in six" and "roughly 55 times
+riskier" are claims a reader will divide two cells to check, and both were
+wrong once from rounding alone.
+
+Each page answers its question in full before it mentions an app. A page that
+withholds the answer to make you install something is the genre this is trying
+not to be in.
 
 ## The chip campaign
 

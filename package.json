@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "build:web": "node scripts/build-web.mjs",
     "build:blog": "node scripts/build-blog.mjs",
+    "build:content": "node scripts/build-content.mjs",
     "build:og": "node scripts/build-og.mjs",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -41,6 +41,41 @@
   to = "/.netlify/functions/chip-scan"
   status = 200
 
+# The guides, at addresses without an extension on them.
+#
+# Netlify will usually serve /running-bad from running-bad.html on its own, but
+# "usually" is a setting rather than a guarantee, and the canonical in each page
+# names the extensionless address. These rules make the served path and the
+# canonical path the same thing by configuration rather than by default, which
+# is the same reasoning that gave /chip its own rules above. They sit before
+# the single-page catch-all for the same reason it does.
+[[redirects]]
+  from = "/running-bad"
+  to = "/running-bad.html"
+  status = 200
+
+[[redirects]]
+  from = "/bankroll"
+  to = "/bankroll.html"
+  status = 200
+
+[[redirects]]
+  from = "/pot-odds"
+  to = "/pot-odds.html"
+  status = 200
+
+[[redirects]]
+  from = "/tilt"
+  to = "/tilt.html"
+  status = 200
+
+# The .html address of each guide also resolves, because Netlify serves a real
+# file before it consults these rules, so each page is reachable at two URLs.
+# That is handled by the canonical in each document rather than by a forced
+# 301 back to the pretty address: a 301 from /x.html to /x, sitting above a
+# 200 from /x to /x.html, is one rule-engine detail away from a redirect loop,
+# and the canonical does the whole job with none of that risk.
+
 # The family page listed the three apps at /apps before the root did. One
 # canonical page rather than two, and the old address keeps working.
 [[redirects]]

@@ -559,6 +559,51 @@ pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
 something sweeps them, which is phase 2 work, and until then a heavy deleter's
 database grows where it used to shrink.
 
+### Signing in, and what it is for
+
+`src/auth` is the client half of the family's identity. It exists for exactly
+one feature, cross-device history, and **nothing else in the app has anything to
+do with it**: Log is free in its entirety and stays completely usable by
+somebody who never types an email address. There is no signed-out state to
+handle, because signed out is the state every screen already runs in.
+
+The token is minted by Untilt's sign-in and is the same string in all three
+apps. It has to be a bearer string rather than a cookie: `log.poker`,
+`untilt.poker` and `tiltproof.poker` are three registrable domains, so no cookie
+crosses them, and on iOS and Android there is no cookie jar at all.
+
+```
+<expiry>.<tier>.<subject>.<signature>
+```
+
+Three things about this are worth knowing before touching it.
+
+- **Nothing on this side verifies a signature.** Checking one needs the gate
+  secret, and a secret shipped inside an app anybody can download is not a
+  secret. A parsed claim decides what to show and what is worth sending; the
+  server re-derives on every request and is the only answer that counts.
+- **The expiry is in seconds** where every other timestamp in this app is
+  milliseconds. Converted at the boundary, and tested there, because the
+  difference is a factor of a thousand and therefore about fifty years.
+- **A tier is not enough to sync; the holder needs a subject of their own.**
+  Everybody who typed a passcode shares one subject, so syncing them together
+  would pour every preview visitor's history into a single bucket.
+
+`SessionManager` holds the token over a three-method `TokenStore`, the same
+trick `SqlRepository` plays on `SqlDriver`: the keychain on device and
+`localStorage` on web are a dozen lines each, and everything worth testing runs
+against an in-memory one. Both adapters answer as if nothing were stored when
+storage is unavailable, which is ordinary rather than exceptional -- a locked
+device, a private window, a prerender with no `window` at all.
+
+**It is not finished, and the missing part is not here.** Untilt's sign-in ends
+in a redirect carrying an `HttpOnly` cookie, which Log can neither read across
+domains nor receive on native. The code redemption needs to answer a JSON
+request with the token in the body; `src/auth/signin.ts` is written against that
+contract and tested against a fake `fetch`. No sign-in screen was built, because
+until that lands any form would be one that cannot succeed. See
+[SYNC.md](SYNC.md).
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -567,8 +612,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 22 passed
-Tests:       678 passed
+Test Suites: 26 passed
+Tests:       724 passed
 
   sqlRepository      86   the SQLite path, against real SQLite
   dexieRepository    86   the IndexedDB path, against real IndexedDB
@@ -587,10 +632,14 @@ Tests:       678 passed
   chip               18   /chip resolves, offline, and never quotes a price
   money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
+  token              16   the family token grammar, against signed fixtures
   seed               13   the demo dataset stays coherent
+  session            12   holding a token, and stores that fail as real ones do
+  signin             10   the sign-in client, against a fake fetch
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
+  tokenStore.web      8   localStorage missing, blocked, and working
   columns             7   header matching
 ```
 
@@ -776,10 +825,12 @@ Ordered roughly by how much each is worth against how much it costs.
    id and an `updatedAt`, and the one feature the family pass adds to this app.
    **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
    starting: three quarters of the server already exists in Untilt.
-   **Phase 0 of that plan has landed** -- deletes are tombstones, the merge
-   rules are written and tested, and `listChangedSince` is the seam the engine
-   plugs into. See [Deletes are tombstones](#deletes-are-tombstones). What is
-   left is the sign-in, the endpoint and the engine itself.
+   **Phase 0 has landed** -- deletes are tombstones, the merge rules are written
+   and tested, and `listChangedSince` is the seam the engine plugs into. See
+   [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
+   has landed too**, in `src/auth`; see
+   [Signing in](#signing-in-and-what-it-is-for). What is left is one endpoint
+   change in Untilt, and then the engine itself.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

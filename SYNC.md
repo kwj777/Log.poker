@@ -275,7 +275,7 @@ order is chosen so that the riskiest work is done before anything depends on it.
 | | Phase | Ships | Roughly |
 |---|---|---|---|
 | **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
-| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | Sign-in that unlocks nothing yet | 3 to 4 days, most of it in Untilt |
+| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Log's half built.** Blocked on one endpoint | 3 to 4 days, most of it in Untilt |
 | **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | The feature | 5 to 8 days |
 | **3** | RevenueCat `log_plus`, the offering, the both-singles rule, store review | The purchase | 3 to 5 days |
 
@@ -307,6 +307,48 @@ database grows where it used to shrink. And the clock clamp is written and
 tested but applied nowhere, because nothing yet receives a stamp from another
 device. Both belong to phase 2 and neither is load bearing until something
 syncs.
+
+### What phase 1 landed, and the one thing blocking the rest
+
+`src/auth` holds the whole client half: the token grammar, what a claim is
+worth, a `SessionManager` over a three-method `TokenStore`, and the two
+adapters that implement it, the keychain on device and `localStorage` on the
+web. 46 tests, and the token ones mint genuinely HMAC-signed fixtures rather
+than typing strings out, because the format belongs to another repository and a
+hand-typed fixture only proves the parser agrees with whoever typed it.
+
+**Untilt's sign-in cannot be used as it stands, and this is the whole of what
+has to change.** Both of its flows end in a 303 carrying a `Set-Cookie`, and
+that cookie is `__Host-` prefixed and `HttpOnly`: unreadable by script by
+design, unreachable from another registrable domain by definition, and
+meaningless to a native app with no browser cookie jar. Nothing about how the
+token is minted, signed or checked moves. What is missing is that **the code
+redemption has to be able to answer a JSON request with the token in the body**:
+
+```
+POST /api/signin        { email }         -> 202, no body
+POST /api/signin/code   { email, code }   -> 200 { token }
+                                             401 { error }
+```
+
+The 202 is deliberate and is already how that endpoint behaves: it answers the
+same whether or not the address is one Stripe has heard of, because an endpoint
+that says *no customer* tells a stranger who bought. The rate limiting, the
+cooldown and the refusal to mail an unknown address all stay exactly as they
+are. `src/auth/signin.ts` is written against that contract and tested against a
+fake `fetch`, which proves it handles those answers and proves nothing about
+whether the server gives them.
+
+**No sign-in screen was built**, on purpose. Until the endpoint answers, any UI
+would be a form that cannot succeed, and a dead end is worse than an absence.
+
+Two things worth carrying forward from building it. The token counts its expiry
+in **seconds** where everything in Log counts milliseconds, which is a factor of
+a thousand and therefore about fifty years if it goes unnoticed; it is converted
+at the boundary and tested there. And the client **cannot verify a signature**,
+because that needs the gate secret and a secret shipped inside a downloadable
+app is not one: a claim read on this side decides what to show and what is worth
+sending, never what is allowed, and the server re-derives on every request.
 
 Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
 no dependency on each other and can be built in either order or at once.

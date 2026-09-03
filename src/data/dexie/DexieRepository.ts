@@ -30,6 +30,7 @@ import {
 } from '../repository';
 import {
   applyPatch,
+  assertImportKeysAvailable,
   buildHand,
   buildMoodEntry,
   buildRebuy,
@@ -76,6 +77,7 @@ const toSession = (record: SessionRecord): Session => ({
   startedAt: record.startedAt,
   endedAt: record.endedAt === OPEN_SESSION_ENDED_AT ? null : record.endedAt,
   notes: record.notes,
+  importKey: record.importKey ?? null,
   createdAt: record.createdAt,
   updatedAt: record.updatedAt,
 });
@@ -90,6 +92,10 @@ const fromSession = (session: Session): SessionRecord => ({
   startedAt: session.startedAt,
   endedAt: session.endedAt ?? OPEN_SESSION_ENDED_AT,
   notes: session.notes,
+  // Spread rather than assigned: see `SessionRecord.importKey` — the property
+  // has to be absent, not null, or the unique index would reject the second
+  // hand-logged session.
+  ...(session.importKey === null ? {} : { importKey: session.importKey }),
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,
 });
@@ -256,9 +262,34 @@ export class DexieRepository implements Repository {
   async createSession(input: NewSession): Promise<Session> {
     const venue = await this.db.venues.get(input.venueId);
     if (!venue) throw new NotFoundError('Venue', input.venueId);
+    if (input.importKey != null) {
+      assertImportKeysAvailable([input], new Set(await this.listImportKeys()));
+    }
     const session = buildSession(input, this.ctx);
     await this.db.sessions.add(fromSession(session));
     return session;
+  }
+
+  async createSessions(inputs: readonly NewSession[]): Promise<Session[]> {
+    if (inputs.length === 0) return [];
+
+    const venueIds = Array.from(new Set(inputs.map((input) => input.venueId)));
+    const known = new Set((await this.db.venues.where('id').anyOf(venueIds).toArray()).map((v) => v.id));
+    for (const venueId of venueIds) {
+      if (!known.has(venueId)) throw new NotFoundError('Venue', venueId);
+    }
+    assertImportKeysAvailable(inputs, new Set(await this.listImportKeys()));
+
+    return this.db.transaction('rw', this.db.sessions, async () => {
+      const sessions = inputs.map((input) => buildSession(input, this.ctx));
+      await this.db.sessions.bulkAdd(sessions.map(fromSession));
+      return sessions;
+    });
+  }
+
+  async listImportKeys(): Promise<string[]> {
+    const keys = await this.db.sessions.orderBy('importKey').keys();
+    return keys.map((key) => String(key));
   }
 
   async updateSession(id: string, patch: SessionPatch): Promise<Session> {

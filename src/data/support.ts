@@ -17,6 +17,7 @@ import type {
   Timestamp,
   Venue,
 } from '../domain/types';
+import { ConstraintError } from './repository';
 
 /** Injected so tests can pin ids and timestamps and still exercise real code. */
 export interface Clock {
@@ -81,9 +82,36 @@ export const buildSession = (input: NewSession, ctx: RepositoryContext): Session
     startedAt: input.startedAt,
     endedAt: input.endedAt ?? null,
     notes: input.notes ?? null,
+    importKey: input.importKey ?? null,
     createdAt: now,
     updatedAt: now,
   };
+};
+
+/**
+ * Reject a batch of sessions that would duplicate something already imported,
+ * or duplicate each other.
+ *
+ * Both repositories call this before writing rather than leaning on the unique
+ * index underneath, so the two engines fail the same way with the same message.
+ * The index stays as the guarantee; this is the readable error.
+ */
+export const assertImportKeysAvailable = (
+  inputs: readonly NewSession[],
+  existing: ReadonlySet<string>,
+): void => {
+  const batch = new Set<string>();
+  for (const input of inputs) {
+    const key = input.importKey;
+    if (key === undefined || key === null) continue;
+    if (batch.has(key)) {
+      throw new ConstraintError(`The same session appears twice in one import (${key})`);
+    }
+    if (existing.has(key)) {
+      throw new ConstraintError(`That session has already been imported (${key})`);
+    }
+    batch.add(key);
+  }
 };
 
 export const buildRebuy = (input: NewRebuy, ctx: RepositoryContext): Rebuy => {

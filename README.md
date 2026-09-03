@@ -42,6 +42,9 @@ over in Untilt beside the monetization document it extends.
   [The variance model](#the-variance-model).
 - **Session history** — filter by period, venue and game type; every filter
   recomputes the totals above the list.
+- **Session-summary import** — bring an online history in from a CSV your site
+  or your tracker exported, rather than typing out a year of sessions. See
+  [Importing an online history](#importing-an-online-history).
 - **Family cross-promo** — a shared "More from the family" card, plus two
   contextual hand-offs: a rough stretch on the variance view offers Untilt, and
   a hand tagged *misplayed?* offers to drill the spot in TiltProof.
@@ -71,7 +74,7 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test           # 219 unit tests
+npm test           # 401 unit tests
 npm run typecheck  # strict TypeScript, app and tests
 npm run lint       # eslint-config-expo
 ```
@@ -276,17 +279,25 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 8 passed
-Tests:       219 passed
+Test Suites: 16 passed
+Tests:       401 passed
 
-  sqlRepository      53   the SQLite path, against real SQLite
-  dexieRepository    53   the IndexedDB path, against real IndexedDB
-  stats              29   P/L, rebuys, duration, hourly rate, groupings
+  sqlRepository      66   the SQLite path, against real SQLite
+  dexieRepository    66   the IndexedDB path, against real IndexedDB
+  sessionImport      40   reading a session-summary export
+  values             36   money, dates, durations, stakes, game types
   variance           31   win rate, σ, confidence bands, verdicts
-  money              23   cents arithmetic, parsing, formatting
-  handNotation       21   parse, round-trip, hand classes
+  stats              29   P/L, rebuys, duration, hourly rate, groupings
+  palette            22   the theme matches BRAND.md
+  csv                19   quoting, delimiters, line endings
+  money              18   cents arithmetic, parsing, formatting
+  chip               17   /chip resolves, offline, and never quotes a price
+  handNotation       16   parse, round-trip, hand classes
   seed               10   the demo dataset stays coherent
-  selectors          10   store reads and filters
+  importIntegration   9   parse → store → read back, against real SQLite
+  selectors           9   store reads and filters
+  plan                8   what an import will write, before it writes it
+  columns             5   header matching
 ```
 
 ### Money
@@ -325,6 +336,60 @@ hand-off possible without a translation layer, and what a CSV export will emit.
 
 ---
 
+## Importing an online history
+
+Log is built for the felt, but plenty of people play both. An online player's
+history already exists in a file — a PokerTracker or Holdem Manager session
+report, a PokerCraft export, a spreadsheet kept by hand for years — and
+**Settings → Import sessions** reads it. On the web there is a file picker; on
+device you paste the rows in. Nothing is uploaded: the file is parsed in the app
+and written to the same local database as everything else.
+
+### What it reads
+
+One row per session, with a header row. It needs a date column and either a
+result column or a buy-in and a cash-out; stakes, site, game, duration and notes
+are used when they are there. Column names are matched against the spellings
+these files actually use — `Date`, `Total Buyin`, `Net Won`, `P/L`, `Limit`,
+`Site` — and the screen shows exactly which column it took for which field before
+anything is written.
+
+The awkward parts of other people's files are handled rather than assumed:
+quoted fields with commas in them, tabs and semicolons, CRLF and byte-order
+marks, `1.234,56` as well as `1,234.56`, and `(52.50)` for a negative. Day-first
+and month-first dates are told apart by scanning the whole column for a day past
+the twelfth — and when a file never proves it either way, the screen says so and
+offers a toggle instead of picking silently.
+
+**It does not read hand histories.** A hand history is an action-level record of
+one hand; Log's `Hand` is a journal entry *about* a hand — hole cards, position,
+a note, a tag. There is nothing to import one into. Session summaries are the
+level the two products genuinely share.
+
+### What it will not invent
+
+A row with no stakes gets zero blinds, not a plausible-looking `$1/$2`; a row
+with no duration ends when it started. Both degrade honestly rather than
+silently: `toObservations` already drops sessions with no measurable duration or
+no big blind, so they count toward profit and the bankroll curve and stay out of
+a win-rate estimate they would poison — and the import warns, in those words,
+before you press the button.
+
+Every imported session is complete by construction: `cashOut` and `endedAt` are
+never null. A null `endedAt` is what Log calls the *active* session and it allows
+exactly one, so 200 rows that each claimed to be live would break the app rather
+than fill it. A contract test asserts it on both storage engines.
+
+### Running it twice
+
+Each imported session stores an `importKey` derived from the row it came from,
+under a unique index. Re-import next month's export and the three new sessions
+land while the rest are skipped — the screen says how many. Delete a session and
+its row becomes importable again. That matters more than it sounds: a doubled
+bankroll is a failure nobody notices until it has compounded for months.
+
+---
+
 ## Post-MVP roadmap
 
 Ordered roughly by how much each is worth against how much it costs.
@@ -341,9 +406,11 @@ Ordered roughly by how much each is worth against how much it costs.
    the store layer, not inside screens, so the free build and the paid build
    stay one codebase. Web entitlements via Stripe through the same RevenueCat
    account.
-4. **Online session support** — multi-table sessions, hands per hour, and
-   results per site. Needs `sessions` to grow a `format` discriminator and the
-   hourly-rate maths to become per-table.
+4. **Online session support** — [importing a session summary](#importing-an-online-history)
+   is the half of this that already ships. The rest is multi-table sessions and
+   hands per hour, which need `sessions` to grow a `format` discriminator and the
+   hourly-rate maths to become per-table: wall-clock hours stop meaning one thing
+   the moment four tables are open.
 5. **Deep Untilt and TiltProof integration** — the seams already exist in
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
    real payload — the flagged hand into a TiltProof drill, the rough stretch

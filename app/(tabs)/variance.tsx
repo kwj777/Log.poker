@@ -31,6 +31,13 @@ import {
   probabilityOfLoss,
   toObservations,
 } from '../../src/domain/variance';
+import { formatMoney } from '../../src/domain/money';
+import {
+  assessTournaments,
+  tournamentTotals,
+  type TournamentAssessment,
+  type TournamentTotals,
+} from '../../src/domain/tournaments';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { openHandOff, untiltHandOff } from '../../src/features/family/hooks';
 import { useLogStore } from '../../src/store/useLogStore';
@@ -58,6 +65,8 @@ export default function VarianceScreen() {
   const sessions = useLogStore((state) => state.sessions);
 
   const observations = useMemo(() => toObservations(sessions), [sessions]);
+  const tournaments = useMemo(() => tournamentTotals(sessions), [sessions]);
+  const tournamentAssessment = useMemo(() => assessTournaments(tournaments), [tournaments]);
   const estimate = useMemo(() => estimatePlayer(observations), [observations]);
   const assessment = useMemo(
     () => assessRecentStretch(observations, estimate, RECENT_SESSIONS),
@@ -123,6 +132,9 @@ export default function VarianceScreen() {
           <Text variant="title">Variance</Text>
         </View>
         <EmptyState title={assessment.headline} body={assessment.body} />
+        {tournaments.entries > 0 ? (
+          <TournamentCard totals={tournaments} assessment={tournamentAssessment} />
+        ) : null}
         <Card style={styles.explainer}>
           <Text variant="bodyStrong">Why this needs a sample</Text>
           <Text color={colors.textSecondary} style={styles.explainerBody}>
@@ -143,7 +155,8 @@ export default function VarianceScreen() {
       <View style={styles.header}>
         <Text variant="title">Variance</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>
-          Your last {assessment.sessionCount} sessions, against what your own numbers predict.
+          Your last {assessment.sessionCount} cash sessions, against what your own numbers
+          predict.
         </Text>
       </View>
 
@@ -155,6 +168,10 @@ export default function VarianceScreen() {
           {assessment.body}
         </Text>
       </Card>
+
+      {tournaments.entries > 0 ? (
+        <TournamentCard totals={tournaments} assessment={tournamentAssessment} />
+      ) : null}
 
       <SectionHeader title="Your results inside your normal range" />
       <Card style={styles.chartCard}>
@@ -255,6 +272,62 @@ const LegendItem = ({
   </View>
 );
 
+/**
+ * Tournaments on the variance page, and deliberately not a confidence band.
+ *
+ * The band above is a Gaussian random walk in big blinds per hour. Tournament
+ * results are neither of those things -- no big blind, and a distribution that
+ * is mostly zero with a long tail -- so drawing one here would be a picture that
+ * looks like the cash one and means nothing. What is left is what can be said
+ * honestly: the rate, the run, and how ordinary the run is at that rate.
+ */
+const TournamentCard = ({
+  totals,
+  assessment,
+}: {
+  totals: TournamentTotals;
+  assessment: TournamentAssessment;
+}) => (
+  <>
+    <SectionHeader title="Tournaments" />
+    <Card>
+      <Text variant="heading">{assessment.headline}</Text>
+      <Text color={colors.textSecondary} style={styles.verdictBody}>
+        {assessment.body}
+      </Text>
+      <View style={styles.tournamentTiles}>
+        <StatTile
+          label="ROI"
+          value={totals.roi === null ? '--' : `${totals.roi >= 0 ? '+' : ''}${Math.round(totals.roi * 100)}%`}
+          valueColor={resultColor(totals.net)}
+          hint={assessment.roiIsMeaningful ? `${totals.entries} entries` : 'too few entries to mean much'}
+        />
+        <StatTile
+          label="Cashed"
+          value={totals.itmRate === null ? '--' : `${Math.round(totals.itmRate * 100)}%`}
+          hint={`${totals.cashes} of ${totals.entries}`}
+        />
+      </View>
+      <View style={styles.tournamentTiles}>
+        <StatTile
+          label="Best finish"
+          value={totals.bestFinish === null ? '--' : `${totals.bestFinish}`}
+          hint={
+            totals.averageFinishPercentile === null
+              ? 'no finishes recorded'
+              : `top ${Math.max(1, Math.round(totals.averageFinishPercentile * 100))}% on average`
+          }
+        />
+        <StatTile
+          label="Fees paid"
+          value={formatMoney(totals.fees)}
+          hint="never coming back"
+        />
+      </View>
+    </Card>
+  </>
+);
+
 const styles = StyleSheet.create({
   header: {
     paddingTop: spacing.xl,
@@ -328,6 +401,11 @@ const styles = StyleSheet.create({
   explainerBody: {
     marginTop: spacing.sm,
     lineHeight: 23,
+  },
+  tournamentTiles: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   guide: {
     marginTop: spacing.md,

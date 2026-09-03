@@ -7,7 +7,15 @@
  * flag (`src/config.ts`) and never reachable from a production build.
  */
 
-import { HAND_TAGS, type GameType, type HandTag, type MoodScore, type Position, type Stakes } from '../domain/types';
+import {
+  HAND_TAGS,
+  type GameType,
+  type HandTag,
+  type MoodScore,
+  type Position,
+  type SessionFormat,
+  type Stakes,
+} from '../domain/types';
 import type { Repository } from './repository';
 
 /** mulberry32 -- small, fast, and identical across every JS engine we ship to. */
@@ -26,9 +34,9 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 const STAKES: Record<string, Stakes> = {
-  low: { smallBlind: 100, bigBlind: 200, currency: 'USD' },
-  mid: { smallBlind: 100, bigBlind: 300, currency: 'USD' },
-  high: { smallBlind: 200, bigBlind: 500, currency: 'USD' },
+  low: { smallBlind: 100, bigBlind: 200 },
+  mid: { smallBlind: 100, bigBlind: 300 },
+  high: { smallBlind: 200, bigBlind: 500 },
 };
 
 const POSITIONS: Position[] = ['UTG', 'MP', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
@@ -53,9 +61,16 @@ const HAND_NOTES = [
 
 interface SessionPlan {
   venue: 'aria' | 'commerce' | 'home' | 'wynn';
+  /** Defaults to a cash game. */
+  format?: SessionFormat;
   gameType: GameType;
-  stakes: Stakes;
+  /** Cash games only; a tournament has none. */
+  stakes?: Stakes;
   buyInDollars: number;
+  /** Tournament entry fee, in dollars. */
+  feeDollars?: number;
+  entrants?: number;
+  finishPosition?: number;
   /** Result in dollars, before rebuys are added back. */
   resultDollars: number;
   hours: number;
@@ -93,6 +108,31 @@ const PLAN: readonly SessionPlan[] = [
   { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: 390, hours: 4.5, startMoodScore: 2, endMoodScore: 1 },
 ];
 
+/**
+ * Tournaments, and shaped like tournaments: seven entries, two cashes, and one
+ * of those carrying the whole set. A demo that showed a tidy 60% cash rate would
+ * make the copy on the tournament card look like it was written for somebody
+ * else, because the copy is about exactly this shape.
+ */
+const TOURNAMENT_PLAN: readonly SessionPlan[] = [
+  { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 210, finishPosition: 88, resultDollars: -110, hours: 3.5, startMoodScore: 2, endMoodScore: 3 },
+  { venue: 'wynn', format: 'tournament', gameType: 'NLHE', buyInDollars: 200, feeDollars: 20, entrants: 143, finishPosition: 12, resultDollars: 415, hours: 7.5, startMoodScore: 2, endMoodScore: 1 },
+  { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 188, finishPosition: 121, resultDollars: -110, hours: 2.5, startMoodScore: 3, endMoodScore: 3 },
+  { venue: 'commerce', format: 'tournament', gameType: 'PLO', buyInDollars: 150, feeDollars: 15, entrants: 96, finishPosition: 40, resultDollars: -165, hours: 4, startMoodScore: 2, endMoodScore: 4 },
+  { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 240, finishPosition: 3, resultDollars: 2_640, hours: 11, startMoodScore: 1, endMoodScore: 1 },
+  { venue: 'wynn', format: 'tournament', gameType: 'NLHE', buyInDollars: 200, feeDollars: 20, entrants: 167, finishPosition: 94, resultDollars: -220, hours: 3, startMoodScore: 2, endMoodScore: 3 },
+  { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 205, finishPosition: 61, resultDollars: -110, hours: 4.5, startMoodScore: 2, endMoodScore: 4 },
+];
+
+/**
+ * Cash and tournaments interleaved by date rather than appended, so the bankroll
+ * curve looks like a life rather than two careers stacked end to end.
+ */
+const ALL_PLANS: readonly SessionPlan[] = PLAN.flatMap((plan, index) => {
+  const tournament = index % 3 === 1 ? TOURNAMENT_PLAN[Math.floor(index / 3)] : undefined;
+  return tournament ? [plan, tournament] : [plan];
+});
+
 export interface SeedOptions {
   /** Anchor for the most recent session. Defaults to now. */
   now?: number;
@@ -109,7 +149,10 @@ export interface SeedResult {
   moodEntries: number;
 }
 
-export const DEMO_SESSION_COUNT = PLAN.length;
+export const DEMO_SESSION_COUNT = ALL_PLANS.length;
+export const DEMO_TOURNAMENT_COUNT = ALL_PLANS.filter(
+  (plan) => plan.format === 'tournament',
+).length;
 
 /**
  * Write the demo dataset. Sessions are spaced roughly every three days working
@@ -136,23 +179,28 @@ export const seedDemoData = async (
   let moodCount = 0;
 
   // Oldest first so the ids and the bankroll curve read chronologically.
-  for (const [index, plan] of PLAN.entries()) {
-    const sessionsFromEnd = PLAN.length - 1 - index;
+  for (const [index, plan] of ALL_PLANS.entries()) {
+    const sessionsFromEnd = ALL_PLANS.length - 1 - index;
     const startedAt =
       now - sessionsFromEnd * 3 * DAY - Math.round(plan.hours * HOUR) - 6 * HOUR;
     const endedAt = startedAt + Math.round(plan.hours * HOUR);
 
     const buyIn = plan.buyInDollars * 100;
+    const fee = (plan.feeDollars ?? 0) * 100;
     const rebuys = (plan.rebuyDollars ?? []).map((amount) => amount * 100);
-    const invested = buyIn + rebuys.reduce((sum, amount) => sum + amount, 0);
+    const invested = buyIn + fee + rebuys.reduce((sum, amount) => sum + amount, 0);
     // The plan states the result; cash-out is derived so the math always ties out.
     const cashOut = Math.max(0, invested + plan.resultDollars * 100);
 
     const session = await repository.createSession({
       venueId: venues[plan.venue].id,
+      format: plan.format ?? 'cash',
       gameType: plan.gameType,
       stakes: plan.stakes,
       buyIn,
+      fee: fee === 0 ? null : fee,
+      entrants: plan.entrants ?? null,
+      finishPosition: plan.finishPosition ?? null,
       startedAt,
     });
 
@@ -213,7 +261,8 @@ export const seedDemoData = async (
         position: pick(POSITIONS),
         note: pick(HAND_NOTES),
         tags,
-        amount: Math.round((random() * 2 - 1) * plan.stakes.bigBlind * 120),
+        // Sized off the big blind for a cash game, off the entry for a tournament.
+        amount: Math.round((random() * 2 - 1) * (plan.stakes ? plan.stakes.bigBlind * 120 : buyIn)),
       });
       handCount += 1;
     }

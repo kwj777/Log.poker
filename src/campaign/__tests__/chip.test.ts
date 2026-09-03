@@ -96,6 +96,16 @@ describe('the page stands alone', () => {
     expect(page).not.toMatch(/\$\s*\d/);
   });
 
+  it('and scopes its one free claim to the app the button installs', () => {
+    // Unlike the front door, this page carries nothing about money at all: the
+    // three cards say what the apps are for and stop there. That leaves one
+    // free claim, under the button, and unqualified it would be a promise on
+    // behalf of two apps that are paid past a point.
+    const cards = page.slice(page.indexOf('<div class="apps">'), page.indexOf('<div class="cta">'));
+    expect(cards).not.toMatch(/\bfree\b/i);
+    expect(page).toContain('Log is free, all of it');
+  });
+
   it('prints the helpline', () => {
     expect(page).toContain('1-800-522-4700');
   });

@@ -67,20 +67,35 @@ export const formatMoneyCompact = (cents: Cents, currency = DEFAULT_CURRENCY): s
 };
 
 /** `$1/$2`, or `$1/$2 ($2 ante)` when the game has a mandatory ante. */
-export const formatStakes = (stakes: Stakes): string => {
-  const base = `${formatMoney(stakes.smallBlind, { currency: stakes.currency })}/${formatMoney(
-    stakes.bigBlind,
-    { currency: stakes.currency },
-  )}`;
+export const formatStakes = (stakes: Stakes, currency: string = DEFAULT_CURRENCY): string => {
+  const base = `${formatMoney(stakes.smallBlind, { currency })}/${formatMoney(stakes.bigBlind, {
+    currency,
+  })}`;
   if (stakes.ante != null && stakes.ante > 0) {
-    return `${base} (${formatMoney(stakes.ante, { currency: stakes.currency })} ante)`;
+    return `${base} (${formatMoney(stakes.ante, { currency })} ante)`;
   }
   return base;
 };
 
 /**
  * Grouping key for "profit by stakes". Built from the numeric blinds rather than
- * the display string so 1/2 typed two different ways still groups together.
+ * the display string so 1/2 typed two different ways still groups together, and
+ * carrying the currency so a 1/2 game in euros is not pooled with one in dollars.
  */
-export const stakesKey = (stakes: Stakes): string =>
-  `${stakes.currency}:${stakes.smallBlind}/${stakes.bigBlind}`;
+export const stakesKey = (stakes: Stakes, currency: string = DEFAULT_CURRENCY): string =>
+  `${currency}:${stakes.smallBlind}/${stakes.bigBlind}`;
+
+/**
+ * How a tournament entry is written: `$100+$10`, or just `$100` with no fee.
+ * The two halves are kept apart because that is how they are advertised, and
+ * because only one of them is ever coming back.
+ */
+export const formatEntry = (
+  buyIn: Cents,
+  fee: Cents | null,
+  currency: string = DEFAULT_CURRENCY,
+): string => {
+  const base = formatMoney(buyIn, { currency });
+  if (fee === null || fee === 0) return base;
+  return `${base}+${formatMoney(fee, { currency })}`;
+};

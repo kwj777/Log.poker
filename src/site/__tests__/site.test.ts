@@ -55,6 +55,33 @@ describe('the front door', () => {
     expect(home).not.toMatch(/\$\s*\d/);
   });
 
+  it('but still says how much of each app is free', () => {
+    // The other half of the same rule, and the one that had been lost: two of
+    // the three are paid past a point, so a page that says "free" once at the
+    // bottom is making a promise on behalf of the two that do not keep it.
+    const apps = home.slice(home.indexOf('<div class="apps">'), home.indexOf('</section>'));
+    const cards = apps.split('<a class="app').slice(1);
+    expect(cards).toHaveLength(3);
+    for (const card of cards) expect(card).toMatch(/\bfree\b/i);
+  });
+
+  it('claims no server, which is true until sync ships', () => {
+    // A tripwire rather than a fact worth asserting for its own sake. Roadmap
+    // items 2 and 3 give this app a server, at which point the honest sentence
+    // becomes "nothing leaves your device unless you turn this on" and this
+    // test is what stops the old one going out beside the new feature.
+    // See SYNC.md, "What must not break".
+    expect(home).toContain('Log has no server to send anything to.');
+  });
+
+  it('and where the line falls, in words rather than in a number', () => {
+    expect(home).toContain('Free at the table, paid away from it.');
+    // Cross-device history is the one paid thing in this app, so the page says
+    // so before it exists rather than after somebody has years of log in it.
+    expect(home).toMatch(/own the other two/i);
+    expect(home).toMatch(/One payment rather than\s+a subscription/);
+  });
+
   it('has a 404 that is a page rather than a wall', () => {
     expect(existsSync(join(ROOT, 'public', '404.html'))).toBe(true);
   });
@@ -207,12 +234,20 @@ describe('the app links out to the guides', () => {
   });
 
   it('bankroll from the dashboard, under the tiles that show the swings', () => {
-    expect(dashboard).toContain('GUIDES.bankroll');
+    // Both ends are found before either is compared. `indexOf` returns -1 for
+    // a marker that is gone, and -1 is less than everything, so an ordering
+    // check on its own passes loudest exactly when it has stopped looking at
+    // anything. That is not hypothetical: the tiles moved from JSX attributes
+    // into a computed array, `label="Worst session"` stopped matching, and
+    // this test went green on a string it could no longer find.
+    const worst = dashboard.search(/label[=:]\s*['"]Worst session['"]/);
+    const guide = dashboard.indexOf('GUIDES.bankroll');
+    expect(worst).toBeGreaterThan(-1);
+    expect(guide).toBeGreaterThan(-1);
+
     // Below the worst-session tile rather than above it: the question only
     // lands once the number that raises it is on screen.
-    expect(dashboard.indexOf('label="Worst session"')).toBeLessThan(
-      dashboard.indexOf('GUIDES.bankroll'),
-    );
+    expect(worst).toBeLessThan(guide);
   });
 
   it('as a real anchor on web rather than a scripted pop-up', () => {

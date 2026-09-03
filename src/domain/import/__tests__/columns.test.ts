@@ -29,8 +29,27 @@ describe('resolveColumns', () => {
   });
 
   it('lists headers it does not recognize and ignores empty ones', () => {
-    const map = resolveColumns(['Date', 'Rake', '', 'bb/100']);
-    expect(map.unmapped).toEqual(['Rake', 'bb/100']);
+    const map = resolveColumns(['Date', 'Seat', '', 'bb/100']);
+    expect(map.unmapped).toEqual(['Seat', 'bb/100']);
+  });
+
+  it('matches the tournament columns', () => {
+    const map = resolveColumns(['Date', 'Format', 'Buyin', 'Rake', 'Entrants', 'Place', 'Prize']);
+    expect(map.indexes).toEqual({
+      startedAt: 0,
+      format: 1,
+      buyIn: 2,
+      fee: 3,
+      entrants: 4,
+      finishPosition: 5,
+      cashOut: 6,
+    });
+  });
+
+  it('reads “Format” as cash-or-tournament and “Game” as the variant', () => {
+    const map = resolveColumns(['Date', 'Format', 'Game', 'Result']);
+    expect(map.indexes.format).toBe(1);
+    expect(map.indexes.gameType).toBe(2);
   });
 
   it('does not match a header by substring', () => {

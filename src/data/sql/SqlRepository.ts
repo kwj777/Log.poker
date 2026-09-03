@@ -9,6 +9,7 @@ import {
   GAME_TYPES,
   HAND_TAGS,
   MOOD_PHASES,
+  SESSION_FORMATS,
   type GameType,
   type Hand,
   type HandTag,
@@ -23,13 +24,17 @@ import {
   type Position,
   type Rebuy,
   type Session,
+  type SessionFormat,
   type SessionWithChildren,
+  type Stakes,
   type Timestamp,
   type Venue,
 } from '../../domain/types';
 import {
   ConstraintError,
   NotFoundError,
+  type Change,
+  type ChangeSet,
   type HandPatch,
   type Repository,
   type SessionFilter,
@@ -56,25 +61,31 @@ interface VenueRow {
   is_home_game: number;
   created_at: number;
   updated_at: number;
+  deleted_at: number | null;
   session_count?: number;
 }
 
 interface SessionRow {
   id: string;
   venue_id: string;
+  format: string;
   game_type: string;
   small_blind: number;
   big_blind: number;
   ante: number | null;
   currency: string;
   buy_in: number;
+  fee: number | null;
   cash_out: number | null;
+  entrants: number | null;
+  finish_position: number | null;
   started_at: number;
   ended_at: number | null;
   notes: string | null;
   import_key: string | null;
   created_at: number;
   updated_at: number;
+  deleted_at: number | null;
 }
 
 interface RebuyRow {
@@ -84,6 +95,7 @@ interface RebuyRow {
   at: number;
   created_at: number;
   updated_at: number;
+  deleted_at: number | null;
 }
 
 interface HandRow {
@@ -97,6 +109,7 @@ interface HandRow {
   at: number;
   created_at: number;
   updated_at: number;
+  deleted_at: number | null;
 }
 
 interface MoodRow {
@@ -107,6 +120,7 @@ interface MoodRow {
   at: number;
   created_at: number;
   updated_at: number;
+  deleted_at: number | null;
 }
 
 const isGameType = (value: string): value is GameType =>
@@ -140,25 +154,45 @@ const toVenue = (row: VenueRow): Venue => ({
   updatedAt: row.updated_at,
 });
 
-const toSession = (row: SessionRow): Session => ({
-  id: row.id,
-  venueId: row.venue_id,
-  gameType: isGameType(row.game_type) ? row.game_type : 'OTHER',
-  stakes: {
+const isSessionFormat = (value: string): value is SessionFormat =>
+  (SESSION_FORMATS as readonly string[]).includes(value);
+
+/**
+ * 0/0 is the stored form of "no stakes" -- see the v3 migration. It is a total
+ * encoding rather than a guess: no poker game has ever been played with both
+ * blinds at zero, so nothing real can collide with it.
+ */
+const toStakes = (row: SessionRow): Stakes | null => {
+  if (row.small_blind === 0 && row.big_blind === 0) return null;
+  return {
     smallBlind: row.small_blind,
     bigBlind: row.big_blind,
     ...(row.ante === null ? {} : { ante: row.ante }),
+  };
+};
+
+const toSession = (row: SessionRow): Session => {
+  const format = isSessionFormat(row.format) ? row.format : 'cash';
+  return {
+    id: row.id,
+    venueId: row.venue_id,
+    format,
+    gameType: isGameType(row.game_type) ? row.game_type : 'OTHER',
+    stakes: format === 'tournament' ? null : toStakes(row),
     currency: row.currency,
-  },
-  buyIn: row.buy_in,
-  cashOut: row.cash_out,
-  startedAt: row.started_at,
-  endedAt: row.ended_at,
-  notes: row.notes,
-  importKey: row.import_key ?? null,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-});
+    buyIn: row.buy_in,
+    fee: row.fee,
+    cashOut: row.cash_out,
+    entrants: row.entrants,
+    finishPosition: row.finish_position,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    notes: row.notes,
+    importKey: row.import_key ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
 
 const toRebuy = (row: RebuyRow): Rebuy => ({
   id: row.id,
@@ -210,12 +244,55 @@ export class SqlRepository implements Repository {
     this.initialized = true;
   }
 
+  // ------------------------------------------------------------------ sync
+
+  async listChangedSince(since: Timestamp): Promise<ChangeSet> {
+    // Ordered by the cursor rather than by anything a screen wants, and run
+    // one after another rather than in parallel, because a driver holding one
+    // connection would serialize them anyway and the interleaving would only
+    // make the failure harder to read.
+    const changed = async <Row extends { deleted_at: number | null }, T>(
+      sql: string,
+      map: (row: Row) => T,
+    ): Promise<Change<T>[]> => {
+      const rows = await this.driver.all<Row>(sql, [since]);
+      return rows.map((row) => ({ record: map(row), deletedAt: row.deleted_at }));
+    };
+
+    return {
+      venues: await changed<VenueRow, Venue>(
+        `SELECT v.*, (SELECT COUNT(*) FROM sessions s
+                      WHERE s.venue_id = v.id AND s.deleted_at IS NULL) AS session_count
+         FROM venues v WHERE v.updated_at > ? ORDER BY v.updated_at ASC`,
+        toVenue,
+      ),
+      sessions: await changed<SessionRow, Session>(
+        `SELECT * FROM sessions WHERE updated_at > ? ORDER BY updated_at ASC`,
+        toSession,
+      ),
+      rebuys: await changed<RebuyRow, Rebuy>(
+        `SELECT * FROM rebuys WHERE updated_at > ? ORDER BY updated_at ASC`,
+        toRebuy,
+      ),
+      hands: await changed<HandRow, Hand>(
+        `SELECT * FROM hands WHERE updated_at > ? ORDER BY updated_at ASC`,
+        toHand,
+      ),
+      moodEntries: await changed<MoodRow, MoodEntry>(
+        `SELECT * FROM mood_entries WHERE updated_at > ? ORDER BY updated_at ASC`,
+        toMoodEntry,
+      ),
+    };
+  }
+
   // ---------------------------------------------------------------- venues
 
   async listVenues(): Promise<Venue[]> {
     const rows = await this.driver.all<VenueRow>(
-      `SELECT v.*, (SELECT COUNT(*) FROM sessions s WHERE s.venue_id = v.id) AS session_count
+      `SELECT v.*, (SELECT COUNT(*) FROM sessions s
+                     WHERE s.venue_id = v.id AND s.deleted_at IS NULL) AS session_count
        FROM venues v
+       WHERE v.deleted_at IS NULL
        ORDER BY session_count DESC, v.name COLLATE NOCASE ASC`,
     );
     return rows.map(toVenue);
@@ -224,8 +301,9 @@ export class SqlRepository implements Repository {
   async getVenue(id: string): Promise<Venue | null> {
     const row = await first<VenueRow>(
       this.driver,
-      `SELECT v.*, (SELECT COUNT(*) FROM sessions s WHERE s.venue_id = v.id) AS session_count
-       FROM venues v WHERE v.id = ?`,
+      `SELECT v.*, (SELECT COUNT(*) FROM sessions s
+                     WHERE s.venue_id = v.id AND s.deleted_at IS NULL) AS session_count
+       FROM venues v WHERE v.id = ? AND v.deleted_at IS NULL`,
       [id],
     );
     return row ? toVenue(row) : null;
@@ -260,13 +338,20 @@ export class SqlRepository implements Repository {
   async deleteVenue(id: string): Promise<void> {
     const row = await first<{ count: number }>(
       this.driver,
-      `SELECT COUNT(*) AS count FROM sessions WHERE venue_id = ?`,
+      // Live sessions only. A tombstoned session no longer holds its venue
+      // back, which is the difference between "this venue is in use" and "this
+      // venue was once used by something waiting to be collected".
+      `SELECT COUNT(*) AS count FROM sessions WHERE venue_id = ? AND deleted_at IS NULL`,
       [id],
     );
     if ((row?.count ?? 0) > 0) {
       throw new ConstraintError('Cannot delete a venue that still has sessions');
     }
-    await this.driver.run(`DELETE FROM venues WHERE id = ?`, [id]);
+    const now = this.ctx.clock.now();
+    await this.driver.run(
+      `UPDATE venues SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
+      [now, now, id],
+    );
   }
 
   // -------------------------------------------------------------- sessions
@@ -278,6 +363,10 @@ export class SqlRepository implements Repository {
     if (filter.venueId !== undefined) {
       clauses.push('venue_id = ?');
       params.push(filter.venueId);
+    }
+    if (filter.format !== undefined) {
+      clauses.push('format = ?');
+      params.push(filter.format);
     }
     if (filter.gameType !== undefined) {
       clauses.push('game_type = ?');
@@ -294,7 +383,9 @@ export class SqlRepository implements Repository {
     if (filter.status === 'active') clauses.push('ended_at IS NULL');
     if (filter.status === 'completed') clauses.push('ended_at IS NOT NULL');
 
-    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    clauses.push('deleted_at IS NULL');
+
+    const where = `WHERE ${clauses.join(' AND ')}`;
     const limit = filter.limit !== undefined ? `LIMIT ${Math.max(0, Math.floor(filter.limit))}` : '';
     const rows = await this.driver.all<SessionRow>(
       `SELECT * FROM sessions ${where} ORDER BY started_at DESC ${limit}`,
@@ -304,7 +395,11 @@ export class SqlRepository implements Repository {
   }
 
   async getSession(id: string): Promise<SessionWithChildren | null> {
-    const row = await first<SessionRow>(this.driver, `SELECT * FROM sessions WHERE id = ?`, [id]);
+    const row = await first<SessionRow>(
+      this.driver,
+      `SELECT * FROM sessions WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    );
     if (!row) return null;
     const [session] = await this.attachChildren([toSession(row)]);
     return session;
@@ -313,7 +408,9 @@ export class SqlRepository implements Repository {
   async getActiveSession(): Promise<SessionWithChildren | null> {
     const row = await first<SessionRow>(
       this.driver,
-      `SELECT * FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
+      `SELECT * FROM sessions
+       WHERE ended_at IS NULL AND deleted_at IS NULL
+       ORDER BY started_at DESC LIMIT 1`,
     );
     if (!row) return null;
     const [session] = await this.attachChildren([toSession(row)]);
@@ -332,12 +429,16 @@ export class SqlRepository implements Repository {
     const venueIds = Array.from(new Set(sessions.map((session) => session.venueId)));
 
     const rebuyRows = await this.driver.all<RebuyRow>(
-      `SELECT * FROM rebuys WHERE session_id IN (${sessionIds.map(() => '?').join(',')}) ORDER BY at ASC`,
+      `SELECT * FROM rebuys
+       WHERE session_id IN (${sessionIds.map(() => '?').join(',')}) AND deleted_at IS NULL
+       ORDER BY at ASC`,
       sessionIds,
     );
     const venueRows = await this.driver.all<VenueRow>(
-      `SELECT v.*, (SELECT COUNT(*) FROM sessions s WHERE s.venue_id = v.id) AS session_count
-       FROM venues v WHERE v.id IN (${venueIds.map(() => '?').join(',')})`,
+      `SELECT v.*, (SELECT COUNT(*) FROM sessions s
+                     WHERE s.venue_id = v.id AND s.deleted_at IS NULL) AS session_count
+       FROM venues v
+       WHERE v.id IN (${venueIds.map(() => '?').join(',')}) AND v.deleted_at IS NULL`,
       venueIds,
     );
 
@@ -375,7 +476,8 @@ export class SqlRepository implements Repository {
     const known = new Set(
       (
         await this.driver.all<{ id: string }>(
-          `SELECT id FROM venues WHERE id IN (${venueIds.map(() => '?').join(',')})`,
+          `SELECT id FROM venues
+           WHERE id IN (${venueIds.map(() => '?').join(',')}) AND deleted_at IS NULL`,
           venueIds,
         )
       ).map((row) => row.id),
@@ -394,7 +496,10 @@ export class SqlRepository implements Repository {
 
   async listImportKeys(): Promise<string[]> {
     const rows = await this.driver.all<{ import_key: string }>(
-      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL`,
+      // `deleted_at` is redundant beside the key check, since tombstoning a
+      // session clears its key, and it is here so that the guarantee reads as
+      // one query rather than as two facts a reader has to hold at once.
+      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL AND deleted_at IS NULL`,
     );
     return rows.map((row) => row.import_key);
   }
@@ -402,19 +507,24 @@ export class SqlRepository implements Repository {
   private async insertSession(session: Session): Promise<void> {
     await this.driver.run(
       `INSERT INTO sessions (
-         id, venue_id, game_type, small_blind, big_blind, ante, currency, buy_in,
-         cash_out, started_at, ended_at, notes, import_key, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         id, venue_id, format, game_type, small_blind, big_blind, ante, currency,
+         buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
+         notes, import_key, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.id,
         session.venueId,
+        session.format,
         session.gameType,
-        session.stakes.smallBlind,
-        session.stakes.bigBlind,
-        session.stakes.ante ?? null,
-        session.stakes.currency,
+        session.stakes?.smallBlind ?? 0,
+        session.stakes?.bigBlind ?? 0,
+        session.stakes?.ante ?? null,
+        session.currency,
         session.buyIn,
+        session.fee,
         session.cashOut,
+        session.entrants,
+        session.finishPosition,
         session.startedAt,
         session.endedAt,
         session.notes,
@@ -436,18 +546,23 @@ export class SqlRepository implements Repository {
 
   private async writeSession(session: Session): Promise<void> {
     await this.driver.run(
-      `UPDATE sessions SET venue_id = ?, game_type = ?, small_blind = ?, big_blind = ?,
-         ante = ?, currency = ?, buy_in = ?, cash_out = ?, started_at = ?, ended_at = ?,
+      `UPDATE sessions SET venue_id = ?, format = ?, game_type = ?, small_blind = ?,
+         big_blind = ?, ante = ?, currency = ?, buy_in = ?, fee = ?, cash_out = ?,
+         entrants = ?, finish_position = ?, started_at = ?, ended_at = ?,
          notes = ?, updated_at = ? WHERE id = ?`,
       [
         session.venueId,
+        session.format,
         session.gameType,
-        session.stakes.smallBlind,
-        session.stakes.bigBlind,
-        session.stakes.ante ?? null,
-        session.stakes.currency,
+        session.stakes?.smallBlind ?? 0,
+        session.stakes?.bigBlind ?? 0,
+        session.stakes?.ante ?? null,
+        session.currency,
         session.buyIn,
+        session.fee,
         session.cashOut,
+        session.entrants,
+        session.finishPosition,
         session.startedAt,
         session.endedAt,
         session.notes,
@@ -467,14 +582,27 @@ export class SqlRepository implements Repository {
   }
 
   async deleteSession(id: string): Promise<void> {
-    // Child rows are deleted explicitly rather than relying on ON DELETE
-    // CASCADE: `PRAGMA foreign_keys` is per-connection, and a future driver that
-    // forgets it would silently orphan rows.
+    // Children are tombstoned explicitly rather than left to ON DELETE CASCADE,
+    // which no longer fires at all now that nothing is removed. They take the
+    // same stamp as the parent so that a merge cannot revive a hand whose
+    // session is gone by finding it a millisecond fresher.
+    const now = this.ctx.clock.now();
     await this.driver.transaction(async () => {
-      await this.driver.run(`DELETE FROM rebuys WHERE session_id = ?`, [id]);
-      await this.driver.run(`DELETE FROM hands WHERE session_id = ?`, [id]);
-      await this.driver.run(`DELETE FROM mood_entries WHERE session_id = ?`, [id]);
-      await this.driver.run(`DELETE FROM sessions WHERE id = ?`, [id]);
+      for (const table of ['rebuys', 'hands', 'mood_entries']) {
+        await this.driver.run(
+          `UPDATE ${table} SET deleted_at = ?, updated_at = ?
+           WHERE session_id = ? AND deleted_at IS NULL`,
+          [now, now, id],
+        );
+      }
+      // `import_key` goes with it: deleting an imported session has always made
+      // it importable again, and a tombstone holding the key in the unique
+      // index would quietly end that.
+      await this.driver.run(
+        `UPDATE sessions SET deleted_at = ?, updated_at = ?, import_key = NULL
+         WHERE id = ? AND deleted_at IS NULL`,
+        [now, now, id],
+      );
     });
   }
 
@@ -482,7 +610,7 @@ export class SqlRepository implements Repository {
 
   async listRebuys(sessionId: string): Promise<Rebuy[]> {
     const rows = await this.driver.all<RebuyRow>(
-      `SELECT * FROM rebuys WHERE session_id = ? ORDER BY at ASC`,
+      `SELECT * FROM rebuys WHERE session_id = ? AND deleted_at IS NULL ORDER BY at ASC`,
       [sessionId],
     );
     return rows.map(toRebuy);
@@ -500,7 +628,11 @@ export class SqlRepository implements Repository {
   }
 
   async deleteRebuy(id: string): Promise<void> {
-    await this.driver.run(`DELETE FROM rebuys WHERE id = ?`, [id]);
+    const now = this.ctx.clock.now();
+    await this.driver.run(
+      `UPDATE rebuys SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
+      [now, now, id],
+    );
   }
 
   // ----------------------------------------------------------------- hands
@@ -508,16 +640,22 @@ export class SqlRepository implements Repository {
   async listHands(sessionId?: string): Promise<Hand[]> {
     const rows =
       sessionId === undefined
-        ? await this.driver.all<HandRow>(`SELECT * FROM hands ORDER BY at DESC`)
+        ? await this.driver.all<HandRow>(
+            `SELECT * FROM hands WHERE deleted_at IS NULL ORDER BY at DESC`,
+          )
         : await this.driver.all<HandRow>(
-            `SELECT * FROM hands WHERE session_id = ? ORDER BY at DESC`,
+            `SELECT * FROM hands WHERE session_id = ? AND deleted_at IS NULL ORDER BY at DESC`,
             [sessionId],
           );
     return rows.map(toHand);
   }
 
   async getHand(id: string): Promise<Hand | null> {
-    const row = await first<HandRow>(this.driver, `SELECT * FROM hands WHERE id = ?`, [id]);
+    const row = await first<HandRow>(
+      this.driver,
+      `SELECT * FROM hands WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    );
     return row ? toHand(row) : null;
   }
 
@@ -567,7 +705,11 @@ export class SqlRepository implements Repository {
   }
 
   async deleteHand(id: string): Promise<void> {
-    await this.driver.run(`DELETE FROM hands WHERE id = ?`, [id]);
+    const now = this.ctx.clock.now();
+    await this.driver.run(
+      `UPDATE hands SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
+      [now, now, id],
+    );
   }
 
   // ------------------------------------------------------------------ mood
@@ -575,9 +717,12 @@ export class SqlRepository implements Repository {
   async listMoodEntries(sessionId?: string): Promise<MoodEntry[]> {
     const rows =
       sessionId === undefined
-        ? await this.driver.all<MoodRow>(`SELECT * FROM mood_entries ORDER BY at DESC`)
+        ? await this.driver.all<MoodRow>(
+            `SELECT * FROM mood_entries WHERE deleted_at IS NULL ORDER BY at DESC`,
+          )
         : await this.driver.all<MoodRow>(
-            `SELECT * FROM mood_entries WHERE session_id = ? ORDER BY at DESC`,
+            `SELECT * FROM mood_entries
+             WHERE session_id = ? AND deleted_at IS NULL ORDER BY at DESC`,
             [sessionId],
           );
     return rows.map(toMoodEntry);
@@ -596,7 +741,11 @@ export class SqlRepository implements Repository {
   }
 
   async deleteMoodEntry(id: string): Promise<void> {
-    await this.driver.run(`DELETE FROM mood_entries WHERE id = ?`, [id]);
+    const now = this.ctx.clock.now();
+    await this.driver.run(
+      `UPDATE mood_entries SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
+      [now, now, id],
+    );
   }
 
   // ----------------------------------------------------------- maintenance

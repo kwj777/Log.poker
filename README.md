@@ -15,10 +15,11 @@ Log is the hub of a three-app family:
 | [Untilt.poker](https://untilt.poker) | How it felt -- mental game work |
 | [TiltProof](https://tiltproof.com) | What to do differently -- odds and spot training |
 
-How the three are priced together -- speculatively, and the short version is that
-Log stays free -- is worked out in
+How the three are priced together is worked out in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md),
-over in Untilt beside the monetization document it extends.
+over in Untilt beside the monetization document it extends. The short version
+for this repo: **Log is free in its entirety and has no standalone price.** See
+[What is free, and what is not](#what-is-free-and-what-is-not).
 
 ---
 
@@ -42,6 +43,9 @@ over in Untilt beside the monetization document it extends.
   [The variance model](#the-variance-model).
 - **Session history** -- filter by period, venue and game type; every filter
   recomputes the totals above the list.
+- **Tournaments** -- entry and fee kept apart, re-entries, field size and where
+  you finished, with ROI and a cash rate that says how much it can be trusted.
+  See [Tournaments](#tournaments).
 - **Session-summary import** -- bring an online history in from a CSV your site
   or your tracker exported, rather than typing out a year of sessions. See
   [Importing an online history](#importing-an-online-history).
@@ -51,6 +55,46 @@ over in Untilt beside the monetization document it extends.
 
 Offline throughout. There is no account, no server, and no network call -- your
 log never leaves your device.
+
+---
+
+## What is free, and what is not
+
+**Everything above is free, permanently, and none of it needs an account.** Log
+is the one app in the family with no standalone price, and that is a decision
+rather than an oversight. What is valuable in a tracker is the player's own
+record, so an app whose entire pitch is *am I running bad or playing bad* cannot
+also charge rent for the answer. It is also the app that gets talked about,
+which is how anybody arrives at the other two.
+
+The paid side of the family is the longer material in TiltProof and Untilt, sold
+as one payment rather than a subscription. **What it adds here is cross-device
+history**, and that is the only thing in Log that will ever be paid for: it
+comes with owning the other two apps rather than carrying a price of its own.
+The line falls there because a second device needs an identity to sync to, and
+paying is what creates one, which makes it an honest conversion moment rather
+than a hostage situation. It is unbuilt today, and it is roadmap items 2 and 3;
+[SYNC.md](SYNC.md) scopes what building it takes.
+
+The numbers themselves live in
+[FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
+and are deliberately not repeated here or anywhere in this repo. Three copies of
+a price is three chances for two of them to go stale.
+
+### The copy rule, and its second half
+
+**No price appears anywhere on log.poker.** Not on the front door, not on the
+four guides, not on `/chip`. Somebody who has used none of the three has no way
+to value one, and a number in front of them prices the family before it has
+earned anything; the pass is sold inside each app at the moment of need instead.
+`src/site/__tests__` and `src/campaign/__tests__` enforce that on all six pages.
+
+Carrying no number is not the same as saying nothing about money, though, and
+that is the half that is easy to lose: **every page says how much of each app is
+free.** All of Log, the early levels and the glossary in TiltProof, the
+at-the-table resets in Untilt. Without it a page that only ever says *free*
+makes a promise on behalf of two apps that do not keep it, and the front door
+had been doing exactly that. Tested alongside the rule it qualifies.
 
 ---
 
@@ -74,12 +118,18 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test            # 435 unit tests
+npm test            # house style, then the unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
-npm run check:prose # house style: no en or em dashes, American spellings
+npm run check:prose # house style on its own
 npm run build:content -- --check  # the guides match their generator
 ```
+
+`npm test` runs the house-style check first and stops if it fails. It reads
+files rather than compiling them, so it costs a fraction of a second and the
+message it prints names the file, the line and the word. `npm run test:watch`
+leaves it out: the tight loop is for the tests, and a half-written comment
+should not interrupt it.
 
 ### Demo data
 
@@ -434,6 +484,7 @@ src/
     handNotation.ts       "AsKd" -- the stable hand-off format
     stats.ts              P/L, hourly rate, bankroll curve, groupings
     variance.ts           win rate, standard deviation, confidence bands
+    tournaments.ts        ROI, cash rate, dry runs, and what they are worth
   data/
     repository.ts         the storage contract
     sql/                  SqlRepository over a narrow SqlDriver
@@ -465,6 +516,94 @@ in the test suite -- so the class that ships to iOS and Android is the class the
 tests exercise, against a real SQLite engine, rather than a fake that would
 agree with whatever the repository happens to do.
 
+### Deletes are tombstones
+
+Nothing in the data layer removes a row any more. `deleteSession` and its four
+siblings set `deleted_at` and leave the record where it is; every read filters
+on it, so from a screen's point of view nothing changed at all. On IndexedDB it
+needed no version bump, because the property is not indexed and a record written
+before it reads as live.
+
+The reason is not local. Across two devices, a row that is absent because
+somebody deleted it and a row that is absent because this device has not been
+told about it yet are **the same absence**, so a merge that unions rows brings
+back every session anybody ever removed. Delete a mis-entered session on the
+phone, watch it come back from the laptop, watch the bankroll curve disagree
+with itself.
+
+Four things fall out of that and are asserted in the conformance suite:
+
+- **Children take the parent's stamp.** A hand tombstoned a millisecond after
+  its session is a hand a later merge can revive on its own.
+- **Tombstoning a session clears its `importKey`.** Deleting an imported session
+  has always made it importable again, and a tombstone holding the key in a
+  unique index would end that quietly. The key is derived from the source row,
+  so a re-import mints it again.
+- **A tombstoned session stops holding its venue back**, but the venue is
+  tombstoned rather than removed, because the deleted session's `venueId` still
+  points at it and a foreign key that stops resolving is a broken read.
+- **`clearAll` is still a truncate.** It is the one delete that is not a
+  tombstone, and the distinction is the whole reason to be careful here: reset
+  means *this device*, not *every device*. Writing tombstones would let somebody
+  clearing a phone they are about to sell take five years of history off the
+  laptop with it.
+
+`listChangedSince(cursor)` is the only read that can see a tombstone, and the
+seam the sync engine plugs into. Nothing calls it yet. It exists because an
+invariant nothing can read is an invariant nothing can test.
+
+The merge rules themselves are pure functions in `src/domain/merge.ts`: per
+record last-write-wins, a clock clamp, and the three cases where the thing in
+conflict is a constraint rather than a field, so both devices are right and the
+pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
+something sweeps them, which is phase 2 work, and until then a heavy deleter's
+database grows where it used to shrink.
+
+### Signing in, and what it is for
+
+`src/auth` is the client half of the family's identity. It exists for exactly
+one feature, cross-device history, and **nothing else in the app has anything to
+do with it**: Log is free in its entirety and stays completely usable by
+somebody who never types an email address. There is no signed-out state to
+handle, because signed out is the state every screen already runs in.
+
+The token is minted by Untilt's sign-in and is the same string in all three
+apps. It has to be a bearer string rather than a cookie: `log.poker`,
+`untilt.poker` and `tiltproof.poker` are three registrable domains, so no cookie
+crosses them, and on iOS and Android there is no cookie jar at all.
+
+```
+<expiry>.<tier>.<subject>.<signature>
+```
+
+Three things about this are worth knowing before touching it.
+
+- **Nothing on this side verifies a signature.** Checking one needs the gate
+  secret, and a secret shipped inside an app anybody can download is not a
+  secret. A parsed claim decides what to show and what is worth sending; the
+  server re-derives on every request and is the only answer that counts.
+- **The expiry is in seconds** where every other timestamp in this app is
+  milliseconds. Converted at the boundary, and tested there, because the
+  difference is a factor of a thousand and therefore about fifty years.
+- **A tier is not enough to sync; the holder needs a subject of their own.**
+  Everybody who typed a passcode shares one subject, so syncing them together
+  would pour every preview visitor's history into a single bucket.
+
+`SessionManager` holds the token over a three-method `TokenStore`, the same
+trick `SqlRepository` plays on `SqlDriver`: the keychain on device and
+`localStorage` on web are a dozen lines each, and everything worth testing runs
+against an in-memory one. Both adapters answer as if nothing were stored when
+storage is unavailable, which is ordinary rather than exceptional -- a locked
+device, a private window, a prerender with no `window` at all.
+
+**It is not finished, and the missing part is not here.** Untilt's sign-in ends
+in a redirect carrying an `HttpOnly` cookie, which Log can neither read across
+domains nor receive on native. The code redemption needs to answer a JSON
+request with the token in the body; `src/auth/signin.ts` is written against that
+contract and tested against a fake `fetch`. No sign-in screen was built, because
+until that lands any form would be one that cannot succeed. See
+[SYNC.md](SYNC.md).
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -473,28 +612,41 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 18 passed
-Tests:       463 passed
+Test Suites: 26 passed
+Tests:       724 passed
 
-  sqlRepository      66   the SQLite path, against real SQLite
-  dexieRepository    66   the IndexedDB path, against real IndexedDB
-  sessionImport      40   reading a session-summary export
-  values             36   money, dates, durations, stakes, game types
-  variance           31   win rate, σ, confidence bands, verdicts
-  site               29   the marketing/app split, the PWA, the sitemap
-  stats              29   P/L, rebuys, duration, hourly rate, groupings
-  palette            27   the theme matches BRAND.md
+  sqlRepository      86   the SQLite path, against real SQLite
+  dexieRepository    86   the IndexedDB path, against real IndexedDB
+  content            55   every figure in the guides, re-derived and read back
+  sessionImport      52   reading a session-summary export
+  stats              45   P/L, rebuys, duration, win rate, groupings
+  values             36   money, dates, durations, stakes, formats, counts
+  site               35   the marketing/app split, the PWA, the sitemap
+  variance           35   win rate, σ, confidence bands, verdicts
+  merge              28   the rules for when two devices both have a say
   blog               28   the post grammar, the share cards, and what it refuses
+  palette            27   the theme matches BRAND.md
+  tournaments        26   ROI, cash rate, dry runs, finishes
+  migrations         22   a filled v2 database walked forward, both engines
   csv                19   quoting, delimiters, line endings
+  chip               18   /chip resolves, offline, and never quotes a price
   money              18   cents arithmetic, parsing, formatting
-  chip               17   /chip resolves, offline, and never quotes a price
   handNotation       16   parse, round-trip, hand classes
-  seed               10   the demo dataset stays coherent
+  token              16   the family token grammar, against signed fixtures
+  seed               13   the demo dataset stays coherent
+  session            12   holding a token, and stores that fail as real ones do
+  signin             10   the sign-in client, against a fake fetch
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
-  columns             5   header matching
+  tokenStore.web      8   localStorage missing, blocked, and working
+  columns             7   header matching
 ```
+
+`npm run check:prose` is the house-style pass (American spellings, no en or em
+dashes) and it runs ahead of Jest as part of `npm test`. It reads tracked files
+*and* new ones that are not yet committed, so a rule nobody checks does not
+quietly become a preference again.
 
 ### Money
 
@@ -517,6 +669,11 @@ time, `σ² = Σ(rᵢ − ŵ·hᵢ)² / Σhᵢ`, with a Bessel-style correction 
 parameter estimated from the same data. Results are normalized to big blinds so
 sessions across different stakes pool into one estimate.
 
+**This model is for cash games only.** `toObservations` drops tournaments, and
+[Tournaments](#tournaments) explains why at length. It also drops any session
+with no measurable duration or no recorded blinds, since neither can be turned
+into a result per hour.
+
 Below eight sessions or twenty hours the view says it doesn't have enough data
 rather than inventing a verdict. Above it, the copy is written to be true *and*
 calming: a rough stretch inside the band is named as ordinary, an outlier is
@@ -529,6 +686,71 @@ they are "due".
 Hole cards are stored as `"AsKd"` -- rank then suit, two characters per card, the
 format every other poker tool already speaks. That is what makes the TiltProof
 hand-off possible without a translation layer, and what a CSV export will emit.
+
+---
+
+## Tournaments
+
+A tournament is not a cash session with different words, so it is a discriminator
+on the record rather than a tag on the side. `Session.format` is `cash` or
+`tournament`, and the format decides which fields the session is allowed to
+carry: a tournament has an entry fee, a field size and a finishing position and
+no blinds; a cash game has blinds and none of the other three. That is enforced
+in `buildSession` rather than trusted from the caller, so a `$1/$2` tournament
+cannot reach the database for some later screen to render.
+
+The entry fee is kept apart from the buy-in because that is how every tournament
+is advertised (`$100+$10`), because players think in those terms, and because a
+year of rake is worth being able to total. Both count as invested, so an ROI is
+measured against what actually left the bankroll. A re-entry is a rebuy in the
+same table, labeled differently on screen.
+
+Since a tournament has no blinds, `Session.stakes` is nullable, and the currency
+that used to live inside it now sits on the session where both formats can reach
+it. A cash session whose blinds were never recorded (which an import can produce)
+is null in exactly the same way, and each storage engine encodes that as it can:
+IndexedDB stores null, and SQLite stores `0/0`, which is not a game anybody has
+ever played.
+
+### Win rate means two different things
+
+The dashboard's **win rate** counts cash sessions only, and tournaments get a
+**cashed** tile beside it. Pooling them produces a figure that moves with how
+many tournaments somebody entered rather than with how they played: a tournament
+entry ends with nothing most nights for everybody, so a cash player who wins
+half their sessions and also fires ten tournaments used to read as a 17% winner,
+under a label that sounds like a verdict. A tournament player cashing 22% is
+doing well and a cash player winning 22% of sessions is not, and one number
+cannot mean both.
+
+Everything else on that row is money, and money is money whichever game it came
+from, so hourly, best and worst still span both.
+
+### Why there is no confidence band here
+
+The variance page draws a Gaussian random walk in big blinds per hour. A
+tournament has neither term: the blinds move every level, and the results are
+not the roughly symmetric distribution that model assumes. A tournament player
+loses their entry most nights and is carried by a handful of deep runs. Running
+that through the cash model would produce a band that looks exactly as
+authoritative as the real one and means nothing, which is worse than showing
+nothing at all.
+
+So the tournament card shows what can be said honestly:
+
+- **ROI and cash rate** as descriptions of what happened. Below a hundred entries
+  the copy says outright that this is a record rather than a measurement, because
+  one final table moves the number a long way.
+- **The dry run**, which is the one genuinely inferential number here, and it is
+  honest because it needs no distribution at all. Whether an entry cashes is
+  independent of the last one, so the chance of missing `n` in a row is
+  `(1 - rate)^n`. Sixteen without a cash at a 20% rate is a 2.8% run: unusual,
+  and not a sign anything has changed. That is the question a tournament player
+  actually asks at two in the morning, and it usually has a calming answer.
+
+A bootstrap over the player's own results would give a real interval on ROI and
+is the obvious next step. It is not here yet, and a Gaussian stand-in in the
+meantime would be the exact thing this section is about.
 
 ---
 
@@ -556,6 +778,12 @@ marks, `1.234,56` as well as `1,234.56`, and `(52.50)` for a negative. Day-first
 and month-first dates are told apart by scanning the whole column for a day past
 the twelfth -- and when a file never proves it either way, the screen says so and
 offers a toggle instead of picking silently.
+
+Tournaments come in through the same door. A row is read as one when the file
+says so (`Tournament`, `MTT`, `SNG`, `Sit & Go`) or when it carries something
+only a tournament has: an entry fee, a field size, a finishing position. `Prize`
+reads as the cash-out, and `Format` is matched to cash-or-tournament while the
+variant stays on `Game`.
 
 **It does not read hand histories.** A hand history is an action-level record of
 one hand; Log's `Hand` is a journal entry *about* a hand -- hole cards, position,
@@ -594,28 +822,53 @@ Ordered roughly by how much each is worth against how much it costs.
    timestamped, money is integer cents, and hands are in a portable notation.
    Wants a share sheet on native and a download on web.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
-   id and an `updatedAt`. A syncing repository wraps the existing one behind the
-   same interface, and `src/data/index.ts` is the single place it gets composed
-   in; no feature folder changes. Last-write-wins per record to start, with the
-   timestamps already in place to do better later.
-3. **RevenueCat cross-platform subscriptions** -- entitlements gate features at
-   the store layer, not inside screens, so the free build and the paid build
-   stay one codebase. Web entitlements via Stripe through the same RevenueCat
-   account.
+   id and an `updatedAt`, and the one feature the family pass adds to this app.
+   **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
+   starting: three quarters of the server already exists in Untilt.
+   **Phase 0 has landed** -- deletes are tombstones, the merge rules are written
+   and tested, and `listChangedSince` is the seam the engine plugs into. See
+   [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
+   has landed too**, in `src/auth`; see
+   [Signing in](#signing-in-and-what-it-is-for). What is left is one endpoint
+   change in Untilt, and then the engine itself.
+   A syncing repository wraps the existing one behind the same interface, and
+   `src/data/index.ts` is the single place it gets composed in; no feature
+   folder changes. Last-write-wins per record to start, with the timestamps
+   already in place to do better later. The sign-in is the genuinely new part:
+   anonymous ids do not merge across apps, so all three have to derive the same
+   id for the same person, and Untilt's existing magic-link endpoint is what
+   that is promoted from. **The free tier never goes behind it** -- Log stays
+   usable forever by somebody who never types an email address.
+3. **RevenueCat entitlements, which are not subscriptions** -- one
+   non-consumable, `log_plus`, checked at the store layer rather than inside
+   screens, so the free build and the paid build stay one codebase. Log's
+   offering sells the family pass alone, because Log has nothing to sell by
+   itself, and every app checks only its own entitlement: which SKU paid for it
+   is a fact about billing that no screen needs to know. Web entitlements via
+   Stripe through the same RevenueCat account. One mapping detail is load
+   bearing, because the front door promises it in words: the pass grants
+   `log_plus`, and so does holding both single-app entitlements at once. Nobody
+   will ever buy two singles when the pass costs less than that, but *own the
+   other two and your history follows you* has to be true however somebody got
+   there, or the page is lying in an edge case.
 4. **Online session support** -- [importing a session summary](#importing-an-online-history)
-   is the half of this that already ships. The rest is multi-table sessions and
-   hands per hour, which need `sessions` to grow a `format` discriminator and the
-   hourly-rate math to become per-table: wall-clock hours stop meaning one thing
-   the moment four tables are open.
-5. **Deep Untilt and TiltProof integration** -- the seams already exist in
+   and [tournaments](#tournaments) are the halves of this that already ship, and
+   `sessions` has its `format` discriminator. What is left is multi-table
+   sessions and hands per hour, which need the hourly-rate math to become
+   per-table: wall-clock hours stop meaning one thing the moment four tables are
+   open.
+5. **A real interval on tournament ROI** -- a bootstrap over the player's own
+   results, which needs no assumption about the shape of the payouts. It is the
+   one thing the tournament card is currently honest about not having.
+6. **Deep Untilt and TiltProof integration** -- the seams already exist in
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
    real payload -- the flagged hand into a TiltProof drill, the rough stretch
    into the matching Untilt exercise -- and eventually share an account across
    the three apps.
-6. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
+7. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
 
-Also wanted, smaller: tournament support, session photos of the chip stack,
+Also wanted, smaller: session photos of the chip stack,
 Apple Health style weekly summaries, an Apple Watch companion for the timer, and
 per-venue rake tracking.
 

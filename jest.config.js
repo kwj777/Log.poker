@@ -9,7 +9,14 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
-  collectCoverageFrom: ['src/domain/**/*.ts', 'src/data/**/*.ts', '!src/data/**/expoSqliteDriver.ts'],
+  collectCoverageFrom: [
+    'src/domain/**/*.ts',
+    'src/data/**/*.ts',
+    'src/auth/**/*.ts',
+    // Both exclusions are native modules with nothing to run in Node.
+    '!src/data/**/expoSqliteDriver.ts',
+    '!src/auth/tokenStore.ts',
+  ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },

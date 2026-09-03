@@ -440,7 +440,7 @@ ${posts.map((post) => `        <li>
 
       <div class="cta">
         <a class="btn" href="/app">Get the log</a>
-        <p class="sub">Free, offline, and no account. Your log never leaves your device.</p>
+        <p class="sub">Log is free, all of it, and works offline with no account. Your log never leaves your device.</p>
       </div>
 
       <footer>
@@ -503,7 +503,7 @@ ${head({
 
       <div class="cta">
         <a class="btn" href="/app">Get the log</a>
-        <p class="sub">Free, offline, and no account. Your log never leaves your device.</p>
+        <p class="sub">Log is free, all of it, and works offline with no account. Your log never leaves your device.</p>
       </div>
 
       <footer>

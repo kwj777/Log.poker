@@ -290,3 +290,30 @@ describe('probabilityOfLoss', () => {
     expect(probabilityOfLoss(estimate, 20)!).toBeGreaterThan(0.2);
   });
 });
+
+describe('the boundary around the cash-game model', () => {
+  it('drops tournaments, whose results are the wrong shape for a random walk', () => {
+    const observations = toObservations([
+      session({ cashOut: 40_000, hours: 3 }),
+      session({ format: 'tournament', buyIn: 10_000, fee: 1_000, cashOut: 0, hours: 4 }),
+    ]);
+    expect(observations).toHaveLength(1);
+  });
+
+  it('drops a cash session whose blinds were never recorded', () => {
+    expect(toObservations([session({ stakes: null, cashOut: 40_000, hours: 3 })])).toEqual([]);
+  });
+
+  it('still drops a session with no measurable duration', () => {
+    expect(toObservations([session({ cashOut: 40_000, hours: 0 })])).toEqual([]);
+  });
+
+  it('leaves a tournament-only player with no estimate rather than a wrong one', () => {
+    const entries = Array.from({ length: 30 }, () =>
+      session({ format: 'tournament', buyIn: 10_000, fee: 1_000, cashOut: 0, hours: 4 }),
+    );
+    const estimate = estimatePlayer(toObservations(entries));
+    expect(estimate.sessionCount).toBe(0);
+    expect(estimate.reliable).toBe(false);
+  });
+});

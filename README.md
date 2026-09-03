@@ -214,9 +214,32 @@ Three things are worth knowing before changing any of it:
   with the bundle and `/blog` would 404 with nothing erroring.
 - **The pages fetch nothing.** No bundle, no stylesheet, no font: the same
   promise `public/home.html` makes, and asserted the same way.
-- **`og:image` is the app icon rather than a drawing from the post.** A share
-  card has to be a raster and nothing in this build makes one, so the honest
-  choice is the mark instead of a preview that renders as nothing.
+- **Share cards are drawn ahead of time, not by the site build.** Nothing an
+  unfurl shows can be an SVG, so `scripts/build-og.mjs` draws a 1200x630 PNG
+  per post into `public/og` and commits it. `build-blog.mjs` only points
+  `og:image` at what it finds there, so a deploy never depends on a
+  rasterizer being installable, and a post with no card yet falls back to the
+  app icon rather than to a hole.
+
+### Share cards
+
+```bash
+npm run build:og            # public/og/<slug>.png, and og/blog.png for the index
+```
+
+The card opens on the hand the post is about: the cards its figure marks as
+played, the two that were mine and then what the board gave, drawn by the same
+code as the diagram in the post. A post with no figure gets its title alone.
+
+Run it after adding a post and commit the PNG. It needs `@resvg/resvg-js`,
+which is a dev dependency and deliberately nothing the deploy touches.
+
+Fonts are the one part not fully in the repository's hands: the card asks for
+the site's own stack, Georgia first, and a Linux machine renders it in
+Liberation Serif, which is metric compatible with Times New Roman and already
+second in that stack. Two machines can draw very slightly different cards,
+which is another reason the PNG is committed rather than generated on the way
+to production.
 
 `src/site/__tests__/blog.test.ts` runs the real script twice, over
 `content/blog` and again over fixtures, so what the grammar refuses is asserted
@@ -358,6 +381,7 @@ to `BRAND.md`. They mean something rather than brand something.
 ```
 content/blog/             the blog, one Markdown file per post
   figures/                hand diagrams, drawn by scripts/draw-hand.mjs
+public/og/                share cards, drawn by scripts/build-og.mjs
 app/                      Expo Router routes
   _layout.tsx             opens the database, then renders the navigator
   +html.tsx               web document shell (PWA wiring)
@@ -410,7 +434,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 18 passed
-Tests:       459 passed
+Tests:       463 passed
 
   sqlRepository      66   the SQLite path, against real SQLite
   dexieRepository    66   the IndexedDB path, against real IndexedDB
@@ -420,7 +444,7 @@ Tests:       459 passed
   site               29   the marketing/app split, the PWA, the sitemap
   stats              29   P/L, rebuys, duration, hourly rate, groupings
   palette            27   the theme matches BRAND.md
-  blog               24   the post grammar, and what it refuses
+  blog               28   the post grammar, the share cards, and what it refuses
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
   chip               17   /chip resolves, offline, and never quotes a price

@@ -1,5 +1,5 @@
 /**
- * Draws the hand diagrams the blog posts inline.
+ * The card art, and the hand diagrams the blog posts inline.
  *
  * A poker hand is a hundred lines of coordinates, and a post that told one in
  * hand-written SVG would be unreadable and would look different from the last
@@ -7,7 +7,7 @@
  * table: cream faces, the family's palette, a gold edge on the cards that
  * mattered, and a face-down back carrying the mark.
  *
- * The **SVG is the artefact**, committed under `content/blog/figures`, and
+ * The **SVG is the artifact**, committed under `content/blog/figures`, and
  * `scripts/build-blog.mjs` inlines it. Nothing in the site build runs this
  * file. Run it by hand after changing a spec, and check the SVG in with the
  * post:
@@ -17,6 +17,9 @@
  * An argument writes the figures somewhere else instead, which is how
  * `src/site/__tests__/blog.test.ts` checks that the committed SVGs are still
  * the ones these specs describe.
+ *
+ * `scripts/build-og.mjs` imports the card drawing and the specs from here, so
+ * the hand on a share card is drawn by the same code as the hand in the post.
  *
  * A card is `<rank><suit>`: `As`, `Td`, `2c`. A trailing `!` gives it the gold
  * edge that marks it as part of the hand being told. `?` as the rank is a card
@@ -30,7 +33,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(process.argv[2] ?? join(ROOT, 'content', 'blog', 'figures'));
 
 const W = 420;
-const CARD = { w: 54, h: 76, r: 5 };
+export const CARD = { w: 54, h: 76, r: 5 };
 const GAP = 8;
 /** The break between the flop and the streets that follow it. */
 const STREET_GAP = 16;
@@ -49,12 +52,15 @@ const MUTED = '#b7c0ba';
 const RED = '#b7343f';
 const BLACK = '#242b28';
 
+/** The family's ink, for anything else drawing on the same table. */
+export const PALETTE = { CREAM, RIM, GOLD, FOREST, DIM, MUTED, RED, BLACK, GROUND: '#1c211f' };
+
 const SUITS = { d: '♦', h: '♥', s: '♠', c: '♣' };
 const NAMES = { d: 'diamonds', h: 'hearts', s: 'spades', c: 'clubs' };
 const SPOKEN = { A: 'Ace', K: 'King', Q: 'Queen', J: 'Jack', T: 'Ten' };
-const PIP_FONT = "'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif";
-const SERIF = "Georgia,'Times New Roman',serif";
-const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif";
+export const PIP_FONT = "'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif";
+export const SERIF = "Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif";
+export const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif";
 const INK = { gold: GOLD, muted: MUTED, dim: DIM };
 
 const label = (x, y, text, fill = DIM) =>
@@ -84,7 +90,8 @@ const back = (x, y) => `  <g>
     </g>
   </g>`;
 
-const card = (x, y, spec) => {
+/** One card face, at the size every hand on this site is drawn at. */
+export const card = (x, y, spec) => {
   if (spec.startsWith('??')) return back(x, y);
 
   const played = spec.endsWith('!');
@@ -163,7 +170,7 @@ ${parts.join('\n')}
 `;
 };
 
-const FIGURES = {
+export const FIGURES = {
   /** The bomb pot: two boards, one deck, and every six in it face up. */
   'bomb-pot-hand': {
     title: 'A double-board bomb pot, scooped',
@@ -221,9 +228,28 @@ const FIGURES = {
   },
 };
 
-mkdirSync(OUT, { recursive: true });
-for (const [name, spec] of Object.entries(FIGURES)) {
-  const svg = draw(name, { ...spec, desc: spec.desc.replace(/\s+/g, ' ').trim() });
-  writeFileSync(join(OUT, `${name}.svg`), svg);
-  console.log(`${name}.svg  ${svg.length} bytes`);
+/**
+ * The cards a figure marks as part of the hand, split the way they were
+ * dealt: the two that were mine, then what the board gave. A share card opens
+ * on those rather than on a logo, and the split is what keeps the row
+ * readable as a hand instead of as five cards in a line.
+ */
+export const playedHand = (name) => {
+  const rows = FIGURES[name]?.rows ?? [];
+  const mine = rows.find((row) => row.type === 'hands')?.groups[0]?.cards ?? [];
+  const board = rows
+    .filter((row) => row.type !== 'hands' && row.type !== 'note')
+    .flatMap((row) => row.cards ?? []);
+  const played = (cards) => cards.filter((spec) => spec.endsWith('!'));
+  return { hole: played(mine), board: played(board) };
+};
+
+// Importing this file must not write anything, so only a direct run draws.
+if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  mkdirSync(OUT, { recursive: true });
+  for (const [name, spec] of Object.entries(FIGURES)) {
+    const svg = draw(name, { ...spec, desc: spec.desc.replace(/\s+/g, ' ').trim() });
+    writeFileSync(join(OUT, `${name}.svg`), svg);
+    console.log(`${name}.svg  ${svg.length} bytes`);
+  }
 }

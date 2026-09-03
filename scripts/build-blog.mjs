@@ -25,9 +25,11 @@
  * prose can never silently eat a paragraph, and anything the grammar does not
  * recognize throws at build time rather than reaching a live page.
  */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { BLOG, SITE, TAGLINE, TITLE, feedDate, longDate, readPosts } from './posts.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
@@ -44,47 +46,14 @@ const OUT = resolve(process.argv[2] ?? join(ROOT, 'dist'));
 const POSTS = resolve(process.argv[3] ?? join(ROOT, 'content', 'blog'));
 const FIGURES = join(POSTS, 'figures');
 
-const SITE = 'https://log.poker';
-const BLOG = `${SITE}/blog`;
-const TITLE = 'The Log Blog';
-const TAGLINE =
-  'Notes from the three apps: what the numbers can tell you, what they cannot, and the part of the game that is not the cards.';
-
-/** `<YYYY-MM-DD>-<slug>.md`. The date orders the directory; the rest is the URL. */
-const FILENAME = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
-
-/** Every front matter key a post may set. An unknown one is a typo, and throws. */
-const FIELDS = new Set(['title', 'description', 'updated', 'draft']);
-
 /** Only what cannot execute: `javascript:` and its friends throw rather than ship. */
 const SAFE_HREF = /^(https?:\/\/|\/|mailto:|#)/;
 
 /** Where a code span parks while the emphasis rules run over the rest. */
 const SPAN = '\u0000';
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'];
-const SHORT_MONTHS = MONTHS.map((month) => month.slice(0, 3));
-const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
 const escapeHtml = (text) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** A date is a day, so it becomes a moment at noon UTC and no reader shifts it. */
-const at = (date) => new Date(`${date}T12:00:00Z`);
-
-/** 3 September 2026. Spelled out here rather than left to a host's locale data. */
-const longDate = (date) => {
-  const day = at(date);
-  return `${day.getUTCDate()} ${MONTHS[day.getUTCMonth()]} ${day.getUTCFullYear()}`;
-};
-
-/** RFC 822, which is what a feed reader parses. */
-const feedDate = (date) => {
-  const day = at(date);
-  const dayOfMonth = String(day.getUTCDate()).padStart(2, '0');
-  return `${SHORT_DAYS[day.getUTCDay()]}, ${dayOfMonth} ${SHORT_MONTHS[day.getUTCMonth()]} ${day.getUTCFullYear()} 12:00:00 GMT`;
-};
 
 /**
  * Inline Markdown, over already-escaped text.
@@ -233,61 +202,6 @@ const renderMarkdown = (markdown, where) => {
   return out.join('\n        ');
 };
 
-/** One file in, one post out. Every complaint names the file it came from. */
-const parsePost = (filename, source) => {
-  const named = FILENAME.exec(filename);
-  if (!named) throw new Error(`${filename}: name a post <YYYY-MM-DD>-<slug>.md, lowercase`);
-  const [, date, slug] = named;
-  if (at(date).toISOString().slice(0, 10) !== date) throw new Error(`${filename}: ${date} is not a real date`);
-
-  const split = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(source);
-  if (!split) throw new Error(`${filename}: needs a --- front matter block, then the post`);
-
-  const fields = {};
-  for (const line of split[1].split('\n')) {
-    if (!line.trim()) continue;
-    const field = /^([a-z]+):\s*(.*)$/.exec(line);
-    if (!field) throw new Error(`${filename}: cannot read front matter line "${line}"`);
-    if (!FIELDS.has(field[1])) throw new Error(`${filename}: unknown front matter "${field[1]}"`);
-    fields[field[1]] = field[2].trim().replace(/^(['"])([\s\S]*)\1$/, '$2');
-  }
-  for (const required of ['title', 'description']) {
-    if (!fields[required]) throw new Error(`${filename}: needs a ${required}`);
-  }
-  if (fields.updated && at(fields.updated).toISOString().slice(0, 10) !== fields.updated) {
-    throw new Error(`${filename}: updated ${fields.updated} is not a real date`);
-  }
-
-  return {
-    slug,
-    date,
-    updated: fields.updated ?? null,
-    title: fields.title,
-    description: fields.description,
-    draft: fields.draft === 'true',
-    url: `${BLOG}/${slug}`,
-    path: `/blog/${slug}`,
-    body: renderMarkdown(split[2], filename),
-  };
-};
-
-/** Newest first, which is the order the index and the feed both want. */
-const readPosts = () => {
-  if (!existsSync(POSTS)) return [];
-  const posts = readdirSync(POSTS)
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => parsePost(name, readFileSync(join(POSTS, name), 'utf8')))
-    .filter((post) => !post.draft)
-    .sort((a, b) => (a.date === b.date ? (a.slug < b.slug ? 1 : -1) : a.date < b.date ? 1 : -1));
-
-  const slugs = new Set();
-  for (const post of posts) {
-    if (slugs.has(post.slug)) throw new Error(`two posts claim /blog/${post.slug}`);
-    slugs.add(post.slug);
-  }
-  return posts;
-};
-
 /**
  * The family mark, the same one on the front door and the 404: the canopy in
  * one green ramp with nothing lit, because this is every app rather than one
@@ -430,14 +344,20 @@ const HELPLINE = `        <p>
         </p>`;
 
 /**
- * `og:image` is the app icon rather than a drawing from the post. A share card
- * has to be a raster (the crawlers do not render SVG) and nothing in this
- * build makes one, so the honest choice is the mark, which is at least the
- * right brand rather than a broken preview.
+ * Share cards, drawn by `scripts/build-og.mjs` and committed under
+ * `public/og`. They have to be rasters, because no crawler renders SVG, so
+ * this build only points at one: it does not draw it and does not depend on
+ * anything that can.
+ *
+ * A post without one falls back to the app icon and a small card. That is the
+ * honest failure: the right brand in the wrong shape, rather than a link
+ * preview with a hole in it.
  */
-const OG_IMAGE = `${SITE}/icons/icon-512.png`;
+const shareCard = (name) => (existsSync(join(PUBLIC, 'og', `${name}.png`))
+  ? { url: `${SITE}/og/${name}.png`, card: 'summary_large_image', width: 1200, height: 630 }
+  : { url: `${SITE}/icons/icon-512.png`, card: 'summary', width: 512, height: 512 });
 
-const head = ({ title, description, canonical, ogType, extra = '' }) => `  <head>
+const head = ({ title, description, canonical, ogType, share, extra = '' }) => `  <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>${escapeHtml(title)}</title>
@@ -453,8 +373,11 @@ const head = ({ title, description, canonical, ogType, extra = '' }) => `  <head
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:url" content="${canonical}" />
-    <meta property="og:image" content="${OG_IMAGE}" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="${share.url}" />
+    <meta property="og:image:width" content="${share.width}" />
+    <meta property="og:image:height" content="${share.height}" />
+    <meta property="og:image:alt" content="${escapeHtml(title)}" />
+    <meta name="twitter:card" content="${share.card}" />
 ${extra}    <style>
 ${STYLE}
     </style>
@@ -480,6 +403,7 @@ ${head({
   description: TAGLINE,
   canonical: BLOG,
   ogType: 'website',
+  share: shareCard('blog'),
   extra: jsonLd({
     '@context': 'https://schema.org',
     '@type': 'Blog',
@@ -542,6 +466,7 @@ ${head({
   description: post.description,
   canonical: post.url,
   ogType: 'article',
+  share: shareCard(post.slug),
   extra:
     `    <meta property="article:published_time" content="${post.date}" />\n` +
     (post.updated ? `    <meta property="article:modified_time" content="${post.updated}" />\n` : '') +
@@ -651,7 +576,7 @@ const write = (relative, contents) => {
   writeFileSync(target, contents);
 };
 
-const posts = readPosts();
+const posts = readPosts(POSTS, renderMarkdown);
 
 // Cleared rather than written over, so a renamed or deleted post stops being
 // served instead of lingering at its old URL for as long as the site exists.

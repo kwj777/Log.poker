@@ -127,6 +127,51 @@ describe('what a post becomes', () => {
   });
 });
 
+describe('the share card', () => {
+  /** Width and height out of a PNG's header, which also proves it is one. */
+  const pngSize = (...parts: string[]) => {
+    const bytes = readFileSync(join(ROOT, ...parts));
+    expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect(bytes.subarray(12, 16).toString('ascii')).toBe('IHDR');
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  };
+
+  it('is drawn for every post, and for the blog itself', () => {
+    // The one image on the site that Claude, Slack and everything else shows
+    // before anybody has read a word, and the one the pages cannot draw.
+    for (const name of ['blog', ...published]) {
+      expect(pngSize('public', 'og', `${name}.png`)).toEqual({ width: 1200, height: 630 });
+    }
+  });
+
+  it('is what each page points at, at the size it actually is', () => {
+    for (const slug of published) {
+      const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
+      expect(page).toContain(`<meta property="og:image" content="https://log.poker/og/${slug}.png" />`);
+      expect(page).toContain('<meta property="og:image:width" content="1200" />');
+      expect(page).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    }
+    expect(index).toContain('<meta property="og:image" content="https://log.poker/og/blog.png" />');
+  });
+
+  it('falls back to the app icon for a post that has none yet', () => {
+    // The honest failure: the right brand in the wrong shape, rather than an
+    // unfurl with a hole in it, and never a build that refuses to publish.
+    const out = build(fixture({ '2026-01-02-uncarded.md': post('No card drawn for this one.') }));
+    const page = readFileSync(join(out, 'blog', 'uncarded', 'index.html'), 'utf8');
+    expect(page).toContain('<meta property="og:image" content="https://log.poker/icons/icon-512.png" />');
+    expect(page).toContain('<meta name="twitter:card" content="summary" />');
+  });
+
+  it('is not drawn by the site build, so a deploy never needs a rasterizer', () => {
+    // build-og is an authoring tool. The PNG is committed, and build-blog only
+    // looks for it, which is what keeps @resvg out of the deploy's way.
+    expect(read('scripts', 'build-blog.mjs')).not.toContain('resvg');
+    expect(read('scripts', 'build-web.mjs')).not.toContain('build-og');
+    expect(read('scripts', 'build-og.mjs')).toContain('@resvg/resvg-js');
+  });
+});
+
 describe('the blog is findable', () => {
   it('is linked from the front door, which is the only way in', () => {
     expect(read('public', 'home.html')).toContain('<a href="/blog">');

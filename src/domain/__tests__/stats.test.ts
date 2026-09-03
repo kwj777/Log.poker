@@ -5,6 +5,7 @@ import {
   byGameType,
   byStakes,
   byVenue,
+  cashWinRate,
   durationHours,
   durationMs,
   formatDuration,
@@ -305,5 +306,61 @@ describe('tournaments in the session math', () => {
       tournament({ cashOut: 0, hours: 2, endedAt: T0 + 2 * HOUR }),
     ]);
     expect(curve.map((point) => point.cumulative)).toEqual([10_000, -1_000]);
+  });
+});
+
+describe('cashWinRate', () => {
+  const won = (spec: Parameters<typeof session>[0] = {}) =>
+    session({ buyIn: 30_000, cashOut: 40_000, hours: 3, ...spec });
+  const lost = (spec: Parameters<typeof session>[0] = {}) =>
+    session({ buyIn: 30_000, cashOut: 10_000, hours: 3, ...spec });
+  const busted = () =>
+    session({ format: 'tournament', buyIn: 10_000, fee: 1_000, cashOut: 0, hours: 3 });
+
+  it('is null with no cash sessions to measure', () => {
+    expect(cashWinRate([]).rate).toBeNull();
+    expect(cashWinRate([busted(), busted()]).rate).toBeNull();
+  });
+
+  it('counts wins over completed cash sessions', () => {
+    const result = cashWinRate([won(), won(), lost(), lost()]);
+    expect(result.rate).toBeCloseTo(0.5, 5);
+    expect(result).toMatchObject({ sessions: 4, winning: 2, losing: 2, breakEven: 0 });
+  });
+
+  it('ignores a session still running', () => {
+    const result = cashWinRate([won(), session({ cashOut: null, endedAt: null })]);
+    expect(result.sessions).toBe(1);
+    expect(result.rate).toBe(1);
+  });
+
+  it('counts a break-even session as neither', () => {
+    const result = cashWinRate([won(), session({ buyIn: 30_000, cashOut: 30_000, hours: 3 })]);
+    expect(result).toMatchObject({ sessions: 2, winning: 1, losing: 0, breakEven: 1 });
+    expect(result.rate).toBeCloseTo(0.5, 5);
+  });
+
+  it('does not let busted tournaments drag a cash player’s win rate down', () => {
+    // The defect this exists to fix: a 50% cash player who also fires ten
+    // tournaments used to read as a 17% winner, under a label that sounds like
+    // a verdict on how they play.
+    const cash = [won(), won(), lost(), lost()];
+    const withTournaments = [...cash, ...Array.from({ length: 10 }, busted)];
+
+    expect(totals(withTournaments).winningSessions / totals(withTournaments).sessionCount)
+      .toBeCloseTo(2 / 14, 5);
+    expect(cashWinRate(withTournaments).rate).toBeCloseTo(0.5, 5);
+    expect(cashWinRate(withTournaments)).toEqual(cashWinRate(cash));
+  });
+
+  it('does not count a tournament that cashed either', () => {
+    const cashed = session({
+      format: 'tournament',
+      buyIn: 10_000,
+      fee: 1_000,
+      cashOut: 50_000,
+      hours: 6,
+    });
+    expect(cashWinRate([won(), cashed]).sessions).toBe(1);
   });
 });

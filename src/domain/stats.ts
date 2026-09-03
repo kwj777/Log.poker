@@ -167,6 +167,41 @@ export const totals = (sessions: readonly SessionWithChildren[]): Totals => {
   };
 };
 
+export interface WinRate {
+  /** Completed cash sessions considered. */
+  sessions: number;
+  winning: number;
+  losing: number;
+  breakEven: number;
+  /** Winning over completed, as a fraction. Null with no completed cash sessions. */
+  rate: number | null;
+}
+
+/**
+ * The share of sessions that finished ahead, over cash games only.
+ *
+ * Deliberately not both formats pooled. A tournament entry ends with nothing
+ * most nights for everybody who plays them, so a player who mixes the two, or
+ * plays only tournaments, gets a number dragged toward their tournament volume
+ * rather than their results, under a label that reads like a verdict on how
+ * they play. A tournament player cashing 22% is doing well; a cash player
+ * winning 22% of sessions is not, and one figure cannot mean both.
+ *
+ * Tournaments have their own rate, in `tournaments.ts`, and it is called what
+ * it actually is: cashed.
+ */
+export const cashWinRate = (sessions: readonly SessionWithChildren[]): WinRate => {
+  const cash = sessions.filter((session) => session.format === 'cash' && isComplete(session));
+  const summary = totals(cash);
+  return {
+    sessions: summary.sessionCount,
+    winning: summary.winningSessions,
+    losing: summary.losingSessions,
+    breakEven: summary.breakEvenSessions,
+    rate: summary.sessionCount > 0 ? summary.winningSessions / summary.sessionCount : null,
+  };
+};
+
 export interface BankrollPoint {
   at: number;
   /** Running total of net result, in cents, after this session. */

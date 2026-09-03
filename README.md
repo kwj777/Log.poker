@@ -524,13 +524,13 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 21 passed
-Tests:       612 passed
+Tests:       618 passed
 
   sqlRepository      75   the SQLite path, against real SQLite
   dexieRepository    75   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
-  stats              39   P/L, rebuys, duration, hourly rate, groupings
+  stats              45   P/L, rebuys, duration, win rate, groupings
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
   site               34   the marketing/app split, the PWA, the sitemap
@@ -617,6 +617,20 @@ it. A cash session whose blinds were never recorded (which an import can produce
 is null in exactly the same way, and each storage engine encodes that as it can:
 IndexedDB stores null, and SQLite stores `0/0`, which is not a game anybody has
 ever played.
+
+### Win rate means two different things
+
+The dashboard's **win rate** counts cash sessions only, and tournaments get a
+**cashed** tile beside it. Pooling them produces a figure that moves with how
+many tournaments somebody entered rather than with how they played: a tournament
+entry ends with nothing most nights for everybody, so a cash player who wins
+half their sessions and also fires ten tournaments used to read as a 17% winner,
+under a label that sounds like a verdict. A tournament player cashing 22% is
+doing well and a cash player winning 22% of sessions is not, and one number
+cannot mean both.
+
+Everything else on that row is money, and money is money whichever game it came
+from, so hourly, best and worst still span both.
 
 ### Why there is no confidence band here
 

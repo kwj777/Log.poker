@@ -18,7 +18,7 @@ import { ChipGroup } from '../../src/components/Chip';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
-import { StatTile } from '../../src/components/StatTile';
+import { StatTile, type StatTileProps } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { BarBreakdown } from '../../src/components/chart/BarBreakdown';
 import { LineChart } from '../../src/components/chart/LineChart';
@@ -30,9 +30,14 @@ import {
   byGameType,
   byStakes,
   byVenue,
+  cashWinRate,
   formatDuration,
   totals,
 } from '../../src/domain/stats';
+import {
+  MIN_TOURNAMENTS_FOR_ROI,
+  tournamentTotals,
+} from '../../src/domain/tournaments';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useLogStore } from '../../src/store/useLogStore';
@@ -48,6 +53,8 @@ export default function DashboardScreen() {
   const [breakdown, setBreakdown] = useState<Breakdown>('stakes');
 
   const summary = useMemo(() => totals(sessions), [sessions]);
+  const winRate = useMemo(() => cashWinRate(sessions), [sessions]);
+  const tourneys = useMemo(() => tournamentTotals(sessions), [sessions]);
   const curve = useMemo(() => bankrollCurve(sessions), [sessions]);
 
   /**
@@ -87,6 +94,77 @@ export default function DashboardScreen() {
     if (active === 'format') return byFormat(sessions);
     return byStakes(sessions);
   }, [active, sessions, venues]);
+
+  /**
+   * The headline figures, built as a list and then laid out two to a row.
+   *
+   * A fixed grid was fine while every player had the same four, but "win rate"
+   * and "cashed" are the same question asked of two different games and only
+   * one of them applies to any given session. Which tiles exist now depends on
+   * what the player actually plays, so the rows are derived rather than written
+   * out: cash only gets the four it always had, tournaments add two of their
+   * own, and a player who has only ever entered tournaments is never shown a
+   * win rate computed over no cash games at all.
+   */
+  const tileRows = useMemo(() => {
+    const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
+    const tiles: StatTileProps[] = [
+      {
+        label: 'Hourly',
+        value: summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true }),
+        valueColor: resultColor(summary.hourly),
+        hint: 'all sessions',
+      },
+    ];
+
+    if (winRate.rate !== null) {
+      tiles.push({
+        label: 'Win rate',
+        value: percent(winRate.rate),
+        hint: `${winRate.winning}W / ${winRate.losing}L`,
+      });
+    }
+
+    if (tourneys.entries > 0) {
+      tiles.push({
+        label: 'Cashed',
+        value: tourneys.itmRate === null ? '--' : percent(tourneys.itmRate),
+        hint: `${tourneys.cashes} of ${tourneys.entries} tournaments`,
+      });
+      tiles.push({
+        label: 'ROI',
+        value:
+          tourneys.roi === null
+            ? '--'
+            : `${tourneys.roi >= 0 ? '+' : ''}${Math.round(tourneys.roi * 100)}%`,
+        valueColor: resultColor(tourneys.net),
+        // The same caveat the variance page carries: an ROI over a few dozen
+        // entries is a record of what happened, not a measurement.
+        hint:
+          tourneys.entries >= MIN_TOURNAMENTS_FOR_ROI
+            ? `${tourneys.entries} entries`
+            : 'too few entries to mean much',
+      });
+    }
+
+    tiles.push(
+      {
+        label: 'Best session',
+        value: summary.biggestWin === null ? '--' : formatMoney(summary.biggestWin, { signed: true }),
+        valueColor: resultColor(summary.biggestWin),
+      },
+      {
+        label: 'Worst session',
+        value:
+          summary.biggestLoss === null ? '--' : formatMoney(summary.biggestLoss, { signed: true }),
+        valueColor: resultColor(summary.biggestLoss),
+      },
+    );
+
+    return Array.from({ length: Math.ceil(tiles.length / 2) }, (_, index) =>
+      tiles.slice(index * 2, index * 2 + 2),
+    );
+  }, [summary, winRate, tourneys]);
 
   const recent = useMemo(
     () => sessions.filter((session) => session.endedAt !== null).slice(0, 5),
@@ -165,31 +243,13 @@ export default function DashboardScreen() {
         </View>
       </Card>
 
-      <View style={styles.tiles}>
-        <StatTile
-          label="Hourly"
-          value={summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true })}
-          valueColor={resultColor(summary.hourly)}
-          hint="all sessions"
-        />
-        <StatTile
-          label="Win rate"
-          value={`${Math.round((summary.winningSessions / Math.max(1, summary.sessionCount)) * 100)}%`}
-          hint={`${summary.winningSessions}W / ${summary.losingSessions}L`}
-        />
-      </View>
-      <View style={styles.tiles}>
-        <StatTile
-          label="Best session"
-          value={summary.biggestWin === null ? '--' : formatMoney(summary.biggestWin, { signed: true })}
-          valueColor={resultColor(summary.biggestWin)}
-        />
-        <StatTile
-          label="Worst session"
-          value={summary.biggestLoss === null ? '--' : formatMoney(summary.biggestLoss, { signed: true })}
-          valueColor={resultColor(summary.biggestLoss)}
-        />
-      </View>
+      {tileRows.map((row) => (
+        <View key={row.map((tile) => tile.label).join('-')} style={styles.tiles}>
+          {row.map((tile) => (
+            <StatTile key={tile.label} {...tile} />
+          ))}
+        </View>
+      ))}
 
       <SectionHeader
         title="Where the money comes from"

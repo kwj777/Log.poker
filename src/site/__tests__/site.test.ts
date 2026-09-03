@@ -184,21 +184,35 @@ describe('the site is findable', () => {
 
 describe('the app links out to the guides', () => {
   const variance = read('app', '(tabs)', 'variance.tsx');
+  const dashboard = read('app', '(tabs)', 'index.tsx');
   const button = read('src', 'components', 'Button.tsx');
 
-  it('at the address the site actually serves', () => {
-    // A typo here is a 404 for everybody who taps it, and nothing in the app
-    // would notice: the link opens a browser and the app carries on.
-    expect(GUIDES.runningBad).toBe('https://log.poker/running-bad');
-    expect(existsSync(join(ROOT, 'public', 'running-bad.html'))).toBe(true);
-    expect(netlify).toContain('from = "/running-bad"');
-  });
+  it.each(Object.entries(GUIDES))(
+    '%s is at an address the site actually serves',
+    (_name, url) => {
+      // A typo here is a 404 for everybody who taps it, and nothing in the app
+      // would notice: the link opens a browser and the app carries on.
+      const slug = url.replace('https://log.poker/', '');
+      expect(url).toBe(`https://log.poker/${slug}`);
+      expect(existsSync(join(ROOT, 'public', `${slug}.html`))).toBe(true);
+      expect(netlify).toContain(`from = "/${slug}"`);
+    },
+  );
 
-  it('from the variance screen, which is the screen the guide is about', () => {
+  it('running-bad from the variance screen, which is what it is about', () => {
     expect(variance).toContain('GUIDES.runningBad');
     // Both branches: the empty state, where somebody most wants to know what
     // this page will eventually tell them, and the one with a real estimate.
     expect([...variance.matchAll(/\{guide\}/g)]).toHaveLength(2);
+  });
+
+  it('bankroll from the dashboard, under the tiles that show the swings', () => {
+    expect(dashboard).toContain('GUIDES.bankroll');
+    // Below the worst-session tile rather than above it: the question only
+    // lands once the number that raises it is on screen.
+    expect(dashboard.indexOf('label="Worst session"')).toBeLessThan(
+      dashboard.indexOf('GUIDES.bankroll'),
+    );
   });
 
   it('as a real anchor on web rather than a scripted pop-up', () => {

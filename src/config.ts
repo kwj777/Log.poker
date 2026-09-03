@@ -32,9 +32,10 @@ export const FAMILY_HOME = 'https://log.poker';
  * "/running-bad" means nothing. On web the app is under /app on the same
  * origin, so these stay same-site there too.
  *
- * `/bankroll`, `/pot-odds` and `/tilt` exist as well, and go here when a
- * screen has a reason to link one.
+ * `/pot-odds` and `/tilt` exist as well, and belong to TiltProof and Untilt
+ * rather than to any screen here.
  */
 export const GUIDES = {
   runningBad: `${FAMILY_HOME}/running-bad`,
+  bankroll: `${FAMILY_HOME}/bankroll`,
 } as const;

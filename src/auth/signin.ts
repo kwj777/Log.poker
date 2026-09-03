@@ -1,24 +1,27 @@
 /**
  * Asking Untilt's sign-in for a token.
  *
- * ## This talks to an endpoint that does not exist yet
+ * ## Why there is a second shape of the same endpoint
  *
- * Untilt's `/api/signin` is shipped and works, and Log cannot use it as it
- * stands. Both of its flows end in a 303 redirect carrying a `Set-Cookie`, and
- * that cookie is `__Host-`prefixed and `HttpOnly`, so it is unreadable by
- * script by design, unreachable from another registrable domain by definition,
- * and meaningless to a native app that has no browser cookie jar at all.
+ * Untilt's `/api/signin` answers a browser with a 303 carrying a `Set-Cookie`,
+ * and that cookie is `__Host-` prefixed and `HttpOnly`: unreadable by script by
+ * design, unreachable from another registrable domain by definition, and
+ * meaningless to a native app with no browser cookie jar at all. So it answers
+ * a caller that asks for JSON with the token in the body instead. Nothing about
+ * how the token is minted, signed or checked differs between the two.
  *
- * What is missing is small and is named here so it can be built once: **the
- * code redemption needs to answer a JSON request with the token in the body**
- * rather than only setting it as a cookie. The token itself already crosses
- * everything, and nothing about how it is minted, signed or checked changes.
- *
- * The contract this file is written against, which is the spec for that work:
+ * The contract:
  *
  *     POST /api/signin            { email }          -> 202, no body
  *     POST /api/signin/code       { email, code }    -> 200 { token }
- *                                                       401 { error }
+ *                                                       400 { error }
+ *                                                       429 { error }
+ *
+ * Both take `Accept: application/json`, which is what makes the difference:
+ * without it the same request is answered with a page and a cookie, exactly as
+ * it always was. A refusal is 400 rather than 401 because that is the status
+ * the page carries for the same condition, and one status per outcome across
+ * both representations is worth more than matching a convention.
  *
  * The first mails a link and a code, and answers 202 whether or not the
  * address is one it has heard of, because an endpoint that says *no customer*
@@ -32,12 +35,12 @@
  * back to an app as signed out as they left it. Untilt learned that and built
  * the code flow for it. A native app has the same problem with no way around.
  *
- * ## Until then
+ * ## What this is still not
  *
  * Nothing in the app calls this. It is tested against a fake `fetch` rather
  * than a live server, which proves it handles the answers the contract
- * describes and proves nothing about whether the server gives them. That is
- * the honest state of it, and it is why phase 1 is not finished. See SYNC.md.
+ * describes and proves nothing about whether the server gives them. See
+ * SYNC.md.
  */
 
 /** Where the family's sign-in lives. One host mints for all three apps. */
@@ -84,7 +87,10 @@ const post = async (
   try {
     return await fetch(`${origin}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Accept is what the endpoint keys on. Without it the server answers the
+      // way it answers a browser, with a page and a cookie that cannot cross a
+      // registrable domain, and every call here would fail on a 200.
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });

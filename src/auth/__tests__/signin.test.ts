@@ -2,10 +2,9 @@
  * The sign-in client, against a fake `fetch`.
  *
  * These prove the client handles the answers the contract in `signin.ts`
- * describes. They prove nothing about whether the server gives them, because
- * the endpoint they describe is not built: Untilt's sign-in currently ends in
- * a redirect carrying an HttpOnly cookie, which Log cannot read from another
- * registrable domain or on a device with no cookie jar. See SYNC.md.
+ * describes. They prove nothing about whether the server gives them: the
+ * endpoint lives in another repository, and the two are held together by that
+ * written contract rather than by anything either side can check alone.
  */
 
 import { redeemCode, requestCode, SIGNIN_ORIGIN, type Fetch } from '../signin';
@@ -42,6 +41,18 @@ describe('asking for a code', () => {
     expect(JSON.parse(call.init.body as string)).toEqual({ email: 'player@example.com' });
   });
 
+  it('asks for JSON, which is the whole of what makes it a token and not a page', async () => {
+    // The same request without this header is answered the way a browser is
+    // answered, with a page and a cookie that cannot cross a registrable
+    // domain: a 200 that carries nothing this app can use.
+    const { fetch, calls } = answering(202);
+    await requestCode('player@example.com', { fetch });
+    const [call] = calls as unknown as { init: RequestInit }[];
+    const headers = call.init.headers as Record<string, string>;
+    expect(headers.Accept).toBe('application/json');
+    expect(headers['Content-Type']).toBe('application/json');
+  });
+
   it('trims what was typed, because a mail app will have added a space', async () => {
     const { fetch, calls } = answering(202);
     await requestCode('  player@example.com  ', { fetch });
@@ -50,7 +61,7 @@ describe('asking for a code', () => {
   });
 
   it('reads a rate limit as its own answer, since retrying is the wrong move', async () => {
-    const { fetch } = answering(429);
+    const { fetch } = answering(429, { error: 'too-many' });
     expect(await requestCode('player@example.com', { fetch })).toEqual({
       ok: false,
       reason: 'throttled',
@@ -85,8 +96,17 @@ describe('trading a code for a token', () => {
     });
   });
 
+  it('sends the Accept header on the redemption too', async () => {
+    const { fetch, calls } = answering(200, { token: 'x' });
+    await redeemCode('a@b.com', '1', { fetch });
+    const [call] = calls as unknown as { init: RequestInit }[];
+    expect((call.init.headers as Record<string, string>).Accept).toBe('application/json');
+  });
+
   it('reads a wrong code as rejected, so the screen can ask again', async () => {
-    const { fetch } = answering(401, { error: 'no' });
+    // 400 rather than 401: it is the status the page carries for the same
+    // condition, and one status per outcome beats matching a convention.
+    const { fetch } = answering(400, { error: 'refused' });
     expect(await redeemCode('a@b.com', '000000', { fetch })).toEqual({
       ok: false,
       reason: 'rejected',

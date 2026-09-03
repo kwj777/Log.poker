@@ -275,7 +275,7 @@ order is chosen so that the riskiest work is done before anything depends on it.
 | | Phase | Ships | Roughly |
 |---|---|---|---|
 | **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
-| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Log's half built.** Blocked on one endpoint | 3 to 4 days, most of it in Untilt |
+| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Built, both halves** | 3 to 4 days, most of it in Untilt |
 | **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | The feature | 5 to 8 days |
 | **3** | RevenueCat `log_plus`, the offering, the both-singles rule, store review | The purchase | 3 to 5 days |
 
@@ -313,34 +313,51 @@ syncs.
 `src/auth` holds the whole client half: the token grammar, what a claim is
 worth, a `SessionManager` over a three-method `TokenStore`, and the two
 adapters that implement it, the keychain on device and `localStorage` on the
-web. 46 tests, and the token ones mint genuinely HMAC-signed fixtures rather
+web. 48 tests, and the token ones mint genuinely HMAC-signed fixtures rather
 than typing strings out, because the format belongs to another repository and a
 hand-typed fixture only proves the parser agrees with whoever typed it.
 
-**Untilt's sign-in cannot be used as it stands, and this is the whole of what
-has to change.** Both of its flows end in a 303 carrying a `Set-Cookie`, and
-that cookie is `__Host-` prefixed and `HttpOnly`: unreadable by script by
-design, unreachable from another registrable domain by definition, and
-meaningless to a native app with no browser cookie jar. Nothing about how the
-token is minted, signed or checked moves. What is missing is that **the code
-redemption has to be able to answer a JSON request with the token in the body**:
+One bug worth recording, because it is the shape of bug a contract across two
+repositories produces: the client did not send `Accept: application/json`, which
+is the one header the server keys on. Nothing would have errored. Every call
+would have come back 200 carrying a page, and the client would have read it as a
+success with no token in it.
+
+**The server half is built too**, in Untilt rather than here. Its sign-in
+answers a browser with a 303 carrying a `Set-Cookie`, and that cookie is
+`__Host-` prefixed and `HttpOnly`: unreadable by script by design, unreachable
+from another registrable domain by definition, and meaningless to a native app
+with no browser cookie jar. So it now answers a caller that asks for JSON with
+the token in the body instead:
 
 ```
 POST /api/signin        { email }         -> 202, no body
 POST /api/signin/code   { email, code }   -> 200 { token }
-                                             401 { error }
+                                             400 { error }
+                                             429 { error }
 ```
 
-The 202 is deliberate and is already how that endpoint behaves: it answers the
-same whether or not the address is one Stripe has heard of, because an endpoint
-that says *no customer* tells a stranger who bought. The rate limiting, the
-cooldown and the refusal to mail an unknown address all stay exactly as they
-are. `src/auth/signin.ts` is written against that contract and tested against a
-fake `fetch`, which proves it handles those answers and proves nothing about
-whether the server gives them.
+Both take `Accept: application/json`, which is the whole of what separates the
+two shapes; without it the same request is answered exactly as it always was.
+Nothing about how a token is minted, signed, checked or spent moves: the same
+nonce, the same Stripe lookup, the same tier read now rather than trusted from
+the mail, the same limiter, and the same deliberate refusal to say which of
+several things went wrong. The 202 is that refusal in the send path: it answers
+the same whether or not Stripe has heard of the address, because an endpoint
+that says *no customer* tells a stranger who bought.
 
-**No sign-in screen was built**, on purpose. Until the endpoint answers, any UI
-would be a form that cannot succeed, and a dead end is worse than an absence.
+Three things hold the cross-origin side in place, each with a test over there:
+an allowlist of two exact origins rather than a pattern, since a pattern for
+`*.poker` is a pattern for a domain somebody else can register; no
+`Access-Control-Allow-Credentials` and no `Set-Cookie` on the JSON answer, so
+the two ways of taking delivery cannot both be half-live at once; and the
+allowlist scoped to the two endpoints the apps use. Nothing newly reachable
+came with it, because those endpoints already answered a caller with no
+`Origin` at all, which is what has always let a native app in.
+
+**No sign-in screen was built.** That is now the only thing left in phase 1,
+and it is a screen rather than a question: the client and the server both
+answer.
 
 Two things worth carrying forward from building it. The token counts its expiry
 in **seconds** where everything in Log counts milliseconds, which is a factor of

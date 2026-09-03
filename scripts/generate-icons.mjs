@@ -9,8 +9,13 @@
  *
  * The mark is the family's, per BRAND.md: three nested triangles sharing a
  * common baseline, stroked and never filled, smallest to largest reading
- * Learn, Observe, Ground. It replaced three ascending bars that were this
- * app's alone.
+ * Learn, Observe, Ground, standing on a trunk.
+ *
+ * The triangles themselves have never changed. What changed around them is the
+ * colour: they used to run gold, sage, forest outward-in, and they now run one
+ * green ramp with the gold moved down to the trunk. That freed gold to mean
+ * one thing, which is *this app*, so an icon lights exactly one ring and the
+ * family mark lights none.
  *
  * Two things about how it is drawn are decisions rather than transcription.
  *
@@ -39,14 +44,32 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const BACKGROUND = [0x1c, 0x21, 0x1f];
-// Outermost to innermost. The inner stroke is forest lifted to #55665e: plain
-// forest is a border colour, correct at 1.76:1 for a border and absent at that
-// ratio as a stroke, and #55665e is 2.71:1 while staying the dimmest of three.
-const MARK_COLORS = [
-  [0xc9, 0xa8, 0x6a],
-  [0x6b, 0x7a, 0x5e],
+// The canopy, outermost to innermost, and the trunk.
+//
+// The ramp climbs past sage rather than below it, because the palette's own
+// three greens run 1.76:1, 2.68:1 and 3.55:1 on the ground, which is one step
+// and a rumour: the darkest is already invisible. These are 6.79, 4.26 and
+// 2.68, evenly spaced at 1.59x, lightest outermost so the silhouette is the
+// strongest line.
+const CANOPY = [
+  [0x9a, 0xae, 0x80],
+  [0x75, 0x88, 0x6a],
   [0x55, 0x66, 0x5e],
 ];
+
+// Gold, on the trunk rather than in the canopy. It is the family accent, so the
+// mark's one warm element is the part the family is named for: the canopy is
+// what grows and the trunk is what becomes the log. It also carries the
+// contrast, at 7.22:1 against a canopy averaging nearer 4.5, which is why it is
+// drawn heavier than the canopy strokes and why brown was refused at 2.66:1.
+const GOLD = [0xc9, 0xa8, 0x6a];
+
+/**
+ * Which ring an app lights, or `null` for the family mark, which has no gold in
+ * the canopy at all. That is what keeps the family and the apps from ever being
+ * mistaken for each other.
+ */
+export const RINGS = { ground: 0, observe: 1, learn: 2 };
 
 // ------------------------------------------------------------------ PNG
 
@@ -138,15 +161,19 @@ const blend = (rgba, index, color, alpha) => {
  * @param size          output edge length in pixels
  * @param transparent   true for a logo on transparent ground (Android adaptive
  *                      foreground); false for a full-bleed square
- * @param inset         the mark's width as a fraction of the canvas. Its
- *                      bounding circle is 1.2x that, which is what the cropped
- *                      icons below are sized against: a maskable icon is cropped
- *                      to 80% of the canvas, so the mark can be up to 0.66 wide,
- *                      and an Android adaptive foreground to 61%, so up to 0.50
+ * @param inset         the mark's width as a fraction of the canvas. With a
+ *                      trunk under it the mark is now about as tall as it is
+ *                      wide, so its bounding circle is 1.38x the width rather
+ *                      than 1.2x, and the cropped icons had to come in: a
+ *                      maskable icon is cropped to 80% of the canvas, so the
+ *                      mark can be up to 0.58 wide, and an Android adaptive
+ *                      foreground to 61%, so up to 0.44
+ * @param lit           which canopy ring turns gold, or null for the family
+ *                      mark, which has no gold in the canopy at all
  * @param cornerRadius  fraction of the size; 0 for a square (maskable icons are
  *                      cropped by the platform and must fill the canvas)
  */
-const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0 }) => {
+const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, lit = null }) => {
   const rgba = new Uint8Array(size * size * 4);
 
   // Background.
@@ -161,15 +188,19 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0 })
     }
   }
 
-  // The mark. A triangle of half-base h has height 4h/3, so the whole thing is
-  // `markWidth` across and two thirds of that tall, and the widest points are
-  // the two base corners. That makes its bounding circle 1.2x the width, which
-  // is what the insets below are chosen against for the icons a platform crops.
+  // The mark. The triangles are untouched: three nested, one shared baseline,
+  // a half-base of h giving a height of 4h/3. What is new is the trunk under
+  // them, which makes the whole thing taller than the canopy alone, so the
+  // canopy is sized against the height budget rather than against the width.
+  const centreX = size / 2;
+  const trunkLength = (size * inset) / 3.47;
   const markWidth = size * inset;
   const halfBase = markWidth / 2;
-  const centreX = size / 2;
-  const baseY = size / 2 + (halfBase * 4) / 3 / 2;
-  const halfStroke = (markWidth * 0.058) / 2;
+  const canopyHeight = (halfBase * 4) / 3;
+  const baseY = (size - (canopyHeight + trunkLength)) / 2 + canopyHeight;
+  const canopyStroke = markWidth * 0.045;
+  const trunkStroke = markWidth * 0.06;
+  const litStroke = markWidth * 0.056;
 
   /** Distance from a point to a segment, which is all a stroke needs. */
   const distanceToSegment = (px, py, ax, ay, bx, by) => {
@@ -183,10 +214,19 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0 })
     return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
   };
 
-  // Outermost first. Each is [colour, segments], and only the outer one carries
-  // the base, because all three stand on the same line rather than each having
-  // one. Round joins fall out of taking the minimum distance across segments.
-  const strokes = [1, 2 / 3, 1 / 3].map((scale, i) => {
+  // The trunk first, then the canopy outermost to innermost, and a lit ring
+  // last of all so it sits over its neighbours at any size. Only the outer ring
+  // carries the baseline, because all three stand on the same line rather than
+  // each having one, and that line lights with the outer ring since Ground is
+  // what a baseline is.
+  const strokes = [
+    {
+      colour: GOLD,
+      width: trunkStroke,
+      segments: [[centreX, baseY, centreX, baseY + trunkLength]],
+    },
+  ];
+  [1, 2 / 3, 1 / 3].forEach((scale, i) => {
     const h = halfBase * scale;
     const left = [centreX - h, baseY];
     const right = [centreX + h, baseY];
@@ -196,10 +236,18 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0 })
       [...apex, ...right],
     ];
     if (i === 0) segments.push([...left, ...right]);
-    return { colour: MARK_COLORS[i], segments };
+    const isLit = i === lit;
+    strokes.push({
+      colour: isLit ? GOLD : CANOPY[i],
+      width: isLit ? litStroke : canopyStroke,
+      segments,
+      lit: isLit,
+    });
   });
+  strokes.sort((a, b) => (a.lit ? 1 : 0) - (b.lit ? 1 : 0));
 
-  for (const { colour, segments } of strokes) {
+  for (const { colour, segments, width } of strokes) {
+    const halfStroke = width / 2;
     for (let py = 0; py < size; py += 1) {
       for (let px = 0; px < size; px += 1) {
         let nearest = Infinity;
@@ -227,26 +275,31 @@ const write = (relativePath, buffer) => {
 
 const size = (buffer) => `${Math.round(buffer.length / 102.4) / 10}KB`;
 
+// Every icon here is Log's own, so every one lights the middle ring. The family
+// mark, with nothing lit, belongs on the marketing surfaces and is drawn there
+// in SVG rather than rasterised.
+const LOG = RINGS.observe;
+
 const OUTPUTS = [
   // Native app icons.
-  ['assets/icon.png', { size: 1024, inset: 0.7, cornerRadius: 0 }],
-  ['assets/splash-icon.png', { size: 512, transparent: true, inset: 0.58 }],
-  ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.48 }],
-  ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.48 }],
-  ['assets/favicon.png', { size: 64, inset: 0.74, cornerRadius: 0.16 }],
+  ['assets/icon.png', { size: 1024, inset: 0.66, cornerRadius: 0, lit: LOG }],
+  ['assets/splash-icon.png', { size: 512, transparent: true, inset: 0.54, lit: LOG }],
+  ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.43, lit: LOG }],
+  ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.43, lit: LOG }],
+  ['assets/favicon.png', { size: 64, inset: 0.7, cornerRadius: 0.16, lit: LOG }],
 
   // The mark alone, on nothing, for empty states inside the app. A PNG rather
   // than a drawn component on purpose: BRAND.md wants empty states derived from
   // this geometry, and rendering it with <Image> needs no SVG dependency, so
   // the mark on a screen is the same bytes as the mark on the icon rather than
   // a second drawing that can drift from it.
-  ['assets/mark.png', { size: 512, transparent: true, inset: 0.94 }],
+  ['assets/mark.png', { size: 512, transparent: true, inset: 0.9, lit: LOG }],
 
   // PWA icons. `maskable` fills the canvas because the platform crops it.
-  ['public/icons/icon-192.png', { size: 192, inset: 0.72, cornerRadius: 0.22 }],
-  ['public/icons/icon-512.png', { size: 512, inset: 0.72, cornerRadius: 0.22 }],
-  ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.62, cornerRadius: 0 }],
-  ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.72, cornerRadius: 0 }],
+  ['public/icons/icon-192.png', { size: 192, inset: 0.68, cornerRadius: 0.22, lit: LOG }],
+  ['public/icons/icon-512.png', { size: 512, inset: 0.68, cornerRadius: 0.22, lit: LOG }],
+  ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.56, cornerRadius: 0, lit: LOG }],
+  ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.68, cornerRadius: 0, lit: LOG }],
 ];
 
 for (const [path, options] of OUTPUTS) {

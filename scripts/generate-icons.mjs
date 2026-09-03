@@ -235,6 +235,13 @@ const OUTPUTS = [
   ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.48 }],
   ['assets/favicon.png', { size: 64, inset: 0.74, cornerRadius: 0.16 }],
 
+  // The mark alone, on nothing, for empty states inside the app. A PNG rather
+  // than a drawn component on purpose: BRAND.md wants empty states derived from
+  // this geometry, and rendering it with <Image> needs no SVG dependency, so
+  // the mark on a screen is the same bytes as the mark on the icon rather than
+  // a second drawing that can drift from it.
+  ['assets/mark.png', { size: 512, transparent: true, inset: 0.94 }],
+
   // PWA icons. `maskable` fills the canvas because the platform crops it.
   ['public/icons/icon-192.png', { size: 192, inset: 0.72, cornerRadius: 0.22 }],
   ['public/icons/icon-512.png', { size: 512, inset: 0.72, cornerRadius: 0.22 }],

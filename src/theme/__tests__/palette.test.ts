@@ -11,12 +11,14 @@
  * meter mean something rather than brand something, and BRAND.md does not
  * define them.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { colors } from '../index';
 
-const brand = readFileSync(join(__dirname, '..', '..', '..', 'BRAND.md'), 'utf8');
+const ROOT = join(__dirname, '..', '..', '..');
+const brand = readFileSync(join(ROOT, 'BRAND.md'), 'utf8');
+const iconScript = readFileSync(join(ROOT, 'scripts', 'generate-icons.mjs'), 'utf8');
 
 /** Every `| Name | \`#hex\` | ... |` row of the palette table, lowercased. */
 const declared = new Map<string, string[]>(
@@ -63,13 +65,9 @@ describe('the app implements the family palette', () => {
 });
 
 describe('the generated icons draw the family mark', () => {
-  const script = readFileSync(
-    join(__dirname, '..', '..', '..', 'scripts', 'generate-icons.mjs'),
-    'utf8',
-  );
   /** MARK_COLORS, outermost first, as `#rrggbb`. */
   const markColours = [
-    ...script.slice(script.indexOf('const MARK_COLORS')).matchAll(/\[(0x[0-9a-f]{2}(?:, 0x[0-9a-f]{2}){2})\]/g),
+    ...iconScript.slice(iconScript.indexOf('const MARK_COLORS')).matchAll(/\[(0x[0-9a-f]{2}(?:, 0x[0-9a-f]{2}){2})\]/g),
   ]
     .slice(0, 3)
     .map((m) => `#${m[1].split(', ').map((b) => b.slice(2)).join('')}`);
@@ -87,7 +85,23 @@ describe('the generated icons draw the family mark', () => {
   it('draws one baseline rather than three', () => {
     // Three coincident bases stripe the line into three colours. Only the
     // outermost triangle is closed; see BRAND.md.
-    expect(script).toContain('if (i === 0) segments.push([...left, ...right]);');
+    expect(iconScript).toContain('if (i === 0) segments.push([...left, ...right]);');
+  });
+});
+
+describe('the mark reaches the app itself', () => {
+  it('exists as an asset, generated rather than drawn twice', () => {
+    expect(existsSync(join(ROOT, 'assets', 'mark.png'))).toBe(true);
+    expect(iconScript).toContain("['assets/mark.png'");
+    expect(iconScript).toContain('transparent: true');
+  });
+
+  it('and the empty states use those bytes rather than a second drawing', () => {
+    // BRAND.md asks that icons, favicons and empty states all derive from the
+    // same geometry. A component redrawing it is a copy free to drift.
+    const empty = readFileSync(join(ROOT, 'src', 'components', 'EmptyState.tsx'), 'utf8');
+    expect(empty).toContain("require('../../assets/mark.png')");
+    expect(empty).toContain('<Image source={MARK}');
   });
 });
 

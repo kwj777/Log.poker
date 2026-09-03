@@ -1,16 +1,23 @@
 {
-  "name": "Log — poker session tracker",
+  "name": "Log \u2014 poker session tracker",
   "short_name": "Log",
   "description": "The session log that keeps you off tilt. Track live cash game and home game sessions, log hands in seconds, and see whether a rough stretch is really outside normal variance.",
-  "id": "/",
-  "start_url": "/",
-  "scope": "/",
+  "id": "/app",
+  "start_url": "/app",
+  "scope": "/app",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait",
   "theme_color": "#1c211f",
   "background_color": "#1c211f",
-  "categories": ["sports", "utilities", "productivity"],
+  "categories": [
+    "sports",
+    "utilities",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -35,8 +42,13 @@
     {
       "name": "Start a session",
       "short_name": "New session",
-      "url": "/session/new",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "url": "/app/session/new",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

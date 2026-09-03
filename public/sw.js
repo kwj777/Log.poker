@@ -22,20 +22,24 @@
  * Bump CACHE_VERSION to force every client to discard its caches on the next load.
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `log-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `log-assets-${CACHE_VERSION}`;
 const CURRENT_CACHES = [SHELL_CACHE, ASSET_CACHE];
 
-/** The single-page shell every route is served from. */
-const SHELL_URL = '/index.html';
+/**
+ * The app's shell, which is under /app rather than at the root: log.poker is
+ * first of all the marketing site for three apps, and this worker is
+ * registered with a scope of /app/ so it never sees or caches that site.
+ */
+const SHELL_URL = '/app/index.html';
 
-const SHELL_ASSETS = ['/', SHELL_URL, '/manifest.webmanifest'];
+const SHELL_ASSETS = ['/app/', SHELL_URL, '/manifest.webmanifest'];
 
 /** Content-hashed by the bundler, so safe to serve from cache indefinitely. */
 const isImmutableAsset = (pathname) =>
-  pathname.startsWith('/_expo/') ||
-  pathname.startsWith('/assets/') ||
+  pathname.startsWith('/app/_expo/') ||
+  pathname.startsWith('/app/assets/') ||
   pathname.startsWith('/icons/') ||
   /\.(?:js|css|png|jpg|jpeg|svg|webp|woff2?|ttf|otf|ico)$/.test(pathname);
 
@@ -111,7 +115,7 @@ const networkFirstShell = async (request) => {
   } catch {
     // Offline: serve the shell. The app boots from IndexedDB and the player
     // never sees a difference.
-    const cached = (await cache.match(SHELL_URL)) ?? (await cache.match('/'));
+    const cached = (await cache.match(SHELL_URL)) ?? (await cache.match('/app/'));
     if (cached) return cached;
     return new Response(
       '<!doctype html><meta charset="utf-8"><title>Log</title><body style="background:#1c211f;color:#e8e4da;font-family:system-ui;padding:2rem"><h1>Log</h1><p>Open Log once while online and it will work offline from then on.</p></body>',

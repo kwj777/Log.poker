@@ -22,6 +22,8 @@ import type {
 import {
   ConstraintError,
   NotFoundError,
+  type Change,
+  type ChangeSet,
   type HandPatch,
   type Repository,
   type SessionFilter,
@@ -42,6 +44,7 @@ import {
 import {
   createDatabase,
   OPEN_SESSION_ENDED_AT,
+  type DeletedAt,
   type HandRecord,
   type LogDatabase,
   type MoodRecord,
@@ -49,6 +52,15 @@ import {
   type SessionRecord,
   type VenueRecord,
 } from './db';
+
+/**
+ * Tombstones read as absent, null or a stamp, in that order of likelihood: a
+ * record written before this build has no property at all. Everything below
+ * asks this rather than testing the field, so the three shapes are handled in
+ * one place.
+ */
+const deletedAt = (record: { deletedAt?: DeletedAt }): number | null => record.deletedAt ?? null;
+const isLive = (record: { deletedAt?: DeletedAt }): boolean => deletedAt(record) === null;
 
 const toVenue = (record: VenueRecord, sessionCount: number): Venue => ({
   id: record.id,
@@ -100,9 +112,43 @@ const fromSession = (session: Session): SessionRecord => ({
   updatedAt: session.updatedAt,
 });
 
-const toRebuy = (record: RebuyRecord): Rebuy => ({ ...record });
-const toHand = (record: HandRecord): Hand => ({ ...record, tags: [...record.tags] });
-const toMoodEntry = (record: MoodRecord): MoodEntry => ({ ...record });
+/**
+ * Field by field rather than by spread, now that the records carry a storage
+ * concern the domain types do not. A spread would put `deletedAt` on a `Hand`,
+ * where SQLite's mapper does not put one, and the conformance suite compares
+ * the two engines' output directly.
+ */
+const toRebuy = (record: RebuyRecord): Rebuy => ({
+  id: record.id,
+  sessionId: record.sessionId,
+  amount: record.amount,
+  at: record.at,
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+});
+
+const toHand = (record: HandRecord): Hand => ({
+  id: record.id,
+  sessionId: record.sessionId,
+  holeCards: record.holeCards,
+  position: record.position,
+  note: record.note,
+  tags: [...record.tags],
+  amount: record.amount,
+  at: record.at,
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+});
+
+const toMoodEntry = (record: MoodRecord): MoodEntry => ({
+  id: record.id,
+  sessionId: record.sessionId,
+  phase: record.phase,
+  score: record.score,
+  at: record.at,
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+});
 
 export class DexieRepository implements Repository {
   private readonly db: LogDatabase;
@@ -120,15 +166,52 @@ export class DexieRepository implements Repository {
     if (!this.db.isOpen()) await this.db.open();
   }
 
+  // ------------------------------------------------------------------ sync
+
+  async listChangedSince(since: Timestamp): Promise<ChangeSet> {
+    const counts = await this.sessionCounts();
+    const changed = <Record extends { updatedAt: number; deletedAt?: DeletedAt }, T>(
+      records: readonly Record[],
+      map: (record: Record) => T,
+    ): Change<T>[] =>
+      records
+        .filter((record) => record.updatedAt > since)
+        .sort((a, b) => a.updatedAt - b.updatedAt)
+        .map((record) => ({ record: map(record), deletedAt: deletedAt(record) }));
+
+    const [venues, sessions, rebuys, hands, moodEntries] = await Promise.all([
+      this.db.venues.toArray(),
+      this.db.sessions.toArray(),
+      this.db.rebuys.toArray(),
+      this.db.hands.toArray(),
+      this.db.moodEntries.toArray(),
+    ]);
+
+    return {
+      venues: changed(venues, (record) => toVenue(record, counts.get(record.id) ?? 0)),
+      sessions: changed(sessions, toSession),
+      rebuys: changed(rebuys, toRebuy),
+      hands: changed(hands, toHand),
+      moodEntries: changed(moodEntries, toMoodEntry),
+    };
+  }
+
   // ---------------------------------------------------------------- venues
 
   /** Session counts come from one grouped pass rather than a query per venue. */
   private async sessionCounts(): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
     await this.db.sessions.each((session) => {
+      if (!isLive(session)) return;
       counts.set(session.venueId, (counts.get(session.venueId) ?? 0) + 1);
     });
     return counts;
+  }
+
+  /** Live sessions at a venue. What decides whether the venue can be deleted. */
+  private async liveSessionsAt(venueId: string): Promise<number> {
+    const records = await this.db.sessions.where('venueId').equals(venueId).toArray();
+    return records.filter(isLive).length;
   }
 
   async listVenues(): Promise<Venue[]> {
@@ -137,6 +220,7 @@ export class DexieRepository implements Repository {
       this.sessionCounts(),
     ]);
     return records
+      .filter(isLive)
       .map((record) => toVenue(record, counts.get(record.id) ?? 0))
       .sort(
         (a, b) =>
@@ -147,9 +231,8 @@ export class DexieRepository implements Repository {
 
   async getVenue(id: string): Promise<Venue | null> {
     const record = await this.db.venues.get(id);
-    if (!record) return null;
-    const count = await this.db.sessions.where('venueId').equals(id).count();
-    return toVenue(record, count);
+    if (!record || !isLive(record)) return null;
+    return toVenue(record, await this.liveSessionsAt(id));
   }
 
   async createVenue(input: NewVenue): Promise<Venue> {
@@ -173,15 +256,27 @@ export class DexieRepository implements Repository {
   }
 
   async deleteVenue(id: string): Promise<void> {
-    const count = await this.db.sessions.where('venueId').equals(id).count();
-    if (count > 0) throw new ConstraintError('Cannot delete a venue that still has sessions');
-    await this.db.venues.delete(id);
+    // Live sessions only: a tombstoned session no longer holds its venue back,
+    // but its `venueId` still points at the row, which is why the venue is
+    // tombstoned rather than removed.
+    if ((await this.liveSessionsAt(id)) > 0) {
+      throw new ConstraintError('Cannot delete a venue that still has sessions');
+    }
+    const now = this.ctx.clock.now();
+    await this.db.venues
+      .where('id')
+      .equals(id)
+      .modify((record) => {
+        if (!isLive(record)) return;
+        record.deletedAt = now;
+        record.updatedAt = now;
+      });
   }
 
   // -------------------------------------------------------------- sessions
 
   async listSessions(filter: SessionFilter = {}): Promise<SessionWithChildren[]> {
-    let records = await this.db.sessions.orderBy('startedAt').reverse().toArray();
+    let records = (await this.db.sessions.orderBy('startedAt').reverse().toArray()).filter(isLive);
 
     if (filter.venueId !== undefined) {
       records = records.filter((record) => record.venueId === filter.venueId);
@@ -210,16 +305,15 @@ export class DexieRepository implements Repository {
 
   async getSession(id: string): Promise<SessionWithChildren | null> {
     const record = await this.db.sessions.get(id);
-    if (!record) return null;
+    if (!record || !isLive(record)) return null;
     const [session] = await this.attachChildren([toSession(record)]);
     return session;
   }
 
   async getActiveSession(): Promise<SessionWithChildren | null> {
-    const records = await this.db.sessions
-      .where('endedAt')
-      .equals(OPEN_SESSION_ENDED_AT)
-      .toArray();
+    const records = (
+      await this.db.sessions.where('endedAt').equals(OPEN_SESSION_ENDED_AT).toArray()
+    ).filter(isLive);
     if (records.length === 0) return null;
     const newest = records.reduce((latest, record) =>
       record.startedAt > latest.startedAt ? record : latest,
@@ -241,7 +335,7 @@ export class DexieRepository implements Repository {
     ]);
 
     const rebuysBySession = new Map<string, Rebuy[]>();
-    for (const record of rebuyRecords) {
+    for (const record of rebuyRecords.filter(isLive)) {
       const list = rebuysBySession.get(record.sessionId);
       if (list) list.push(toRebuy(record));
       else rebuysBySession.set(record.sessionId, [toRebuy(record)]);
@@ -249,7 +343,9 @@ export class DexieRepository implements Repository {
     for (const list of rebuysBySession.values()) list.sort((a, b) => a.at - b.at);
 
     const venuesById = new Map(
-      venueRecords.map((record) => [record.id, toVenue(record, counts.get(record.id) ?? 0)]),
+      venueRecords
+        .filter(isLive)
+        .map((record) => [record.id, toVenue(record, counts.get(record.id) ?? 0)]),
     );
 
     return sessions.map((session) => ({
@@ -261,7 +357,7 @@ export class DexieRepository implements Repository {
 
   async createSession(input: NewSession): Promise<Session> {
     const venue = await this.db.venues.get(input.venueId);
-    if (!venue) throw new NotFoundError('Venue', input.venueId);
+    if (!venue || !isLive(venue)) throw new NotFoundError('Venue', input.venueId);
     if (input.importKey != null) {
       assertImportKeysAvailable([input], new Set(await this.listImportKeys()));
     }
@@ -274,7 +370,9 @@ export class DexieRepository implements Repository {
     if (inputs.length === 0) return [];
 
     const venueIds = Array.from(new Set(inputs.map((input) => input.venueId)));
-    const known = new Set((await this.db.venues.where('id').anyOf(venueIds).toArray()).map((v) => v.id));
+    const known = new Set(
+      (await this.db.venues.where('id').anyOf(venueIds).toArray()).filter(isLive).map((v) => v.id),
+    );
     for (const venueId of venueIds) {
       if (!known.has(venueId)) throw new NotFoundError('Venue', venueId);
     }
@@ -294,7 +392,7 @@ export class DexieRepository implements Repository {
 
   async updateSession(id: string, patch: SessionPatch): Promise<Session> {
     const existing = await this.db.sessions.get(id);
-    if (!existing) throw new NotFoundError('Session', id);
+    if (!existing || !isLive(existing)) throw new NotFoundError('Session', id);
     const next = applyPatch<Session>(toSession(existing), patch);
     next.updatedAt = this.ctx.clock.now();
     await this.db.sessions.put(fromSession(next));
@@ -303,7 +401,7 @@ export class DexieRepository implements Repository {
 
   async endSession(id: string, cashOut: number, endedAt: Timestamp): Promise<Session> {
     const existing = await this.db.sessions.get(id);
-    if (!existing) throw new NotFoundError('Session', id);
+    if (!existing || !isLive(existing)) throw new NotFoundError('Session', id);
     if (endedAt < existing.startedAt) {
       throw new ConstraintError('A session cannot end before it started');
     }
@@ -311,14 +409,33 @@ export class DexieRepository implements Repository {
   }
 
   async deleteSession(id: string): Promise<void> {
+    const now = this.ctx.clock.now();
+    const tombstone = (record: { deletedAt?: DeletedAt; updatedAt: number }): void => {
+      if (!isLive(record)) return;
+      record.deletedAt = now;
+      record.updatedAt = now;
+    };
+
     await this.db.transaction(
       'rw',
       [this.db.sessions, this.db.rebuys, this.db.hands, this.db.moodEntries],
       async () => {
-        await this.db.rebuys.where('sessionId').equals(id).delete();
-        await this.db.hands.where('sessionId').equals(id).delete();
-        await this.db.moodEntries.where('sessionId').equals(id).delete();
-        await this.db.sessions.delete(id);
+        // Children take the parent's stamp, so a merge cannot revive a hand
+        // whose session is gone by finding it a millisecond fresher.
+        await this.db.rebuys.where('sessionId').equals(id).modify(tombstone);
+        await this.db.hands.where('sessionId').equals(id).modify(tombstone);
+        await this.db.moodEntries.where('sessionId').equals(id).modify(tombstone);
+        await this.db.sessions
+          .where('id')
+          .equals(id)
+          .modify((record) => {
+            if (!isLive(record)) return;
+            tombstone(record);
+            // Deleted and then re-imported has always worked. The property is
+            // removed rather than nulled because the index it sits in is
+            // unique: see `SessionRecord.importKey`.
+            delete record.importKey;
+          });
       },
     );
   }
@@ -327,19 +444,27 @@ export class DexieRepository implements Repository {
 
   async listRebuys(sessionId: string): Promise<Rebuy[]> {
     const records = await this.db.rebuys.where('sessionId').equals(sessionId).toArray();
-    return records.map(toRebuy).sort((a, b) => a.at - b.at);
+    return records.filter(isLive).map(toRebuy).sort((a, b) => a.at - b.at);
   }
 
   async addRebuy(input: NewRebuy): Promise<Rebuy> {
     const session = await this.db.sessions.get(input.sessionId);
-    if (!session) throw new NotFoundError('Session', input.sessionId);
+    if (!session || !isLive(session)) throw new NotFoundError('Session', input.sessionId);
     const rebuy = buildRebuy(input, this.ctx);
     await this.db.rebuys.add({ ...rebuy });
     return rebuy;
   }
 
   async deleteRebuy(id: string): Promise<void> {
-    await this.db.rebuys.delete(id);
+    const now = this.ctx.clock.now();
+    await this.db.rebuys
+      .where('id')
+      .equals(id)
+      .modify((record) => {
+        if (!isLive(record)) return;
+        record.deletedAt = now;
+        record.updatedAt = now;
+      });
   }
 
   // ----------------------------------------------------------------- hands
@@ -349,17 +474,17 @@ export class DexieRepository implements Repository {
       sessionId === undefined
         ? await this.db.hands.toArray()
         : await this.db.hands.where('sessionId').equals(sessionId).toArray();
-    return records.map(toHand).sort((a, b) => b.at - a.at);
+    return records.filter(isLive).map(toHand).sort((a, b) => b.at - a.at);
   }
 
   async getHand(id: string): Promise<Hand | null> {
     const record = await this.db.hands.get(id);
-    return record ? toHand(record) : null;
+    return record && isLive(record) ? toHand(record) : null;
   }
 
   async createHand(input: NewHand): Promise<Hand> {
     const session = await this.db.sessions.get(input.sessionId);
-    if (!session) throw new NotFoundError('Session', input.sessionId);
+    if (!session || !isLive(session)) throw new NotFoundError('Session', input.sessionId);
     const hand = buildHand(input, this.ctx);
     await this.db.hands.add({ ...hand, tags: [...hand.tags] });
     return hand;
@@ -367,7 +492,7 @@ export class DexieRepository implements Repository {
 
   async updateHand(id: string, patch: HandPatch): Promise<Hand> {
     const existing = await this.db.hands.get(id);
-    if (!existing) throw new NotFoundError('Hand', id);
+    if (!existing || !isLive(existing)) throw new NotFoundError('Hand', id);
     const next = applyPatch<Hand>(toHand(existing), patch);
     next.updatedAt = this.ctx.clock.now();
     await this.db.hands.put({ ...next, tags: [...next.tags] });
@@ -375,7 +500,15 @@ export class DexieRepository implements Repository {
   }
 
   async deleteHand(id: string): Promise<void> {
-    await this.db.hands.delete(id);
+    const now = this.ctx.clock.now();
+    await this.db.hands
+      .where('id')
+      .equals(id)
+      .modify((record) => {
+        if (!isLive(record)) return;
+        record.deletedAt = now;
+        record.updatedAt = now;
+      });
   }
 
   // ------------------------------------------------------------------ mood
@@ -385,19 +518,27 @@ export class DexieRepository implements Repository {
       sessionId === undefined
         ? await this.db.moodEntries.toArray()
         : await this.db.moodEntries.where('sessionId').equals(sessionId).toArray();
-    return records.map(toMoodEntry).sort((a, b) => b.at - a.at);
+    return records.filter(isLive).map(toMoodEntry).sort((a, b) => b.at - a.at);
   }
 
   async createMoodEntry(input: NewMoodEntry): Promise<MoodEntry> {
     const session = await this.db.sessions.get(input.sessionId);
-    if (!session) throw new NotFoundError('Session', input.sessionId);
+    if (!session || !isLive(session)) throw new NotFoundError('Session', input.sessionId);
     const entry = buildMoodEntry(input, this.ctx);
     await this.db.moodEntries.add({ ...entry });
     return entry;
   }
 
   async deleteMoodEntry(id: string): Promise<void> {
-    await this.db.moodEntries.delete(id);
+    const now = this.ctx.clock.now();
+    await this.db.moodEntries
+      .where('id')
+      .equals(id)
+      .modify((record) => {
+        if (!isLive(record)) return;
+        record.deletedAt = now;
+        record.updatedAt = now;
+      });
   }
 
   // ----------------------------------------------------------- maintenance

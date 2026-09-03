@@ -47,15 +47,56 @@ export type HandPatch = Partial<
   Pick<Hand, 'holeCards' | 'position' | 'note' | 'tags' | 'amount' | 'at'>
 >;
 
+/**
+ * A record as the sync layer sees it: the row, and whether it is a tombstone.
+ *
+ * `deletedAt` is deliberately not a field on `Session`, `Hand` and the rest.
+ * A tombstone is a storage fact rather than a domain one, every read below
+ * filters them out, and keeping the flag off the domain types is what makes it
+ * impossible for a screen to render one by forgetting to check.
+ */
+export interface Change<T> {
+  record: T;
+  /** When the row was tombstoned, or null while it is live. */
+  deletedAt: Timestamp | null;
+}
+
+/** Everything that changed after a cursor, tombstones included. */
+export interface ChangeSet {
+  venues: Change<Venue>[];
+  sessions: Change<Session>[];
+  rebuys: Change<Rebuy>[];
+  hands: Change<Hand>[];
+  moodEntries: Change<MoodEntry>[];
+}
+
 export interface Repository {
   /** Create tables / open the database. Safe to call repeatedly. */
   init(): Promise<void>;
+
+  /**
+   * Every record with `updatedAt` strictly after `since`, tombstones included.
+   *
+   * The only read that can see a deleted row, and the seam the sync engine
+   * plugs into: `updatedAt` is the cursor, so there is no sequence number for
+   * two devices to keep in step. Nothing in the app calls this yet. It exists
+   * now because tombstones are otherwise unobservable through this interface,
+   * and an invariant nothing can read is an invariant nothing can test.
+   */
+  listChangedSince(since: Timestamp): Promise<ChangeSet>;
 
   listVenues(): Promise<Venue[]>;
   getVenue(id: string): Promise<Venue | null>;
   createVenue(input: NewVenue): Promise<Venue>;
   updateVenue(id: string, patch: VenuePatch): Promise<Venue>;
-  /** Rejects if any session still references the venue. */
+  /**
+   * Tombstones the venue. Rejects if any live session still references it.
+   *
+   * A tombstoned session does not hold a venue back, but its `venueId` still
+   * points at the row, which is why the venue is tombstoned rather than
+   * removed: the foreign key has to keep resolving for history that is only
+   * waiting to be collected.
+   */
   deleteVenue(id: string): Promise<void>;
 
   listSessions(filter?: SessionFilter): Promise<SessionWithChildren[]>;
@@ -80,7 +121,16 @@ export interface Repository {
   updateSession(id: string, patch: SessionPatch): Promise<Session>;
   /** Cash out and stamp the end time in one write. */
   endSession(id: string, cashOut: number, endedAt: Timestamp): Promise<Session>;
-  /** Cascades to the session's rebuys, hands and mood entries. */
+  /**
+   * Tombstones the session, and cascades tombstones to its rebuys, hands and
+   * mood entries under the same stamp, so no merge can revive a hand whose
+   * session is gone.
+   *
+   * Also clears `importKey`. Deleting an imported session has always made it
+   * importable again, and a tombstone that kept the key would hold it in the
+   * unique index forever and silently break re-import. The key is derived from
+   * the source row, so a re-import simply mints it again.
+   */
   deleteSession(id: string): Promise<void>;
 
   listRebuys(sessionId: string): Promise<Rebuy[]>;
@@ -98,7 +148,16 @@ export interface Repository {
   createMoodEntry(input: NewMoodEntry): Promise<MoodEntry>;
   deleteMoodEntry(id: string): Promise<void>;
 
-  /** Wipes user data. Used by the dev seeder and the settings reset. */
+  /**
+   * Wipes user data. Used by the dev seeder and the settings reset.
+   *
+   * A truncate rather than a tombstone sweep, deliberately, and it is the one
+   * delete in here that is not a tombstone. Reset means "this device", not
+   * "every device": writing tombstones here would push a wipe to every other
+   * one, so a player clearing a phone they are about to sell would take five
+   * years of history off the laptop with it. Erasing everywhere is a different
+   * action and needs its own control. See SYNC.md.
+   */
   clearAll(): Promise<void>;
 }
 

@@ -115,7 +115,7 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test            # 525 unit tests
+npm test            # 582 unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
 npm run check:prose # house style: no en or em dashes, American spellings
@@ -506,6 +506,47 @@ in the test suite -- so the class that ships to iOS and Android is the class the
 tests exercise, against a real SQLite engine, rather than a fake that would
 agree with whatever the repository happens to do.
 
+### Deletes are tombstones
+
+Nothing in the data layer removes a row any more. `deleteSession` and its four
+siblings set `deleted_at` and leave the record where it is; every read filters
+on it, so from a screen's point of view nothing changed at all.
+
+The reason is not local. Across two devices, a row that is absent because
+somebody deleted it and a row that is absent because this device has not been
+told about it yet are **the same absence**, so a merge that unions rows brings
+back every session anybody ever removed. Delete a mis-entered session on the
+phone, watch it come back from the laptop, watch the bankroll curve disagree
+with itself.
+
+Four things fall out of that and are asserted in the conformance suite:
+
+- **Children take the parent's stamp.** A hand tombstoned a millisecond after
+  its session is a hand a later merge can revive on its own.
+- **Tombstoning a session clears its `importKey`.** Deleting an imported session
+  has always made it importable again, and a tombstone holding the key in a
+  unique index would end that quietly. The key is derived from the source row,
+  so a re-import mints it again.
+- **A tombstoned session stops holding its venue back**, but the venue is
+  tombstoned rather than removed, because the deleted session's `venueId` still
+  points at it and a foreign key that stops resolving is a broken read.
+- **`clearAll` is still a truncate.** It is the one delete that is not a
+  tombstone, and the distinction is the whole reason to be careful here: reset
+  means *this device*, not *every device*. Writing tombstones would let somebody
+  clearing a phone they are about to sell take five years of history off the
+  laptop with it.
+
+`listChangedSince(cursor)` is the only read that can see a tombstone, and the
+seam the sync engine plugs into. Nothing calls it yet. It exists because an
+invariant nothing can read is an invariant nothing can test.
+
+The merge rules themselves are pure functions in `src/domain/merge.ts`: per
+record last-write-wins, a clock clamp, and the three cases where the thing in
+conflict is a constraint rather than a field, so both devices are right and the
+pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
+something sweeps them, which is phase 2 work, and until then a heavy deleter's
+database grows where it used to shrink.
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -514,17 +555,18 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 19 passed
-Tests:       525 passed
+Test Suites: 21 passed
+Tests:       582 passed
 
-  sqlRepository      66   the SQLite path, against real SQLite
-  dexieRepository    66   the IndexedDB path, against real IndexedDB
+  sqlRepository      77   the SQLite path, against real SQLite
+  dexieRepository    77   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      40   reading a session-summary export
   values             36   money, dates, durations, stakes, game types
   site               35   the marketing/app split, the PWA, the sitemap
   variance           31   win rate, σ, confidence bands, verdicts
   stats              29   P/L, rebuys, duration, hourly rate, groupings
+  merge              28   the rules for when two devices both have a say
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   csv                19   quoting, delimiters, line endings
@@ -532,6 +574,7 @@ Tests:       525 passed
   chip               18   /chip resolves, offline, and never quotes a price
   handNotation       16   parse, round-trip, hand classes
   seed               10   the demo dataset stays coherent
+  migration           7   an existing database walking forward, with rows in it
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
@@ -638,9 +681,11 @@ Ordered roughly by how much each is worth against how much it costs.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
    id and an `updatedAt`, and the one feature the family pass adds to this app.
    **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
-   starting: three quarters of the server already exists in Untilt, and the work
-   that does not is mostly that nothing here records a delete, so a merge
-   resurrects every session anybody removed.
+   starting: three quarters of the server already exists in Untilt.
+   **Phase 0 of that plan has landed** -- deletes are tombstones, the merge
+   rules are written and tested, and `listChangedSince` is the seam the engine
+   plugs into. See [Deletes are tombstones](#deletes-are-tombstones). What is
+   left is the sign-in, the endpoint and the engine itself.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

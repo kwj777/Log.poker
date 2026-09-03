@@ -67,6 +67,7 @@ export default function RootLayout() {
               title: 'Log a hand · Log',
             }}
           />
+          <Stack.Screen name="import" options={{ title: 'Import sessions · Log' }} />
           <Stack.Screen name="session/active" options={{ title: 'Live session · Log' }} />
           <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
         </Stack>

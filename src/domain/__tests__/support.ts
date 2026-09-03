@@ -65,6 +65,7 @@ export const session = (spec: SessionSpec = {}): SessionWithChildren => {
     startedAt,
     endedAt,
     notes: null,
+    importKey: null,
     createdAt: startedAt,
     updatedAt: startedAt,
     rebuys,

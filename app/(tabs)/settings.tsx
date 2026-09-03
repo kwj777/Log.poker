@@ -1,13 +1,15 @@
 /**
  * Settings and about.
  *
- * Short by design. The only real controls are venue management and the dev-only
- * demo seeder; everything else is information about where your data lives —
- * which, with no account and no server, is a question worth answering plainly.
+ * Short by design. The real controls are venue management, the session-summary
+ * import and the dev-only demo seeder; everything else is information about
+ * where your data lives — which, with no account and no server, is a question
+ * worth answering plainly.
  */
 
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -97,6 +99,20 @@ export default function SettingsScreen() {
             </View>
           ))
         )}
+      </Card>
+
+      <SectionHeader title="Import" />
+      <Card>
+        <Text color={colors.textSecondary} style={styles.body}>
+          Play online? Export a session summary from your site or your tracker and bring the
+          whole history in at once, rather than typing it out.
+        </Text>
+        <Button
+          label="Import sessions"
+          variant="secondary"
+          size="medium"
+          onPress={() => router.push('/import')}
+        />
       </Card>
 
       <SectionHeader title="Your data" />

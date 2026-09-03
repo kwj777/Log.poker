@@ -79,6 +79,16 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_mood_session ON mood_entries(session_id)`,
     ],
   },
+  {
+    // Session-summary import. The index is UNIQUE so a re-import cannot double a
+    // bankroll even if the check above it is ever bypassed; SQLite treats NULLs
+    // as distinct, so the column stays free for every hand-logged session.
+    version: 2,
+    statements: [
+      `ALTER TABLE sessions ADD COLUMN import_key TEXT`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

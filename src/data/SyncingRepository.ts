@@ -56,6 +56,15 @@ import type {
 export interface Cursors {
   pulled: Timestamp;
   pushed: Timestamp;
+  /**
+   * This install's own id, invented once and kept.
+   *
+   * The server needs to know whether anybody is still waiting to see a
+   * tombstone before it collects it, and "anybody" has to be countable. It is
+   * worth no more than knowing two requests came from one place, which is
+   * already obvious from them carrying the same token.
+   */
+  device: string;
 }
 
 /** Where the cursors live. Small enough that anything durable will do. */
@@ -64,7 +73,9 @@ export interface CursorStore {
   write(cursors: Cursors): Promise<void>;
 }
 
-export const memoryCursorStore = (start: Cursors = { pulled: 0, pushed: 0 }): CursorStore => {
+export const memoryCursorStore = (
+  start: Cursors = { pulled: 0, pushed: 0, device: 'test-device-0001' },
+): CursorStore => {
   let held = start;
   return {
     read: async () => held,
@@ -199,7 +210,11 @@ export class SyncingRepository implements Repository {
       }
     }
 
-    const outcome = await sync({ since: cursors.pulled, changes }, this.token, this.options);
+    const outcome = await sync(
+      { since: cursors.pulled, changes, device: cursors.device },
+      this.token,
+      this.options,
+    );
 
     if (!outcome.ok) {
       this.dirty = true;
@@ -217,7 +232,14 @@ export class SyncingRepository implements Repository {
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
     }
-    await this.cursors.write({ pulled: outcome.response.cursor, pushed: sent });
+    await this.cursors.write({ ...cursors, pulled: outcome.response.cursor, pushed: sent });
+
+    // Collect what the server has, and never more. Its line is drawn from every
+    // device it has heard from; this one only knows about itself, and guessing
+    // wider would drop a tombstone that had not reached the others yet.
+    if (outcome.response.collectedThrough > 0) {
+      await this.local.collectTombstones(outcome.response.collectedThrough);
+    }
 
     this.failures = 0;
     this.nextAttemptAt = 0;
@@ -251,6 +273,10 @@ export class SyncingRepository implements Repository {
 
   applyChanges(changes: ChangeSet): Promise<void> {
     return this.local.applyChanges(changes);
+  }
+
+  collectTombstones(before: Timestamp): Promise<number> {
+    return this.local.collectTombstones(before);
   }
 
   listVenues() {
@@ -342,7 +368,11 @@ export class SyncingRepository implements Repository {
    */
   async clearAll(): Promise<void> {
     await this.local.clearAll();
-    await this.cursors.write({ pulled: 0, pushed: 0 });
+    const { device } = await this.cursors.read();
+    // The device id survives a reset, because forgetting it would make this
+    // device look like a new one to the server and hold up collection for a
+    // whole retention window under a name nobody will ever use again.
+    await this.cursors.write({ pulled: 0, pushed: 0, device });
     this.dirty = true;
     this.announce({ lastSyncedAt: null, pending: 0 });
   }

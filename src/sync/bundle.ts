@@ -46,7 +46,12 @@ import {
   type Versioned,
 } from '../domain/merge';
 import type { Session, Timestamp } from '../domain/types';
-import type { Change, ChangeSet } from '../data/repository';
+import {
+  DEVICE_FORGET_MS,
+  TOMBSTONE_RETENTION_MS,
+  type Change,
+  type ChangeSet,
+} from '../data/repository';
 import {
   BUNDLE_VERSION,
   SYNC_TABLES,
@@ -90,12 +95,29 @@ const sanitize = (change: unknown, now: Timestamp): Change<Row> | null => {
   return { record: stamped, deletedAt: clampStamp(deletedAt, now) };
 };
 
+const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+
 /** A stored bundle, or a fresh one, without trusting what came out of the store. */
 export const readBundle = (stored: unknown): Bundle => {
   const bundle = emptyBundle();
   if (typeof stored !== 'object' || stored === null) return bundle;
 
-  const { records } = stored as { records?: unknown };
+  const { records, devices, collectedThrough } = stored as {
+    records?: unknown;
+    devices?: unknown;
+    collectedThrough?: unknown;
+  };
+
+  if (typeof collectedThrough === 'number' && Number.isFinite(collectedThrough)) {
+    bundle.collectedThrough = Math.max(0, collectedThrough);
+  }
+  if (typeof devices === 'object' && devices !== null) {
+    for (const [id, seen] of Object.entries(devices as Record<string, unknown>)) {
+      if (!DEVICE_ID.test(id)) continue;
+      if (typeof seen === 'number' && Number.isFinite(seen)) bundle.devices[id] = seen;
+    }
+  }
+
   if (typeof records !== 'object' || records === null) return bundle;
 
   for (const table of SYNC_TABLES) {
@@ -218,12 +240,71 @@ const settleVenueTombstones = (bundle: Bundle, now: Timestamp): void => {
   }
 };
 
+/**
+ * Collect tombstones nobody is still waiting to hear about.
+ *
+ * Two conditions, and the second is the one that makes this a rule rather than
+ * a guess.
+ *
+ * **Old enough.** Older than the retention window, which answers "how long can
+ * a device be switched off and still come back coherent".
+ *
+ * **And seen by everybody.** A tombstone newer than the least recently seen
+ * device has not reached that device, and collecting it would let that device
+ * push the live row back into a server with nothing left to refuse it. A
+ * session somebody deleted in March would be back on every device in June.
+ *
+ * A device not seen for twice the window is forgotten first, so a phone that
+ * was lost or replaced cannot hold collection up for the rest of somebody's
+ * life. Twice rather than once because the two thresholds being equal would
+ * make this whole rule decorative: every remembered device would be newer than
+ * the window and the minimum would never be the binding one. That is the case
+ * `collectedThrough` then covers, below.
+ */
+const collect = (bundle: Bundle, now: Timestamp): void => {
+  for (const [id, seen] of Object.entries(bundle.devices)) {
+    if (now - seen > DEVICE_FORGET_MS) delete bundle.devices[id];
+  }
+
+  const seen = Object.values(bundle.devices);
+  const horizon = Math.min(
+    now - TOMBSTONE_RETENTION_MS,
+    seen.length === 0 ? Number.MAX_SAFE_INTEGER : Math.min(...seen),
+  );
+  if (horizon <= bundle.collectedThrough) return;
+
+  const referenced = new Set(
+    Object.values(bundle.records.sessions).map((change) => String(change.record.venueId ?? '')),
+  );
+
+  let collected = 0;
+  for (const table of SYNC_TABLES) {
+    for (const [id, change] of Object.entries(bundle.records[table])) {
+      if (change.deletedAt === null || change.deletedAt >= horizon) continue;
+      // A venue stays while anything still points at it, tombstoned or not, for
+      // the same reason the local sweep keeps it: a session whose venue is gone
+      // renders with no venue at all.
+      if (table === 'venues' && referenced.has(id)) continue;
+      delete bundle.records[table][id];
+      collected += 1;
+    }
+  }
+
+  // Only when something actually went. The line is "below here a tombstone may
+  // have been removed", and it arms the refusal below; advancing it on a sweep
+  // that removed nothing would refuse records from any device that had simply
+  // been away a while, with no deleted row anywhere near them.
+  if (collected > 0) bundle.collectedThrough = horizon;
+};
+
 export interface MergeResult {
   bundle: Bundle;
   /** Everything at or after `since` once the merge has run. */
   changes: ChangeSet;
   /** What the device should send as `since` next time. */
   cursor: Timestamp;
+  /** How far back this bundle has been collected, for the device to match. */
+  collectedThrough: Timestamp;
 }
 
 /**
@@ -239,9 +320,11 @@ export const mergeIntoBundle = (
   incoming: unknown,
   since: Timestamp,
   now: Timestamp,
+  device: string | null = null,
 ): MergeResult => {
   const bundle = readBundle(stored);
   bundle.version = BUNDLE_VERSION;
+  if (device !== null && DEVICE_ID.test(device)) bundle.devices[device] = now;
 
   const sent = (incoming ?? {}) as Record<string, unknown>;
   for (const table of SYNC_TABLES) {
@@ -251,6 +334,17 @@ export const mergeIntoBundle = (
       const change = sanitize(raw, now);
       if (change === null) continue;
       const held = bundle.records[table][change.record.id];
+
+      // The backstop for a device that was away longer than the whole retention
+      // window and has already been forgotten. A record the server has never
+      // seen, older than everything it has collected, is exactly the shape of a
+      // row whose tombstone it threw away, and taking it would put a session
+      // somebody deleted back on every device. Refusing it can lose a record
+      // that device really did create and never sent, which is the worse thing
+      // to lose but the rarer one: it needs three months offline and a write
+      // that never left. See SYNC.md.
+      if (!held && change.record.updatedAt < bundle.collectedThrough) continue;
+
       bundle.records[table][change.record.id] = held
         ? (resolve(versioned(held), versioned(change)) as Change<Row>)
         : change;
@@ -262,6 +356,10 @@ export const mergeIntoBundle = (
   settleActiveSessions(bundle, now);
   settleImportCollisions(bundle, now);
   settleVenueTombstones(bundle, now);
+
+  // Last, so it never collects a tombstone one of the rules above just wrote,
+  // and so an un-tombstoned venue is live again before anything looks at it.
+  collect(bundle, now);
 
   // Built loose and named once, because a `ChangeSet` is five differently
   // typed arrays and the server is deliberately indifferent to which is which.
@@ -277,7 +375,7 @@ export const mergeIntoBundle = (
   }
   const changes = collected as unknown as ChangeSet;
 
-  return { bundle, changes, cursor };
+  return { bundle, changes, cursor, collectedThrough: bundle.collectedThrough };
 };
 
 /** Every table, for a caller that wants to walk one at a time. */

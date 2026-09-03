@@ -116,6 +116,23 @@ export interface Repository {
    */
   applyChanges(changes: ChangeSet): Promise<void>;
 
+  /**
+   * Remove tombstones deleted before `before`, for real this time. Answers how
+   * many rows went.
+   *
+   * **Collecting one too early resurrects the record.** A device still holding
+   * the live row meets a server with nothing to refuse it, pushes, and a
+   * session somebody deleted months ago is back on every device. So `before` is
+   * never chosen here: the caller works out how far back is safe, and this only
+   * does as it is told. See `TOMBSTONE_RETENTION_MS` and, on the server side,
+   * the device map in `src/sync/bundle.ts`.
+   *
+   * Children first, then sessions, then venues, and a venue only when nothing
+   * references it at all: foreign keys are on, and a half-collected sweep is
+   * worse than an uncollected one.
+   */
+  collectTombstones(before: Timestamp): Promise<number>;
+
   listVenues(): Promise<Venue[]>;
   getVenue(id: string): Promise<Venue | null>;
   createVenue(input: NewVenue): Promise<Venue>;
@@ -191,6 +208,37 @@ export interface Repository {
    */
   clearAll(): Promise<void>;
 }
+
+/**
+ * How long a tombstone is kept before it can be collected.
+ *
+ * The number answers one question: how long can a device be switched off and
+ * still come back with a coherent view? Ninety days covers a phone in a drawer
+ * for a season, which is the realistic worst case for an app somebody opens at
+ * a poker table. A tombstone is a few hundred bytes, so being generous costs
+ * almost nothing and being wrong costs a resurrected session on every device.
+ *
+ * It is a floor rather than the rule. The server will not collect a tombstone
+ * any device has yet to see, however old it is.
+ */
+export const TOMBSTONE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
+ * How long a device is remembered as one that might still be waiting.
+ *
+ * Twice the retention window, and it has to be longer than it or the rule it
+ * serves does nothing: a device is only worth counting while it can still hold
+ * collection up, and if it were forgotten at exactly the window then every
+ * remembered device would be newer than the window and the count would never
+ * decide anything.
+ *
+ * So between ninety days and a hundred and eighty, a device that has been away
+ * blocks collection of anything it has not seen. Past that it is presumed gone
+ * -- a phone that was sold, or replaced -- because one lost device should not
+ * freeze collection for the rest of somebody's life. That is the case the
+ * refusal in `mergeIntoBundle` then covers.
+ */
+export const DEVICE_FORGET_MS = 2 * TOMBSTONE_RETENTION_MS;
 
 export class NotFoundError extends Error {
   constructor(entity: string, id: string) {

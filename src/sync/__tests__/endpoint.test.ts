@@ -60,6 +60,16 @@ describe('the sync endpoint', () => {
     expect(source).not.toMatch(/getStore\([^)]*subject/);
   });
 
+  it('tells the device how far back it has collected', () => {
+    // Without it the device keeps its tombstones forever, which is the safe
+    // failure and still a growing database.
+    expect(source).toContain('collectedThrough: merged.collectedThrough');
+  });
+
+  it('names the device so the merge knows who is still waiting', () => {
+    expect(source).toMatch(/typeof device === 'string' \? device : null/);
+  });
+
   it('caps the body, and reads the stream rather than the declared length', () => {
     expect(source).toContain('MAX_BODY');
     expect(source).toContain('reader.cancel()');

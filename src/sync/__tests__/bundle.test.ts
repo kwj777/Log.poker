@@ -311,6 +311,211 @@ describe('the three constraints, applied where the whole picture is', () => {
   });
 });
 
+describe('collecting tombstones', () => {
+  const DAY = 24 * HOUR;
+  const RETENTION = 90 * DAY;
+  const LATER = T0 + RETENTION + 10 * DAY;
+
+  /** A bundle holding one deleted session, tombstoned at T0. */
+  const withADeletedSession = (device = 'device-aaaa0001') => {
+    let bundle: unknown = mergeIntoBundle(
+      null,
+      changeSet({ venues: [venue('v1')], sessions: [session('s1')] }),
+      0,
+      T0,
+      device,
+    ).bundle;
+    bundle = mergeIntoBundle(
+      bundle,
+      changeSet({ sessions: [{ ...session('s1', T0), deletedAt: T0 }] }),
+      0,
+      T0,
+      device,
+    ).bundle;
+    return bundle;
+  };
+
+  it('keeps one that is not old enough yet', () => {
+    const { bundle } = mergeIntoBundle(withADeletedSession(), changeSet({}), 0,
+      T0 + 10 * DAY, 'device-aaaa0001');
+    expect(bundle.records.sessions.s1.deletedAt).toBe(T0);
+  });
+
+  it('does not draw a line when it collected nothing', () => {
+    // The line arms a refusal, and arming it on a sweep that removed nothing
+    // would turn away records from any device that had simply been away.
+    const { bundle } = mergeIntoBundle(
+      mergeIntoBundle(null, changeSet({ venues: [venue('v1')] }), 0, T0, 'device-aaaa0001').bundle,
+      changeSet({}), 0, LATER, 'device-aaaa0001',
+    );
+    expect(bundle.collectedThrough).toBe(0);
+  });
+
+  it('collects one past the window when the only device has seen it', () => {
+    const { bundle, collectedThrough } = mergeIntoBundle(
+      withADeletedSession(), changeSet({}), 0, LATER, 'device-aaaa0001');
+    expect(bundle.records.sessions.s1).toBeUndefined();
+    expect(collectedThrough).toBeGreaterThan(T0);
+  });
+
+  it('will not collect one a second device has not seen', () => {
+    // The rule this whole thing turns on. That device still holds the live row,
+    // and collecting the tombstone would let it push the row into a server with
+    // nothing left to refuse it.
+    let bundle: unknown = mergeIntoBundle(
+      null,
+      changeSet({ venues: [venue('v1')], sessions: [session('s1')] }),
+      0, T0, 'device-aaaa0001',
+    ).bundle;
+    // The second device syncs here, and then goes quiet forever.
+    bundle = mergeIntoBundle(bundle, changeSet({}), 0, T0, 'device-bbbb0002').bundle;
+    // The delete happens after that, so the second device has never seen it.
+    bundle = mergeIntoBundle(
+      bundle,
+      changeSet({ sessions: [{ ...session('s1', T0 + DAY), deletedAt: T0 + DAY }] }),
+      0, T0 + DAY, 'device-aaaa0001',
+    ).bundle;
+
+    // Well past the window as far as the first device is concerned. The line is
+    // drawn by the second, which last synced before the delete existed.
+    const merged = mergeIntoBundle(bundle, changeSet({}), 0, T0 + RETENTION + 2 * DAY,
+      'device-aaaa0001');
+    expect(merged.bundle.records.sessions.s1).toBeDefined();
+    expect(merged.bundle.records.sessions.s1.deletedAt).toBe(T0 + DAY);
+  });
+
+  it('forgets a device gone longer than twice the window, so it cannot hold this up', () => {
+    // Otherwise one lost phone freezes collection for the rest of somebody's
+    // life, which is a worse outcome than the row it was protecting.
+    let bundle: unknown = withADeletedSession('device-aaaa0001');
+    bundle = mergeIntoBundle(bundle, changeSet({}), 0, T0, 'device-bbbb0002').bundle;
+
+    // Just inside the forget threshold, it still blocks.
+    const blocked = mergeIntoBundle(bundle, changeSet({}), 0, T0 + 2 * RETENTION - DAY,
+      'device-aaaa0001');
+    expect(blocked.bundle.records.sessions.s1).toBeDefined();
+
+    // Past it, it is presumed gone and stops holding anything up.
+    const merged = mergeIntoBundle(bundle, changeSet({}), 0, T0 + 2 * RETENTION + DAY,
+      'device-aaaa0001');
+    expect(merged.bundle.records.sessions.s1).toBeUndefined();
+    expect(Object.keys(merged.bundle.devices)).toEqual(['device-aaaa0001']);
+  });
+
+  it('keeps a collected venue while a session still names it', () => {
+    let bundle: unknown = mergeIntoBundle(
+      null,
+      changeSet({ venues: [{ ...venue('v1'), deletedAt: T0 }], sessions: [session('s1')] }),
+      0, T0, 'device-aaaa0001',
+    ).bundle;
+    bundle = mergeIntoBundle(bundle, changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
+    // The merge un-tombstones it first, so there is nothing left to collect.
+    expect((bundle as { records: { venues: Record<string, unknown> } }).records.venues.v1)
+      .toBeDefined();
+  });
+
+  it('never collects a tombstone the merge has only just written', () => {
+    // Collection runs last for this reason: the import-collision rule
+    // tombstones a session with today's date, and a sweep that ran first could
+    // in principle meet it with a stale line.
+    const bundle = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('a', T0, { importKey: 'k', createdAt: T0 }),
+                   session('b', T0, { importKey: 'k', createdAt: T0 + HOUR })],
+      }),
+      0, LATER, 'device-aaaa0001',
+    ).bundle;
+    expect(bundle.records.sessions.b.deletedAt).not.toBeNull();
+    expect(bundle.records.sessions.b).toBeDefined();
+  });
+
+  it('records a device that names itself, and serves one that does not', () => {
+    const named = mergeIntoBundle(null, changeSet({}), 0, T0, 'device-aaaa0001');
+    expect(Object.keys(named.bundle.devices)).toEqual(['device-aaaa0001']);
+
+    // An unnamed device holds nothing up and is protected by the window alone,
+    // which is strictly safer than being counted wrongly.
+    const anonymous = mergeIntoBundle(null, changeSet({}), 0, T0, null);
+    expect(anonymous.bundle.devices).toEqual({});
+  });
+
+  it('ignores a device id that is not one', () => {
+    for (const id of ['', 'short', 'x'.repeat(65), 'has spaces', '../../etc']) {
+      const { bundle } = mergeIntoBundle(null, changeSet({}), 0, T0, id);
+      expect(bundle.devices).toEqual({});
+    }
+  });
+});
+
+describe('a device that was away longer than the whole window', () => {
+  const LATER = T0 + 120 * 24 * HOUR;
+
+  /**
+   * A bundle that has actually collected something, so the line is drawn.
+   *
+   * It has to have collected: the line is only moved by a sweep that removed a
+   * row, which is what stops it refusing records on a bundle where nothing was
+   * ever deleted.
+   */
+  const swept = () => {
+    let bundle: unknown = mergeIntoBundle(
+      null,
+      changeSet({ venues: [venue('v1')], sessions: [session('deleted-long-ago')] }),
+      0, T0, 'device-aaaa0001',
+    ).bundle;
+    bundle = mergeIntoBundle(
+      bundle,
+      changeSet({ sessions: [{ ...session('deleted-long-ago', T0), deletedAt: T0 }] }),
+      0, T0, 'device-aaaa0001',
+    ).bundle;
+    return mergeIntoBundle(bundle, changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
+  };
+
+  it('cannot resurrect a row whose tombstone was collected', () => {
+    // The backstop. An unknown record older than everything collected is
+    // exactly the shape of a row whose tombstone was thrown away.
+    const bundle = swept();
+    expect(bundle.collectedThrough).toBeGreaterThan(T0);
+
+    const { bundle: after } = mergeIntoBundle(
+      bundle,
+      changeSet({ sessions: [session('long-gone', T0)] }),
+      0,
+      LATER,
+      'device-cccc0003',
+    );
+    expect(after.records.sessions['long-gone']).toBeUndefined();
+  });
+
+  it('but can still edit a record the server does know about', () => {
+    // Not a blanket refusal of old stamps: the server has this one, so a
+    // tombstone would have been there to refuse it if there were one.
+    const bundle = swept();
+    const { bundle: after } = mergeIntoBundle(
+      bundle,
+      changeSet({ venues: [venue('v1', T0 + 1, { name: 'renamed' })] }),
+      0,
+      LATER,
+      'device-cccc0003',
+    );
+    expect(after.records.venues.v1.record.name).toBe('renamed');
+  });
+
+  it('and anything it wrote after the line still lands', () => {
+    const bundle = swept();
+    const { bundle: after } = mergeIntoBundle(
+      bundle,
+      changeSet({ sessions: [session('new-one', LATER)] }),
+      0,
+      LATER,
+      'device-cccc0003',
+    );
+    expect(after.records.sessions['new-one']).toBeDefined();
+  });
+});
+
 describe('two devices, from nothing', () => {
   it('end up with the same bundle whichever synced first', () => {
     const phone = changeSet({

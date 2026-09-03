@@ -421,9 +421,37 @@ Log's Netlify site, the same value Untilt signs with, and then `ALLOW_SIGN_IN`
 flips. Until that is true the endpoint answers 503 to everything, which is the
 state to leave it in.
 
-Still not built: **collecting tombstones.** They accumulate, and a heavy
-deleter's database grows where it used to shrink. It is now the oldest thing on
-this list.
+### Collecting tombstones
+
+Built, and it turned out to be the one piece where the obvious implementation is
+wrong in a way that only shows up months later. **Collecting a tombstone too
+early resurrects the record**: a device still holding the live row meets a server
+with nothing left to refuse it, and a session deleted in March is back on every
+device in June.
+
+So the window is a floor rather than the rule. Ninety days says how long a
+device can be switched off and still come back coherent; the bundle also holds a
+map of device to last-seen, and the line is the earlier of *ninety days ago* and
+*the least recently seen device*. A device unseen for a hundred and eighty days
+is presumed gone, because one lost phone should not freeze collection forever.
+
+**Twice the window rather than once, and this was a real bug before it was a
+decision.** The first version forgot a device at exactly the retention window,
+which meant every remembered device was newer than the window and the minimum
+could never be the binding one: the whole device map was decoration, and the
+test that was supposed to prove it worked was passing for another reason.
+
+**Two more things came out of writing it.** The collection line only moves when
+a sweep actually removed something, because it arms a refusal and arming it on
+an empty sweep would turn away records from any device that had merely been
+away. And the sweep runs last in the merge, after the three constraint rules, so
+it cannot collect a tombstone one of them has just written.
+
+The backstop for a device gone past the forget threshold is that **a record the
+server has never seen, older than everything collected, is refused**. That can
+lose a record such a device created and never sent. It is the worse thing to
+lose and much the rarer: it needs six months offline and a write that never
+left, where the alternative needs only the six months.
 
 Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
 no dependency on each other and can be built in either order or at once.

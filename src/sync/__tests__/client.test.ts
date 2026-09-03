@@ -32,14 +32,22 @@ const dead = (): Fetch =>
     throw new TypeError('Network request failed');
   }) as unknown as Fetch;
 
-const request = { since: 0, changes: emptyChangeSet() };
+const request = { since: 0, changes: emptyChangeSet(), device: 'device-00000001' };
 
 describe('one round trip', () => {
   it('sends the cursor, the changes and the token', async () => {
     const { fetch, calls } = answering(200, { cursor: 5, changes: emptyChangeSet() });
-    const outcome = await sync({ since: 3, changes: emptyChangeSet() }, 'tok.en.abc.sig', { fetch });
+    const outcome = await sync(
+      { since: 3, changes: emptyChangeSet(), device: 'device-00000001' },
+      'tok.en.abc.sig',
+      { fetch },
+    );
 
-    expect(outcome).toEqual({ ok: true, response: { cursor: 5, changes: emptyChangeSet() } });
+    expect(outcome).toEqual({
+      ok: true,
+      response: { cursor: 5, changes: emptyChangeSet(), collectedThrough: 0 },
+    });
+    expect(JSON.parse(calls[0].init.body as string).device).toBe('device-00000001');
     expect(calls[0].url).toBe(SYNC_URL);
     const headers = calls[0].init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer tok.en.abc.sig');
@@ -88,7 +96,24 @@ describe('one round trip', () => {
   it('takes a cursor with no changes beside it as nothing to apply', async () => {
     const { fetch } = answering(200, { cursor: 9 });
     const outcome = await sync(request, 'x', { fetch });
-    expect(outcome).toEqual({ ok: true, response: { cursor: 9, changes: emptyChangeSet() } });
+    expect(outcome).toEqual({
+      ok: true,
+      response: { cursor: 9, changes: emptyChangeSet(), collectedThrough: 0 },
+    });
+  });
+
+  it('reads a missing collection line as nothing collected', async () => {
+    // Keeping a tombstone too long costs a few hundred bytes. Dropping one too
+    // early costs a resurrected session, so absence has to mean keep.
+    const { fetch } = answering(200, { cursor: 9, collectedThrough: 'soon' });
+    const outcome = await sync(request, 'x', { fetch });
+    expect(outcome.ok && outcome.response.collectedThrough).toBe(0);
+  });
+
+  it('carries the collection line through when there is one', async () => {
+    const { fetch } = answering(200, { cursor: 9, collectedThrough: 5 });
+    const outcome = await sync(request, 'x', { fetch });
+    expect(outcome.ok && outcome.response.collectedThrough).toBe(5);
   });
 });
 

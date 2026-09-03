@@ -62,11 +62,33 @@ export interface SyncRow {
 export interface Bundle {
   version: number;
   records: { [T in SyncTable]: Record<string, Change<SyncRow>> };
+  /**
+   * When each device was last seen, by its own opaque id.
+   *
+   * The only thing this is for is deciding when a tombstone may be collected,
+   * and it is the difference between a rule and a guess. Time alone says "no
+   * device is plausibly older than ninety days"; this says "no device *is*".
+   *
+   * It holds no more than an id somebody's app invented and a timestamp. A
+   * device that has not been seen for the retention window is forgotten, so a
+   * phone that was lost cannot hold collection up forever.
+   */
+  devices: Record<string, Timestamp>;
+  /**
+   * Tombstones deleted before this have been collected and are gone.
+   *
+   * Which makes it the line under which the server can no longer tell a record
+   * it has never seen from one it deliberately forgot, and therefore the line
+   * under which an unknown record is refused. See `mergeIntoBundle`.
+   */
+  collectedThrough: Timestamp;
 }
 
 export const emptyBundle = (): Bundle => ({
   version: BUNDLE_VERSION,
   records: { venues: {}, sessions: {}, rebuys: {}, hands: {}, moodEntries: {} },
+  devices: {},
+  collectedThrough: 0,
 });
 
 export interface SyncRequest {
@@ -74,6 +96,12 @@ export interface SyncRequest {
   since: Timestamp;
   /** Everything it has changed since it last pushed. Empty is a plain pull. */
   changes: ChangeSet;
+  /**
+   * Who is asking, so the server knows whether anybody is still waiting to see
+   * a tombstone before it collects it. Opaque, invented by the app on first
+   * run, and worth no more than knowing two requests came from one place.
+   */
+  device: string;
 }
 
 export interface SyncResponse {
@@ -81,6 +109,11 @@ export interface SyncResponse {
   cursor: Timestamp;
   /** Everything at or after the request's `since`, once the merge has run. */
   changes: ChangeSet;
+  /**
+   * How far back the server has collected. A device may safely drop its own
+   * tombstones this old, because nothing will ever ask about them again.
+   */
+  collectedThrough: Timestamp;
 }
 
 /** An answer that is not one. The client shows one sentence for all of them. */

@@ -89,7 +89,11 @@ export const sync = async (
 
   try {
     const body: unknown = await response.json();
-    const { cursor, changes } = (body ?? {}) as { cursor?: unknown; changes?: unknown };
+    const { cursor, changes, collectedThrough } = (body ?? {}) as {
+      cursor?: unknown;
+      changes?: unknown;
+      collectedThrough?: unknown;
+    };
     if (typeof cursor !== 'number' || !Number.isFinite(cursor)) {
       return { ok: false, reason: 'unreachable' };
     }
@@ -98,6 +102,13 @@ export const sync = async (
       response: {
         cursor,
         changes: shapedLikeAChangeSet(changes) ? changes : emptyChangeSet(),
+        // Absent reads as nothing collected, which makes this device keep its
+        // tombstones. Keeping one too long costs a few hundred bytes; dropping
+        // one too early costs a resurrected session.
+        collectedThrough:
+          typeof collectedThrough === 'number' && Number.isFinite(collectedThrough)
+            ? collectedThrough
+            : 0,
       },
     };
   } catch {

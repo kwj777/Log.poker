@@ -248,6 +248,46 @@ export class DexieRepository implements Repository {
     );
   }
 
+  /** Collect tombstones older than `before`. See the contract for the rule. */
+  async collectTombstones(before: Timestamp): Promise<number> {
+    let removed = 0;
+    await this.db.transaction(
+      'rw',
+      [this.db.venues, this.db.sessions, this.db.rebuys, this.db.hands, this.db.moodEntries],
+      async () => {
+        const stale = (record: { deletedAt?: DeletedAt }): boolean => {
+          const at = deletedAt(record);
+          return at !== null && at < before;
+        };
+
+        // Children first, for the same reason as SQLite even without a foreign
+        // key to enforce it: a hand whose session is gone is not a hand.
+        for (const table of [this.db.moodEntries, this.db.hands, this.db.rebuys] as const) {
+          const going = (await table.toArray()).filter(stale).map((record) => record.id);
+          if (going.length === 0) continue;
+          await table.bulkDelete(going);
+          removed += going.length;
+        }
+
+        const sessions = (await this.db.sessions.toArray()).filter(stale);
+        if (sessions.length > 0) {
+          await this.db.sessions.bulkDelete(sessions.map((session) => session.id));
+          removed += sessions.length;
+        }
+
+        const referenced = new Set((await this.db.sessions.toArray()).map((s) => s.venueId));
+        const venues = (await this.db.venues.toArray())
+          .filter((venue) => stale(venue) && !referenced.has(venue.id))
+          .map((venue) => venue.id);
+        if (venues.length > 0) {
+          await this.db.venues.bulkDelete(venues);
+          removed += venues.length;
+        }
+      },
+    );
+    return removed;
+  }
+
   // ---------------------------------------------------------------- venues
 
   /** Session counts come from one grouped pass rather than a query per venue. */

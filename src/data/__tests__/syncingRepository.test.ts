@@ -51,13 +51,20 @@ const server = () => {
       return { ok: true, status: 204, json: async () => null } as Response;
     }
 
-    const { since, changes } = JSON.parse(init.body as string);
-    const merged = mergeIntoBundle(held.bundle, changes, since, now);
+    const { since, changes, device } = JSON.parse(init.body as string);
+    const merged = mergeIntoBundle(held.bundle, changes, since, now, device);
     held.bundle = JSON.parse(JSON.stringify(merged.bundle));
     return {
       ok: true,
       status: 200,
-      json: async () => JSON.parse(JSON.stringify({ cursor: merged.cursor, changes: merged.changes })),
+      json: async () =>
+        JSON.parse(
+          JSON.stringify({
+            cursor: merged.cursor,
+            changes: merged.changes,
+            collectedThrough: merged.collectedThrough,
+          }),
+        ),
     } as Response;
   }) as unknown as Fetch;
 
@@ -67,7 +74,7 @@ const server = () => {
 const drivers: NodeSqliteDriver[] = [];
 
 /** A device: its own database, its own cursor, the shared server. */
-const device = async (fetch: Fetch, name: string) => {
+const device = async (fetch: Fetch, name: string, id = `device-${name}0001`) => {
   const driver = new NodeSqliteDriver(':memory:');
   drivers.push(driver);
   let counter = 0;
@@ -76,7 +83,13 @@ const device = async (fetch: Fetch, name: string) => {
     ids: { next: () => `${name}-${String(++counter).padStart(3, '0')}` },
   });
   await local.init();
-  return new SyncingRepository(local, 'a.b.c.d', memoryCursorStore(), { fetch }, () => now);
+  return new SyncingRepository(
+    local,
+    'a.b.c.d',
+    memoryCursorStore({ pulled: 0, pushed: 0, device: id }),
+    { fetch },
+    () => now,
+  );
 };
 
 const startSession = async (repository: SyncingRepository, venueName = 'Aria') => {
@@ -323,6 +336,95 @@ describe('the loop around it', () => {
     const spent = held.calls;
     await phone.push();
     expect(held.calls).toBe(spent);
+  });
+});
+
+describe('collecting tombstones, once nobody is still waiting', () => {
+  const DAY = 24 * HOUR;
+  const RETENTION = 90 * DAY;
+
+  it('is not collected while the other device has not seen the delete', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.push();
+    await laptop.push(true);
+
+    tick(DAY);
+    await phone.deleteSession(session.id);
+    await phone.push();
+
+    // The laptop has not synced since the delete. Well past the window, and the
+    // tombstone still has to be there: the laptop is holding the live row, and
+    // without something to refuse it, it would push the session back.
+    tick(RETENTION + DAY);
+    await phone.push(true);
+    const { sessions } = await phone.listChangedSince(0);
+    expect(sessions.some((change) => change.record.id === session.id)).toBe(true);
+  });
+
+  it('and once it has, the row goes from the server and from both devices', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.push();
+    await laptop.push(true);
+
+    tick(DAY);
+    await phone.deleteSession(session.id);
+    await phone.push();
+    await laptop.push(true);
+    expect(await laptop.getSession(session.id)).toBeNull();
+
+    // Both devices have to have been seen past the window before the server
+    // will draw a line, and each one then sweeps on its own next sync. So it
+    // takes a round each, which is exactly the caution the rule is for.
+    tick(RETENTION + DAY);
+    await phone.push(true);
+    await laptop.push(true);
+    tick(DAY);
+    await phone.push(true);
+
+    // Gone for real on both, not merely invisible.
+    for (const repository of [phone, laptop]) {
+      const { sessions } = await repository.listChangedSince(0);
+      expect(sessions.some((change) => change.record.id === session.id)).toBe(false);
+    }
+
+    // And it does not come back on the sync after that, which is the failure
+    // collecting too early would produce.
+    tick(DAY);
+    await laptop.push(true);
+    await phone.push(true);
+    expect(await phone.listSessions()).toEqual([]);
+    expect(await laptop.listSessions()).toEqual([]);
+  });
+
+  it('never collects further than the server has', async () => {
+    // A device that swept on its own clock could drop a tombstone the others
+    // have not seen, and then push the live row back itself.
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.push();
+    await laptop.push(true);
+    tick(DAY);
+    await phone.deleteSession(session.id);
+    await phone.push();
+
+    // The phone is long past the window on its own reckoning. The laptop is not
+    // caught up, so the server has drawn no line and the phone collects nothing.
+    tick(RETENTION + DAY);
+    await phone.push(true);
+    const { sessions } = await phone.listChangedSince(0);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].deletedAt).not.toBeNull();
   });
 });
 

@@ -96,14 +96,53 @@ native and PWA size.
 
 ---
 
+## The site, and where the app lives
+
+**log.poker is the marketing front door for all three apps, and Log itself is
+under `/app`.** That split is worth understanding before changing anything about
+the build.
+
+| | |
+|---|---|
+| `/` | `public/home.html`, renamed to `index.html` at build time. Static, no bundle, no external request of any kind. |
+| `/app` | Log. The whole Expo export, moved wholesale into `dist/app`. |
+| `/chip` | The card protector landing. See [The chip campaign](#the-chip-campaign). |
+| `/apps` | 301 to `/`, which now lists the family. |
+
+`scripts/build-web.mjs` is what makes that shape, and its rule is one line that
+maintains itself: **everything the bundler emitted moves under `/app`, and
+everything that came from `public/` stays at the root.** The names in `public/`
+are read at build time rather than listed, so adding a file there needs no
+change to the script.
+
+Moving files rather than rewriting URLs is what keeps `netlify.toml` short: the
+prerendered routes land as real files at the paths that serve them, so
+`/app/history` is a document rather than a rule, and the only redirect the app
+needs is the client-router fallback for paths that were never prerendered, like
+`/app/session/<id>`. `experiments.baseUrl` in `app.json` is the other half, and
+makes the export reference its bundle at `/app/_expo`.
+
+Three things are load-bearing and quiet when broken, so `src/site/__tests__`
+asserts them:
+
+- **Netlify's build command is `npm run build:web`, not the bare export.**
+  Running the export alone deploys the app at `/` with no front door, and
+  nothing errors.
+- **The manifest is scoped to `/app`.** Scoped to `/`, installing the app
+  installs the marketing page.
+- **The service worker is registered with `{ scope: '/app/' }`**, which a worker
+  served from `/` may only claim because `netlify.toml` sends
+  `Service-Worker-Allowed: /app/`. Without that header the registration throws
+  and offline disappears without a trace.
+
 ## Deploying to Netlify
 
 `netlify.toml` is committed and complete; connecting the repo is the whole setup.
 
 1. **New site from Git** → pick this repository.
 2. Netlify reads `netlify.toml`, so the build command
-   (`npx expo export --platform web`), publish directory (`dist`) and Node
-   version are already configured. Leave them as detected.
+   (`npm run build:web`), publish directory (`dist`) and Node version are
+   already configured. Leave them as detected.
 3. Deploy, then point `log.poker` at the site under **Domain management**.
    Netlify provisions the TLS certificate; the PWA needs HTTPS to install and to
    run a service worker.
@@ -117,9 +156,11 @@ npx serve dist      # or any static server with a single-page fallback
 
 ### What `netlify.toml` does
 
-- **SPA fallback** — `/*` → `/index.html` with status `200`, so a deep link like
-  `/session/<id>` is served the app shell and resolved by the client router
-  rather than 404ing.
+- **SPA fallback** — `/app/*` → `/app/index.html` with status `200`, so a deep
+  link like `/app/session/<id>` is served the app shell and resolved by the
+  client router rather than 404ing. There is deliberately no catch-all at the
+  root: an unknown address gets `404.html` rather than quietly resolving to the
+  app.
 - **Cache headers** — `index.html`, `sw.js` and the manifest are
   `must-revalidate` so a deploy reaches returning visitors immediately;
   everything under `_expo/` and `assets/` is content-hashed by the bundler and
@@ -140,7 +181,8 @@ the app shell itself.
 
 - **`public/manifest.webmanifest`** — standalone display, portrait, the charcoal
   theme colour, 192/512 icons plus a maskable one, and a "Start a session"
-  shortcut.
+  shortcut. `start_url` and `scope` are `/app`, not `/`: at the root, installing
+  Log would install the marketing page.
 - **`public/sw.js`** — network-first for navigations (so a deploy is picked up
   promptly) falling back to the cached shell; cache-first for the
   content-hashed bundle and icons; stale-while-revalidate for everything else.

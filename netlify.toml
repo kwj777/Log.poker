@@ -1,10 +1,16 @@
 # Netlify configuration for log.poker
 #
-# The web build is an Expo (Metro) single-page export: one `index.html`, a
-# content-hashed JS bundle under `_expo/`, and whatever `public/` contains.
+# log.poker is the marketing site for three apps, and Log itself is under /app.
+# `scripts/build-web.mjs` produces that shape: the Expo export moves under
+# dist/app, and everything from `public/` stays at the root, which is why so
+# few rules are needed below.
 
 [build]
-  command = "npx expo export --platform web"
+  # Not the bare export. `scripts/build-web.mjs` runs it and then moves the
+  # output under dist/app, which is what puts the marketing site at the root
+  # and Log under /app. Running the export alone deploys the app at / and no
+  # front door at all, silently, so this line is asserted by a test.
+  command = "npm run build:web"
   publish = "dist"
 
 [build.environment]
@@ -35,15 +41,37 @@
   to = "/.netlify/functions/chip-scan"
   status = 200
 
-# Every route is served by the single-page shell; the client router takes it
-# from there. Must come after any more specific rules.
+# The family page listed the three apps at /apps before the root did. One
+# canonical page rather than two, and the old address keeps working.
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/apps"
+  to = "/"
+  status = 301
+
+# Log lives under /app, because log.poker is first of all the front door for
+# three apps. `scripts/build-web.mjs` moves the whole export under dist/app, so
+# every prerendered route is a real file at the path that serves it and this is
+# the only rule the app needs: the client-router fallback for the paths that
+# were never prerendered, like /app/session/<id>.
+[[redirects]]
+  from = "/app/*"
+  to = "/app/index.html"
   status = 200
+
+# No catch-all for the root. Netlify serves 404.html, which is a page rather
+# than a wall, and an unknown address stops quietly resolving to the app.
 
 # The service worker must never be served from a stale cache, or a deploy can
 # take an unbounded amount of time to reach a returning visitor.
+# The worker file sits at the root and controls /app only. A worker's scope is
+# capped by where it is served from unless the server says otherwise, and this
+# header is what lets one at / claim a narrower scope than /. Without it the
+# registration in app/+html.tsx fails and the app silently loses offline.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Service-Worker-Allowed = "/app/"
+
 [[headers]]
   for = "/sw.js"
   [headers.values]

@@ -1,0 +1,211 @@
+<!doctype html>
+<!--
+  log.poker, the front door.
+
+  This is the marketing site for three apps, and Log itself lives at /app. It
+  is a static document with no bundle and no external request of any kind, not
+  even a font, for the same reason /chip is: it is the first thing anybody sees
+  and it has to paint immediately on a phone in a card room.
+
+  `scripts/build-web.mjs` renames this to index.html after the export, which is
+  why it is called home.html here: the bundler writes an index.html of its own,
+  and one of the two would silently win.
+
+  No price appears on this page. Somebody who has used none of the three has no
+  way to value one, and a number here prices the family before it has earned
+  anything. There is a test that enforces it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Log: poker apps for the part that is not the cards</title>
+    <meta
+      name="description"
+      content="Three poker apps. TiltProof drills the odds, Log tracks your sessions and tells you whether you are running bad or playing bad, and Untilt is the mental game. Free to start, offline, no account."
+    />
+    <link rel="canonical" href="https://log.poker/" />
+    <meta name="theme-color" content="#1c211f" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Log" />
+    <meta property="og:title" content="Be the LOG. Learn, Observe, Ground." />
+    <meta
+      property="og:description"
+      content="Three poker apps for the part that is not the cards: the odds, the record, and the tilt."
+    />
+    <meta property="og:url" content="https://log.poker/" />
+    <style>
+      :root {
+        --ground: #1c211f; --raised: #232a27; --rim: #2e3a35; --ring: #333f39;
+        --gold: #c9a86a; --sage: #6b7a5e; --forest: #3d4a44;
+        --cream: #e8e4da; --muted: #b7c0ba; --dim: #828e89;
+        --serif: Georgia, "Times New Roman", "Nimbus Roman", serif;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0; background: var(--ground); color: var(--cream);
+        font-family: var(--sans); font-size: 16px; line-height: 1.62;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 40rem; margin: 0 auto;
+        padding: clamp(2.5rem, 9vw, 4.5rem) clamp(1.25rem, 6vw, 2rem) 3rem;
+        display: flex; flex-direction: column; gap: clamp(2.5rem, 8vw, 4rem);
+      }
+      .hero { display: flex; flex-direction: column; align-items: center; gap: 1.15rem; text-align: center; }
+      .mark { width: 84px; height: auto; }
+      h1 {
+        font-family: var(--serif); font-weight: normal; margin: 0;
+        font-size: clamp(2.2rem, 11vw, 3.2rem); line-height: 1.04; text-wrap: balance;
+      }
+      h1 .caps { color: var(--gold); letter-spacing: .02em; }
+      .verbs {
+        margin: 0; font-size: clamp(.76rem, 3.4vw, .88rem);
+        letter-spacing: .28em; text-transform: uppercase; color: var(--muted);
+      }
+      .lede {
+        margin: 0; max-width: 32rem; color: var(--muted);
+        font-family: var(--serif); font-size: clamp(1.04rem, 2.6vw, 1.18rem); line-height: 1.55;
+      }
+      h2 {
+        font-family: var(--serif); font-weight: normal; margin: 0;
+        font-size: clamp(1.35rem, 4vw, 1.6rem); line-height: 1.2;
+      }
+      .eyebrow {
+        margin: 0 0 .35rem; font-size: .68rem; letter-spacing: .22em;
+        text-transform: uppercase; color: var(--dim);
+      }
+      section { display: flex; flex-direction: column; gap: 1.1rem; }
+      p { margin: 0; max-width: 34rem; }
+      .apps { display: flex; flex-direction: column; gap: .8rem; }
+      .app {
+        display: block; border: 1px solid var(--rim); border-radius: 3px;
+        background: var(--raised); padding: 1.1rem 1.2rem;
+        text-decoration: none; color: inherit;
+      }
+      .app:hover, .app:focus-visible { border-color: var(--ring); }
+      .app .verb { display: block; font-size: .67rem; letter-spacing: .22em; text-transform: uppercase; margin-bottom: .3rem; }
+      .app.l .verb { color: var(--gold); }
+      .app.o .verb { color: var(--sage); }
+      .app.g .verb { color: var(--dim); }
+      .app .name { font-family: var(--serif); font-size: 1.24rem; display: block; }
+      .app .name .host { font-family: var(--sans); font-size: .74rem; color: var(--dim); letter-spacing: .04em; margin-left: .5rem; }
+      .app .what { display: block; margin-top: .2rem; color: var(--muted); font-size: .9rem; }
+      .cta { display: flex; flex-direction: column; align-items: center; gap: .8rem; text-align: center; }
+      .btn {
+        display: inline-block; background: var(--gold); color: #1c211f;
+        font-weight: 600; font-size: 1.02rem; text-decoration: none;
+        padding: .85rem 2.1rem; border-radius: 3px;
+      }
+      .btn:hover, .btn:focus-visible { background: #d8ba80; }
+      .cta .sub { font-family: var(--serif); color: var(--muted); font-size: 1.02rem; }
+      .creed { border-left: 2px solid var(--forest); padding-left: 1.15rem; display: flex; flex-direction: column; gap: .7rem; }
+      .creed p { font-family: var(--serif); font-size: 1.02rem; color: var(--muted); line-height: 1.55; }
+      .creed strong { color: var(--cream); font-weight: normal; }
+      a { color: var(--gold); text-underline-offset: 2px; }
+      :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      footer {
+        border-top: 1px solid var(--rim); padding-top: 1.5rem;
+        color: var(--dim); font-size: .8rem; line-height: 1.55;
+        display: flex; flex-direction: column; gap: .8rem;
+      }
+      footer strong { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <svg class="mark" viewBox="0 0 200 112" role="img" aria-label="Three nested triangles sharing a baseline">
+          <g fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M10 100 L190 100 L100 20 Z" stroke="#c9a86a" />
+            <path d="M40 100 L100 47 L160 100" stroke="#6b7a5e" />
+            <path d="M70 100 L100 73 L130 100" stroke="#55665e" />
+          </g>
+        </svg>
+        <h1>Be the <span class="caps">LOG</span>.</h1>
+        <p class="verbs">Learn &middot; Observe &middot; Ground</p>
+        <p class="lede">
+          Three poker apps for the part of the game that is not the cards. The
+          math props it, the ground holds it, and the river goes past.
+        </p>
+      </header>
+
+      <section id="apps">
+        <div>
+          <p class="eyebrow">The three</p>
+          <h2>One state, three ways in</h2>
+        </div>
+        <div class="apps">
+          <a class="app l" href="https://tiltproof.poker">
+            <span class="verb">Learn</span>
+            <span class="name">TiltProof<span class="host">tiltproof.poker</span></span>
+            <span class="what">
+              Count your outs, price the pot, learn to feel a percentage. Every
+              answer marked against a real hand evaluator rather than a table
+              somebody typed up.
+            </span>
+          </a>
+          <a class="app o" href="/app">
+            <span class="verb">Observe</span>
+            <span class="name">Log<span class="host">this one</span></span>
+            <span class="what">
+              A session in under ten seconds and a hand in fifteen, then an
+              honest answer to the question every downswing provokes: are you
+              running bad, or playing bad?
+            </span>
+          </a>
+          <a class="app g" href="https://untilt.poker">
+            <span class="verb">Ground</span>
+            <span class="name">Untilt<span class="host">untilt.poker</span></span>
+            <span class="what">
+              Short guided meditations written for poker players: before the
+              session, between the hands, and after the last one. The
+              at-the-table resets are free forever.
+            </span>
+          </a>
+        </div>
+      </section>
+
+      <div class="cta">
+        <a class="btn" href="/app">Get the log</a>
+        <p class="sub">Free, offline, and no account. Your log never leaves your device.</p>
+      </div>
+
+      <section>
+        <div>
+          <p class="eyebrow">Where the money comes from</p>
+          <h2>Not from you playing more</h2>
+        </div>
+        <div class="creed">
+          <p>
+            <strong>No rake, no affiliate deals, no poker room sponsorship.</strong>
+            An app that tells you to set a stop-loss cannot also earn more when
+            you ignore it.
+          </p>
+          <p><strong>No ads and no trackers.</strong> Log has no server to send anything to.</p>
+          <p>
+            <strong>Paid once, if you ever pay.</strong> Nothing here bills you
+            monthly for having quit.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          These are record keeping and practice tools, not gambling advice. If
+          poker has stopped being a choice: in the US, the National Problem
+          Gambling Helpline is <strong>1-800-522-4700</strong>, 24/7, free and
+          confidential. Anywhere else,
+          <a href="https://gamblingtherapy.org">Gambling Therapy</a> is free,
+          answers in any language, and is not a phone call.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

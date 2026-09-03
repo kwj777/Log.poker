@@ -20,7 +20,11 @@ import { ScrollViewStyleReset } from 'expo-router/html';
 const SERVICE_WORKER_SCRIPT = `
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js').catch(function () {
+    // The file is at the root and the scope is /app/, because log.poker is the
+    // marketing site for three apps and the worker has no business caching it.
+    // A worker cannot normally claim a scope above where it is served from, so
+    // netlify.toml sends Service-Worker-Allowed: /app/ with this file.
+    navigator.serviceWorker.register('/sw.js', { scope: '/app/' }).catch(function () {
       // A blocked or unsupported worker just means no offline support.
     });
   });

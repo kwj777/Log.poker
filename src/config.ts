@@ -11,8 +11,15 @@ export const IS_DEV: boolean = typeof __DEV__ !== 'undefined' && __DEV__;
 /** Gates the demo-data seeder in Settings. */
 export const ALLOW_DEMO_SEED = IS_DEV;
 
+/**
+ * Where each app lives. `log.poker` is the family's front door and Log itself
+ * is under /app, so a link meant to open the app has to say so.
+ */
 export const FAMILY_LINKS = {
   untilt: 'https://untilt.poker',
-  tiltproof: 'https://tiltproof.com',
-  log: 'https://log.poker',
+  tiltproof: 'https://tiltproof.poker',
+  log: 'https://log.poker/app',
 } as const;
+
+/** The marketing site, for a link that means the family rather than the app. */
+export const FAMILY_HOME = 'https://log.poker';

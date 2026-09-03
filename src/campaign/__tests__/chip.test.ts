@@ -41,11 +41,19 @@ describe('the route cannot be swallowed', () => {
   });
 
   it.each([CHIP_CAMPAIGN.path, `${CHIP_CAMPAIGN.path}/`, '/api/chip-scan'])(
-    'rewrites %s above the single-page catch-all',
+    'rewrites %s ahead of every other rule',
     (from) => {
       const rule = ruleAt(from);
       expect(rule).toBeGreaterThan(-1);
-      expect(rule).toBeLessThan(ruleAt('/*'));
+      // Netlify takes the first matching rule, so the only durable guarantee is
+      // that nothing sits above these. This used to be asserted against the
+      // single-page catch-all, until the site grew a marketing front door and
+      // that rule stopped existing; the invariant it was standing in for is the
+      // one written here, and it does not depend on what else the file holds.
+      const others = [...netlify.matchAll(/from = "([^"]+)"/g)]
+        .filter((m) => !m[1].startsWith('/chip') && m[1] !== '/api/chip-scan')
+        .map((m) => m.index ?? Infinity);
+      expect(rule).toBeLessThan(Math.min(...others));
     },
   );
 

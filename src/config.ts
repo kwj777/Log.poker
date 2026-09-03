@@ -12,6 +12,20 @@ export const IS_DEV: boolean = typeof __DEV__ !== 'undefined' && __DEV__;
 export const ALLOW_DEMO_SEED = IS_DEV;
 
 /**
+ * Gates the sign-in card in Settings.
+ *
+ * Signing in currently unlocks nothing, because cross-device history is not
+ * built yet: somebody who typed their address, waited for mail and read a code
+ * off a phone would arrive back at a screen that looks exactly as it did
+ * before. A dead end is worse than an absence, so it stays out of production
+ * builds until there is something on the other side of it.
+ *
+ * **Flip this to `true` when sync lands.** That is the whole of what it takes;
+ * the card, the client and the endpoint it talks to are all built. See SYNC.md.
+ */
+export const ALLOW_SIGN_IN = IS_DEV;
+
+/**
  * Where each app lives. `log.poker` is the family's front door and Log itself
  * is under /app, so a link meant to open the app has to say so.
  */

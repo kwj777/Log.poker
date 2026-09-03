@@ -14,7 +14,16 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 
-import type { GameType, HandTag, MoodPhase, MoodScore, Position, Stakes } from '../../domain/types';
+import { DEFAULT_CURRENCY } from '../../domain/money';
+import type {
+  GameType,
+  HandTag,
+  MoodPhase,
+  MoodScore,
+  Position,
+  SessionFormat,
+  Stakes,
+} from '../../domain/types';
 
 export const DATABASE_NAME = 'log-poker';
 
@@ -32,10 +41,16 @@ export interface VenueRecord {
 export interface SessionRecord {
   id: string;
   venueId: string;
+  format: SessionFormat;
   gameType: GameType;
-  stakes: Stakes;
+  /** Null for a tournament, and for a cash session with no blinds recorded. */
+  stakes: Stakes | null;
+  currency: string;
   buyIn: number;
+  fee: number | null;
   cashOut: number | null;
+  entrants: number | null;
+  finishPosition: number | null;
   startedAt: number;
   /** `OPEN_SESSION_ENDED_AT` while the session is running. */
   endedAt: number;
@@ -86,6 +101,11 @@ export interface MoodRecord {
   updatedAt: number;
 }
 
+/** A v1/v2 session as it sits on disk before the v3 upgrade rewrites it. */
+type LegacySessionRecord = Omit<SessionRecord, 'stakes'> & {
+  stakes?: (Stakes & { currency?: string }) | null;
+};
+
 export type LogDatabase = Dexie & {
   venues: EntityTable<VenueRecord, 'id'>;
   sessions: EntityTable<SessionRecord, 'id'>;
@@ -117,5 +137,39 @@ export const createDatabase = (name: string = DATABASE_NAME): LogDatabase => {
     hands: 'id, sessionId, at',
     moodEntries: 'id, sessionId, phase, at',
   });
+  // v3 adds tournaments, and moves the currency out of the nested stakes object
+  // onto the record -- a tournament has no stakes to hang it off. Everything
+  // stored before this version is a cash game, which is what the upgrade writes.
+  db.version(3)
+    .stores({
+      venues: 'id, name, createdAt',
+      sessions: 'id, venueId, format, gameType, startedAt, endedAt, &importKey',
+      rebuys: 'id, sessionId, at',
+      hands: 'id, sessionId, at',
+      moodEntries: 'id, sessionId, phase, at',
+    })
+    .upgrade((tx) =>
+      tx
+        .table<LegacySessionRecord>('sessions')
+        .toCollection()
+        .modify((record) => {
+          const legacy = record.stakes;
+          record.format = 'cash';
+          record.currency = legacy?.currency ?? DEFAULT_CURRENCY;
+          record.fee = null;
+          record.entrants = null;
+          record.finishPosition = null;
+          // The importer wrote 0/0 for a session whose blinds it could not read.
+          // Those become null here, which is what they always meant.
+          record.stakes =
+            legacy && (legacy.smallBlind !== 0 || legacy.bigBlind !== 0)
+              ? {
+                  smallBlind: legacy.smallBlind,
+                  bigBlind: legacy.bigBlind,
+                  ...(legacy.ante == null ? {} : { ante: legacy.ante }),
+                }
+              : null;
+        }),
+    );
   return db;
 };

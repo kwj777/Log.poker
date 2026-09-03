@@ -1,5 +1,7 @@
 import {
   bankrollCurve,
+  byBuyIn,
+  byFormat,
   byGameType,
   byStakes,
   byVenue,
@@ -230,5 +232,78 @@ describe('grouping', () => {
   it('falls back to a placeholder when a venue is missing', () => {
     const orphan = completed({ venueId: 'gone', hours: 1, buyIn: 100, cashOut: 200, venue: null });
     expect(byVenue([orphan], []).map((group) => group.label)).toEqual(['Unknown venue']);
+  });
+});
+
+describe('tournaments in the session math', () => {
+  const tournament = (spec: Parameters<typeof session>[0] = {}) =>
+    session({ format: 'tournament', buyIn: 10_000, fee: 1_000, ...spec });
+
+  it('counts the entry fee as invested', () => {
+    const entry = tournament();
+    expect(totalInvested(entry, entry.rebuys)).toBe(11_000);
+  });
+
+  it('nets a tournament against buy-in and fee together', () => {
+    const entry = tournament({ cashOut: 25_000, hours: 4 });
+    expect(netResult(entry, entry.rebuys)).toBe(14_000);
+  });
+
+  it('counts a re-entry the same way a rebuy is counted', () => {
+    const entry = tournament({ rebuys: [11_000], cashOut: 0 });
+    expect(totalInvested(entry, entry.rebuys)).toBe(22_000);
+    expect(netResult(entry, entry.rebuys)).toBe(-22_000);
+  });
+
+  it('leaves the fee out of a cash game entirely', () => {
+    const cash = session({ buyIn: 30_000 });
+    expect(totalInvested(cash, cash.rebuys)).toBe(30_000);
+  });
+
+  it('keeps two entries of the same total cost apart when they are shaped differently', () => {
+    const groups = byBuyIn([
+      tournament({ cashOut: 0, hours: 2 }),
+      tournament({ buyIn: 11_000, fee: 0, cashOut: 0, hours: 2 }),
+    ]);
+    expect(groups.map((group) => group.label).sort()).toEqual(['$110', '$100+$10'].sort());
+  });
+
+  it('groups tournaments by what one entry cost', () => {
+    const groups = byBuyIn([
+      tournament({ cashOut: 0, hours: 2 }),
+      tournament({ cashOut: 40_000, hours: 5 }),
+      tournament({ buyIn: 20_000, fee: 2_000, cashOut: 0, hours: 1 }),
+    ]);
+    expect(groups.map((group) => group.label)).toEqual(['$100+$10', '$200+$20']);
+    expect(groups[0].sessionCount).toBe(2);
+  });
+
+  it('keeps tournaments out of the stakes breakdown, which they have none of', () => {
+    const groups = byStakes([
+      session({ stakes: STAKES_1_2, cashOut: 40_000, hours: 3 }),
+      tournament({ cashOut: 0, hours: 2 }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe('$1/$2');
+  });
+
+  it('keeps a cash session with no stakes out of the stakes breakdown too', () => {
+    expect(byStakes([session({ stakes: null, cashOut: 40_000, hours: 3 })])).toEqual([]);
+  });
+
+  it('splits the two formats when asked', () => {
+    const groups = byFormat([
+      session({ cashOut: 40_000, hours: 3 }),
+      tournament({ cashOut: 0, hours: 2 }),
+    ]);
+    expect(groups.map((group) => group.label).sort()).toEqual(['Cash game', 'Tournament']);
+  });
+
+  it('puts both formats in one bankroll curve', () => {
+    const curve = bankrollCurve([
+      session({ cashOut: 40_000, hours: 3, endedAt: T0 + HOUR }),
+      tournament({ cashOut: 0, hours: 2, endedAt: T0 + 2 * HOUR }),
+    ]);
+    expect(curve.map((point) => point.cumulative)).toEqual([10_000, -1_000]);
   });
 });

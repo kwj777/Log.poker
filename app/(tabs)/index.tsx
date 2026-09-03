@@ -25,6 +25,8 @@ import { LineChart } from '../../src/components/chart/LineChart';
 import { formatMoney, formatMoneyCompact } from '../../src/domain/money';
 import {
   bankrollCurve,
+  byBuyIn,
+  byFormat,
   byGameType,
   byStakes,
   byVenue,
@@ -37,13 +39,7 @@ import { useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
 import { APP_DESCRIPTION, PageMeta } from '../../src/components/PageMeta';
 
-type Breakdown = 'stakes' | 'venue' | 'game';
-
-const BREAKDOWN_OPTIONS = [
-  { value: 'stakes' as const, label: 'Stakes' },
-  { value: 'venue' as const, label: 'Venue' },
-  { value: 'game' as const, label: 'Game' },
-];
+type Breakdown = 'stakes' | 'buyIn' | 'format' | 'venue' | 'game';
 
 export default function DashboardScreen() {
   const sessions = useLogStore((state) => state.sessions);
@@ -53,11 +49,44 @@ export default function DashboardScreen() {
 
   const summary = useMemo(() => totals(sessions), [sessions]);
   const curve = useMemo(() => bankrollCurve(sessions), [sessions]);
+
+  /**
+   * A player who has never entered a tournament is not offered a buy-in
+   * breakdown that would draw nothing, and one who only plays tournaments is not
+   * offered a stakes breakdown for the same reason.
+   */
+  const hasTournaments = useMemo(
+    () => sessions.some((session) => session.format === 'tournament'),
+    [sessions],
+  );
+  const hasCash = useMemo(
+    () => sessions.some((session) => session.format === 'cash'),
+    [sessions],
+  );
+  const breakdownOptions = useMemo(
+    () => [
+      ...(hasCash ? [{ value: 'stakes' as const, label: 'Stakes' }] : []),
+      ...(hasTournaments ? [{ value: 'buyIn' as const, label: 'Buy-in' }] : []),
+      ...(hasCash && hasTournaments ? [{ value: 'format' as const, label: 'Format' }] : []),
+      { value: 'venue' as const, label: 'Venue' },
+      { value: 'game' as const, label: 'Game' },
+    ],
+    [hasCash, hasTournaments],
+  );
+
+  // The default is the first option that exists, so a tournament-only player
+  // does not open the app on an empty chart.
+  const active: Breakdown = breakdownOptions.some((option) => option.value === breakdown)
+    ? breakdown
+    : (breakdownOptions[0]?.value ?? 'venue');
+
   const groups = useMemo(() => {
-    if (breakdown === 'venue') return byVenue(sessions, venues);
-    if (breakdown === 'game') return byGameType(sessions);
+    if (active === 'venue') return byVenue(sessions, venues);
+    if (active === 'game') return byGameType(sessions);
+    if (active === 'buyIn') return byBuyIn(sessions);
+    if (active === 'format') return byFormat(sessions);
     return byStakes(sessions);
-  }, [breakdown, sessions, venues]);
+  }, [active, sessions, venues]);
 
   const recent = useMemo(
     () => sessions.filter((session) => session.endedAt !== null).slice(0, 5),
@@ -165,11 +194,7 @@ export default function DashboardScreen() {
       <SectionHeader
         title="Where the money comes from"
         action={
-          <ChipGroup
-            options={BREAKDOWN_OPTIONS}
-            value={breakdown}
-            onChange={setBreakdown}
-          />
+          <ChipGroup options={breakdownOptions} value={active} onChange={setBreakdown} />
         }
       />
       <Card>

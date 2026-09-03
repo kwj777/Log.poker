@@ -89,6 +89,25 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)`,
     ],
   },
+  {
+    // Tournaments. Existing rows are cash games, which is what the default says.
+    //
+    // `small_blind` and `big_blind` stay NOT NULL: SQLite cannot relax a column
+    // constraint without rebuilding the table, and rebuilding one that three
+    // other tables hold foreign keys into is a great deal of risk for a column
+    // that has a perfectly good sentinel available. A session with no stakes
+    // stores 0/0, which is not a poker game anybody has ever played, and
+    // `toSession` maps it back to null. Same trick as `OPEN_SESSION_ENDED_AT`
+    // on the IndexedDB side, for the same reason.
+    version: 3,
+    statements: [
+      `ALTER TABLE sessions ADD COLUMN format TEXT NOT NULL DEFAULT 'cash'`,
+      `ALTER TABLE sessions ADD COLUMN fee INTEGER`,
+      `ALTER TABLE sessions ADD COLUMN entrants INTEGER`,
+      `ALTER TABLE sessions ADD COLUMN finish_position INTEGER`,
+      `CREATE INDEX IF NOT EXISTS idx_sessions_format ON sessions(format)`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

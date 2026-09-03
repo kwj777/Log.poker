@@ -18,12 +18,16 @@ export const IMPORT_FIELDS = [
   'startedAt',
   'endedAt',
   'duration',
+  'format',
   'gameType',
   'stakes',
   'venue',
   'buyIn',
+  'fee',
   'cashOut',
   'result',
+  'entrants',
+  'finishPosition',
   'currency',
   'notes',
 ] as const;
@@ -35,12 +39,16 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   startedAt: 'Start',
   endedAt: 'End',
   duration: 'Duration',
+  format: 'Cash / tournament',
   gameType: 'Game',
   stakes: 'Stakes',
   venue: 'Site',
   buyIn: 'Buy-in',
+  fee: 'Entry fee',
   cashOut: 'Cash-out',
   result: 'Result',
+  entrants: 'Entrants',
+  finishPosition: 'Finish',
   currency: 'Currency',
   notes: 'Notes',
 };
@@ -63,7 +71,16 @@ const ALIASES: Record<ImportField, readonly string[]> = {
     'sessionlength', 'timeplayed', 'playtime', 'elapsed', 'durationhours',
     'durationminutes', 'durationmins', 'timeatable', 'tabletime',
   ],
-  gameType: ['game', 'gametype', 'variant', 'type', 'format', 'gameformat', 'limittype'],
+  // `format` and `gameformat` belong to the cash/tournament discriminator rather
+  // than to the variant: in these exports "Format" is overwhelmingly Cash or
+  // Tournament, while the variant column is called Game or Type. A wrong guess
+  // here is visible -- the preview shows what matched what before anything is
+  // written -- which is why it is worth taking the likelier reading.
+  format: [
+    'format', 'gameformat', 'sessiontype', 'sessionformat', 'tabletype',
+    'cashortournament', 'cashtournament', 'playtype',
+  ],
+  gameType: ['game', 'gametype', 'variant', 'type', 'limittype'],
   stakes: ['stakes', 'stake', 'blinds', 'blind', 'limit', 'level', 'tablestakes', 'gamelimit'],
   venue: [
     'site', 'venue', 'room', 'pokersite', 'pokerroom', 'network', 'location',
@@ -73,9 +90,19 @@ const ALIASES: Record<ImportField, readonly string[]> = {
     'buyin', 'buyins', 'totalbuyin', 'totalbuyins', 'boughtin', 'bought', 'invested',
     'totalinvested', 'amountin', 'in', 'buyinamount', 'totalbuyinamount', 'stakein',
   ],
+  fee: ['fee', 'fees', 'rake', 'entryfee', 'buyinfee', 'tournamentfee', 'totalrake', 'juice'],
   cashOut: [
     'cashout', 'cashouts', 'cashedout', 'totalcashout', 'totalcashouts', 'amountout',
     'out', 'finalstack', 'endingstack', 'endstack', 'cashoutamount', 'totalout',
+    'prize', 'prizes', 'prizewon', 'winnings2', 'payout', 'totalpayout',
+  ],
+  entrants: [
+    'entrants', 'players', 'fieldsize', 'field', 'runners', 'totalentrants',
+    'numberofentrants', 'playersentered', 'totalplayers',
+  ],
+  finishPosition: [
+    'finish', 'finishposition', 'finishingposition', 'place', 'placed', 'position',
+    'rank', 'finishedin', 'placefinished',
   ],
   result: [
     'result', 'results', 'profit', 'net', 'netprofit', 'netwon', 'netwin', 'won',

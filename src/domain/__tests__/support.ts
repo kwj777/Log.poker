@@ -1,12 +1,12 @@
 /** Builders so the math tests read as poker scenarios, not object literals. */
 
-import type { Rebuy, SessionWithChildren, Stakes, Venue } from '../types';
+import type { Rebuy, SessionFormat, SessionWithChildren, Stakes, Venue } from '../types';
 
 export const HOUR = 3_600_000;
 export const T0 = 1_700_000_000_000;
 
-export const STAKES_1_2: Stakes = { smallBlind: 100, bigBlind: 200, currency: 'USD' };
-export const STAKES_2_5: Stakes = { smallBlind: 200, bigBlind: 500, currency: 'USD' };
+export const STAKES_1_2: Stakes = { smallBlind: 100, bigBlind: 200 };
+export const STAKES_2_5: Stakes = { smallBlind: 200, bigBlind: 500 };
 
 export const venue = (overrides: Partial<Venue> = {}): Venue => ({
   id: 'venue-1',
@@ -23,9 +23,14 @@ let counter = 0;
 export interface SessionSpec {
   id?: string;
   venueId?: string;
+  format?: SessionFormat;
   gameType?: SessionWithChildren['gameType'];
-  stakes?: Stakes;
+  stakes?: Stakes | null;
+  currency?: string;
   buyIn?: number;
+  fee?: number | null;
+  entrants?: number | null;
+  finishPosition?: number | null;
   cashOut?: number | null;
   startedAt?: number;
   /** Convenience: session length in hours, converted to an end timestamp. */
@@ -55,12 +60,21 @@ export const session = (spec: SessionSpec = {}): SessionWithChildren => {
     updatedAt: startedAt,
   }));
 
+  const format: SessionFormat = spec.format ?? 'cash';
+
   return {
     id,
     venueId,
+    format,
     gameType: spec.gameType ?? 'NLHE',
-    stakes: spec.stakes ?? STAKES_1_2,
+    // A tournament never carries stakes, exactly as `buildSession` enforces, so
+    // a test cannot accidentally construct a session the app could not store.
+    stakes: format === 'tournament' ? null : spec.stakes !== undefined ? spec.stakes : STAKES_1_2,
+    currency: spec.currency ?? 'USD',
     buyIn: spec.buyIn ?? 30_000,
+    fee: format === 'tournament' ? (spec.fee ?? null) : null,
+    entrants: format === 'tournament' ? (spec.entrants ?? null) : null,
+    finishPosition: format === 'tournament' ? (spec.finishPosition ?? null) : null,
     cashOut: spec.cashOut !== undefined ? spec.cashOut : null,
     startedAt,
     endedAt,

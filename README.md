@@ -42,6 +42,9 @@ over in Untilt beside the monetization document it extends.
   [The variance model](#the-variance-model).
 - **Session history** -- filter by period, venue and game type; every filter
   recomputes the totals above the list.
+- **Tournaments** -- entry and fee kept apart, re-entries, field size and where
+  you finished, with ROI and a cash rate that says how much it can be trusted.
+  See [Tournaments](#tournaments).
 - **Session-summary import** -- bring an online history in from a CSV your site
   or your tracker exported, rather than typing out a year of sessions. See
   [Importing an online history](#importing-an-online-history).
@@ -74,7 +77,7 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test            # 435 unit tests
+npm test            # 523 unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
 npm run check:prose # house style: no en or em dashes, American spellings
@@ -283,6 +286,7 @@ src/
     handNotation.ts       "AsKd" -- the stable hand-off format
     stats.ts              P/L, hourly rate, bankroll curve, groupings
     variance.ts           win rate, standard deviation, confidence bands
+    tournaments.ts        ROI, cash rate, dry runs, and what they are worth
   data/
     repository.ts         the storage contract
     sql/                  SqlRepository over a narrow SqlDriver
@@ -322,26 +326,32 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 16 passed
-Tests:       401 passed
+Test Suites: 19 passed
+Tests:       523 passed
 
-  sqlRepository      66   the SQLite path, against real SQLite
-  dexieRepository    66   the IndexedDB path, against real IndexedDB
-  sessionImport      40   reading a session-summary export
-  values             36   money, dates, durations, stakes, game types
-  variance           31   win rate, σ, confidence bands, verdicts
-  stats              29   P/L, rebuys, duration, hourly rate, groupings
-  palette            22   the theme matches BRAND.md
+  sqlRepository      75   the SQLite path, against real SQLite
+  dexieRepository    75   the IndexedDB path, against real IndexedDB
+  sessionImport      52   reading a session-summary export
+  stats              39   P/L, rebuys, duration, hourly rate, groupings
+  values             36   money, dates, durations, stakes, formats, counts
+  variance           35   win rate, σ, confidence bands, verdicts
+  site               29   the marketing front door
+  palette            27   the theme matches BRAND.md
+  tournaments        26   ROI, cash rate, dry runs, finishes
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
   chip               17   /chip resolves, offline, and never quotes a price
   handNotation       16   parse, round-trip, hand classes
-  seed               10   the demo dataset stays coherent
+  migrations         13   a filled v2 database opened at v3, both engines
+  seed               13   the demo dataset stays coherent
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
-  columns             5   header matching
+  columns             7   header matching
 ```
+
+`npm run check:prose` is a separate pass over the house style (American
+spellings, no en or em dashes). It is not part of `npm test`.
 
 ### Money
 
@@ -364,6 +374,11 @@ time, `σ² = Σ(rᵢ − ŵ·hᵢ)² / Σhᵢ`, with a Bessel-style correction 
 parameter estimated from the same data. Results are normalized to big blinds so
 sessions across different stakes pool into one estimate.
 
+**This model is for cash games only.** `toObservations` drops tournaments, and
+[Tournaments](#tournaments) explains why at length. It also drops any session
+with no measurable duration or no recorded blinds, since neither can be turned
+into a result per hour.
+
 Below eight sessions or twenty hours the view says it doesn't have enough data
 rather than inventing a verdict. Above it, the copy is written to be true *and*
 calming: a rough stretch inside the band is named as ordinary, an outlier is
@@ -376,6 +391,57 @@ they are "due".
 Hole cards are stored as `"AsKd"` -- rank then suit, two characters per card, the
 format every other poker tool already speaks. That is what makes the TiltProof
 hand-off possible without a translation layer, and what a CSV export will emit.
+
+---
+
+## Tournaments
+
+A tournament is not a cash session with different words, so it is a discriminator
+on the record rather than a tag on the side. `Session.format` is `cash` or
+`tournament`, and the format decides which fields the session is allowed to
+carry: a tournament has an entry fee, a field size and a finishing position and
+no blinds; a cash game has blinds and none of the other three. That is enforced
+in `buildSession` rather than trusted from the caller, so a `$1/$2` tournament
+cannot reach the database for some later screen to render.
+
+The entry fee is kept apart from the buy-in because that is how every tournament
+is advertised (`$100+$10`), because players think in those terms, and because a
+year of rake is worth being able to total. Both count as invested, so an ROI is
+measured against what actually left the bankroll. A re-entry is a rebuy in the
+same table, labeled differently on screen.
+
+Since a tournament has no blinds, `Session.stakes` is nullable, and the currency
+that used to live inside it now sits on the session where both formats can reach
+it. A cash session whose blinds were never recorded (which an import can produce)
+is null in exactly the same way, and each storage engine encodes that as it can:
+IndexedDB stores null, and SQLite stores `0/0`, which is not a game anybody has
+ever played.
+
+### Why there is no confidence band here
+
+The variance page draws a Gaussian random walk in big blinds per hour. A
+tournament has neither term: the blinds move every level, and the results are
+not the roughly symmetric distribution that model assumes. A tournament player
+loses their entry most nights and is carried by a handful of deep runs. Running
+that through the cash model would produce a band that looks exactly as
+authoritative as the real one and means nothing, which is worse than showing
+nothing at all.
+
+So the tournament card shows what can be said honestly:
+
+- **ROI and cash rate** as descriptions of what happened. Below a hundred entries
+  the copy says outright that this is a record rather than a measurement, because
+  one final table moves the number a long way.
+- **The dry run**, which is the one genuinely inferential number here, and it is
+  honest because it needs no distribution at all. Whether an entry cashes is
+  independent of the last one, so the chance of missing `n` in a row is
+  `(1 - rate)^n`. Sixteen without a cash at a 20% rate is a 2.8% run: unusual,
+  and not a sign anything has changed. That is the question a tournament player
+  actually asks at two in the morning, and it usually has a calming answer.
+
+A bootstrap over the player's own results would give a real interval on ROI and
+is the obvious next step. It is not here yet, and a Gaussian stand-in in the
+meantime would be the exact thing this section is about.
 
 ---
 
@@ -403,6 +469,12 @@ marks, `1.234,56` as well as `1,234.56`, and `(52.50)` for a negative. Day-first
 and month-first dates are told apart by scanning the whole column for a day past
 the twelfth -- and when a file never proves it either way, the screen says so and
 offers a toggle instead of picking silently.
+
+Tournaments come in through the same door. A row is read as one when the file
+says so (`Tournament`, `MTT`, `SNG`, `Sit & Go`) or when it carries something
+only a tournament has: an entry fee, a field size, a finishing position. `Prize`
+reads as the cash-out, and `Format` is matched to cash-or-tournament while the
+variant stays on `Game`.
 
 **It does not read hand histories.** A hand history is an action-level record of
 one hand; Log's `Hand` is a journal entry *about* a hand -- hole cards, position,
@@ -450,19 +522,23 @@ Ordered roughly by how much each is worth against how much it costs.
    stay one codebase. Web entitlements via Stripe through the same RevenueCat
    account.
 4. **Online session support** -- [importing a session summary](#importing-an-online-history)
-   is the half of this that already ships. The rest is multi-table sessions and
-   hands per hour, which need `sessions` to grow a `format` discriminator and the
-   hourly-rate math to become per-table: wall-clock hours stop meaning one thing
-   the moment four tables are open.
-5. **Deep Untilt and TiltProof integration** -- the seams already exist in
+   and [tournaments](#tournaments) are the halves of this that already ship, and
+   `sessions` has its `format` discriminator. What is left is multi-table
+   sessions and hands per hour, which need the hourly-rate math to become
+   per-table: wall-clock hours stop meaning one thing the moment four tables are
+   open.
+5. **A real interval on tournament ROI** -- a bootstrap over the player's own
+   results, which needs no assumption about the shape of the payouts. It is the
+   one thing the tournament card is currently honest about not having.
+6. **Deep Untilt and TiltProof integration** -- the seams already exist in
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
    real payload -- the flagged hand into a TiltProof drill, the rough stretch
    into the matching Untilt exercise -- and eventually share an account across
    the three apps.
-6. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
+7. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
 
-Also wanted, smaller: tournament support, session photos of the chip stack,
+Also wanted, smaller: session photos of the chip stack,
 Apple Health style weekly summaries, an Apple Watch companion for the timer, and
 per-venue rake tracking.
 

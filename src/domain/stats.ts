@@ -4,17 +4,30 @@
  * every number on screen is reproducible in a unit test.
  */
 
-import { stakesKey, formatStakes } from './money';
-import type { Cents, GameType, Rebuy, Session, SessionWithChildren, Venue } from './types';
+import { formatEntry, formatStakes, stakesKey } from './money';
+import {
+  SESSION_FORMAT_LABELS,
+  type Cents,
+  type GameType,
+  type Rebuy,
+  type Session,
+  type SessionWithChildren,
+  type Stakes,
+  type Venue,
+} from './types';
 
 export const MS_PER_HOUR = 3_600_000;
 
 export const rebuyTotal = (rebuys: readonly Rebuy[]): Cents =>
   rebuys.reduce((sum, rebuy) => sum + rebuy.amount, 0);
 
-/** Everything the player put on the table: initial buy-in plus every rebuy. */
+/**
+ * Everything the session cost: buy-in, the tournament entry fee where there is
+ * one, and every rebuy. The fee counts because it is money that left the
+ * bankroll -- leaving it out would flatter every tournament ROI by the rake.
+ */
 export const totalInvested = (session: Session, rebuys: readonly Rebuy[]): Cents =>
-  session.buyIn + rebuyTotal(rebuys);
+  session.buyIn + (session.fee ?? 0) + rebuyTotal(rebuys);
 
 /**
  * Net result. Null while the session is live -- a running session has no P/L yet,
@@ -201,10 +214,37 @@ const groupBy = (
     .sort((a, b) => b.net - a.net);
 };
 
+/**
+ * Cash sessions by stakes. Tournaments are absent rather than bucketed together:
+ * they have no blinds, and a "no stakes" bar sitting next to $1/$2 and $2/$5
+ * would read as a stake level rather than as the wrong question. `byBuyIn` is
+ * the tournament equivalent.
+ */
 export const byStakes = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
+  groupBy(
+    sessions.filter((session) => session.format === 'cash' && session.stakes !== null),
+    (session) => ({
+      key: stakesKey(session.stakes as Stakes, session.currency),
+      label: formatStakes(session.stakes as Stakes, session.currency),
+    }),
+  );
+
+/** Tournaments by what one entry cost -- the level a tournament player thinks in. */
+export const byBuyIn = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
+  groupBy(
+    sessions.filter((session) => session.format === 'tournament'),
+    (session) => ({
+      // Keyed on the two halves rather than their sum, so `$100+$10` and
+      // `$110` stay apart: they cost the same and are not the same tournament.
+      key: `${session.currency}:${session.buyIn}+${session.fee ?? 0}`,
+      label: formatEntry(session.buyIn, session.fee, session.currency),
+    }),
+  );
+
+export const byFormat = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
   groupBy(sessions, (session) => ({
-    key: stakesKey(session.stakes),
-    label: formatStakes(session.stakes),
+    key: session.format,
+    label: SESSION_FORMAT_LABELS[session.format],
   }));
 
 export const byGameType = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>

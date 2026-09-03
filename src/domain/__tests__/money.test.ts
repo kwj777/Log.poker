@@ -111,6 +111,6 @@ describe('stakes', () => {
   });
 
   it('separates the same numbers in different currencies', () => {
-    expect(stakesKey(STAKES_1_2)).not.toBe(stakesKey({ ...STAKES_1_2, currency: 'EUR' }));
+    expect(stakesKey(STAKES_1_2, 'USD')).not.toBe(stakesKey(STAKES_1_2, 'EUR'));
   });
 });

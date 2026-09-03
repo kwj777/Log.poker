@@ -13,6 +13,7 @@
 
 import type {
   GameType,
+  SessionFormat,
   Hand,
   MoodEntry,
   NewHand,
@@ -29,6 +30,7 @@ import type {
 
 export interface SessionFilter {
   venueId?: string;
+  format?: SessionFormat;
   gameType?: GameType;
   /** Inclusive lower bound on `startedAt`. */
   from?: Timestamp;
@@ -41,7 +43,21 @@ export interface SessionFilter {
 
 export type VenuePatch = Partial<NewVenue>;
 export type SessionPatch = Partial<
-  Pick<Session, 'venueId' | 'gameType' | 'stakes' | 'buyIn' | 'cashOut' | 'startedAt' | 'endedAt' | 'notes'>
+  Pick<
+    Session,
+    | 'venueId'
+    | 'gameType'
+    | 'stakes'
+    | 'currency'
+    | 'buyIn'
+    | 'fee'
+    | 'cashOut'
+    | 'entrants'
+    | 'finishPosition'
+    | 'startedAt'
+    | 'endedAt'
+    | 'notes'
+  >
 >;
 export type HandPatch = Partial<
   Pick<Hand, 'holeCards' | 'position' | 'note' | 'tags' | 'amount' | 'at'>

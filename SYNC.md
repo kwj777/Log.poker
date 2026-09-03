@@ -275,7 +275,7 @@ order is chosen so that the riskiest work is done before anything depends on it.
 | | Phase | Ships | Roughly |
 |---|---|---|---|
 | **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
-| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Built, both halves** | 3 to 4 days, most of it in Untilt |
+| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Done**, behind `ALLOW_SIGN_IN` | 3 to 4 days, most of it in Untilt |
 | **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | The feature | 5 to 8 days |
 | **3** | RevenueCat `log_plus`, the offering, the both-singles rule, store review | The purchase | 3 to 5 days |
 
@@ -355,9 +355,30 @@ allowlist scoped to the two endpoints the apps use. Nothing newly reachable
 came with it, because those endpoints already answered a caller with no
 `Origin` at all, which is what has always let a native app in.
 
-**No sign-in screen was built.** That is now the only thing left in phase 1,
-and it is a screen rather than a question: the client and the server both
-answer.
+**The screen is built**, in `src/features/account`, and phase 1 is done. Two
+steps, an address then the code mailed to it, and never the link, for the
+reason Untilt already found: mail opens links in the browser, so somebody
+tapping one on a phone is signed in to Safari and comes back to an app as
+signed out as they left it.
+
+The copy carries the rule the endpoint is built around, at the last place it
+can die. `/api/signin` answers the same whether or not Stripe has heard of the
+address, on purpose, and a screen saying *check your inbox* throws that away on
+the client where nobody reviewing the server would see it. So the confirmation
+is conditional, the code refusal never guesses why, and both are asserted.
+
+**It is behind `ALLOW_SIGN_IN`, which is `__DEV__`.** Signing in unlocks
+nothing until there is something to sync to, and somebody who typed an address,
+waited for mail and read a code off a phone would arrive back at a screen that
+looks exactly as it did before. That is worse than an absence. Flipping the one
+constant when phase 2 lands is the whole of shipping it.
+
+What it buys meanwhile is the thing nothing else could do: the chain runs end to
+end in a browser. Ask, redeem, hold, reload, sign out; both requests carrying
+`Accept: application/json`; the token parsed from a genuinely signed fixture and
+still held after a reload, which is the `localStorage` adapter doing its job.
+Two halves tested against fakes and joined by a written contract is exactly the
+arrangement that hides a bug from both sides, and it had already hidden one.
 
 Two things worth carrying forward from building it. The token counts its expiry
 in **seconds** where everything in Log counts milliseconds, which is a factor of

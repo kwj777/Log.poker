@@ -604,7 +604,20 @@ the whole of what separates the two shapes. `src/auth/signin.ts` speaks that
 contract and is tested against a fake `fetch`, which is as far as a client in a
 different repository can prove anything.
 
-**What is left is a sign-in screen**, and nothing else. See [SYNC.md](SYNC.md).
+The screen is in `src/features/account`: an address, then the code mailed to
+it, and never the link, because mail opens links in the browser and an installed
+app keeps its own storage.
+
+**It is behind `ALLOW_SIGN_IN`, which is `__DEV__`**, the same treatment the
+demo seeder gets and for the same reason: signing in unlocks nothing until there
+is something to sync to, and a form that cannot succeed is worse than an
+absence. One constant flips when phase 2 lands.
+
+The copy has tests, which most copy should not. `/api/signin` answers the same
+whether or not it has heard of an address, deliberately, so that nobody can use
+it to ask which addresses have bought. A screen that said *check your inbox*
+would throw that away on the client, where no review of the server would catch
+it. So the confirmation is conditional and the refusal never guesses why.
 
 ### Testing
 
@@ -614,8 +627,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 26 passed
-Tests:       726 passed
+Test Suites: 27 passed
+Tests:       739 passed
 
   sqlRepository      86   the SQLite path, against real SQLite
   dexieRepository    86   the IndexedDB path, against real IndexedDB
@@ -635,6 +648,7 @@ Tests:       726 passed
   money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
   token              16   the family token grammar, against signed fixtures
+  copy               13   what the sign-in is allowed to say
   seed               13   the demo dataset stays coherent
   session            12   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
@@ -831,8 +845,8 @@ Ordered roughly by how much each is worth against how much it costs.
    and tested, and `listChangedSince` is the seam the engine plugs into. See
    [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
    has landed too**, in `src/auth`; see
-   [Signing in](#signing-in-and-what-it-is-for), with the endpoint it needs now
-   built in Untilt. What is left is a sign-in screen, and then the engine.
+   [Signing in](#signing-in-and-what-it-is-for). **Phase 1 is done**, screen and
+   all. What is left is the engine itself.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

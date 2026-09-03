@@ -1,5 +1,5 @@
 /**
- * Parse a file, write it, read it back — the whole import path against a real
+ * Parse a file, write it, read it back -- the whole import path against a real
  * SQLite engine.
  *
  * The unit tests either side of this one prove the parser reads a file and the

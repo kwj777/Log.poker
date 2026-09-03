@@ -4,7 +4,7 @@
  * Expo Router manages the document head through react-helmet, which renders its
  * own `<title>` element ahead of anything written in `+html.tsx`. `document.title`
  * resolves to the *first* title in the head, so a static title in the shell is
- * silently overridden by helmet's empty one — the browser tab ends up blank.
+ * silently overridden by helmet's empty one -- the browser tab ends up blank.
  * Setting it here is what actually reaches the tab, the bookmark and the
  * pre-rendered HTML.
  */

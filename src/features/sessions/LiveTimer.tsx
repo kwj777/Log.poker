@@ -3,7 +3,7 @@
  *
  * Ticks once a minute, not once a second: the display has minute resolution, and
  * a per-second interval would wake the JS thread 60× more often for no visible
- * change — which matters on a phone sitting in a pocket for six hours.
+ * change -- which matters on a phone sitting in a pocket for six hours.
  */
 
 import { useEffect, useState } from 'react';
@@ -12,7 +12,7 @@ import { formatDuration } from '../../domain/stats';
 
 /**
  * Milliseconds since `startedAt`, or 0 when there is no session. Accepts null so
- * a caller can invoke the hook unconditionally — as the rules of hooks require —
+ * a caller can invoke the hook unconditionally -- as the rules of hooks require --
  * without inventing a start time by reading the clock during render.
  */
 export const useElapsed = (startedAt: number | null): number => {

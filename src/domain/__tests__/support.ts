@@ -1,4 +1,4 @@
-/** Builders so the maths tests read as poker scenarios, not object literals. */
+/** Builders so the math tests read as poker scenarios, not object literals. */
 
 import type { Rebuy, SessionWithChildren, Stakes, Venue } from '../types';
 

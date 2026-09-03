@@ -1,17 +1,17 @@
 /**
- * Variance analysis — the anti-tilt maths.
+ * Variance analysis -- the anti-tilt math.
  *
  * The question this answers is the one every losing stretch provokes: "am I
  * running bad, or am I playing bad?" Statistics can't fully separate those, but
  * it can say whether a stretch is *unremarkable* for a player with your win rate
- * and your swings — and for most rough stretches, it is.
+ * and your swings -- and for most rough stretches, it is.
  *
  * Model
  * -----
  * Results are treated as a random walk in time: over `h` hours a player with win
  * rate `w` (big blinds per hour) and per-hour standard deviation `σ` has a result
  * with mean `w·h` and standard deviation `σ·√h`. Both parameters are estimated
- * from the player's own completed sessions — never from a hard-coded "typical"
+ * from the player's own completed sessions -- never from a hard-coded "typical"
  * number, which would be a guess dressed up as a measurement.
  *
  * Everything is computed in **big blinds**, not currency, so sessions across
@@ -74,8 +74,8 @@ export interface PlayerEstimate {
  * Estimate win rate and per-hour standard deviation from a player's own results.
  *
  * Win rate is total big blinds over total hours. Standard deviation uses the
- * method-of-moments estimator for a variance that scales with time —
- * `σ² = Σ(rᵢ − ŵ·hᵢ)² / Σhᵢ` — with a Bessel-style `n/(n−1)` correction for the
+ * method-of-moments estimator for a variance that scales with time --
+ * `σ² = Σ(rᵢ − ŵ·hᵢ)² / Σhᵢ` -- with a Bessel-style `n/(n−1)` correction for the
  * one parameter (`ŵ`) estimated from the same data.
  */
 export const estimatePlayer = (observations: readonly SessionObservation[]): PlayerEstimate => {
@@ -264,7 +264,7 @@ export const assessRecentStretch = (
       ...filled,
       verdict: 'running_bad',
       headline: 'A genuinely rough stretch',
-      body: `${swing} That's outside your usual band — the coldest 2.5% of runs. Stretches like this happen to winning players; they're the tail of the same distribution, not a different game. Nothing in this number says your edge is gone. It does say this is a good week to protect your bankroll and your head.`,
+      body: `${swing} That's outside your usual band, the coldest 2.5% of runs. Stretches like this happen to winning players; they're the tail of the same distribution, not a different game. Nothing in this number says your edge is gone. It does say this is a good week to protect your bankroll and your head.`,
       suggestsUntilt: true,
     };
   }
@@ -273,7 +273,7 @@ export const assessRecentStretch = (
     return {
       ...filled,
       verdict: 'below_expectation',
-      headline: "You're running below expectation — and it's normal",
+      headline: "You're running below expectation, and it's normal",
       body: `${swing} That's inside the range you'd expect from your own win rate and swings, which means this stretch is variance doing what variance does. Keep the sessions honest and it evens out over a much longer sample than this one.`,
       suggestsUntilt: true,
     };
@@ -284,7 +284,7 @@ export const assessRecentStretch = (
       ...filled,
       verdict: 'running_hot',
       headline: "You're running well above expectation",
-      body: `${swing} That's the hottest 2.5% of runs for a player with your numbers. Worth knowing so you don't bank on it continuing — your true win rate is almost certainly lower than this stretch suggests.`,
+      body: `${swing} That's the hottest 2.5% of runs for a player with your numbers. Worth knowing so you don't bank on it continuing: your true win rate is almost certainly lower than this stretch suggests.`,
       suggestsUntilt: false,
     };
   }
@@ -303,7 +303,7 @@ export const assessRecentStretch = (
     ...filled,
     verdict: 'normal',
     headline: 'Right where you should be',
-    body: `${swing} This stretch sits in the middle of your normal range — about as ordinary as results get.`,
+    body: `${swing} This stretch sits in the middle of your normal range, about as ordinary as results get.`,
     suggestsUntilt: false,
   };
 };

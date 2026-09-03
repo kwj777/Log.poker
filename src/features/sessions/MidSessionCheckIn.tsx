@@ -3,7 +3,7 @@
  *
  * Deliberately subtle: an inline card, never a modal, never a notification, and
  * it appears at most once per session after two hours of play. The brief is
- * "subtle prompt" and the reason is behavioural — a check-in that interrupts a
+ * "subtle prompt" and the reason is behavioural -- a check-in that interrupts a
  * hand is one the player learns to dismiss, and a dismissed prompt collects no
  * data and defuses no tilt.
  */
@@ -47,7 +47,7 @@ export const MidSessionCheckIn = ({ session, elapsedMs }: MidSessionCheckInProps
   return (
     <Card style={styles.card}>
       <View style={styles.headerRow}>
-        <Text variant="bodyStrong">Quick check — how’s your head?</Text>
+        <Text variant="bodyStrong">Quick check: how’s your head?</Text>
         <Button label="Not now" variant="ghost" size="small" onPress={dismiss} />
       </View>
       <Text variant="caption" color={colors.textTertiary} style={styles.hint}>

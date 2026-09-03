@@ -2,8 +2,8 @@
  * The live session.
  *
  * This is the screen that is open on a phone face-down next to a stack of chips,
- * so it is built around three things a player does mid-session — rebuy, log a
- * hand, cash out — each one tap from the top of the screen. Everything else is
+ * so it is built around three things a player does mid-session -- rebuy, log a
+ * hand, cash out -- each one tap from the top of the screen. Everything else is
  * information, not interaction.
  */
 
@@ -58,7 +58,7 @@ export default function ActiveSessionScreen() {
       <Screen>
         <PageMeta title="Live session · Log" />
         <View style={styles.empty}>
-          <Text variant="heading" centre>
+          <Text variant="heading" center>
             No session running
           </Text>
           <Button
@@ -175,7 +175,7 @@ export default function ActiveSessionScreen() {
           <Card>
             <Text color={colors.textSecondary}>
               Nothing logged yet. Tap <Text variant="bodyStrong">Log hand</Text> when something
-              is worth remembering — it takes about ten seconds.
+              is worth remembering. It takes about ten seconds.
             </Text>
           </Card>
         ) : (

@@ -1,5 +1,5 @@
 /**
- * Web repository factory — IndexedDB via Dexie.
+ * Web repository factory -- IndexedDB via Dexie.
  *
  * Mirrors `repositoryFactory.ts`; see that file for why the split exists.
  */

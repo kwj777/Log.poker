@@ -27,7 +27,7 @@ export const selectSessionById = (
 
 /**
  * In-memory equivalent of `Repository.listSessions(filter)`, for the history
- * screen — same semantics, including `from` inclusive and `to` exclusive, so the
+ * screen -- same semantics, including `from` inclusive and `to` exclusive, so the
  * two never disagree about which sessions a date range contains.
  */
 export const filterSessions = (

@@ -42,7 +42,7 @@ states derive from the same geometry rather than redrawing it.
 
 ### How it is drawn
 
-Two decisions, both made by rasterising it rather than by looking at it, and
+Two decisions, both made by rasterizing it rather than by looking at it, and
 both now settled.
 
 **The baseline is drawn once.** Sharing a common baseline means one line, not
@@ -53,7 +53,7 @@ it. The line they stand on is gold, which is Ground, which is the point.
 
 **The canopy ramp had to climb past sage, not below it.** The palette's own
 three greens measure 1.76:1, 2.68:1 and 3.55:1 on the ground, which is one step
-and a rumour: the darkest is already invisible, which is why gold used to be on
+and a rumor: the darkest is already invisible, which is why gold used to be on
 the outside at all.
 
 | Ring | Color | On the ground | Step |
@@ -69,7 +69,7 @@ border should be quiet. It is not a stroke color on this ground.
 
 **One measurement that looked alarming and was the wrong instrument.** Gold on
 the outer ring is 1.06:1, so on paper Untilt's lit ring should vanish into its
-neighbour. It does not: those two are 56 degrees apart in hue, and a contrast
+neighbor. It does not: those two are 56 degrees apart in hue, and a contrast
 ratio answers whether text is legible rather than whether one ring looks
 different from the next. Warm against cool carries it at equal brightness. The
 number is only the right tool for type.
@@ -506,7 +506,7 @@ than a bright yellow, and this is that. It reads better on Untilt's felt too,
 8.20:1 against 7.66:1.
 
 Three things in that repo would have shipped broken from a search and replace,
-and they are worth knowing because two of them generalise. The five legal pages
+and they are worth knowing because two of them generalize. The five legal pages
 share one inline style block admitted by a single CSP hash, so a color change
 unstyles them in production with no error anywhere. The social card's test
 identifies the mark by pixel range and its blue ceiling fitted only the old

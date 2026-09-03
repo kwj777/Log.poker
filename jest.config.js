@@ -1,5 +1,5 @@
 /**
- * Tests cover the data layer and the domain maths — pure TypeScript with no
+ * Tests cover the data layer and the domain math -- pure TypeScript with no
  * React Native imports, so they run on plain ts-jest in Node rather than
  * needing the (much slower) jest-expo native preset.
  */

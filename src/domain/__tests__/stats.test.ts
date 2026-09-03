@@ -10,7 +10,7 @@ import {
   isComplete,
   netResult,
   rebuyTotal,
-  summarise,
+  summarize,
   totalInvested,
   totals,
 } from '../stats';
@@ -96,10 +96,10 @@ describe('hourly rate', () => {
   });
 });
 
-describe('summarise', () => {
+describe('summarize', () => {
   it('bundles invested, net, hours and hourly for one session', () => {
     const s = completed({ buyIn: 20_000, cashOut: 50_000, hours: 3, rebuys: [20_000] });
-    expect(summarise(s)).toMatchObject({ invested: 40_000, net: 10_000, hours: 3, hourly: 3_333 });
+    expect(summarize(s)).toMatchObject({ invested: 40_000, net: 10_000, hours: 3, hourly: 3_333 });
   });
 });
 
@@ -163,7 +163,7 @@ describe('totals', () => {
 });
 
 describe('bankroll curve', () => {
-  it('accumulates results in the order they were realised', () => {
+  it('accumulates results in the order they were realized', () => {
     const curve = bankrollCurve([
       completed({ id: 'c', startedAt: T0 + 20 * HOUR, hours: 2, buyIn: 100, cashOut: 400 }),
       completed({ id: 'a', startedAt: T0, hours: 2, buyIn: 100, cashOut: 300 }),

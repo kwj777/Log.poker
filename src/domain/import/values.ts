@@ -10,7 +10,7 @@
  * the same amount written by two locales; `03/04/2024` is two different days
  * depending on which side of the Atlantic exported it. The rules below are
  * written out rather than delegated to `Date.parse`, which is permitted by spec
- * to accept almost anything and does — including reading `03/04/2024` one way on
+ * to accept almost anything and does -- including reading `03/04/2024` one way on
  * one engine and another way somewhere else.
  */
 
@@ -54,7 +54,7 @@ export interface ParsedMoney {
 /**
  * Work out which of `.` and `,` is the decimal separator, then strip the other.
  *
- * With both present the last one wins — `1.234,50` is European, `1,234.50` is
+ * With both present the last one wins -- `1.234,50` is European, `1,234.50` is
  * not. With only commas, one comma trailed by one or two digits is a decimal
  * (`1,50`); anything else is a thousands separator (`1,234` and `1,234,567`).
  * With only dots, more than one means thousands (`1.234.567`).
@@ -88,7 +88,7 @@ const toNumeric = (digits: string): number | null => {
 /**
  * Read a money cell.
  *
- * Accepts `$1,240.50`, `-40`, `1.234,56 EUR`, and `(52.50)` — accounting
+ * Accepts `$1,240.50`, `-40`, `1.234,56 EUR`, and `(52.50)` -- accounting
  * parentheses for a negative, which is what a spreadsheet exports and what
  * `parseAmount` in `money.ts` would read as a *positive* fifty-two fifty. That
  * difference is the reason this lives here rather than reusing that function:
@@ -136,7 +136,7 @@ const expandYear = (year: number, digits: number): number => {
  *
  * A single `03/04/2024` is unknowable, but a column containing one `13/04/2024`
  * settles the whole column. Returns `unknown` when the column never proves it
- * either way — or, worse, proves both, which means the file is inconsistent and
+ * either way -- or, worse, proves both, which means the file is inconsistent and
  * the caller should say so rather than pick.
  */
 export const detectDateOrder = (samples: readonly string[]): DateOrder | 'unknown' => {
@@ -147,7 +147,7 @@ export const detectDateOrder = (samples: readonly string[]): DateOrder | 'unknow
     const match = DATE_TIME.exec(sample.trim());
     if (!match) continue;
     const [, first, , second, third] = match;
-    // A four-digit leading year is ISO — it says nothing about the other two.
+    // A four-digit leading year is ISO -- it says nothing about the other two.
     if (first.length === 4) continue;
     if (third.length < 3 && Number(third) <= 31) continue;
     if (Number(first) > 12) dmy = true;
@@ -166,7 +166,7 @@ export const detectDateOrder = (samples: readonly string[]): DateOrder | 'unknow
  * cell without one is read as **local time**, because that is what the player
  * meant: they played on the evening of the 15th, in the room they were sitting
  * in. A trailing zone abbreviation like PokerStars' `ET` is ignored rather than
- * guessed at — `ET` is two different offsets depending on the month.
+ * guessed at -- `ET` is two different offsets depending on the month.
  */
 export const parseTimestamp = (input: string, order: DateOrder = 'mdy'): number | null => {
   const text = input.trim();
@@ -241,7 +241,7 @@ export type DurationUnit = 'hours' | 'minutes' | 'seconds';
  * Read a duration cell as milliseconds.
  *
  * Handles `3:45` and `3:45:20` (clock form), `3h 45m` and `90m` (spelled form),
- * and a bare `3.5`, which means whatever the column header said it means — a
+ * and a bare `3.5`, which means whatever the column header said it means -- a
  * column called "Minutes" and one called "Hours" both hold bare numbers, and
  * only the header can tell them apart.
  */
@@ -292,7 +292,7 @@ const ANTE = /(?:ante|straddle|bring[- ]?in)\D{0,3}(\d[\d.,]*)/i;
 /**
  * Read a stakes cell: `$0.25/$0.50`, `1/2`, `0,25/0,50`, `50/100 ante 12`.
  *
- * Returns `null` for anything without two blinds in it — including shorthand
+ * Returns `null` for anything without two blinds in it -- including shorthand
  * like `NL50`, which encodes a maximum buy-in rather than the blinds and means
  * different things on different sites. Inventing `$0.25/$0.50` from it would be
  * a guess dressed as a measurement, and the caller has a warning for that.
@@ -344,7 +344,7 @@ export const parseGameType = (input: string): GameType | null => {
 };
 
 /**
- * Whether any sample is a numeric date that is *not* ISO — the shape where
+ * Whether any sample is a numeric date that is *not* ISO -- the shape where
  * day-first and month-first disagree. Used to decide whether an undetermined
  * `detectDateOrder` is worth warning about: a column of `2024-01-15` is
  * unambiguous, so saying "these dates could be read two ways" would be noise.

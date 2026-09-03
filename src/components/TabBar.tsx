@@ -1,11 +1,11 @@
 /**
  * A custom bottom tab bar.
  *
- * React Navigation's default bar lays out at 43pt on web — too short for an icon
- * above a label, so the labels were clipped — and it is absolutely positioned,
- * which means content scrolls underneath it. Rather than fight both behaviours
+ * React Navigation's default bar lays out at 43pt on web -- too short for an icon
+ * above a label, so the labels were clipped -- and it is absolutely positioned,
+ * which means content scrolls underneath it. Rather than fight both behaviors
  * with style overrides that differ per platform, Log draws its own bar: one
- * height, one look, identical on iOS, Android and the web, and centred with the
+ * height, one look, identical on iOS, Android and the web, and centered with the
  * content column on desktop.
  */
 

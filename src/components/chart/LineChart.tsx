@@ -2,7 +2,7 @@
  * A small SVG line chart.
  *
  * react-native-svg renders to real SVG on web and to native drawing on iOS and
- * Android, so one implementation covers all three targets — which is the reason
+ * Android, so one implementation covers all three targets -- which is the reason
  * for hand-rolling this rather than pulling in a charting library that is
  * web-only or native-only.
  */
@@ -27,7 +27,7 @@ export interface Series {
   points: readonly Point[];
   color: string;
   width?: number;
-  /** Fills between the line and zero — used for the bankroll curve. */
+  /** Fills between the line and zero -- used for the bankroll curve. */
   fill?: string;
   dashed?: boolean;
 }
@@ -42,7 +42,7 @@ interface LineChartProps {
   series: readonly Series[];
   band?: Band;
   height?: number;
-  /** Draws a horizontal rule at y = 0 — break-even. */
+  /** Draws a horizontal rule at y = 0 -- break-even. */
   showZeroLine?: boolean;
   /** Marks the final point of the first series. */
   showEndPoint?: boolean;

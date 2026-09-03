@@ -2,13 +2,13 @@
  * A CSV/TSV reader.
  *
  * Log has no backend, so the only way an online player's history gets in here is
- * a file they exported themselves — from PokerTracker, Holdem Manager,
+ * a file they exported themselves -- from PokerTracker, Holdem Manager,
  * PokerCraft, or a spreadsheet they have kept by hand for years. Those files
  * disagree about almost everything: the delimiter, the quoting, the line
  * endings, whether there is a byte-order mark on the front.
  *
  * So this is a real RFC 4180 parser rather than `text.split(',')`. A split
- * breaks on the first session note containing a comma, and it breaks silently —
+ * breaks on the first session note containing a comma, and it breaks silently --
  * every column after it shifts by one and the import lands wrong data rather
  * than failing. The state machine below cannot do that.
  *
@@ -24,7 +24,7 @@ export interface CsvRow {
 }
 
 export interface CsvTable {
-  /** The first non-empty record. Never null — an empty source yields `[]`. */
+  /** The first non-empty record. Never null -- an empty source yields `[]`. */
   header: string[];
   rows: CsvRow[];
   delimiter: string;
@@ -42,8 +42,8 @@ export type Delimiter = (typeof DELIMITERS)[number];
 const stripBom = (text: string): string =>
   text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 
-/** Normalise CRLF and lone-CR line endings so the parser only sees `\n`. */
-const normaliseNewlines = (text: string): string => text.replace(/\r\n?/g, '\n');
+/** Normalize CRLF and lone-CR line endings so the parser only sees `\n`. */
+const normalizeNewlines = (text: string): string => text.replace(/\r\n?/g, '\n');
 
 /**
  * Count unquoted delimiters in the first physical line.
@@ -72,11 +72,11 @@ const countInHeaderLine = (line: string, delimiter: string): number => {
  *
  * Ties go to the earlier candidate, which is why `DELIMITERS` is ordered. A
  * single-column file has no delimiter to find, so it falls back to a comma and
- * parses as one column — which is what the caller should report on, rather than
+ * parses as one column -- which is what the caller should report on, rather than
  * this function guessing something more interesting.
  */
 export const sniffDelimiter = (text: string): Delimiter => {
-  const firstLine = normaliseNewlines(stripBom(text)).split('\n').find((line) => line.trim() !== '');
+  const firstLine = normalizeNewlines(stripBom(text)).split('\n').find((line) => line.trim() !== '');
   if (firstLine === undefined) return ',';
 
   let best: Delimiter = ',';
@@ -97,7 +97,7 @@ export const sniffDelimiter = (text: string): Delimiter => {
  * Quoting follows RFC 4180: a field that opens with `"` runs until the closing
  * quote, `""` inside it is a literal quote, and delimiters and newlines inside
  * it are data. A quote anywhere other than the start of a field is a literal
- * character — spreadsheets emit `5" pot` unquoted and rejecting the file over it
+ * character -- spreadsheets emit `5" pot` unquoted and rejecting the file over it
  * would be pedantry.
  *
  * Blank lines are skipped rather than yielding an empty record, because trackers
@@ -105,7 +105,7 @@ export const sniffDelimiter = (text: string): Delimiter => {
  * kept: it was written deliberately.
  */
 export const parseCsv = (text: string, delimiter: string = sniffDelimiter(text)): CsvTable => {
-  const source = normaliseNewlines(stripBom(text));
+  const source = normalizeNewlines(stripBom(text));
   const rows: CsvRow[] = [];
 
   let cells: string[] = [];
@@ -178,7 +178,7 @@ export const parseCsv = (text: string, delimiter: string = sniffDelimiter(text))
 /**
  * Read a cell by column index, tolerating a ragged row.
  *
- * Exports are ragged more often than they should be — a trailing empty column
+ * Exports are ragged more often than they should be -- a trailing empty column
  * dropped here, an extra delimiter in a note there. A missing cell reads as
  * empty, which every downstream parser already treats as "not provided".
  */

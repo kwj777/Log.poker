@@ -4,7 +4,7 @@
  * One store rather than several: every screen in Log reads some mixture of
  * sessions, hands and mood, and splitting them would mean coordinating refreshes
  * across stores for no benefit at this size. The whole dataset is held in memory
- * — a heavy live player logs a few hundred sessions a year, which is trivial —
+ * -- a heavy live player logs a few hundred sessions a year, which is trivial --
  * and the repository stays the source of truth, re-read after every write.
  */
 
@@ -227,7 +227,7 @@ export const useLogStore = create<LogState>((set, get) => ({
    * Rows already carrying a stored import key are dropped before anything is
    * written, so running the same file again next month adds only what is new.
    * The sessions themselves go in as one all-or-nothing batch; the venues they
-   * name cannot, since creating a venue is its own write — so a failure after
+   * name cannot, since creating a venue is its own write -- so a failure after
    * that point deletes the rooms this import invented rather than leaving them
    * in the picker for a session that never landed.
    */
@@ -332,7 +332,7 @@ export const useLogStore = create<LogState>((set, get) => ({
  * `useLogStore`.
  *
  * Zustand compares the selector's result by reference, so a selector that builds
- * a new array on every call reports a change on every render — which is an
+ * a new array on every call reports a change on every render -- which is an
  * infinite render loop, not merely a wasted render. Subscribing to the stored
  * array (a stable reference) and deriving inside `useMemo` keeps the comparison
  * honest.

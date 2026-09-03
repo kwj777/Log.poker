@@ -1,6 +1,6 @@
 /**
- * Session maths: profit/loss, hourly rate, and the aggregations the dashboard
- * groups by. Pure functions over plain records — no repository, no React — so
+ * Session math: profit/loss, hourly rate, and the aggregations the dashboard
+ * groups by. Pure functions over plain records -- no repository, no React -- so
  * every number on screen is reproducible in a unit test.
  */
 
@@ -17,7 +17,7 @@ export const totalInvested = (session: Session, rebuys: readonly Rebuy[]): Cents
   session.buyIn + rebuyTotal(rebuys);
 
 /**
- * Net result. Null while the session is live — a running session has no P/L yet,
+ * Net result. Null while the session is live -- a running session has no P/L yet,
  * and returning 0 would quietly drag every average toward zero.
  */
 export const netResult = (session: Session, rebuys: readonly Rebuy[]): Cents | null => {
@@ -45,7 +45,7 @@ export const formatDuration = (ms: number): string => {
 
 /**
  * Cents per hour. Null when the session is unfinished or lasted no measurable
- * time — dividing a result by a zero-length session produces Infinity, which
+ * time -- dividing a result by a zero-length session produces Infinity, which
  * would poison every downstream average.
  */
 export const hourlyRate = (session: Session, rebuys: readonly Rebuy[]): Cents | null => {
@@ -67,7 +67,7 @@ export interface SessionSummary {
   hourly: Cents | null;
 }
 
-export const summarise = (
+export const summarize = (
   session: SessionWithChildren,
   now?: number,
 ): SessionSummary => {
@@ -128,7 +128,7 @@ export const totals = (sessions: readonly SessionWithChildren[]): Totals => {
   let biggestLoss: Cents | null = null;
 
   for (const session of completed) {
-    const summary = summarise(session);
+    const summary = summarize(session);
     const result = summary.net ?? 0;
     hours += summary.hours;
     net += result;
@@ -163,8 +163,8 @@ export interface BankrollPoint {
 }
 
 /**
- * Cumulative P/L over time, oldest first — the bankroll graph's data.
- * Ordered by session end so the curve reflects when results were realised.
+ * Cumulative P/L over time, oldest first -- the bankroll graph's data.
+ * Ordered by session end so the curve reflects when results were realized.
  */
 export const bankrollCurve = (sessions: readonly SessionWithChildren[]): BankrollPoint[] => {
   const completed = sessions

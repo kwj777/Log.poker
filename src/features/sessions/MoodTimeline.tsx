@@ -1,8 +1,8 @@
 /**
  * How a session felt, start to finish.
  *
- * The whole value of the mood data is the comparison between the ends — walking
- * in calm and leaving rattled is the pattern worth seeing — so the start and end
+ * The whole value of the mood data is the comparison between the ends -- walking
+ * in calm and leaving rattled is the pattern worth seeing -- so the start and end
  * scores are shown side by side with the delta named in words.
  */
 

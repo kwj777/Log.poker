@@ -5,7 +5,7 @@
  * which are famously windowless basements with no reception. A player mid-session
  * has to be able to add a rebuy and log a hand with the network completely gone.
  *
- * That is achievable because Log has no backend — every read and write goes to
+ * That is achievable because Log has no backend -- every read and write goes to
  * IndexedDB in the browser. The only thing the network is needed for is the app
  * shell itself, so this worker's whole job is to make sure the shell is always
  * available from cache.
@@ -16,7 +16,7 @@
  *   to the cached shell. The app is a single-page build, so every route resolves
  *   to the same `index.html`.
  * - Build assets and icons: cache first. Their URLs are content-hashed by the
- *   bundler, so a cached copy can never be stale — a new build means a new URL.
+ *   bundler, so a cached copy can never be stale -- a new build means a new URL.
  * - Everything else same-origin: stale-while-revalidate.
  *
  * Bump CACHE_VERSION to force every client to discard its caches on the next load.
@@ -48,7 +48,7 @@ const isImmutableAsset = (pathname) =>
  *
  * They are content-hashed by the bundler, so they cannot be hard-coded here.
  * Without this the worker would only cache the bundle once the browser had
- * already requested it through the worker — which is one page load too late, and
+ * already requested it through the worker -- which is one page load too late, and
  * would leave the very first offline visit staring at a blank page.
  */
 const shellSubresources = (html) => {

@@ -1,5 +1,5 @@
 /**
- * IndexedDB-backed repository — the web implementation.
+ * IndexedDB-backed repository -- the web implementation.
  *
  * Behaviourally identical to `SqlRepository`; the shared conformance suite in
  * `src/data/__tests__/repositoryContract.ts` runs against both to keep it that way.
@@ -92,7 +92,7 @@ const fromSession = (session: Session): SessionRecord => ({
   startedAt: session.startedAt,
   endedAt: session.endedAt ?? OPEN_SESSION_ENDED_AT,
   notes: session.notes,
-  // Spread rather than assigned: see `SessionRecord.importKey` — the property
+  // Spread rather than assigned: see `SessionRecord.importKey` -- the property
   // has to be absent, not null, or the unique index would reject the second
   // hand-logged session.
   ...(session.importKey === null ? {} : { importKey: session.importKey }),

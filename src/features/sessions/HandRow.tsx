@@ -1,7 +1,7 @@
 /**
  * One logged hand, as it appears in a session.
  *
- * Cards first and largest — that is what a player scans for when looking back
+ * Cards first and largest -- that is what a player scans for when looking back
  * at a night. The note is truncated to one line here; the full text lives in
  * the hand itself.
  */
@@ -22,7 +22,7 @@ interface HandRowProps {
   currency?: string;
   /**
    * Shows the TiltProof hand-off on hands tagged "misplayed?". Off in the live
-   * session — sending a player out to a training app mid-session is the last
+   * session -- sending a player out to a training app mid-session is the last
    * thing this app should do.
    */
   showDrillLink?: boolean;

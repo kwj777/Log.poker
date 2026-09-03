@@ -28,10 +28,10 @@ export const EmptyState = ({ title, body, action }: EmptyStateProps) => (
         expecting content, so the mark is a watermark behind the sentence that
         explains it rather than the thing they have to look at first. */}
     <Image source={MARK} style={styles.mark} resizeMode="contain" accessibilityIgnoresInvertColors />
-    <Text variant="heading" centre>
+    <Text variant="heading" center>
       {title}
     </Text>
-    <Text color={colors.textSecondary} centre style={styles.body}>
+    <Text color={colors.textSecondary} center style={styles.body}>
       {body}
     </Text>
     {action ? <View style={styles.action}>{action}</View> : null}

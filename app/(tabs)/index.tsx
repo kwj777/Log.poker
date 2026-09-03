@@ -1,10 +1,10 @@
 /**
- * Dashboard — the app's home.
+ * Dashboard -- the app's home.
  *
  * Ordered by what a player wants first: is there a session running, what is my
  * bankroll doing, what are the headline numbers, where is the money actually
  * coming from. The primary action is always "start a session" (or "resume"),
- * because logging is the behaviour the app needs to make effortless.
+ * because logging is the behavior the app needs to make effortless.
  */
 
 import { useMemo, useState } from 'react';
@@ -78,7 +78,7 @@ export default function DashboardScreen() {
   if (sessions.length === 0) {
     return (
       <Screen>
-        <PageMeta title="Log — the session log that keeps you off tilt" description={APP_DESCRIPTION} />
+        <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
         <View style={styles.brandHeader}>
           <Text variant="title">Log</Text>
           <Text color={colors.textSecondary}>The session log that keeps you off tilt.</Text>
@@ -108,7 +108,7 @@ export default function DashboardScreen() {
         )
       }
     >
-      <PageMeta title="Log — the session log that keeps you off tilt" description={APP_DESCRIPTION} />
+      <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
       <View style={styles.brandHeader}>
         <Text variant="overline" color={colors.textTertiary}>
           Bankroll
@@ -139,7 +139,7 @@ export default function DashboardScreen() {
       <View style={styles.tiles}>
         <StatTile
           label="Hourly"
-          value={summary.hourly === null ? '—' : formatMoney(summary.hourly, { signed: true })}
+          value={summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true })}
           valueColor={resultColor(summary.hourly)}
           hint="all sessions"
         />
@@ -152,12 +152,12 @@ export default function DashboardScreen() {
       <View style={styles.tiles}>
         <StatTile
           label="Best session"
-          value={summary.biggestWin === null ? '—' : formatMoney(summary.biggestWin, { signed: true })}
+          value={summary.biggestWin === null ? '--' : formatMoney(summary.biggestWin, { signed: true })}
           valueColor={resultColor(summary.biggestWin)}
         />
         <StatTile
           label="Worst session"
-          value={summary.biggestLoss === null ? '—' : formatMoney(summary.biggestLoss, { signed: true })}
+          value={summary.biggestLoss === null ? '--' : formatMoney(summary.biggestLoss, { signed: true })}
           valueColor={resultColor(summary.biggestLoss)}
         />
       </View>

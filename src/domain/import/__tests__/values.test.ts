@@ -113,7 +113,7 @@ describe('parseTimestamp', () => {
     expect(parseTimestamp('2024-01-15T20:14:32')).toBe(local(2024, 1, 15, 20, 14, 32));
   });
 
-  it('honours an explicit offset', () => {
+  it('honors an explicit offset', () => {
     expect(parseTimestamp('2024-01-15T20:14:32Z')).toBe(Date.UTC(2024, 0, 15, 20, 14, 32));
     expect(parseTimestamp('2024-01-15T20:14:32+02:00')).toBe(Date.UTC(2024, 0, 15, 18, 14, 32));
     expect(parseTimestamp('2024-01-15T20:14:32+0200')).toBe(Date.UTC(2024, 0, 15, 18, 14, 32));
@@ -232,7 +232,7 @@ describe('parseStakes', () => {
 });
 
 describe('parseGameType', () => {
-  it('recognises the two variants Log names', () => {
+  it('recognizes the two variants Log names', () => {
     expect(parseGameType("Hold'em No Limit")).toBe('NLHE');
     expect(parseGameType('NLHE')).toBe('NLHE');
     expect(parseGameType('Texas Holdem')).toBe('NLHE');

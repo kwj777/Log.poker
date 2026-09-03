@@ -6,7 +6,7 @@ import { Text } from './Text';
 interface StatTileProps {
   label: string;
   value: string;
-  /** Colours the value — used for money, which is green or red or neither. */
+  /** Colors the value -- used for money, which is green or red or neither. */
   valueColor?: string;
   hint?: string;
   style?: ViewStyle;

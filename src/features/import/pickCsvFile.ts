@@ -1,5 +1,5 @@
 /**
- * Reading a file the player chose — the native half.
+ * Reading a file the player chose -- the native half.
  *
  * There is no file picker on iOS or Android without adding a native module, and
  * an import feature is not worth a dependency and a rebuild to the one platform

@@ -64,7 +64,7 @@ describe('formatMoney', () => {
     expect(formatMoney(0, { signed: true })).toBe('+$0');
   });
 
-  it('honours other currencies', () => {
+  it('honors other currencies', () => {
     expect(formatMoney(4_000, { currency: 'EUR' })).toBe('€40');
     expect(formatMoney(4_000, { currency: 'GBP' })).toBe('£40');
   });

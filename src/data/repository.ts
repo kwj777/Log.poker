@@ -4,7 +4,7 @@
  * Two implementations satisfy it: `SqlRepository` (SQLite via expo-sqlite on
  * iOS/Android) and `DexieRepository` (IndexedDB on web). Nothing above this
  * interface knows which one it is talking to, which is what makes the same
- * screens run on all three targets — and what will make a syncing
+ * screens run on all three targets -- and what will make a syncing
  * implementation droppable later without touching a feature folder.
  *
  * Every method is async even where an implementation could answer synchronously,
@@ -64,7 +64,7 @@ export interface Repository {
   getActiveSession(): Promise<SessionWithChildren | null>;
   createSession(input: NewSession): Promise<Session>;
   /**
-   * Create many sessions in one transaction — the session-summary import.
+   * Create many sessions in one transaction -- the session-summary import.
    *
    * All-or-nothing. A file that names a venue that does not exist, or that
    * duplicates a session already imported, writes nothing: a half-imported

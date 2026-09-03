@@ -3,7 +3,7 @@
  *
  * Log is a live-poker journal: a venue, a buy-in, a cash-out, and the hours in
  * between, all typed by a player sitting at a table. An online player has that
- * same history already — their site or their tracker wrote it down for them —
+ * same history already -- their site or their tracker wrote it down for them --
  * and no way to get it in here without typing out a year of sessions by hand.
  *
  * This reads a session-summary export and turns it into sessions. It does not
@@ -13,7 +13,7 @@
  *
  * Two invariants hold for everything this produces, and both matter downstream:
  *
- * 1. **Imported sessions are always complete** — `cashOut` and `endedAt` are
+ * 1. **Imported sessions are always complete** -- `cashOut` and `endedAt` are
  *    never null. A session with a null `endedAt` is what Log calls the *active*
  *    session, and it allows exactly one; importing 200 rows that each claim to
  *    be live would break the app rather than fill it.
@@ -52,7 +52,7 @@ export interface ImportWarning {
 }
 
 /**
- * A session ready to be written, minus the venue id — which does not exist yet,
+ * A session ready to be written, minus the venue id -- which does not exist yet,
  * because venues are created from the names in the file at import time.
  */
 export interface ImportedSessionDraft {
@@ -68,7 +68,7 @@ export interface ImportedSessionDraft {
 export interface ImportedSession {
   /**
    * Stable identity for this row, stored on the session so that importing the
-   * same export again — next month, with three new sessions on the end — adds
+   * same export again -- next month, with three new sessions on the end -- adds
    * the three and skips the rest.
    *
    * Deliberately the row's own values joined together rather than a hash: it is
@@ -126,7 +126,7 @@ const plural = (count: number, one: string, many = `${one}s`): string =>
  *
  * Pure: it takes a string and returns a description of what is in it. Nothing is
  * written, no venue is created, and the caller is expected to show the result to
- * the player before any of that happens — an import that silently rewrites a
+ * the player before any of that happens -- an import that silently rewrites a
  * bankroll is not one anybody would run twice.
  */
 export const parseSessionCsv = (
@@ -149,7 +149,7 @@ export const parseSessionCsv = (
   };
 
   if (table.header.length === 0) {
-    return { ...base, error: 'That file is empty — there is no header row to read.' };
+    return { ...base, error: 'That file is empty: there is no header row to read.' };
   }
 
   const columns = resolveColumns(table.header);
@@ -163,7 +163,7 @@ export const parseSessionCsv = (
     return {
       ...withColumns,
       error:
-        'No date column. Log needs to know when each session happened — a column called “Date”, “Start” or “Session date” will do.',
+        'No date column. Log needs to know when each session happened: a column called “Date”, “Start” or “Session date” will do.',
     };
   }
   if (indexes.cashOut === undefined && indexes.result === undefined) {
@@ -237,7 +237,7 @@ export const parseSessionCsv = (
     } else if (resultCell !== null) {
       if (buyInCell === null && resultCell.cents < 0) {
         // Nothing says what went on the table, but a loss entails at least as
-        // much as was lost — that is entailed, not invented. Booking it keeps
+        // much as was lost -- that is entailed, not invented. Booking it keeps
         // the net exact and both figures readable: a cash-out of minus forty
         // is not a thing that happens.
         buyIn = -resultCell.cents;
@@ -291,7 +291,7 @@ export const parseSessionCsv = (
     sessions.push({ importKey: importKeyFor(venueName, draft), venueName, line: row.line, draft });
   }
 
-  // Two rows can be genuinely identical — a daily export with no times, played
+  // Two rows can be genuinely identical -- a daily export with no times, played
   // twice at the same stakes for the same result. Numbering the repeats keeps
   // the file self-consistent while re-importing it still matches row for row.
   const seen = new Map<string, number>();
@@ -313,7 +313,7 @@ export const parseSessionCsv = (
   if (noStakes > 0) {
     warn(
       null,
-      `${plural(noStakes, 'session')} had no readable stakes. They count toward profit and the bankroll curve, but the variance view skips them — it works in big blinds and cannot place a session without them.`,
+      `${plural(noStakes, 'session')} had no readable stakes. They count toward profit and the bankroll curve, but the variance view skips them: it works in big blinds and cannot place a session without them.`,
     );
   }
   if (noDuration > 0) {
@@ -324,7 +324,7 @@ export const parseSessionCsv = (
   }
   if (columns.duplicates.length > 0) {
     const listed = columns.duplicates.map((entry) => `“${entry.header}”`).join(', ');
-    warn(null, `Ignored ${listed} — an earlier column already supplied the same field.`);
+    warn(null, `Ignored ${listed}: an earlier column already supplied the same field.`);
   }
 
   return {

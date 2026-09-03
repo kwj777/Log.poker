@@ -1,9 +1,9 @@
 /**
- * Dexie (IndexedDB) database definition — the web implementation.
+ * Dexie (IndexedDB) database definition -- the web implementation.
  *
  * IndexedDB rather than localStorage because session history is relational and
  * grows for years: localStorage is a synchronous ~5MB string store with no
- * indexes, and querying it would mean deserialising every session on every read.
+ * indexes, and querying it would mean deserializing every session on every read.
  *
  * Rows are stored in the same shape as the domain records, with two exceptions
  * forced by IndexedDB's index rules: booleans and nulls are not indexable, so
@@ -18,7 +18,7 @@ import type { GameType, HandTag, MoodPhase, MoodScore, Position, Stakes } from '
 
 export const DATABASE_NAME = 'log-poker';
 
-/** Sentinel for "no end time" — see the note above about indexing nulls. */
+/** Sentinel for "no end time" -- see the note above about indexing nulls. */
 export const OPEN_SESSION_ENDED_AT = 0;
 
 export interface VenueRecord {
@@ -41,7 +41,7 @@ export interface SessionRecord {
   endedAt: number;
   notes: string | null;
   /**
-   * Absent — not null — for a session logged in the app.
+   * Absent -- not null -- for a session logged in the app.
    *
    * IndexedDB leaves a record out of an index entirely when the key path does
    * not resolve, which is the only way a *unique* index can coexist with a

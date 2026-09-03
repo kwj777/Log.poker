@@ -1,8 +1,8 @@
 /**
  * The repository conformance suite.
  *
- * One suite, two implementations. Anything the app relies on — ordering,
- * cascade behaviour, patch semantics, constraint errors — is asserted here once,
+ * One suite, two implementations. Anything the app relies on -- ordering,
+ * cascade behavior, patch semantics, constraint errors -- is asserted here once,
  * so SQLite and IndexedDB cannot quietly diverge and produce a bug that only
  * reproduces on one platform.
  */
@@ -393,7 +393,7 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
       });
 
       it('keeps many hand-logged sessions alongside imported ones', async () => {
-        // The unique index has to tolerate any number of sessions with no key —
+        // The unique index has to tolerate any number of sessions with no key --
         // on IndexedDB that only works because the property is absent, not null.
         const venue = await newVenue('Aria');
         await newSession({ venueId: venue.id });

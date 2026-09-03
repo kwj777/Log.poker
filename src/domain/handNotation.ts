@@ -1,7 +1,7 @@
 /**
  * Hand notation: the stable wire format for hole cards.
  *
- * A card is two characters — rank then suit — and a hand is those cards
+ * A card is two characters -- rank then suit -- and a hand is those cards
  * concatenated in the order they were picked: `"AsKd"`, `"Th9h"`, `"7c7d"`.
  * The format is deliberately the same one used by essentially every poker tool
  * (PokerStars hand histories, solvers, TiltProof's drill importer), so a Log
@@ -47,8 +47,8 @@ export const cardsToNotation = (cards: readonly Card[]): string =>
 export const cardsEqual = (a: Card, b: Card): boolean => a.rank === b.rank && a.suit === b.suit;
 
 /**
- * Parse a notation string into cards. Returns null — never throws and never
- * partially succeeds — if the string is malformed or repeats a card, so callers
+ * Parse a notation string into cards. Returns null -- never throws and never
+ * partially succeeds -- if the string is malformed or repeats a card, so callers
  * can treat "unparseable" and "absent" identically.
  */
 export const parseNotation = (notation: string | null | undefined): Card[] | null => {
@@ -95,7 +95,7 @@ export const toHandClass = (notation: string | null | undefined): string | null 
 /** Human-facing rendering: `"A♠ K♦"`. Falls back to an em dash when absent. */
 export const formatNotation = (notation: string | null | undefined): string => {
   const cards = parseNotation(notation);
-  if (cards === null) return '—';
+  if (cards === null) return '--';
   return cards.map((c) => `${c.rank}${SUIT_SYMBOLS[c.suit]}`).join(' ');
 };
 

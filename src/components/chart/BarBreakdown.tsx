@@ -1,8 +1,8 @@
 /**
  * Profit by category, as a diverging bar list.
  *
- * Bars grow right from a centre line for a win and left for a loss, scaled to
- * the largest absolute value on screen — so the shape of a player's game
+ * Bars grow right from a center line for a win and left for a loss, scaled to
+ * the largest absolute value on screen -- so the shape of a player's game
  * (crushing $1/$2, bleeding at $2/$5) is readable in one glance without axes.
  */
 
@@ -16,7 +16,7 @@ import { Text } from '../Text';
 interface BarBreakdownProps {
   groups: readonly GroupTotals[];
   currency?: string;
-  /** Caps the list; the rest are summarised in a trailing line. */
+  /** Caps the list; the rest are summarized in a trailing line. */
   limit?: number;
 }
 
@@ -60,7 +60,7 @@ export const BarBreakdown = ({ groups, currency = 'USD', limit = 6 }: BarBreakdo
                   />
                 )}
               </View>
-              <View style={styles.centreLine} />
+              <View style={styles.centerLine} />
               <View style={styles.half}>
                 {positive ? (
                   <View
@@ -77,7 +77,7 @@ export const BarBreakdown = ({ groups, currency = 'USD', limit = 6 }: BarBreakdo
               {group.sessionCount} session{group.sessionCount === 1 ? '' : 's'} ·{' '}
               {Math.round(group.hours)}h ·{' '}
               {group.hourly === null
-                ? '—'
+                ? '--'
                 : `${formatMoney(group.hourly, { currency, signed: true })}/hr`}
             </Text>
           </View>
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   barLeft: {
     alignSelf: 'flex-end',
   },
-  centreLine: {
+  centerLine: {
     width: 1,
     height: 12,
     backgroundColor: colors.borderStrong,

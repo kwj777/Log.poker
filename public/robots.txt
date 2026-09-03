@@ -1,0 +1,17 @@
+# log.poker
+#
+# Nothing is disallowed, deliberately. The obvious instinct is to keep crawlers
+# out of /app, and it is the wrong one: a crawler that cannot fetch
+# /app/_expo/* cannot render the app at all, and a blocked bundle is a blank
+# page in the index rather than no page. The duplicate-shell problem that
+# disallowing was meant to solve is handled where it belongs, by a canonical in
+# the app's own document shell, so every route under /app collapses onto /app.
+#
+# /chip carries its own noindex. It is a campaign landing reached by scanning a
+# QR code off a ceramic disc, it is close to a duplicate of the front page, and
+# nobody has ever searched for it.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://log.poker/sitemap.xml

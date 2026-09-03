@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { FAMILY_LINKS, FAMILY_HOME } from '../../config';
+import { FAMILY_LINKS, FAMILY_HOME, GUIDES } from '../../config';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
@@ -179,6 +179,35 @@ describe('the site is findable', () => {
 
   it('and the front door out of nobody\'s way', () => {
     expect(home).not.toMatch(/name="robots"[^>]*noindex/);
+  });
+});
+
+describe('the app links out to the guides', () => {
+  const variance = read('app', '(tabs)', 'variance.tsx');
+  const button = read('src', 'components', 'Button.tsx');
+
+  it('at the address the site actually serves', () => {
+    // A typo here is a 404 for everybody who taps it, and nothing in the app
+    // would notice: the link opens a browser and the app carries on.
+    expect(GUIDES.runningBad).toBe('https://log.poker/running-bad');
+    expect(existsSync(join(ROOT, 'public', 'running-bad.html'))).toBe(true);
+    expect(netlify).toContain('from = "/running-bad"');
+  });
+
+  it('from the variance screen, which is the screen the guide is about', () => {
+    expect(variance).toContain('GUIDES.runningBad');
+    // Both branches: the empty state, where somebody most wants to know what
+    // this page will eventually tell them, and the one with a real estimate.
+    expect([...variance.matchAll(/\{guide\}/g)]).toHaveLength(2);
+  });
+
+  it('as a real anchor on web rather than a scripted pop-up', () => {
+    // react-native-web turns an href into an <a>, which can be middle-clicked,
+    // copied and followed by a crawler. It also leaves the press handlers
+    // firing, so the button skips onPress on web or the page opens twice.
+    expect(button).toContain('href');
+    expect(button).toContain("accessibilityRole={href === undefined ? 'button' : 'link'}");
+    expect(button).toContain("if (href !== undefined && Platform.OS === 'web') return;");
   });
 });
 

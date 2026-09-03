@@ -23,6 +23,7 @@ import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { LineChart } from '../../src/components/chart/LineChart';
+import { GUIDES } from '../../src/config';
 import {
   assessRecentStretch,
   confidenceBand,
@@ -95,6 +96,25 @@ export default function VarianceScreen() {
 
   const lossChance = probabilityOfLoss(estimate, assessment.hours);
 
+  /**
+   * The long version of what this screen is doing, on the marketing site.
+   *
+   * It appears in both branches below: with no sample yet, because that is
+   * when somebody most wants to know what the page will eventually tell them,
+   * and with one, because the loss chance printed above it is a number people
+   * want to see the working for.
+   */
+  const guide = (
+    <Button
+      label="Running bad, or playing bad?"
+      variant="secondary"
+      size="small"
+      href={GUIDES.runningBad}
+      onPress={() => openHandOff(GUIDES.runningBad)}
+      style={styles.guide}
+    />
+  );
+
   if (!estimate.reliable) {
     return (
       <Screen>
@@ -111,6 +131,7 @@ export default function VarianceScreen() {
             would tell you nothing about your game. So this page waits until it can use
             yours.
           </Text>
+          {guide}
         </Card>
       </Screen>
     );
@@ -182,6 +203,7 @@ export default function VarianceScreen() {
             looks like over this few hours. Losing stretches are part of a winning
             player’s results, not a departure from them.
           </Text>
+          {guide}
         </Card>
       ) : null}
 
@@ -306,5 +328,9 @@ const styles = StyleSheet.create({
   explainerBody: {
     marginTop: spacing.sm,
     lineHeight: 23,
+  },
+  guide: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
   },
 });

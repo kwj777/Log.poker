@@ -244,11 +244,12 @@ supersedes the four line adjective stack on those two surfaces, for the reason
 that stack already conceded: three imperatives is dilute where one is sharp, and
 this is one.
 
-**And it changes the chip.** LEARN, OBSERVE and GROUND are already set in
-capitals around the QR on the back, so a line reading *Be the LOG* in mixed case
-turns those three words into its own expansion. The object teaches the acronym
-without printing it twice, and mixed case is the more legible setting at 1.9mm
-besides.
+**And it very nearly changed the chip.** LEARN, OBSERVE and GROUND are set in
+capitals around the QR on the back, and a mixed-case *Be the LOG* under them
+would have turned those three words into its own expansion. It was drawn that
+way and then taken out: on a disc handed to a stranger the line was the only
+element explaining the object to itself, and the face reads better with the
+three words and the code alone. See [The words on the back](#the-words-on-the-back-and-the-line-that-is-not-there).
 
 ### The eye in the sky
 
@@ -376,7 +377,7 @@ the first place.
 |---|---|
 | **Keep a log. Be the log.** | The positioning line. Five words, does the pun, and ties the product to the state so the wrong app problem disappears. Home page, App Store subtitle. |
 | **Get the log. Be the log.** | The same device as a call to action. The install prompt, and anywhere the next thing is a press rather than a thought. |
-| **Be the LOG. Learn, Observe, Ground.** | The lockup, and the primary. It carries its own key. The `/chip` landing at full size, the about page, and the back of the chip in its short form. |
+| **Be the LOG. Learn, Observe, Ground.** | The lockup, and the primary. It carries its own key. The `/chip` landing at full size and the about page. Not the chip: the disc sets the three verbs around the code and lets side 1's `log.poker` supply the rest. |
 | **Be logical. Be observant. Be grounded. Be the log.** | The faculties, for longer form copy rather than as a lockup. Demoted by the line above, which does the same job in nine words instead of thirteen and names the apps while it does it. Never the first three without the fourth. |
 | **Think in logs.** | Proportions rather than dollars. The variance view and bankroll goals only, and never the front door. |
 | **The math props it. The ground holds it. The river goes past.** | The full statement, and the only place all three apps are in one sentence. The `/chip` landing page and the about page, where there is room to land it. |
@@ -446,17 +447,23 @@ Free and worth taking: a different image on each face, text on the edge, and the
 border being optional. The per-design setup is the line item that settled one
 chip rather than two.
 
-## Where the line goes on the chip
+## The words on the back, and the line that is not there
 
-The back is already full: mark at the top, QR on a cream tile at the center,
-two words in the side channels, one under the QR, and the `log.poker` wordmark
-in gold beneath it. Something has to give.
+**Settled by taking it out.** This section argued at length about which line
+should sit under the three verbs, on the premise that the back was full and
+something had to give. What gave was the line itself: the drawn face carries the
+mark, the code and LEARN, OBSERVE, GROUND, and nothing else.
+
+The argument below is kept because the placement it settled is still the
+placement, and because the reasoning about reading order is the reason those
+three words sit where they do.
 
 **And the words were in the wrong places.** With LEARN on the left, GROUND on
 the right and OBSERVE underneath, a left, right, down scan reads *Learn,
-Ground, Observe*. That was cosmetic until the gold line went mixed case, and
-then it was a defect: **Be the LOG** points at those three words, and they were
-spelling L-G-O.
+Ground, Observe*, spelling L-G-O. That mattered more when a mixed-case
+**Be the LOG** sat under them pointing at it, and it still matters with the line
+gone: the front says `log.poker`, so the two faces give the acronym and its
+expansion between them, and they have to agree.
 
 So **OBSERVE and GROUND swap**. GROUND takes the bottom, because **the ground is
 the bottom**, which is decodable by anybody holding the chip for the first time.
@@ -477,26 +484,22 @@ would spell O-L-G, which breaks the mechanism this whole section exists to
 protect, so it loses on the one criterion that is not aesthetic. See [The eye in
 the sky](#the-eye-in-the-sky) for the part of it worth keeping.
 
-**Then give the wordmark.** `Be the LOG` takes its slot, in gold, at the same ~1.9mm
-cap height, and stays the second-loudest element after the QR. Mixed case rather
-than all capitals, so that LOG picks up the three words already set around the
-QR and the face expands its own acronym.
+**And then neither line goes there.** The wordmark's slot was given to
+`Be the LOG`, on the reasoning that the QR two millimeters above says where to
+go better than any typed URL and the front carries `log.poker` at full size
+anyway. Both halves of that were right. What the reasoning missed is that it
+argued only about which of two lines to keep, and the answer was neither.
 
-The wordmark's job on the back was to say where to go, and the QR two
-millimeters above it already does that better and more accurately: nobody types
-a URL off a card protector when there is a code right there. The front still
-carries `log.poker` at full size, so the object is not anonymous. That trade
-buys the back's most valuable line: the one that makes somebody want to scan at
-all.
+`Be the LOG` was the one thing on the disc explaining itself out loud, and an
+object that is handed to a stranger does better showing than telling: three
+words around a code, and a domain on the other face. The room it freed went to
+the code taking the exact middle of the disc and to the verbs standing clear of
+each other, which is worth more than a line nobody needed in order to scan.
 
-It fits with room. At that position the inner ring leaves about 35mm of channel,
-and `Be the LOG` letterspaced at 1.9mm cap sets to roughly 17mm. Everything on
-the face stays above the 1.5mm floor.
-
-The alternate, if the wordmark has to stay: put the line on the **front**, below
-the wordmark, at 1.6mm. It is quieter and it costs a second reading of the
-object, since the front is the face somebody sees first and the line lands
-better after the QR has been scanned.
+The one thing lost with it is that the face no longer names the acronym it
+spells. It still spells it, and side 1 still says `log.poker`, so the object
+carries both halves and asks the reader to put them together. That is a fair
+trade for a thing somebody turns over in their fingers.
 
 ---
 

@@ -13,8 +13,14 @@
      ## The reading order is the whole layout
 
      LEARN on the left, OBSERVE on the right, GROUND underneath. Left, right,
-     down spells L-O-G, and `Be the LOG` sits under them pointing at it, so the
-     face expands its own acronym for somebody who has never seen it.
+     down spells L-O-G, and side 1 says log.poker, so the two faces give the
+     acronym and its expansion between them without either one explaining it.
+
+     A `Be the LOG` line sat under the three words and has been taken out. It
+     was the only thing on the disc doing the pointing out loud, and the object
+     reads better without it: three words around a code, and a domain on the
+     back of them. The room it used went to the code taking the exact middle of
+     the disc and to the verbs standing clear of each other.
 
      An earlier arrangement put GROUND on the right and OBSERVE at the bottom
      and spelled L-G-O, which was cosmetic until the gold line went mixed case
@@ -43,9 +49,9 @@
 
   /* The mark, small, at the top. Same ink-cropped viewBox as side 1. */
   .mark {
-    top: 250px;
-    width: 300px;
-    height: 287px;
+    top: 340px;
+    width: 261px;
+    height: 250px;
   }
 
   /* The code, on a cream tile.
@@ -57,7 +63,7 @@
      and the type rather than the other way round: everything else on this face
      can lose a millimeter and still read. */
   .qr {
-    top: 640px;
+    top: 660px;
     width: 680px;
     height: 680px;
     background: var(--cream);
@@ -85,7 +91,7 @@
   /* Centered on the tile rather than on the disc, so the pair reads as a
      caption to the code rather than as a band across the whole face. */
   .verb.side {
-    top: 980px;
+    top: 1000px;
     transform-origin: center;
   }
   .verb.learn {
@@ -102,29 +108,10 @@
   }
 
   .verb.ground {
-    top: 1375px;
+    top: 1420px;
     left: 50%;
     transform: translateX(-50%);
   }
-
-  /* The line the three words are an expansion of. Gold, and the loudest thing
-     on the face after the code, at about 1.9mm of cap. */
-  .lockup {
-    top: 1510px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: var(--serif);
-    font-weight: 400;
-    font-size: 132px;
-    line-height: 1;
-    letter-spacing: 0.01em;
-    color: var(--gold);
-    white-space: nowrap;
-  }
-
-  /* LOG picks up the three words set around the code, so it is the only part
-     of the line in capitals. */
-  .lockup .caps { letter-spacing: 0.06em; }
 </style>
 
 <div class="face">
@@ -143,8 +130,6 @@
   <div class="verb side learn">LEARN</div>
   <div class="verb side observe">OBSERVE</div>
   <div class="verb ground">GROUND</div>
-
-  <div class="lockup">Be the <span class="caps">LOG</span></div>
 </div>
 
 <script>

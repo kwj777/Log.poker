@@ -17,7 +17,7 @@ names all three apps where that one carries a domain somebody has to type.
 | | |
 |---|---|
 | `side-1.html` | the identity face: the family mark over `log.poker` |
-| `side-2.html` | the ask face: the mark, the code, the three verbs, `Be the LOG` |
+| `side-2.html` | the ask face: the mark, the code, and the three verbs |
 | `proof.html` | both faces on a drawn chip with the safe circle dashed over them, for looking at and never for sending |
 | `face.css` | the ground, the palette and the artboard geometry |
 | `face.js` | reads `?mm=` and scales the drawing to that art diameter |
@@ -65,9 +65,14 @@ scuff the way a sticker does. The bigger module wins.
 ## What the faces say, and why in that order
 
 The back reads **LEARN** on the left, **OBSERVE** on the right, **GROUND**
-underneath, with `Be the LOG` under all three. Left, right, down spells L-O-G
-and the gold line points at it, so the face expands its own acronym for
-somebody who has never seen it.
+underneath. Left, right, down spells L-O-G, and side 1 says `log.poker`, so the
+two faces carry the acronym and its expansion between them without either one
+explaining it.
+
+A `Be the LOG` line sat under the three words and was taken out. It was the
+only element on the disc explaining the object to itself, and a thing handed to
+a stranger does better showing than telling. The room went to the code taking
+the exact middle of the disc and to the verbs standing clear of each other.
 
 An earlier arrangement put GROUND on the right and OBSERVE at the bottom and
 spelled L-G-O. That was cosmetic until the gold line went mixed case and then
@@ -75,10 +80,9 @@ it was a defect. GROUND takes the bottom because **the ground is the bottom**,
 which decodes for anybody meeting the object cold; OBSERVE under the code only
 decoded for somebody who already knew that Observe meant Log.
 
-The back gave up its wordmark to make room. The code two millimeters above that
-line says where to go better than a typed URL does, and the front carries
-`log.poker` at full size, so the object is not anonymous once it is off the
-table.
+The back carries no wordmark of its own. The code says where to go better than a
+typed URL does, and the front carries `log.poker` at full size, so the object is
+not anonymous once it is off the table.
 
 **The mark lights no ring.** An app icon turns exactly one canopy ring gold;
 this disc stands for all three apps, so it lights none. That is also what stops

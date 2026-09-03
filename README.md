@@ -596,13 +596,15 @@ against an in-memory one. Both adapters answer as if nothing were stored when
 storage is unavailable, which is ordinary rather than exceptional -- a locked
 device, a private window, a prerender with no `window` at all.
 
-**It is not finished, and the missing part is not here.** Untilt's sign-in ends
-in a redirect carrying an `HttpOnly` cookie, which Log can neither read across
-domains nor receive on native. The code redemption needs to answer a JSON
-request with the token in the body; `src/auth/signin.ts` is written against that
-contract and tested against a fake `fetch`. No sign-in screen was built, because
-until that lands any form would be one that cannot succeed. See
-[SYNC.md](SYNC.md).
+The server side is built too, in Untilt. Its sign-in answers a browser with a
+redirect carrying an `HttpOnly` cookie, which Log can neither read across
+domains nor receive on native, so it answers a caller sending
+`Accept: application/json` with the token in the body instead. That header is
+the whole of what separates the two shapes. `src/auth/signin.ts` speaks that
+contract and is tested against a fake `fetch`, which is as far as a client in a
+different repository can prove anything.
+
+**What is left is a sign-in screen**, and nothing else. See [SYNC.md](SYNC.md).
 
 ### Testing
 
@@ -613,7 +615,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 26 passed
-Tests:       724 passed
+Tests:       726 passed
 
   sqlRepository      86   the SQLite path, against real SQLite
   dexieRepository    86   the IndexedDB path, against real IndexedDB
@@ -635,7 +637,7 @@ Tests:       724 passed
   token              16   the family token grammar, against signed fixtures
   seed               13   the demo dataset stays coherent
   session            12   holding a token, and stores that fail as real ones do
-  signin             10   the sign-in client, against a fake fetch
+  signin             12   the sign-in client, against a fake fetch
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
@@ -829,8 +831,8 @@ Ordered roughly by how much each is worth against how much it costs.
    and tested, and `listChangedSince` is the seam the engine plugs into. See
    [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
    has landed too**, in `src/auth`; see
-   [Signing in](#signing-in-and-what-it-is-for). What is left is one endpoint
-   change in Untilt, and then the engine itself.
+   [Signing in](#signing-in-and-what-it-is-for), with the endpoint it needs now
+   built in Untilt. What is left is a sign-in screen, and then the engine.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

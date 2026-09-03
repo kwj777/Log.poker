@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 502" role="img"
+  aria-labelledby="bomb-pot-hand-title bomb-pot-hand-desc">
+  <title id="bomb-pot-hand-title">A double-board bomb pot, scooped</title>
+  <desc id="bomb-pot-hand-desc">My hand: the two and four of diamonds. His hand: the jack of clubs and six of spades. Board one runs three, five and six of diamonds, then a jack of spades and a six of clubs, giving me a six-high straight flush and him sixes full of jacks. Board two runs the jack of hearts, three of spades and five of clubs, then the six of hearts, with the river unrecorded, giving me a six-high straight and him jacks and sixes. Gold-edged cards are the ones that made my hand.</desc>
+
+  <text x="121.8" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">MY HAND</text>
+  <g>
+    <title>2 of diamonds</title>
+    <rect x="63.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="70.8" y="48" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">2</text>
+    <text x="90.8" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>4 of diamonds</title>
+    <rect x="125.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="132.8" y="48" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">4</text>
+    <text x="152.8" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <text x="298.2" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">HIS HAND</text>
+  <g>
+    <title>Jack of clubs</title>
+    <rect x="240.2" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="247.2" y="48" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#242b28">J</text>
+    <text x="267.2" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♣</text>
+  </g>
+  <g>
+    <title>6 of spades</title>
+    <rect x="302.2" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="309.2" y="48" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#242b28">6</text>
+    <text x="329.2" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <text x="210" y="152" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">BOARD ONE</text>
+  <g>
+    <title>3 of diamonds</title>
+    <rect x="51" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="58" y="184" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">3</text>
+    <text x="78" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>5 of diamonds</title>
+    <rect x="113" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="120" y="184" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">5</text>
+    <text x="140" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>6 of diamonds</title>
+    <rect x="175" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="182" y="184" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">6</text>
+    <text x="202" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>Jack of spades</title>
+    <rect x="253" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="260" y="184" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#242b28">J</text>
+    <text x="280" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <g>
+    <title>6 of clubs</title>
+    <rect x="315" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="322" y="184" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#242b28">6</text>
+    <text x="342" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♣</text>
+  </g>
+  <text x="140" y="254" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="9.5" letter-spacing="1.8"
+    text-anchor="middle" fill="#828e89">FLOP</text>
+  <text x="280" y="254" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="9.5" letter-spacing="1.8"
+    text-anchor="middle" fill="#828e89">TURN</text>
+  <text x="342" y="254" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="9.5" letter-spacing="1.8"
+    text-anchor="middle" fill="#828e89">RIVER</text>
+  <text x="210" y="276" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Straight flush, six high</text>
+  <text x="210" y="298" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>Sixes full of jacks</text>
+  <text x="210" y="348" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">BOARD TWO</text>
+  <g>
+    <title>Jack of hearts</title>
+    <rect x="51" y="358" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="58" y="380" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">J</text>
+    <text x="78" y="416" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♥</text>
+  </g>
+  <g>
+    <title>3 of spades</title>
+    <rect x="113" y="358" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="120" y="380" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#242b28">3</text>
+    <text x="140" y="416" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <g>
+    <title>5 of clubs</title>
+    <rect x="175" y="358" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="182" y="380" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#242b28">5</text>
+    <text x="202" y="416" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♣</text>
+  </g>
+  <g>
+    <title>6 of hearts</title>
+    <rect x="253" y="358" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="260" y="380" font-family="Georgia,'Times New Roman',serif" font-size="19"
+      fill="#b7343f">6</text>
+    <text x="280" y="416" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♥</text>
+  </g>
+  <g>
+    <title>A card that was never shown</title>
+    <rect x="315" y="358" width="54" height="76" rx="5"
+      fill="#3d4a44" stroke="#2e3a35" stroke-width="1" />
+    <g transform="translate(320 374) scale(0.22)"
+      fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.75">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </g>
+  <text x="140" y="450" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="9.5" letter-spacing="1.8"
+    text-anchor="middle" fill="#828e89">FLOP</text>
+  <text x="280" y="450" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="9.5" letter-spacing="1.8"
+    text-anchor="middle" fill="#828e89">TURN</text>
+  <text x="342" y="450" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="9.5" letter-spacing="1.8"
+    text-anchor="middle" fill="#828e89">RIVER</text>
+  <text x="210" y="472" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Straight, six high</text>
+  <text x="210" y="494" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>Jacks and sixes</text>
+</svg>

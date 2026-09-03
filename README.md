@@ -106,6 +106,7 @@ the build.
 |---|---|
 | `/` | `public/home.html`, renamed to `index.html` at build time. Static, no bundle, no external request of any kind. |
 | `/app` | Log. The whole Expo export, moved wholesale into `dist/app`. |
+| `/blog` | The Log Blog, generated from `content/blog`. See [The blog](#the-blog). |
 | `/chip` | The card protector landing. See [The chip campaign](#the-chip-campaign). |
 | `/apps` | 301 to `/`, which now lists the family. |
 
@@ -134,6 +135,89 @@ asserts them:
   served from `/` may only claim because `netlify.toml` sends
   `Service-Worker-Allowed: /app/`. Without that header the registration throws
   and offline disappears without a trace.
+
+## The blog
+
+There is no back office. **A post is a Markdown file in `content/blog`, and
+publishing one is committing it.** `scripts/build-blog.mjs` reads that
+directory and generates the index, the post pages, an RSS feed and the sitemap
+entries, so nothing about a post is written down in two places.
+
+Name the file `<YYYY-MM-DD>-<slug>.md`: the date orders the directory and dates
+the post, and the rest of the name is the URL.
+
+```markdown
+---
+title: I flopped a straight flush in a bomb pot. He had a boat.
+description: One sentence. It is the index line, the search result and the feed summary.
+---
+
+The body starts here. Headings start at `##`, because the title is the h1.
+```
+
+| Front matter | |
+|---|---|
+| `title` | Required. |
+| `description` | Required, and it is doing three jobs: the index line, the meta description, and the feed summary. |
+| `updated` | Optional `YYYY-MM-DD`, for a post edited after it went out. |
+| `draft` | `draft: true` keeps it out of the index, the feed, the sitemap and the build entirely. |
+
+The Markdown is a deliberate subset — headings from `##` down, paragraphs, `-`
+and `1.` lists, `>` quotes, fenced code, `---`, and inline `**bold**`,
+`*italic*`, `` `code` `` and `[links](/here)` — plus two block directives:
+
+```
+::: figure bomb-pot-hand
+A caption, which is optional.
+:::
+
+::: stat 1 in 34,700
+The line under the number, which is also optional.
+:::
+```
+
+A figure inlines `content/blog/figures/<name>.svg` into the page, so an
+illustration costs no request either. Hand diagrams are drawn by
+`scripts/draw-hand.mjs` from a short spec — `2d!` is the two of diamonds with
+the gold edge that marks a card as part of the hand, `?s` is a spade whose rank
+nobody remembers, `??` is face down — so every hand on the blog is drawn the
+same way. The SVG is the artefact and is committed with the post; run
+`node scripts/draw-hand.mjs` after changing a spec, which a test then checks. Everything outside the subset throws at
+build time rather than reaching a live page, and raw HTML in a post is escaped
+rather than passed through — a stray `<` in prose can never eat a paragraph.
+
+To read a draft before it ships, without waiting for the app export:
+
+```bash
+npm run build:blog -- .preview
+npx serve .preview          # then open /blog
+```
+
+What a build produces:
+
+| | |
+|---|---|
+| `/blog` | The index, newest first. |
+| `/blog/<slug>` | A post. Written as `blog/<slug>/index.html`, so the URL carries no `.html` and needs no redirect rule. |
+| `/blog/feed.xml` | RSS 2.0, with the full post in `content:encoded`. |
+| `/sitemap.xml` | `public/sitemap.xml`, which stays the hand-written truth for the front door and the app, plus one entry per post. |
+
+Three things are worth knowing before changing any of it:
+
+- **The blog is generated after the export has been moved under `/app`.**
+  Generated before, the move loop would sweep every page of it under `/app`
+  with the bundle and `/blog` would 404 with nothing erroring.
+- **The pages fetch nothing.** No bundle, no stylesheet, no font — the same
+  promise `public/home.html` makes, and asserted the same way.
+- **`og:image` is the app icon rather than a drawing from the post.** A share
+  card has to be a raster and nothing in this build makes one, so the honest
+  choice is the mark instead of a preview that renders as nothing.
+
+`src/site/__tests__/blog.test.ts` runs the real script — over `content/blog`,
+and again over fixtures — so what the grammar refuses is asserted rather than
+assumed.
+
+---
 
 ## Deploying to Netlify
 
@@ -267,6 +351,8 @@ to `BRAND.md`. They mean something rather than brand something.
 ## Architecture
 
 ```
+content/blog/             the blog, one Markdown file per post
+  figures/                hand diagrams, drawn by scripts/draw-hand.mjs
 app/                      Expo Router routes
   _layout.tsx             opens the database, then renders the navigator
   +html.tsx               web document shell (PWA wiring)
@@ -318,17 +404,21 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 8 passed
-Tests:       219 passed
+Test Suites: 12 passed
+Tests:       315 passed
 
   sqlRepository      53   the SQLite path, against real SQLite
   dexieRepository    53   the IndexedDB path, against real IndexedDB
-  stats              29   P/L, rebuys, duration, hourly rate, groupings
   variance           31   win rate, σ, confidence bands, verdicts
-  money              23   cents arithmetic, parsing, formatting
-  handNotation       21   parse, round-trip, hand classes
+  stats              29   P/L, rebuys, duration, hourly rate, groupings
+  site               29   the marketing/app split, the PWA, the sitemap
+  palette            27   the theme against BRAND.md, which is the source
+  blog               23   the post grammar, and what it refuses
+  money              18   cents arithmetic, parsing, formatting
+  chip               17   the printed URL, and the route it promises
+  handNotation       16   parse, round-trip, hand classes
   seed               10   the demo dataset stays coherent
-  selectors          10   store reads and filters
+  selectors           9   store reads and filters
 ```
 
 ### Money

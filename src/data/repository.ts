@@ -101,6 +101,21 @@ export interface Repository {
    */
   listChangedSince(since: Timestamp): Promise<ChangeSet>;
 
+  /**
+   * Write records exactly as given, stamps and tombstones included.
+   *
+   * The other half of `listChangedSince`, and the sync engine's only write. It
+   * upserts rather than creating, and it does **not** touch `updatedAt`: these
+   * records are already resolved, and re-stamping them would make every
+   * incoming record look like a local change and push it straight back.
+   *
+   * Applied parents first, because a session can arrive naming a venue this
+   * device has never seen. A record whose parent is still missing after its
+   * table's turn is skipped rather than thrown on: this runs in a background
+   * loop where one inconsistent row should cost that row and not the sync.
+   */
+  applyChanges(changes: ChangeSet): Promise<void>;
+
   listVenues(): Promise<Venue[]>;
   getVenue(id: string): Promise<Venue | null>;
   createVenue(input: NewVenue): Promise<Venue>;

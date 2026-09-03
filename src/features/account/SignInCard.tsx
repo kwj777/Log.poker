@@ -28,12 +28,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 
 import { getSession, signIn, signOut, type Session } from '../../auth';
+import { getSyncingRepository, recomposeRepository, type SyncState } from '../../data';
 import { redeemCode, requestCode } from '../../auth/signin';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Text } from '../../components/Text';
 import { colors, radius, spacing } from '../../theme';
-import { CODE_SENT, NOTHING_LEAVES, describeSession, messageFor, type Stage } from './copy';
+import {
+  CODE_SENT,
+  NOTHING_LEAVES,
+  describeSession,
+  describeSync,
+  messageFor,
+  type Stage,
+} from './copy';
 
 export const SignInCard = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -44,11 +52,25 @@ export const SignInCard = () => {
   const [note, setNote] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
+  const [syncState, setSyncState] = useState<SyncState | null>(null);
+
   useEffect(() => {
     // A held token is read once on mount. There is nothing to subscribe to:
     // this card is the only thing in the app that can change it.
     void getSession().then(setSession);
   }, []);
+
+  useEffect(() => {
+    // The sync state does change under this card, on every write anywhere in
+    // the app, so this one is a subscription rather than a read.
+    let drop: (() => void) | undefined;
+    void getSyncingRepository().then((repository) => {
+      if (!repository) return;
+      setSyncState(repository.current());
+      drop = repository.subscribe(setSyncState);
+    });
+    return () => drop?.();
+  }, [session]);
 
   const reset = useCallback(() => {
     setStage('email');
@@ -91,6 +113,10 @@ export const SignInCard = () => {
       setProblem('The sign-in answered with something this app could not read.');
       return;
     }
+    // The data layer composed itself before there was a token to compose with,
+    // so it is holding the plain local repository. Nothing syncs until it is
+    // asked again.
+    recomposeRepository();
     setSession(held);
     setNote(null);
   };
@@ -98,6 +124,7 @@ export const SignInCard = () => {
   const leave = async () => {
     setBusy(true);
     await signOut();
+    recomposeRepository();
     setSession(null);
     setEmail('');
     reset();
@@ -110,6 +137,15 @@ export const SignInCard = () => {
         <Text color={colors.textSecondary} style={styles.body}>
           {describeSession(session.syncs)}
         </Text>
+        {syncState ? (
+          <Text
+            variant="caption"
+            color={syncState.problem ? colors.danger : colors.textTertiary}
+            style={styles.note}
+          >
+            {describeSync(syncState)}
+          </Text>
+        ) : null}
         <Text variant="caption" color={colors.textTertiary} style={styles.note}>
           {/* Signing out is not a wipe, and the one place to say so is the
               button that sounds like it might be. */}

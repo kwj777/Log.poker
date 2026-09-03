@@ -67,6 +67,32 @@ export const messageFor = (failure: SignInFailure, stage: Stage): string => {
   }
 };
 
+/**
+ * What the sync is doing, in one line and without a spinner.
+ *
+ * A sync that fails silently is worse than no sync, because the player goes on
+ * believing their laptop has tonight on it. So the failure is the loud case
+ * here and the success is the quiet one, and the failure always says that
+ * nothing was lost, because nothing is: it is all still on this device.
+ */
+export const describeSync = (state: {
+  lastSyncedAt: number | null;
+  pending: number;
+  problem: string | null;
+  running: boolean;
+}): string => {
+  if (state.problem === 'unauthorized') {
+    return 'Sync has stopped: this device needs to sign in again.';
+  }
+  if (state.problem !== null) {
+    const waiting = state.pending === 1 ? '1 change is' : `${state.pending} changes are`;
+    return `Could not reach the sync. ${waiting} waiting, and nothing is lost.`;
+  }
+  if (state.running) return 'Syncing.';
+  if (state.lastSyncedAt === null) return 'Not synced yet.';
+  return 'Up to date on this device.';
+};
+
 /** What a held session is worth, said without a number or a SKU. */
 export const describeSession = (syncs: boolean): string =>
   syncs

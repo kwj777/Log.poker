@@ -98,6 +98,17 @@ export class SessionManager {
   }
 
   /**
+   * The raw token, for the one caller that needs to send it somewhere.
+   *
+   * Read through `current()` rather than straight out of the store, so an
+   * expired one is cleared here too and never handed to a request that would
+   * be refused for carrying it.
+   */
+  async token(): Promise<string | null> {
+    return (await this.current()) === null ? null : this.store.read();
+  }
+
+  /**
    * Forget the token.
    *
    * Only the token. Signing out is not a wipe: the log is the player's and it

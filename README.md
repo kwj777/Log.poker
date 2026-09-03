@@ -15,10 +15,11 @@ Log is the hub of a three-app family:
 | [Untilt.poker](https://untilt.poker) | How it felt -- mental game work |
 | [TiltProof](https://tiltproof.com) | What to do differently -- odds and spot training |
 
-How the three are priced together -- speculatively, and the short version is that
-Log stays free -- is worked out in
+How the three are priced together is worked out in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md),
-over in Untilt beside the monetization document it extends.
+over in Untilt beside the monetization document it extends. The short version
+for this repo: **Log is free in its entirety and has no standalone price.** See
+[What is free, and what is not](#what-is-free-and-what-is-not).
 
 ---
 
@@ -54,6 +55,45 @@ log never leaves your device.
 
 ---
 
+## What is free, and what is not
+
+**Everything above is free, permanently, and none of it needs an account.** Log
+is the one app in the family with no standalone price, and that is a decision
+rather than an oversight. What is valuable in a tracker is the player's own
+record, so an app whose entire pitch is *am I running bad or playing bad* cannot
+also charge rent for the answer. It is also the app that gets talked about,
+which is how anybody arrives at the other two.
+
+The paid side of the family is the longer material in TiltProof and Untilt, sold
+as one payment rather than a subscription. **What it adds here is cross-device
+history**, and that is the only thing in Log that will ever be paid for: it
+comes with owning the other two apps rather than carrying a price of its own.
+The line falls there because a second device needs an identity to sync to, and
+paying is what creates one, which makes it an honest conversion moment rather
+than a hostage situation. It is unbuilt today, and it is roadmap items 2 and 3.
+
+The numbers themselves live in
+[FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
+and are deliberately not repeated here or anywhere in this repo. Three copies of
+a price is three chances for two of them to go stale.
+
+### The copy rule, and its second half
+
+**No price appears anywhere on log.poker.** Not on the front door, not on the
+four guides, not on `/chip`. Somebody who has used none of the three has no way
+to value one, and a number in front of them prices the family before it has
+earned anything; the pass is sold inside each app at the moment of need instead.
+`src/site/__tests__` and `src/campaign/__tests__` enforce that on all six pages.
+
+Carrying no number is not the same as saying nothing about money, though, and
+that is the half that is easy to lose: **every page says how much of each app is
+free.** All of Log, the early levels and the glossary in TiltProof, the
+at-the-table resets in Untilt. Without it a page that only ever says *free*
+makes a promise on behalf of two apps that do not keep it, and the front door
+had been doing exactly that. Tested alongside the rule it qualifies.
+
+---
+
 ## Running it
 
 Requires Node 22+.
@@ -74,7 +114,7 @@ npm run web        # http://localhost:8081
 ### Checks
 
 ```bash
-npm test            # 435 unit tests
+npm test            # 524 unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
 npm run check:prose # house style: no en or em dashes, American spellings
@@ -473,21 +513,22 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 18 passed
-Tests:       463 passed
+Test Suites: 19 passed
+Tests:       524 passed
 
   sqlRepository      66   the SQLite path, against real SQLite
   dexieRepository    66   the IndexedDB path, against real IndexedDB
+  content            55   every figure in the guides, re-derived and read back
   sessionImport      40   reading a session-summary export
   values             36   money, dates, durations, stakes, game types
+  site               34   the marketing/app split, the PWA, the sitemap
   variance           31   win rate, σ, confidence bands, verdicts
-  site               29   the marketing/app split, the PWA, the sitemap
   stats              29   P/L, rebuys, duration, hourly rate, groupings
-  palette            27   the theme matches BRAND.md
   blog               28   the post grammar, the share cards, and what it refuses
+  palette            27   the theme matches BRAND.md
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
-  chip               17   /chip resolves, offline, and never quotes a price
+  chip               18   /chip resolves, offline, and never quotes a price
   handNotation       16   parse, round-trip, hand classes
   seed               10   the demo dataset stays coherent
   importIntegration   9   parse → store → read back, against real SQLite
@@ -594,14 +635,27 @@ Ordered roughly by how much each is worth against how much it costs.
    timestamped, money is integer cents, and hands are in a portable notation.
    Wants a share sheet on native and a download on web.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
-   id and an `updatedAt`. A syncing repository wraps the existing one behind the
-   same interface, and `src/data/index.ts` is the single place it gets composed
-   in; no feature folder changes. Last-write-wins per record to start, with the
-   timestamps already in place to do better later.
-3. **RevenueCat cross-platform subscriptions** -- entitlements gate features at
-   the store layer, not inside screens, so the free build and the paid build
-   stay one codebase. Web entitlements via Stripe through the same RevenueCat
-   account.
+   id and an `updatedAt`, and the one feature the family pass adds to this app.
+   A syncing repository wraps the existing one behind the same interface, and
+   `src/data/index.ts` is the single place it gets composed in; no feature
+   folder changes. Last-write-wins per record to start, with the timestamps
+   already in place to do better later. The sign-in is the genuinely new part:
+   anonymous ids do not merge across apps, so all three have to derive the same
+   id for the same person, and Untilt's existing magic-link endpoint is what
+   that is promoted from. **The free tier never goes behind it** -- Log stays
+   usable forever by somebody who never types an email address.
+3. **RevenueCat entitlements, which are not subscriptions** -- one
+   non-consumable, `log_plus`, checked at the store layer rather than inside
+   screens, so the free build and the paid build stay one codebase. Log's
+   offering sells the family pass alone, because Log has nothing to sell by
+   itself, and every app checks only its own entitlement: which SKU paid for it
+   is a fact about billing that no screen needs to know. Web entitlements via
+   Stripe through the same RevenueCat account. One mapping detail is load
+   bearing, because the front door promises it in words: the pass grants
+   `log_plus`, and so does holding both single-app entitlements at once. Nobody
+   will ever buy two singles when the pass costs less than that, but *own the
+   other two and your history follows you* has to be true however somebody got
+   there, or the page is lying in an edge case.
 4. **Online session support** -- [importing a session summary](#importing-an-online-history)
    is the half of this that already ships. The rest is multi-table sessions and
    hands per hour, which need `sessions` to grow a `format` discriminator and the

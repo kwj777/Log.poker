@@ -55,6 +55,24 @@ describe('the front door', () => {
     expect(home).not.toMatch(/\$\s*\d/);
   });
 
+  it('but still says how much of each app is free', () => {
+    // The other half of the same rule, and the one that had been lost: two of
+    // the three are paid past a point, so a page that says "free" once at the
+    // bottom is making a promise on behalf of the two that do not keep it.
+    const apps = home.slice(home.indexOf('<div class="apps">'), home.indexOf('</section>'));
+    const cards = apps.split('<a class="app').slice(1);
+    expect(cards).toHaveLength(3);
+    for (const card of cards) expect(card).toMatch(/\bfree\b/i);
+  });
+
+  it('and where the line falls, in words rather than in a number', () => {
+    expect(home).toContain('Free at the table, paid away from it.');
+    // Cross-device history is the one paid thing in this app, so the page says
+    // so before it exists rather than after somebody has years of log in it.
+    expect(home).toMatch(/own the other two/i);
+    expect(home).toMatch(/One payment rather than\s+a subscription/);
+  });
+
   it('has a 404 that is a page rather than a wall', () => {
     expect(existsSync(join(ROOT, 'public', '404.html'))).toBe(true);
   });

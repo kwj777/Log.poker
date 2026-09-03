@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "node scripts/build-web.mjs",
+    "content": "node scripts/build-content.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",

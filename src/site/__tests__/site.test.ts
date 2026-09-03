@@ -141,8 +141,19 @@ describe('the site is findable', () => {
     expect(robots).toContain('Allow: /');
   });
 
-  it('lists the front door and the app, and nothing that duplicates them', () => {
-    expect(locs).toEqual(['https://log.poker/', 'https://log.poker/app']);
+  it('lists the front door, the app and the guides, and nothing else', () => {
+    // The guides earn their place by answering four different questions;
+    // src/site/__tests__/content.test.ts is where that is held to. What this
+    // one guards is the boundary: no near-duplicate slipping in beside them,
+    // and no /chip, /apps or per-route /app page.
+    expect(locs).toEqual([
+      'https://log.poker/',
+      'https://log.poker/app',
+      'https://log.poker/running-bad',
+      'https://log.poker/bankroll',
+      'https://log.poker/pot-odds',
+      'https://log.poker/tilt',
+    ]);
   });
 
   it('dates every entry, in the past', () => {

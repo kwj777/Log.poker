@@ -516,6 +516,94 @@ in the test suite -- so the class that ships to iOS and Android is the class the
 tests exercise, against a real SQLite engine, rather than a fake that would
 agree with whatever the repository happens to do.
 
+### Deletes are tombstones
+
+Nothing in the data layer removes a row any more. `deleteSession` and its four
+siblings set `deleted_at` and leave the record where it is; every read filters
+on it, so from a screen's point of view nothing changed at all. On IndexedDB it
+needed no version bump, because the property is not indexed and a record written
+before it reads as live.
+
+The reason is not local. Across two devices, a row that is absent because
+somebody deleted it and a row that is absent because this device has not been
+told about it yet are **the same absence**, so a merge that unions rows brings
+back every session anybody ever removed. Delete a mis-entered session on the
+phone, watch it come back from the laptop, watch the bankroll curve disagree
+with itself.
+
+Four things fall out of that and are asserted in the conformance suite:
+
+- **Children take the parent's stamp.** A hand tombstoned a millisecond after
+  its session is a hand a later merge can revive on its own.
+- **Tombstoning a session clears its `importKey`.** Deleting an imported session
+  has always made it importable again, and a tombstone holding the key in a
+  unique index would end that quietly. The key is derived from the source row,
+  so a re-import mints it again.
+- **A tombstoned session stops holding its venue back**, but the venue is
+  tombstoned rather than removed, because the deleted session's `venueId` still
+  points at it and a foreign key that stops resolving is a broken read.
+- **`clearAll` is still a truncate.** It is the one delete that is not a
+  tombstone, and the distinction is the whole reason to be careful here: reset
+  means *this device*, not *every device*. Writing tombstones would let somebody
+  clearing a phone they are about to sell take five years of history off the
+  laptop with it.
+
+`listChangedSince(cursor)` is the only read that can see a tombstone, and the
+seam the sync engine plugs into. Nothing calls it yet. It exists because an
+invariant nothing can read is an invariant nothing can test.
+
+The merge rules themselves are pure functions in `src/domain/merge.ts`: per
+record last-write-wins, a clock clamp, and the three cases where the thing in
+conflict is a constraint rather than a field, so both devices are right and the
+pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
+something sweeps them, which is phase 2 work, and until then a heavy deleter's
+database grows where it used to shrink.
+
+### Signing in, and what it is for
+
+`src/auth` is the client half of the family's identity. It exists for exactly
+one feature, cross-device history, and **nothing else in the app has anything to
+do with it**: Log is free in its entirety and stays completely usable by
+somebody who never types an email address. There is no signed-out state to
+handle, because signed out is the state every screen already runs in.
+
+The token is minted by Untilt's sign-in and is the same string in all three
+apps. It has to be a bearer string rather than a cookie: `log.poker`,
+`untilt.poker` and `tiltproof.poker` are three registrable domains, so no cookie
+crosses them, and on iOS and Android there is no cookie jar at all.
+
+```
+<expiry>.<tier>.<subject>.<signature>
+```
+
+Three things about this are worth knowing before touching it.
+
+- **Nothing on this side verifies a signature.** Checking one needs the gate
+  secret, and a secret shipped inside an app anybody can download is not a
+  secret. A parsed claim decides what to show and what is worth sending; the
+  server re-derives on every request and is the only answer that counts.
+- **The expiry is in seconds** where every other timestamp in this app is
+  milliseconds. Converted at the boundary, and tested there, because the
+  difference is a factor of a thousand and therefore about fifty years.
+- **A tier is not enough to sync; the holder needs a subject of their own.**
+  Everybody who typed a passcode shares one subject, so syncing them together
+  would pour every preview visitor's history into a single bucket.
+
+`SessionManager` holds the token over a three-method `TokenStore`, the same
+trick `SqlRepository` plays on `SqlDriver`: the keychain on device and
+`localStorage` on web are a dozen lines each, and everything worth testing runs
+against an in-memory one. Both adapters answer as if nothing were stored when
+storage is unavailable, which is ordinary rather than exceptional -- a locked
+device, a private window, a prerender with no `window` at all.
+
+**It is not finished, and the missing part is not here.** Untilt's sign-in ends
+in a redirect carrying an `HttpOnly` cookie, which Log can neither read across
+domains nor receive on native. The code redemption needs to answer a JSON
+request with the token in the body; `src/auth/signin.ts` is written against that
+contract and tested against a fake `fetch`. No sign-in screen was built, because
+until that lands any form would be one that cannot succeed. See
+[SYNC.md](SYNC.md).
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -524,29 +612,34 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 21 passed
-Tests:       619 passed
+Test Suites: 26 passed
+Tests:       724 passed
 
-  sqlRepository      75   the SQLite path, against real SQLite
-  dexieRepository    75   the IndexedDB path, against real IndexedDB
+  sqlRepository      86   the SQLite path, against real SQLite
+  dexieRepository    86   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   stats              45   P/L, rebuys, duration, win rate, groupings
   values             36   money, dates, durations, stakes, formats, counts
   site               35   the marketing/app split, the PWA, the sitemap
   variance           35   win rate, σ, confidence bands, verdicts
+  merge              28   the rules for when two devices both have a say
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   tournaments        26   ROI, cash rate, dry runs, finishes
+  migrations         22   a filled v2 database walked forward, both engines
   csv                19   quoting, delimiters, line endings
   chip               18   /chip resolves, offline, and never quotes a price
   money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
-  migrations         13   a filled v2 database opened at v3, both engines
+  token              16   the family token grammar, against signed fixtures
   seed               13   the demo dataset stays coherent
+  session            12   holding a token, and stores that fail as real ones do
+  signin             10   the sign-in client, against a fake fetch
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
+  tokenStore.web      8   localStorage missing, blocked, and working
   columns             7   header matching
 ```
 
@@ -731,9 +824,13 @@ Ordered roughly by how much each is worth against how much it costs.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
    id and an `updatedAt`, and the one feature the family pass adds to this app.
    **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
-   starting: three quarters of the server already exists in Untilt, and the work
-   that does not is mostly that nothing here records a delete, so a merge
-   resurrects every session anybody removed.
+   starting: three quarters of the server already exists in Untilt.
+   **Phase 0 has landed** -- deletes are tombstones, the merge rules are written
+   and tested, and `listChangedSince` is the seam the engine plugs into. See
+   [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
+   has landed too**, in `src/auth`; see
+   [Signing in](#signing-in-and-what-it-is-for). What is left is one endpoint
+   change in Untilt, and then the engine itself.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

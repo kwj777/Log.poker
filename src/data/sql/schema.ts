@@ -108,6 +108,30 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_sessions_format ON sessions(format)`,
     ],
   },
+  {
+    // Tombstones, and the reason for them is not local at all.
+    //
+    // A deleted row stops being a removed row and becomes one carrying
+    // `deleted_at`. Locally that is strictly worse; across two devices it is
+    // the only thing that works, because a row that is absent because somebody
+    // deleted it and a row that is absent because this device has not been told
+    // about it yet are the same absence, and any merge that unions rows
+    // resurrects the first kind. Delete a mis-entered session on the phone,
+    // watch it come back from the laptop. See SYNC.md.
+    //
+    // No index on the new column. It is null on almost every row, so on its own
+    // it narrows nothing, and every query that filters on it is already ordered
+    // by an indexed column. A composite index would help and is not worth
+    // carrying before there is a sync to profile it against.
+    version: 4,
+    statements: [
+      `ALTER TABLE venues ADD COLUMN deleted_at INTEGER`,
+      `ALTER TABLE sessions ADD COLUMN deleted_at INTEGER`,
+      `ALTER TABLE rebuys ADD COLUMN deleted_at INTEGER`,
+      `ALTER TABLE hands ADD COLUMN deleted_at INTEGER`,
+      `ALTER TABLE mood_entries ADD COLUMN deleted_at INTEGER`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

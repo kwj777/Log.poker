@@ -30,12 +30,31 @@ export const DATABASE_NAME = 'log-poker';
 /** Sentinel for "no end time" -- see the note above about indexing nulls. */
 export const OPEN_SESSION_ENDED_AT = 0;
 
+/**
+ * Tombstones, and why they added no version below.
+ *
+ * `deletedAt` is a property rather than an index, and IndexedDB stores whole
+ * objects, so adding one needs no migration: a record written by an earlier
+ * build simply has no `deletedAt` and reads as live. That is the one place this
+ * file and the SQLite schema genuinely differ. The tombstone column there is
+ * migration 4, added by an `ALTER TABLE`, while the versions below stop at the
+ * 3 that tournaments needed, because that one changed indexed keys and this
+ * does not.
+ *
+ * It stays out of the indexes on purpose. Every query that filters on it is
+ * already ordered by an indexed key, and indexing a property that is absent on
+ * almost every record buys nothing. See SYNC.md.
+ */
+export type DeletedAt = number | null | undefined;
+
 export interface VenueRecord {
   id: string;
   name: string;
   isHomeGame: 0 | 1;
   createdAt: number;
   updatedAt: number;
+  /** Absent or null while the record is live. See the note above. */
+  deletedAt?: DeletedAt;
 }
 
 export interface SessionRecord {
@@ -67,6 +86,8 @@ export interface SessionRecord {
   importKey?: string;
   createdAt: number;
   updatedAt: number;
+  /** Absent or null while the record is live. See the note above. */
+  deletedAt?: DeletedAt;
 }
 
 export interface RebuyRecord {
@@ -76,6 +97,8 @@ export interface RebuyRecord {
   at: number;
   createdAt: number;
   updatedAt: number;
+  /** Absent or null while the record is live. See the note above. */
+  deletedAt?: DeletedAt;
 }
 
 export interface HandRecord {
@@ -89,6 +112,8 @@ export interface HandRecord {
   at: number;
   createdAt: number;
   updatedAt: number;
+  /** Absent or null while the record is live. See the note above. */
+  deletedAt?: DeletedAt;
 }
 
 export interface MoodRecord {
@@ -99,6 +124,8 @@ export interface MoodRecord {
   at: number;
   createdAt: number;
   updatedAt: number;
+  /** Absent or null while the record is live. See the note above. */
+  deletedAt?: DeletedAt;
 }
 
 /** A v1/v2 session as it sits on disk before the v3 upgrade rewrites it. */

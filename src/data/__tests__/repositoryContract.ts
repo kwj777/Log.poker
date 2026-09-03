@@ -764,6 +764,168 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
       });
     });
 
+    describe('tombstones', () => {
+      /** Every changed record of one kind, by id, tombstones included. */
+      const changed = async (since = 0) => await repository.listChangedSince(since);
+
+      it('keeps a deleted session readable to the sync layer and to nobody else', async () => {
+        const session = await newSession();
+        context.tick(HOUR);
+        await repository.deleteSession(session.id);
+
+        expect(await repository.getSession(session.id)).toBeNull();
+        expect(await repository.listSessions()).toEqual([]);
+
+        const { sessions } = await changed();
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0].record.id).toBe(session.id);
+        expect(sessions[0].deletedAt).toBe(T0 + HOUR);
+      });
+
+      it('stamps the children with the same moment as the parent', async () => {
+        const session = await newSession();
+        await repository.addRebuy({ sessionId: session.id, amount: 100, at: T0 });
+        await repository.createHand({ sessionId: session.id, at: T0 });
+        await repository.createMoodEntry({ sessionId: session.id, phase: 'start', score: 3, at: T0 });
+
+        context.tick(HOUR);
+        await repository.deleteSession(session.id);
+
+        // Not merely "all deleted": a child a millisecond fresher than its
+        // parent is a hand that a later merge can revive on its own.
+        const { rebuys, hands, moodEntries } = await changed();
+        for (const change of [...rebuys, ...hands, ...moodEntries]) {
+          expect(change.deletedAt).toBe(T0 + HOUR);
+        }
+        expect(await repository.listHands()).toEqual([]);
+        expect(await repository.listMoodEntries()).toEqual([]);
+        expect(await repository.listRebuys(session.id)).toEqual([]);
+      });
+
+      it('frees the import key, so a deleted import can be imported again', async () => {
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id, importKey: 'stars:2026-03-01:1' });
+        expect(await repository.listImportKeys()).toEqual(['stars:2026-03-01:1']);
+
+        context.tick(HOUR);
+        await repository.deleteSession(session.id);
+        expect(await repository.listImportKeys()).toEqual([]);
+
+        // The whole point: the unique index has to let the row back in.
+        const again = await newSession({ venueId: venue.id, importKey: 'stars:2026-03-01:1' });
+        expect(again.id).not.toBe(session.id);
+      });
+
+      it('tombstones a hand, a rebuy and a mood entry one at a time', async () => {
+        const session = await newSession();
+        const rebuy = await repository.addRebuy({ sessionId: session.id, amount: 100, at: T0 });
+        const hand = await repository.createHand({ sessionId: session.id, at: T0 });
+        const mood = await repository.createMoodEntry({
+          sessionId: session.id,
+          phase: 'start',
+          score: 3,
+          at: T0,
+        });
+
+        context.tick(HOUR);
+        await repository.deleteRebuy(rebuy.id);
+        await repository.deleteHand(hand.id);
+        await repository.deleteMoodEntry(mood.id);
+
+        expect(await repository.getHand(hand.id)).toBeNull();
+        expect(await repository.listRebuys(session.id)).toEqual([]);
+        expect(await repository.listMoodEntries()).toEqual([]);
+
+        const { rebuys, hands, moodEntries } = await changed();
+        expect(rebuys[0].deletedAt).toBe(T0 + HOUR);
+        expect(hands[0].deletedAt).toBe(T0 + HOUR);
+        expect(moodEntries[0].deletedAt).toBe(T0 + HOUR);
+        // The session itself was not touched by any of the three.
+        const { sessions } = await changed();
+        expect(sessions[0].deletedAt).toBeNull();
+      });
+
+      it('does not let a tombstoned session hold its venue hostage', async () => {
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id });
+        await expect(repository.deleteVenue(venue.id)).rejects.toThrow(ConstraintError);
+
+        await repository.deleteSession(session.id);
+        await expect(repository.deleteVenue(venue.id)).resolves.toBeUndefined();
+        expect(await repository.listVenues()).toEqual([]);
+
+        // Tombstoned, not removed: the deleted session's venueId still points
+        // at the row, and a foreign key that stops resolving is a broken read.
+        const { venues } = await changed();
+        expect(venues).toHaveLength(1);
+        expect(venues[0].deletedAt).not.toBeNull();
+      });
+
+      it('leaves a tombstoned session out of its venue count', async () => {
+        const venue = await newVenue();
+        const kept = await newSession({ venueId: venue.id });
+        const dropped = await newSession({ venueId: venue.id });
+        expect((await repository.getVenue(venue.id))?.sessionCount).toBe(2);
+
+        await repository.deleteSession(dropped.id);
+        expect((await repository.getVenue(venue.id))?.sessionCount).toBe(1);
+        expect((await repository.listVenues())[0].sessionCount).toBe(1);
+        expect(kept.id).not.toBe(dropped.id);
+      });
+
+      it('refuses to add anything to a session that is gone', async () => {
+        const session = await newSession();
+        await repository.deleteSession(session.id);
+
+        await expect(repository.addRebuy({ sessionId: session.id, amount: 1, at: T0 })).rejects.toThrow(
+          NotFoundError,
+        );
+        await expect(repository.createHand({ sessionId: session.id, at: T0 })).rejects.toThrow(
+          NotFoundError,
+        );
+        await expect(repository.updateSession(session.id, { notes: 'back?' })).rejects.toThrow(
+          NotFoundError,
+        );
+      });
+
+      it('does not offer a tombstoned session as the active one', async () => {
+        const session = await newSession();
+        expect((await repository.getActiveSession())?.id).toBe(session.id);
+        await repository.deleteSession(session.id);
+        expect(await repository.getActiveSession()).toBeNull();
+      });
+
+      it('reports changes after a cursor and nothing before it', async () => {
+        const venue = await newVenue();
+        context.tick(HOUR);
+        const session = await newSession({ venueId: venue.id });
+
+        // The venue is older than the cursor and the session is not.
+        const { venues, sessions } = await repository.listChangedSince(T0 + HOUR - 1);
+        expect(venues).toEqual([]);
+        expect(sessions.map((change) => change.record.id)).toEqual([session.id]);
+
+        // And a cursor at the newest stamp reports nothing at all, which is
+        // what makes a second sync with no changes cost one empty answer.
+        expect(await repository.listChangedSince(T0 + HOUR)).toEqual({
+          venues: [],
+          sessions: [],
+          rebuys: [],
+          hands: [],
+          moodEntries: [],
+        });
+      });
+
+      it('hands the sync layer records the domain types would not carry', async () => {
+        const session = await newSession();
+        const { sessions } = await changed();
+        // The record is the same shape the app reads, with the storage concern
+        // beside it rather than on it.
+        expect(sessions[0].record).toEqual(session);
+        expect(Object.hasOwn(sessions[0].record, 'deletedAt')).toBe(false);
+      });
+    });
+
     describe('maintenance', () => {
       it('clears every table', async () => {
         const session = await newSession();
@@ -777,6 +939,23 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listSessions()).toEqual([]);
         expect(await repository.listHands()).toEqual([]);
         expect(await repository.listMoodEntries()).toEqual([]);
+      });
+
+      it('clears without leaving tombstones, because reset is not erasure', async () => {
+        // A tombstone here would push the wipe to every other device, so a
+        // player clearing a phone they are about to sell would take five years
+        // of history off the laptop with it. See SYNC.md.
+        const session = await newSession();
+        await repository.createHand({ sessionId: session.id, at: T0 });
+        await repository.clearAll();
+
+        expect(await repository.listChangedSince(0)).toEqual({
+          venues: [],
+          sessions: [],
+          rebuys: [],
+          hands: [],
+          moodEntries: [],
+        });
       });
 
       it('is safe to init twice', async () => {

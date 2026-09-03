@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Two URLs, which is the whole site: the front door and the app.
+
+  Everything else is deliberately absent rather than forgotten. The prerendered
+  routes under /app are one document with one description repeated, so they
+  canonicalise onto /app instead of appearing here. /chip is noindex. /apps is
+  a 301. A sitemap listing near-duplicates asks to be judged on them.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://log.poker/</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://log.poker/app</loc>
+    <lastmod>2026-09-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>

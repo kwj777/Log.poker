@@ -11,9 +11,31 @@ three repos enforce that in CI and copy gets lifted verbatim out of this file.
 
 ## The mark
 
-Three nested triangles sharing a common baseline. Stroked, never filled.
-Smallest to largest reads **Learn, Observe, Ground**, which is the order the
-family is named in and the order a player moves through.
+Three nested triangles sharing a common baseline, standing on a trunk. Stroked,
+never filled. Smallest to largest reads **Learn, Observe, Ground**, which is the
+order the family is named in and the order a player moves through.
+
+**The triangles have never changed.** Same ratio, same nesting, same shared
+baseline. What changed around them, in September 2026, is the color and the
+trunk.
+
+**The canopy is one green ramp and the gold moved to the trunk.** Gold is the
+family accent, so putting it on the trunk makes the mark's one warm element the
+part the family is named for: the canopy is what grows, and the trunk is what
+becomes the log. Brown was tried and refused at 2.66:1 on the ground, where it
+read as the dimmest thing in the mark; gold is 7.22:1 and anchors it, which
+matters because green is a much weaker carrier.
+
+**And that freed gold to mean one thing, which is *this app*.** An app icon
+lights exactly one ring gold and the family mark lights none, so the two can
+never be mistaken for each other.
+
+| | Lights |
+|---|---|
+| The family mark | Nothing. Canopy in the ramp, gold trunk only. |
+| **TiltProof** | The innermost ring. Learn. |
+| **Log** | The middle ring. Observe. |
+| **Untilt** | The outermost ring, and the baseline with it, since a baseline is what Ground is. |
 
 The mark is canonical on the card protector, and app icons, favicons and empty
 states derive from the same geometry rather than redrawing it.
@@ -29,25 +51,28 @@ into three colors and reads as a mistake at every size. So the outer triangle is
 closed and carries the line, and the two inside it are open chevrons standing on
 it. The line they stand on is gold, which is Ground, which is the point.
 
-**Gold is the outermost stroke.** This reverses what this document recommended
-before anything was drawn, and the reason is measured rather than aesthetic:
+**The canopy ramp had to climb past sage, not below it.** The palette's own
+three greens measure 1.76:1, 2.68:1 and 3.55:1 on the ground, which is one step
+and a rumour: the darkest is already invisible, which is why gold used to be on
+the outside at all.
 
-| Stroke on the ground | Ratio |
-|---|---|
-| Gold `#c9a86a` | **7.22:1** |
-| Sage `#6b7a5e` | 3.55:1 |
-| Forest `#3d4a44` | 1.76:1 |
+| Ring | Color | On the ground | Step |
+|---|---|---|---|
+| Outer | `#9aae80` | **6.79:1** | |
+| Middle | `#75886a` | 4.26:1 | 1.59x |
+| Inner | `#55665e` | 2.68:1 | 1.59x |
 
-Forest on the outside meant the stroke that gives the mark its silhouette was
-the one nobody could see. Gold on the outside is the brightest color on the
-defining edge, and it happens to restore the original brief's own order, forest
-to sage to gold reading inward to outward, which was one of the two
-contradictory specs recorded here.
+Even steps, and **lightest on the outside so the silhouette is the strongest
+line**, which is the same reasoning that once put gold there. Plain forest
+`#3d4a44` stays what it is, a border color where 1.76:1 is correct because a
+border should be quiet. It is not a stroke color on this ground.
 
-**The innermost stroke is forest lifted to `#55665e`**, 2.71:1. Plain forest
-stays what it is: a border color, where 1.76:1 is correct because a border
-should be quiet. It is simply not a stroke color on this ground, and the mark
-needs its third line to exist.
+**One measurement that looked alarming and was the wrong instrument.** Gold on
+the outer ring is 1.06:1, so on paper Untilt's lit ring should vanish into its
+neighbour. It does not: those two are 56 degrees apart in hue, and a contrast
+ratio answers whether text is legible rather than whether one ring looks
+different from the next. Warm against cool carries it at equal brightness. The
+number is only the right tool for type.
 
 ## The palette
 
@@ -56,9 +81,12 @@ needs its third line to exist.
 | Ground | `#1c211f` | Background, all three apps |
 | Rim | `#2e3a35` | Borders |
 | Ring | `#333f39` | Subtle dividers |
-| Gold | `#c9a86a` | The accent, spent sparingly |
-| Sage | `#6b7a5e` | The mark's middle stroke |
-| Forest | `#3d4a44` | The mark's outer stroke |
+| Gold | `#c9a86a` | The accent. The trunk, and whichever ring an app lights |
+| Sage | `#6b7a5e` | General purpose green. No longer in the mark |
+| Forest | `#3d4a44` | Borders. Never a stroke on this ground, see below |
+| Canopy outer | `#9aae80` | The mark's outermost ring |
+| Canopy middle | `#75886a` | The mark's middle ring |
+| Canopy inner | `#55665e` | The mark's innermost ring |
 | Cream | `#e8e4da` | Body text |
 | Muted | `#b7c0ba` / `#828e89` | Secondary and tertiary text |
 

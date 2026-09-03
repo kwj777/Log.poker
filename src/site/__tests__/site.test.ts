@@ -124,6 +124,53 @@ describe('the worker caches the app and not the marketing site', () => {
   });
 });
 
+describe('the site is findable', () => {
+  const robots = read('public', 'robots.txt');
+  const sitemap = read('public', 'sitemap.xml');
+  const shell = read('app', '+html.tsx');
+  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+
+  it('has a sitemap, and points at it from robots', () => {
+    expect(robots).toContain('Sitemap: https://log.poker/sitemap.xml');
+  });
+
+  it('disallows nothing, because a blocked bundle is a blank page in the index', () => {
+    // Keeping crawlers out of /app is the instinct and the trap: without
+    // /app/_expo/* they cannot render the app, so they index an empty shell.
+    expect(robots).not.toMatch(/^Disallow:\s*\/\S/m);
+    expect(robots).toContain('Allow: /');
+  });
+
+  it('lists the front door and the app, and nothing that duplicates them', () => {
+    expect(locs).toEqual(['https://log.poker/', 'https://log.poker/app']);
+  });
+
+  it('dates every entry, in the past', () => {
+    const dates = [...sitemap.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)].map((m) => m[1]);
+    expect(dates).toHaveLength(locs.length);
+    for (const date of dates) {
+      expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(Date.parse(date)).toBeLessThanOrEqual(Date.now());
+    }
+  });
+
+  it('collapses the app routes onto one URL instead of competing with itself', () => {
+    // The prerendered routes are one document with one description repeated.
+    expect(shell).toContain('<link rel="canonical" href="https://log.poker/app" />');
+    expect(shell).toContain('content="https://log.poker/app"');
+    expect(shell).not.toContain('content="https://log.poker"');
+  });
+
+  it('keeps the campaign landing out of the index', () => {
+    // Reached by scanning a disc, and close to a duplicate of the front page.
+    expect(read('public', 'chip.html')).toContain('name="robots" content="noindex, follow"');
+  });
+
+  it('and the front door out of nobody\'s way', () => {
+    expect(home).not.toMatch(/name="robots"[^>]*noindex/);
+  });
+});
+
 describe('the family links', () => {
   it('point the app link at the app rather than the marketing site', () => {
     expect(FAMILY_LINKS.log).toBe('https://log.poker/app');

@@ -45,3 +45,10 @@ yarn-error.*
 
 # Netlify
 .netlify/
+
+# Audit scratch. An auditing agent proves a hypothesis by writing a probe and
+# running it, and jest only collects from src/, so the probes have to live here
+# rather than in a temp directory. They are throwaway by definition: the finding
+# is the output, not the probe. Ignored so a half-finished audit never reads as
+# uncommitted work.
+src/__audit_*/

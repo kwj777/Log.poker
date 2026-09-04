@@ -44,7 +44,8 @@ for this repo: **Log is free in its entirety and has no standalone price.** See
 - **Session history** -- filter by period, venue and game type; every filter
   recomputes the totals above the list.
 - **Tournaments** -- entry and fee kept apart, re-entries, field size and where
-  you finished, with ROI and a cash rate that says how much it can be trusted.
+  you finished, with a cash rate, a dry-run reading, and an ROI carrying a
+  bootstrapped confidence interval rather than a false air of precision.
   See [Tournaments](#tournaments).
 - **Session-summary import** -- bring an online history in from a CSV your site
   or your tracker exported, rather than typing out a year of sessions. See
@@ -484,7 +485,8 @@ src/
     handNotation.ts       "AsKd" -- the stable hand-off format
     stats.ts              P/L, hourly rate, bankroll curve, groupings
     variance.ts           win rate, standard deviation, confidence bands
-    tournaments.ts        ROI, cash rate, dry runs, and what they are worth
+    tournaments.ts        ROI, its bootstrapped interval, cash rate, dry runs
+    random.ts             one seeded generator, shared by the demo and the bootstrap
   data/
     repository.ts         the storage contract
     sql/                  SqlRepository over a narrow SqlDriver
@@ -525,25 +527,25 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 21 passed
-Tests:       619 passed
+Tests:       645 passed
 
   sqlRepository      75   the SQLite path, against real SQLite
   dexieRepository    75   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
+  tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   stats              45   P/L, rebuys, duration, win rate, groupings
   values             36   money, dates, durations, stakes, formats, counts
   site               35   the marketing/app split, the PWA, the sitemap
   variance           35   win rate, σ, confidence bands, verdicts
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
-  tournaments        26   ROI, cash rate, dry runs, finishes
   csv                19   quoting, delimiters, line endings
   chip               18   /chip resolves, offline, and never quotes a price
   money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
+  seed               14   the demo dataset stays coherent
   migrations         13   a filled v2 database opened at v3, both engines
-  seed               13   the demo dataset stays coherent
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
@@ -655,9 +657,44 @@ So the tournament card shows what can be said honestly:
   and not a sign anything has changed. That is the question a tournament player
   actually asks at two in the morning, and it usually has a calming answer.
 
-A bootstrap over the player's own results would give a real interval on ROI and
-is the obvious next step. It is not here yet, and a Gaussian stand-in in the
-meantime would be the exact thing this section is about.
+### The interval that is honest, and what it costs to earn one
+
+The bare ROI is still only a description, so there is a real interval around it
+now, and it comes from the one method that assumes nothing about the shape of
+the payouts: the **nonparametric bootstrap**. Draw `n` entries with replacement
+from the `n` the player actually has, recompute ROI, do that two thousand times,
+and take the middle 95% of the answers. `variance.ts` cannot touch tournaments
+because its model needs results to be roughly symmetric; this one needs only the
+results themselves, whatever shape they came in.
+
+It is seeded from a fixed constant, so the same results always give the same
+interval. That is not a detail: a confidence interval that shifted every time
+the screen re-rendered would be correct on each render and untrustworthy across
+all of them.
+
+What it will not do is manufacture information, and the number it puts on that
+is the most useful thing in this section. Take a genuine 5% ROI winner, paying
+the way tournaments pay -- one entry in ten returning ten and a half times the
+buy-in. The 95% interval on that player's ROI:
+
+```
+  1,000 entries   -15% to +25%   straddles break even
+  5,000 entries    -4% to +14%   straddles break even
+ 15,000 entries     0% to +10%   straddles break even
+ 25,000 entries    +1% to  +9%   clears break even
+```
+
+Around **fifteen thousand entries** before a real 5% edge separates from zero.
+That is not a flaw in the method; it is what tournament variance actually costs,
+and it is why the copy on this card spends its time explaining that a straddling
+range is a fact about tournaments rather than a verdict on the player. A test
+asserts it at 50, 5,000 and 25,000 entries.
+
+`roiConcentration` says the rest out loud: how much of everything that came back
+arrived in one score, and what the same entries read without it. The demo set,
+twelve entries carried by one deep run, reports a range of -100% to +495% and
+then explains that one score is 75% of the returns and the other eleven entries
+read -44%. Both numbers are true, and neither is any use without the other.
 
 ---
 
@@ -760,15 +797,12 @@ Ordered roughly by how much each is worth against how much it costs.
    sessions and hands per hour, which need the hourly-rate math to become
    per-table: wall-clock hours stop meaning one thing the moment four tables are
    open.
-5. **A real interval on tournament ROI** -- a bootstrap over the player's own
-   results, which needs no assumption about the shape of the payouts. It is the
-   one thing the tournament card is currently honest about not having.
-6. **Deep Untilt and TiltProof integration** -- the seams already exist in
+5. **Deep Untilt and TiltProof integration** -- the seams already exist in
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
    real payload -- the flagged hand into a TiltProof drill, the rough stretch
    into the matching Untilt exercise -- and eventually share an account across
    the three apps.
-7. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
+6. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
 
 Also wanted, smaller: session photos of the chip stack,

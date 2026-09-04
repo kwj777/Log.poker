@@ -20,19 +20,13 @@
  *   two in the morning, and it usually has a calming answer.
  */
 
+import { makeRandom } from './random';
 import { isComplete, netResult, durationHours, totalInvested } from './stats';
+import type { ConfidenceLevel } from './variance';
 import type { Cents, SessionWithChildren } from './types';
 
 export const isTournament = (session: { format: string }): boolean =>
   session.format === 'tournament';
-
-/**
- * Below this, an ROI is a record of what happened rather than an estimate of
- * anything. Even at this many it is thin -- the number moves a long way on one
- * final table -- which is why the copy says so rather than hiding behind a
- * threshold.
- */
-export const MIN_TOURNAMENTS_FOR_ROI = 100;
 
 export interface TournamentTotals {
   /** Completed tournaments. Live ones have no result yet. */
@@ -177,7 +171,6 @@ export interface TournamentAssessment {
   headline: string;
   body: string;
   /** Whether the ROI above is a measurement or just a record of what happened. */
-  roiIsMeaningful: boolean;
   /** True when the copy should offer an Untilt.poker nudge. */
   suggestsUntilt: boolean;
 }
@@ -188,28 +181,26 @@ const percent = (fraction: number): string => `${Math.round(fraction * 100)}%`;
  * What to say to a tournament player about their own numbers.
  *
  * Written to the same rule as the cash-game copy: true first, calming second,
- * and never implying the player is broken or that anything is owed to them. The
- * difference is that this one has to be honest about how little an ROI over a
- * few dozen entries means, rather than dressing a small sample as a verdict.
+ * and never implying the player is broken or that anything is owed to them.
+ *
+ * Kept narrowly to the dry run and the cash rate. What an ROI over this many
+ * entries is worth used to be a sentence here, guessing from a threshold; it is
+ * now `assessRoi`, which resamples the results and answers with a range. Saying
+ * it in both places would put the same paragraph on the screen twice, and only
+ * one of them would have a number in it.
  */
 export const assessTournaments = (totals: TournamentTotals): TournamentAssessment => {
   if (totals.entries === 0) {
     return {
       headline: 'No tournaments yet',
       body: 'Log one and this fills in: cash rate, ROI, and how ordinary your current dry run is.',
-      roiIsMeaningful: false,
       suggestsUntilt: false,
     };
   }
 
-  const roiIsMeaningful = totals.entries >= MIN_TOURNAMENTS_FOR_ROI;
   const rate = totals.itmRate ?? 0;
   const dry = totals.currentDryRun;
   const odds = probabilityOfDryRun(rate, dry);
-
-  const sample = roiIsMeaningful
-    ? `Across ${totals.entries} entries that ROI is starting to mean something, though it still moves a long way on one deep run.`
-    : `That is ${totals.entries} entr${totals.entries === 1 ? 'y' : 'ies'}, which is a record of what happened rather than a measurement of how you play. Tournament ROI is carried by rare big scores, so it needs several hundred entries before it settles -- and until then the honest reading is that it is not yet a number about you.`;
 
   if (dry >= 2 && odds !== null) {
     const median = medianDryRun(rate);
@@ -221,8 +212,7 @@ export const assessTournaments = (totals: TournamentTotals): TournamentAssessmen
       headline: `${dry} without a cash`,
       body: `You cash ${percent(rate)} of the time, so missing ${dry} in a row comes up about ${percent(
         odds,
-      )} of the time -- it is the ordinary shape of the game, not a sign anything has changed.${typical} ${sample}`,
-      roiIsMeaningful,
+      )} of the time -- it is the ordinary shape of the game, not a sign anything has changed.${typical}`,
       suggestsUntilt: odds < 0.1,
     };
   }
@@ -233,11 +223,10 @@ export const assessTournaments = (totals: TournamentTotals): TournamentAssessmen
       totals.cashes > 0
         ? `${totals.cashes} cash${totals.cashes === 1 ? '' : 'es'} from ${totals.entries} entr${
             totals.entries === 1 ? 'y' : 'ies'
-          }. ${sample}`
+          }.`
         : `Nothing has come back yet from ${totals.entries} entr${
             totals.entries === 1 ? 'y' : 'ies'
-          }. That is a short enough run that it says very little: most tournament entries end with nothing, for everybody. ${sample}`,
-    roiIsMeaningful,
+          }. That is a short enough run that it says very little: most tournament entries end with nothing, for everybody.`,
     suggestsUntilt: false,
   };
 };
@@ -257,4 +246,246 @@ export const formatFinish = (
   };
   const place = `${finishPosition}${suffix(finishPosition)}`;
   return entrants !== null && entrants > 0 ? `${place} of ${entrants}` : place;
+};
+
+// --------------------------------------------------------------- the interval
+
+/** What one entry cost and what came back. The only two numbers an ROI needs. */
+export interface EntryResult {
+  invested: Cents;
+  returned: Cents;
+}
+
+export const toEntryResults = (
+  sessions: readonly SessionWithChildren[],
+): EntryResult[] =>
+  sessions
+    .filter((session) => isTournament(session) && isComplete(session))
+    .map((session) => ({
+      invested: totalInvested(session, session.rebuys),
+      returned: session.cashOut ?? 0,
+    }));
+
+/**
+ * Below this the resamples are too degenerate to describe anything. The
+ * interval above it is often enormous, and that is the point: an enormous
+ * interval is the honest answer, and hiding it would leave the bare ROI looking
+ * like a measurement.
+ */
+export const MIN_ENTRIES_FOR_INTERVAL = 10;
+
+/** Enough for a stable percentile interval, cheap enough to run on a phone. */
+export const BOOTSTRAP_SAMPLES = 2_000;
+
+/**
+ * Fixed, so the same results always produce the same interval.
+ *
+ * This matters more than it looks. An interval that shifted every time the
+ * screen re-rendered would be correct on each render and untrustworthy across
+ * all of them, and a player watching their own confidence interval twitch would
+ * be right not to believe any of it.
+ */
+const BOOTSTRAP_SEED = 0x10_9c_4a_21;
+
+export type RoiVerdict = 'winning' | 'losing' | 'undetermined';
+
+export interface RoiInterval {
+  /** The ROI actually observed, as a fraction. */
+  roi: number;
+  lower: number;
+  upper: number;
+  level: ConfidenceLevel;
+  entries: number;
+  /** How many resamples produced the interval. */
+  samples: number;
+  /** Whether the whole range clears break even, one way or the other. */
+  verdict: RoiVerdict;
+}
+
+/** Linear interpolation between order statistics. `sorted` must be ascending. */
+const percentileOf = (sorted: readonly number[], fraction: number): number => {
+  const position = (sorted.length - 1) * fraction;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (position - lower) * (sorted[upper] - sorted[lower]);
+};
+
+/**
+ * A confidence interval on ROI, by resampling the player's own entries.
+ *
+ * The nonparametric bootstrap: draw `n` entries with replacement from the `n`
+ * the player actually has, recompute ROI, and do it a couple of thousand times.
+ * The spread of those numbers is the spread of the estimate, and the middle 95%
+ * of them is the interval.
+ *
+ * This is the right tool here precisely because it assumes nothing about the
+ * shape of the payouts. `variance.ts` cannot touch tournaments because its model
+ * needs results to be roughly symmetric and they are emphatically not; this one
+ * needs only the results themselves, whatever shape they came in.
+ *
+ * What it cannot do is manufacture information. A player with thirty entries
+ * and one big score gets an interval driven by how often that score was drawn,
+ * which is a lumpy and very wide answer -- and the correct one. `roiConcentration`
+ * exists to say so out loud rather than leave the width unexplained.
+ */
+export const bootstrapRoi = (
+  results: readonly EntryResult[],
+  options: { level?: ConfidenceLevel; samples?: number; seed?: number } = {},
+): RoiInterval | null => {
+  const level = options.level ?? 95;
+  const samples = options.samples ?? BOOTSTRAP_SAMPLES;
+  const count = results.length;
+  if (count < MIN_ENTRIES_FOR_INTERVAL || samples < 1) return null;
+
+  const invested = results.reduce((sum, result) => sum + result.invested, 0);
+  if (invested <= 0) return null;
+  const returned = results.reduce((sum, result) => sum + result.returned, 0);
+  const roi = (returned - invested) / invested;
+
+  const random = makeRandom(options.seed ?? BOOTSTRAP_SEED);
+  const draws: number[] = [];
+  for (let sample = 0; sample < samples; sample += 1) {
+    let drawnInvested = 0;
+    let drawnReturned = 0;
+    for (let pick = 0; pick < count; pick += 1) {
+      const entry = results[Math.floor(random() * count)];
+      drawnInvested += entry.invested;
+      drawnReturned += entry.returned;
+    }
+    if (drawnInvested > 0) draws.push((drawnReturned - drawnInvested) / drawnInvested);
+  }
+  if (draws.length === 0) return null;
+  draws.sort((a, b) => a - b);
+
+  const tail = (1 - level / 100) / 2;
+  const lower = percentileOf(draws, tail);
+  const upper = percentileOf(draws, 1 - tail);
+
+  return {
+    roi,
+    lower,
+    upper,
+    level,
+    entries: count,
+    samples: draws.length,
+    verdict: lower > 0 ? 'winning' : upper < 0 ? 'losing' : 'undetermined',
+  };
+};
+
+export interface RoiConcentration {
+  /** The largest single return as a share of everything that came back. */
+  topShare: number;
+  /** ROI over the same entries with the single biggest score taken out. */
+  roiWithoutTop: number | null;
+}
+
+/**
+ * How much of the return came from one score.
+ *
+ * The number that explains the width of the interval above. Tournament money
+ * arrives in a few large pieces, so a sample of any realistic size is often one
+ * deep run away from telling a different story, and this says how far.
+ */
+export const roiConcentration = (
+  results: readonly EntryResult[],
+): RoiConcentration | null => {
+  if (results.length === 0) return null;
+  const invested = results.reduce((sum, result) => sum + result.invested, 0);
+  const returned = results.reduce((sum, result) => sum + result.returned, 0);
+  if (invested <= 0 || returned <= 0) return null;
+
+  const top = results.reduce((best, result) => (result.returned > best.returned ? result : best));
+  const restInvested = invested - top.invested;
+  const restReturned = returned - top.returned;
+
+  return {
+    topShare: top.returned / returned,
+    roiWithoutTop: restInvested > 0 ? (restReturned - restInvested) / restInvested : null,
+  };
+};
+
+/** `+15%`, `-8%`, `0%`. */
+export const formatRoi = (roi: number): string => {
+  const rounded = Math.round(roi * 100);
+  return `${rounded > 0 ? '+' : ''}${rounded}%`;
+};
+
+/** Above this, one score is carrying the sample and the copy says so. */
+const CONCENTRATION_THRESHOLD = 0.3;
+
+export interface RoiAssessment {
+  headline: string;
+  body: string;
+  /** The line about one score carrying the sample, when one does. */
+  concentrationNote: string | null;
+  verdict: RoiVerdict | 'insufficient_data';
+}
+
+/**
+ * What the interval means, in words.
+ *
+ * Same rule as the rest of the copy in this app: true first, calming second,
+ * and never implying the player is broken or that anything is owed to them. The
+ * hardest case is the common one, where the interval straddles break even and
+ * the honest reading is that the sample cannot tell a winner from a loser. That
+ * is written as a fact about tournaments rather than a failing of the player,
+ * because that is what it is.
+ */
+export const assessRoi = (
+  interval: RoiInterval | null,
+  concentration: RoiConcentration | null,
+  entries: number,
+): RoiAssessment => {
+  const note =
+    concentration !== null &&
+    concentration.topShare >= CONCENTRATION_THRESHOLD &&
+    concentration.roiWithoutTop !== null
+      ? `One score is ${Math.round(concentration.topShare * 100)}% of everything that has come back. Without it the same entries read ${formatRoi(
+          concentration.roiWithoutTop,
+        )}. That is not a reason to discount it, because deep runs are where tournament money comes from, but it is why the range is as wide as it is.`
+      : null;
+
+  if (interval === null) {
+    const short = Math.max(0, MIN_ENTRIES_FOR_INTERVAL - entries);
+    return {
+      headline: 'Not enough entries to put a range on it',
+      body: `An ROI over ${entries} entr${
+        entries === 1 ? 'y' : 'ies'
+      } is a record of what happened, not an estimate of anything. Log ${short} more and this page will start resampling your own results to say how wide the honest range around it is.`,
+      concentrationNote: null,
+      verdict: 'insufficient_data',
+    };
+  }
+
+  // Reads after "between" in all three headlines below, so: and, not to.
+  const range = `${formatRoi(interval.lower)} and ${formatRoi(interval.upper)}`;
+  const basis = `Resampling your own ${interval.entries} entries ${interval.samples.toLocaleString(
+    'en-US',
+  )} times puts your true ROI somewhere in that range, ${interval.level}% of the time.`;
+
+  if (interval.verdict === 'winning') {
+    return {
+      headline: `Winning, somewhere between ${range}`,
+      body: `${basis} The whole range sits above break even, which after ${interval.entries} entries is a real signal rather than a good run. Where in the range is still open, and the low end is the one to plan a bankroll around.`,
+      concentrationNote: note,
+      verdict: 'winning',
+    };
+  }
+
+  if (interval.verdict === 'losing') {
+    return {
+      headline: `Losing, somewhere between ${range}`,
+      body: `${basis} The whole range sits below break even. That is worth knowing rather than worth panicking about: it is a reading on the games you have actually been playing, at the buy-ins you have been playing them, and neither of those has to stay the same.`,
+      concentrationNote: note,
+      verdict: 'losing',
+    };
+  }
+
+  return {
+    headline: `Somewhere between ${range}`,
+    body: `${basis} It straddles break even, which means ${interval.entries} entries cannot yet tell a winning tournament player from a losing one. That is a fact about tournaments rather than about you: the results are mostly zeros with a few large numbers in them, and an average made of those takes a very long time to settle.`,
+    concentrationNote: note,
+    verdict: 'undetermined',
+  };
 };

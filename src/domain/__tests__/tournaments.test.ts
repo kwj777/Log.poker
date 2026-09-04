@@ -1,6 +1,12 @@
 import {
-  MIN_TOURNAMENTS_FOR_ROI,
+  BOOTSTRAP_SAMPLES,
+  MIN_ENTRIES_FOR_INTERVAL,
+  assessRoi,
   assessTournaments,
+  bootstrapRoi,
+  formatRoi,
+  roiConcentration,
+  type EntryResult,
   formatFinish,
   medianDryRun,
   probabilityOfDryRun,
@@ -155,15 +161,14 @@ describe('assessTournaments', () => {
     expect(assessTournaments(tournamentTotals([])).headline).toBe('No tournaments yet');
   });
 
-  it('refuses to call a small sample an ROI', () => {
-    const assessment = assessTournaments(tournamentTotals(many(10, 4)));
-    expect(assessment.roiIsMeaningful).toBe(false);
-    expect(assessment.body).toContain('not yet a number about you');
-  });
-
-  it('allows the ROI to mean something once the sample is large', () => {
-    const totals = tournamentTotals(many(MIN_TOURNAMENTS_FOR_ROI, 4));
-    expect(assessTournaments(totals).roiIsMeaningful).toBe(true);
+  it('leaves the ROI alone entirely, since assessRoi answers that with a range', () => {
+    // Two cards sit next to each other on the variance screen. This one is about
+    // the dry run; saying the same thing about sample size in both would put the
+    // paragraph on screen twice, and only one of them has a number in it.
+    for (const count of [10, 40, 200]) {
+      const { body } = assessTournaments(tournamentTotals(many(count, 4)));
+      expect(body).not.toMatch(/\bROI\b/);
+    }
   });
 
   it('answers the two-in-the-morning question with the player’s own rate', () => {
@@ -213,5 +218,218 @@ describe('formatFinish', () => {
     expect(formatFinish(12, null)).toBe('12th');
     expect(formatFinish(null, 340)).toBe('340 entrants');
     expect(formatFinish(null, null)).toBeNull();
+  });
+});
+
+describe('bootstrapRoi', () => {
+  /** `count` entries costing $110 each, with returns following a repeating pattern. */
+  const runs = (count: number, pattern: readonly number[]): EntryResult[] =>
+    Array.from({ length: count }, (_, index) => ({
+      invested: 11_000,
+      returned: pattern[index % pattern.length],
+    }));
+
+  /** Three cashes in ten, adding up to exactly break even over the ten. */
+  const BREAK_EVEN = [0, 0, 0, 22_000, 0, 0, 0, 0, 33_000, 55_000];
+
+  const width = (interval: { lower: number; upper: number }) => interval.upper - interval.lower;
+
+  it('refuses a sample too small to describe anything', () => {
+    expect(bootstrapRoi(runs(9, BREAK_EVEN))).toBeNull();
+    expect(bootstrapRoi(runs(MIN_ENTRIES_FOR_INTERVAL, BREAK_EVEN))).not.toBeNull();
+  });
+
+  it('refuses entries that cost nothing, having no ROI to speak of', () => {
+    const free = Array.from({ length: 20 }, () => ({ invested: 0, returned: 0 }));
+    expect(bootstrapRoi(free)).toBeNull();
+  });
+
+  it('reports the ROI actually observed alongside the range', () => {
+    const interval = bootstrapRoi(runs(50, BREAK_EVEN));
+    expect(interval?.roi).toBeCloseTo(0, 10);
+    expect(interval?.entries).toBe(50);
+    expect(interval?.samples).toBe(BOOTSTRAP_SAMPLES);
+  });
+
+  it('brackets the observed ROI', () => {
+    const interval = bootstrapRoi(runs(50, BREAK_EVEN));
+    expect(interval!.lower).toBeLessThan(interval!.roi);
+    expect(interval!.upper).toBeGreaterThan(interval!.roi);
+  });
+
+  it('is the same interval every time, so it cannot twitch between renders', () => {
+    const once = bootstrapRoi(runs(40, BREAK_EVEN));
+    const twice = bootstrapRoi(runs(40, BREAK_EVEN));
+    expect(once).toEqual(twice);
+  });
+
+  it('actually uses the seed it is given', () => {
+    const a = bootstrapRoi(runs(40, BREAK_EVEN), { seed: 1 });
+    const b = bootstrapRoi(runs(40, BREAK_EVEN), { seed: 2 });
+    expect(a).not.toEqual(b);
+    // Different draws, same underlying results: the two agree on the answer.
+    expect(a!.lower).toBeCloseTo(b!.lower, 1);
+  });
+
+  it('narrows as the sample grows, which is the whole point', () => {
+    const few = bootstrapRoi(runs(20, BREAK_EVEN))!;
+    const many = bootstrapRoi(runs(200, BREAK_EVEN))!;
+    // Ten times the entries, so a little over three times narrower.
+    expect(width(many)).toBeLessThan(width(few) * 0.6);
+    expect(few.roi).toBeCloseTo(many.roi, 10);
+  });
+
+  it('widens as the confidence level rises', () => {
+    const results = runs(60, BREAK_EVEN);
+    const ninety = bootstrapRoi(results, { level: 90 })!;
+    const ninetyFive = bootstrapRoi(results, { level: 95 })!;
+    expect(ninetyFive.lower).toBeLessThanOrEqual(ninety.lower);
+    expect(ninetyFive.upper).toBeGreaterThanOrEqual(ninety.upper);
+  });
+
+  it('collapses to a point when every entry is identical', () => {
+    // Nothing to resample: every draw is the same number, so there is no spread
+    // and the interval says exactly that rather than inventing one.
+    const identical = runs(30, [22_000]);
+    const interval = bootstrapRoi(identical)!;
+    expect(interval.roi).toBeCloseTo(1, 10);
+    expect(width(interval)).toBeCloseTo(0, 10);
+  });
+
+  it('calls a player who has never cashed a loser, with no range at all', () => {
+    const interval = bootstrapRoi(runs(30, [0]))!;
+    expect(interval.roi).toBeCloseTo(-1, 10);
+    expect(interval.verdict).toBe('losing');
+  });
+
+  it('calls it winning only when the whole range clears break even', () => {
+    // Every entry returns more than it cost, so every resample does too.
+    expect(bootstrapRoi(runs(40, [15_000, 20_000, 12_000]))!.verdict).toBe('winning');
+  });
+
+  it('leaves a straddling range undetermined rather than picking a side', () => {
+    expect(bootstrapRoi(runs(40, BREAK_EVEN))!.verdict).toBe('undetermined');
+  });
+
+  it('needs a great many entries before a thin edge separates from zero', () => {
+    // A genuine 5% winner, paying the way tournaments actually pay: one entry in
+    // ten returning ten and a half times the buy-in. Five thousand entries is
+    // still not enough to tell that player from a break-even one, which is the
+    // most useful thing this whole calculation has to say. Analytically the
+    // interval clears zero at around fifteen thousand.
+    const edge = [0, 0, 0, 0, 0, 0, 0, 0, 0, 115_500];
+    const fewer = { samples: 400 };
+
+    expect(bootstrapRoi(runs(50, edge), fewer)!.verdict).toBe('undetermined');
+    expect(bootstrapRoi(runs(5_000, edge), fewer)!.verdict).toBe('undetermined');
+    expect(bootstrapRoi(runs(25_000, edge), { samples: 200 })!.verdict).toBe('winning');
+  });
+});
+
+describe('roiConcentration', () => {
+  it('is null when nothing has come back', () => {
+    expect(roiConcentration([])).toBeNull();
+    expect(roiConcentration([{ invested: 11_000, returned: 0 }])).toBeNull();
+  });
+
+  it('measures the biggest score against everything returned', () => {
+    const result = roiConcentration([
+      { invested: 11_000, returned: 0 },
+      { invested: 11_000, returned: 20_000 },
+      { invested: 11_000, returned: 60_000 },
+    ])!;
+    expect(result.topShare).toBeCloseTo(0.75, 5);
+  });
+
+  it('says what the same entries read without it', () => {
+    const result = roiConcentration([
+      { invested: 11_000, returned: 0 },
+      { invested: 11_000, returned: 0 },
+      { invested: 11_000, returned: 99_000 },
+    ])!;
+    expect(result.topShare).toBeCloseTo(1, 5);
+    // Two entries, nothing back: minus everything.
+    expect(result.roiWithoutTop).toBeCloseTo(-1, 5);
+  });
+
+  it('has nothing to remove when there is only one entry', () => {
+    expect(roiConcentration([{ invested: 11_000, returned: 40_000 }])!.roiWithoutTop).toBeNull();
+  });
+});
+
+describe('formatRoi', () => {
+  it('signs a gain and not a loss', () => {
+    expect(formatRoi(0.153)).toBe('+15%');
+    expect(formatRoi(-0.08)).toBe('-8%');
+    expect(formatRoi(0)).toBe('0%');
+  });
+});
+
+describe('assessRoi', () => {
+  const runs = (count: number, pattern: readonly number[]): EntryResult[] =>
+    Array.from({ length: count }, (_, index) => ({
+      invested: 11_000,
+      returned: pattern[index % pattern.length],
+    }));
+  const BREAK_EVEN = [0, 0, 0, 22_000, 0, 0, 0, 0, 33_000, 55_000];
+
+  const assess = (results: EntryResult[]) =>
+    assessRoi(bootstrapRoi(results), roiConcentration(results), results.length);
+
+  it('says how many more entries it needs when it cannot say anything', () => {
+    const assessment = assess(runs(4, BREAK_EVEN));
+    expect(assessment.verdict).toBe('insufficient_data');
+    expect(assessment.body).toContain('Log 6 more');
+  });
+
+  it('names the range in the headline', () => {
+    const assessment = assess(runs(40, BREAK_EVEN));
+    expect(assessment.headline).toMatch(/^Somewhere between [-+]?\d+% and [-+]?\d+%$/);
+  });
+
+  it('explains a straddling range as a fact about tournaments', () => {
+    const assessment = assess(runs(40, BREAK_EVEN));
+    expect(assessment.verdict).toBe('undetermined');
+    expect(assessment.body).toContain('fact about tournaments rather than about you');
+  });
+
+  it('calls a clear winner a signal rather than a good run', () => {
+    const assessment = assess(runs(40, [15_000, 20_000, 12_000]));
+    expect(assessment.verdict).toBe('winning');
+    expect(assessment.body).toContain('real signal');
+  });
+
+  it('tells a losing player what the reading is of, without a verdict on them', () => {
+    const assessment = assess(runs(30, [0]));
+    expect(assessment.verdict).toBe('losing');
+    expect(assessment.body).toContain('games you have actually been playing');
+  });
+
+  it('never tells the player they are broken or that anything is owed', () => {
+    const samples = [
+      runs(4, BREAK_EVEN),
+      runs(40, BREAK_EVEN),
+      runs(40, [15_000, 20_000, 12_000]),
+      runs(30, [0]),
+      runs(200, [0, 0, 0, 0, 0, 0, 0, 0, 0, 115_500]),
+    ];
+    for (const results of samples) {
+      const { headline, body, concentrationNote } = assess(results);
+      expect(`${headline} ${body} ${concentrationNote ?? ""}`).not.toMatch(
+        /due|owed|deserve|broken|leak|tilting/i,
+      );
+    }
+  });
+
+  it('says out loud when one score is carrying the sample', () => {
+    // Ten entries, one of them everything that came back.
+    const carried = runs(20, [0, 0, 0, 0, 0, 0, 0, 0, 0, 220_000]);
+    const note = assess(carried).concentrationNote;
+    expect(note).toContain('of everything that has come back');
+    expect(note).toContain('deep runs are where tournament money comes from');
+  });
+
+  it('stays quiet when the returns are spread across many cashes', () => {
+    expect(assess(runs(40, [15_000, 20_000, 12_000])).concentrationNote).toBeNull();
   });
 });

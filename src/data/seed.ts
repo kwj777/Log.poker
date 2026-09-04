@@ -7,6 +7,7 @@
  * flag (`src/config.ts`) and never reachable from a production build.
  */
 
+import { makeRandom } from '../domain/random';
 import {
   HAND_TAGS,
   type GameType,
@@ -17,18 +18,6 @@ import {
   type Stakes,
 } from '../domain/types';
 import type { Repository } from './repository';
-
-/** mulberry32 -- small, fast, and identical across every JS engine we ship to. */
-const makeRandom = (seed: number) => {
-  let state = seed >>> 0;
-  return (): number => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -122,15 +111,26 @@ const TOURNAMENT_PLAN: readonly SessionPlan[] = [
   { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 240, finishPosition: 3, resultDollars: 2_640, hours: 11, startMoodScore: 1, endMoodScore: 1 },
   { venue: 'wynn', format: 'tournament', gameType: 'NLHE', buyInDollars: 200, feeDollars: 20, entrants: 167, finishPosition: 94, resultDollars: -220, hours: 3, startMoodScore: 2, endMoodScore: 3 },
   { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 205, finishPosition: 61, resultDollars: -110, hours: 4.5, startMoodScore: 2, endMoodScore: 4 },
+  { venue: 'commerce', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 132, finishPosition: 77, resultDollars: -110, hours: 3, startMoodScore: 2, endMoodScore: 3 },
+  { venue: 'wynn', format: 'tournament', gameType: 'NLHE', buyInDollars: 200, feeDollars: 20, entrants: 154, finishPosition: 110, resultDollars: -220, hours: 2.5, startMoodScore: 3, endMoodScore: 4 },
+  { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 219, finishPosition: 24, resultDollars: 180, hours: 6, startMoodScore: 2, endMoodScore: 2 },
+  { venue: 'aria', format: 'tournament', gameType: 'NLHE', buyInDollars: 100, feeDollars: 10, entrants: 197, finishPosition: 143, resultDollars: -110, hours: 2, startMoodScore: 2, endMoodScore: 4 },
+  { venue: 'commerce', format: 'tournament', gameType: 'PLO', buyInDollars: 150, feeDollars: 15, entrants: 88, finishPosition: 51, resultDollars: -165, hours: 3.5, startMoodScore: 3, endMoodScore: 3 },
 ];
 
 /**
  * Cash and tournaments interleaved by date rather than appended, so the bankroll
  * curve looks like a life rather than two careers stacked end to end.
+ *
+ * Spread evenly whatever the two lengths are, rather than every nth: the
+ * tournament count is chosen to clear `MIN_ENTRIES_FOR_INTERVAL` so the demo
+ * actually shows the ROI range, and that number should be free to move without
+ * a divisor here quietly dropping entries off the end.
  */
 const ALL_PLANS: readonly SessionPlan[] = PLAN.flatMap((plan, index) => {
-  const tournament = index % 3 === 1 ? TOURNAMENT_PLAN[Math.floor(index / 3)] : undefined;
-  return tournament ? [plan, tournament] : [plan];
+  const placed = Math.floor((index * TOURNAMENT_PLAN.length) / PLAN.length);
+  const wanted = Math.floor(((index + 1) * TOURNAMENT_PLAN.length) / PLAN.length);
+  return wanted > placed ? [plan, TOURNAMENT_PLAN[placed]] : [plan];
 });
 
 export interface SeedOptions {
@@ -154,9 +154,16 @@ export const DEMO_TOURNAMENT_COUNT = ALL_PLANS.filter(
   (plan) => plan.format === 'tournament',
 ).length;
 
+/** The whole demo set spans this, whatever the plan grows to. */
+const DEMO_SPAN_DAYS = 70;
+
 /**
- * Write the demo dataset. Sessions are spaced roughly every three days working
- * backwards from `now`, so the bankroll graph spans a believable couple of months.
+ * Write the demo dataset. Sessions are spread evenly backwards from `now` across
+ * `DEMO_SPAN_DAYS`, so the bankroll graph covers a believable couple of months.
+ *
+ * Derived from the plan length rather than a fixed gap between sessions: a fixed
+ * gap means every session added to the plan stretches the demo further into the
+ * past, and a "couple of months" quietly becomes half a year.
  */
 export const seedDemoData = async (
   repository: Repository,
@@ -181,8 +188,9 @@ export const seedDemoData = async (
   // Oldest first so the ids and the bankroll curve read chronologically.
   for (const [index, plan] of ALL_PLANS.entries()) {
     const sessionsFromEnd = ALL_PLANS.length - 1 - index;
+    const spacing = (DEMO_SPAN_DAYS * DAY) / Math.max(1, ALL_PLANS.length - 1);
     const startedAt =
-      now - sessionsFromEnd * 3 * DAY - Math.round(plan.hours * HOUR) - 6 * HOUR;
+      now - Math.round(sessionsFromEnd * spacing) - Math.round(plan.hours * HOUR) - 6 * HOUR;
     const endedAt = startedAt + Math.round(plan.hours * HOUR);
 
     const buyIn = plan.buyInDollars * 100;

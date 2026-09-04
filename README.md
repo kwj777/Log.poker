@@ -1018,7 +1018,9 @@ Ordered roughly by how much each is worth against how much it costs.
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
    real payload -- the flagged hand into a TiltProof drill, the rough stretch
    into the matching Untilt exercise -- and eventually share an account across
-   the three apps.
+   the three apps. What the TiltProof half becomes on the far side of that link
+   is drafted in [`design/tree-review.md`](design/tree-review.md), which also
+   records where the URL we emit today actually lands.
 6. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
 

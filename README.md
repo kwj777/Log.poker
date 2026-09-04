@@ -123,7 +123,9 @@ npm test            # house style, then the unit tests
 npm run typecheck   # strict TypeScript, app and tests
 npm run lint        # eslint-config-expo
 npm run check:prose # house style on its own
+npm run test:table  # rewrite the README test table from a real run
 npm run build:content -- --check  # the guides match their generator
+npm run test:table -- --check     # the test table matches the suite
 ```
 
 `npm test` runs the house-style check first and stops if it fails. It reads
@@ -703,11 +705,11 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 32 passed
-Tests:       910 passed
+Test Suites: 33 passed
+Tests:       916 passed
 
-  sqlRepository     104   the SQLite path, against real SQLite
   dexieRepository   104   the IndexedDB path, against real IndexedDB
+  sqlRepository     104   the SQLite path, against real SQLite
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
@@ -738,12 +740,34 @@ Tests:       910 passed
   plan                8   what an import will write, before it writes it
   tokenStore.web      8   the browser token store
   columns             7   header matching
+  readme              6   the test table adds up and says what each suite is for
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em
 dashes) and it runs ahead of Jest as part of `npm test`. It reads tracked files
 *and* new ones that are not yet committed, so a rule nobody checks does not
 quietly become a preference again.
+
+**The table above is generated.** It was kept by hand and it showed: it
+conflicted on every merge into a feature branch without exception, because both
+sides always carried a count that went stale the moment the branches parted.
+`npm run test:table` runs the suite and rewrites it; `-- --check` fails if the
+committed table does not match one.
+
+The counts are generated and the descriptions are not. "two devices disagreeing,
+and who wins" is the reason to have the table at all, and nothing can derive it
+from a suite name, so the generator reads the descriptions back out of the README
+and writes them again beside fresh numbers. This file stays the place you edit
+the prose; the script owns only the digits. A new suite arrives with a
+placeholder, which `src/site/__tests__/readme.test.ts` fails on until somebody
+writes it a sentence.
+
+It cannot run inside `npm test`, because finding out what the suite does means
+running the suite. What runs there instead is that test, which checks everything
+that does not need the results: that the rows add up to the stated total, that
+the order is a function of the numbers, and that no placeholder was left behind.
+Only `--check` can see a suite missing from the table altogether, because seeing
+that means knowing what suites exist.
 
 ### Money
 

@@ -72,7 +72,3 @@ player can be honest about the range.
 - **Pricing.** [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
   argues the first two levels of every drill stay free. A review is not a level,
   and this file does not rule on it.
-- **The domain in Log's own README.** The family table links TiltProof at
-  `tiltproof.com`, while `src/config.ts` and `SYNC.md` use `tiltproof.poker` and
-  a test pins the config value as the host TiltProof actually serves. One of the
-  two is stale.

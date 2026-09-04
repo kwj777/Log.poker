@@ -13,7 +13,7 @@ Log is the hub of a three-app family:
 | --- | --- |
 | **Log** (this repo) | What happened -- sessions, hands, results, variance |
 | [Untilt.poker](https://untilt.poker) | How it felt -- mental game work |
-| [TiltProof](https://tiltproof.com) | What to do differently -- odds and spot training |
+| [TiltProof](https://tiltproof.poker) | What to do differently -- odds and spot training |
 
 How the three are priced together is worked out in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md),

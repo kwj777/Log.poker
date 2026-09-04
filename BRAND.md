@@ -354,6 +354,65 @@ playing bad* is exactly what the variance view sells. It is refused anyway:
 spend two of its three words on the same note and lose the head, eyes, body
 progression that makes it work. Keep observant, and know what it is doing.
 
+### T-R-E-E, which is a mnemonic and not a line
+
+The mark is a canopy on a trunk, which is a tree in everything but the word, and
+the trunk is the part that becomes the log. So the family already owns the
+shape. What it is allowed to do with it is the question, and the answer is
+narrow.
+
+**One expansion is worth having: Tell, Range, Equity, Exploit.**
+
+| | | |
+|---|---|---|
+| **T** | Tell | What you saw |
+| **R** | Range | What it meant |
+| **E** | Equity | What you had |
+| **E** | Exploit | What you did about it |
+
+**It is a chain rather than a list, which is the whole test.** A tell narrows a
+range, the range yields the equity, and the equity is the thing worth
+exploiting, so every word is the input to the next one. Four steps and four
+faculties: observation, inference, arithmetic, action. That is the same property
+that makes Learn, Observe, Ground work rather than merely fit, which is that the
+expansion does a job instead of filling letters.
+
+**The doubled E is what kills every other candidate.** Poker's E vocabulary is
+roughly equity, EV, edge, exploit, early position and effective stacks, and
+three of those mean close to one thing, so the ordinary attempt spends both Es
+on a single idea and the fourth word restates the third. The rule that gets out
+of it: **one E is a quantity and the other is an action.** Nothing else is
+reliable.
+
+| Candidate | Where it lands |
+|---|---|
+| **Tell, Range, Equity, Edge** | The runner up rather than a rejection. The same chain ending on the long run instead of on the hand, since *edge* is what *equity* becomes once it is repeated. Softer, because those two sit close enough that the last word can read as a restatement, and only the chain rescues it. The variance view, if anywhere. |
+| Turn, River, Equity, EV | Two streets and then two synonyms. Reads as a list that ran out of poker halfway through. |
+| Tilt, Rake, Equity, Edge | Four things that happen to you, in no order, with the Es still collided. |
+| Trips, River, Equity, Exploit | *Trips* is there for the T and for nothing else, which an audience hears in one pass. |
+
+**It is not a line, and it never becomes one.** *Be the tree* undoes the whole
+argument in three words. A log is what is left after the tree comes down, and
+what is being sold is that a log is already down and does not move, so the tree
+is both the thing that sways and the thing that got felled. The imperative frame
+belongs to *log*, permanently, which is why this sits here rather than in
+[The variants](#the-variants).
+
+What it has instead is a noun the game already uses. **The game tree is the
+thing you walk back after the hand**, so the acrostic reads as a review shape
+rather than as a state, and the two never want the same surface.
+
+**Where it goes is TiltProof, on the hand Log hands over.** Log's journal is
+fifteen seconds by design and a four step frame is the opposite of that, but a
+hand tagged *misplayed?* already offers to drill the spot in TiltProof, and
+T-R-E-E is the shape of the drill on the other side of that hand-off. It is also
+the one surface where the mark being a tree is doing work rather than sitting
+there being pleasant.
+
+**And it adds no fifth sense of *log*.** The counting stopped at four and stays
+stopped. This is a different word, in a different app, doing a different job,
+and it is in this document only because the trunk is already here.
+
 ### The variants
 
 Ranked, with where each earns its place. Two families, because the face and the

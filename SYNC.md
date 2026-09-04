@@ -58,7 +58,7 @@ estimate below.
 | `createdAt` and `updatedAt` on every row | `src/data/sql/schema.ts`, `src/data/dexie/db.ts` | Present on all five tables, both engines |
 | One storage contract, two implementations | `src/data/repository.ts` | Nothing above it knows which engine it is on |
 | One composition point | `src/data/index.ts` | `getRepository()`, and `setRepository()` for swapping |
-| A conformance suite over both engines | `src/data/__tests__/repositoryContract.ts` | 132 tests, real SQLite and real IndexedDB |
+| A conformance suite over both engines | `src/data/__tests__/repositoryContract.ts` | 154 tests, real SQLite and real IndexedDB |
 | Magic-link sign-in, no user table | Untilt `netlify/edge-functions/signin.js` | Shipped |
 | A signed bearer token | Untilt `lib/access.js` | `<expiry>.<tier>.<subject>.<signature>`, HMAC |
 | A per-user bucket, keyed by HMAC of the subject | Untilt `netlify/edge-functions/sync.js` | Shipped. The store never holds a customer id |
@@ -86,8 +86,11 @@ who deletes a mis-entered session on the phone watches it reappear on the
 laptop, and then watches their bankroll curve disagree with itself.
 
 **Every table gets `deleted_at`, and `delete*` writes a tombstone instead of
-removing the row.** Migration v3 on SQLite, version 3 on Dexie, both append-only
-as the existing ones are. Consequences worth naming before they are discovered:
+removing the row.** A numbered migration on SQLite. On Dexie it turned out to
+need no version at all: IndexedDB stores whole objects, so an unindexed property
+needs no bump and a record written by an earlier build simply has no
+`deletedAt` and reads as live. Consequences worth naming before they are
+discovered:
 
 - **Every read has to exclude tombstones.** That is a `WHERE deleted_at IS NULL`
   in `SqlRepository` and a filter in `DexieRepository`, on every list and get.
@@ -271,10 +274,184 @@ order is chosen so that the riskiest work is done before anything depends on it.
 
 | | Phase | Ships | Roughly |
 |---|---|---|---|
-| **0** | Tombstones, the three merge rules, contract tests. No network. | Dark, behind nothing | 3 to 5 days |
-| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | Sign-in that unlocks nothing yet | 3 to 4 days, most of it in Untilt |
-| **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | The feature | 5 to 8 days |
+| **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
+| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Done**, behind `ALLOW_SIGN_IN` | 3 to 4 days, most of it in Untilt |
+| **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | **Built.** Waiting on one env var | 5 to 8 days |
 | **3** | RevenueCat `log_plus`, the offering, the both-singles rule, store review | The purchase | 3 to 5 days |
+
+### What phase 0 actually landed
+
+A numbered migration adds `deleted_at` to all five tables; the Dexie side needs
+none, because IndexedDB stores whole objects and a record written by an earlier
+build simply has no property and reads as live. Every read in both
+repositories filters tombstones, `delete*` writes them, children take the
+parent's stamp, and tombstoning a session clears its `importKey` so that a
+deleted import stays re-importable. `clearAll` remains a truncate.
+
+`listChangedSince(cursor)` was added to the `Repository` interface. It was not
+in the plan above, and it is here for one reason: tombstones are otherwise
+unobservable through the interface, so nothing could test them. It is also the
+read phase 2 needs, so it is early rather than speculative.
+
+`src/domain/merge.ts` holds the rules as pure functions, tested for the property
+that matters most: **the answer cannot depend on which device the merge looked
+at first.** 28 tests there, 22 more in the conformance suite across both
+engines, and 7 on the migration itself, which is the half of a schema change the
+conformance suite cannot see: it starts from an empty database at the latest
+version and so says nothing about a player with three years of history
+installing an update.
+
+**Two things named above are deliberately not built.** Tombstone collection: the
+ninety-day sweep does not exist, so tombstones accumulate and a heavy deleter's
+database grows where it used to shrink. And the clock clamp is written and
+tested but applied nowhere, because nothing yet receives a stamp from another
+device. Both belong to phase 2 and neither is load bearing until something
+syncs.
+
+### What phase 1 landed, and the one thing blocking the rest
+
+`src/auth` holds the whole client half: the token grammar, what a claim is
+worth, a `SessionManager` over a three-method `TokenStore`, and the two
+adapters that implement it, the keychain on device and `localStorage` on the
+web. 48 tests, and the token ones mint genuinely HMAC-signed fixtures rather
+than typing strings out, because the format belongs to another repository and a
+hand-typed fixture only proves the parser agrees with whoever typed it.
+
+One bug worth recording, because it is the shape of bug a contract across two
+repositories produces: the client did not send `Accept: application/json`, which
+is the one header the server keys on. Nothing would have errored. Every call
+would have come back 200 carrying a page, and the client would have read it as a
+success with no token in it.
+
+**The server half is built too**, in Untilt rather than here. Its sign-in
+answers a browser with a 303 carrying a `Set-Cookie`, and that cookie is
+`__Host-` prefixed and `HttpOnly`: unreadable by script by design, unreachable
+from another registrable domain by definition, and meaningless to a native app
+with no browser cookie jar. So it now answers a caller that asks for JSON with
+the token in the body instead:
+
+```
+POST /api/signin        { email }         -> 202, no body
+POST /api/signin/code   { email, code }   -> 200 { token }
+                                             400 { error }
+                                             429 { error }
+```
+
+Both take `Accept: application/json`, which is the whole of what separates the
+two shapes; without it the same request is answered exactly as it always was.
+Nothing about how a token is minted, signed, checked or spent moves: the same
+nonce, the same Stripe lookup, the same tier read now rather than trusted from
+the mail, the same limiter, and the same deliberate refusal to say which of
+several things went wrong. The 202 is that refusal in the send path: it answers
+the same whether or not Stripe has heard of the address, because an endpoint
+that says *no customer* tells a stranger who bought.
+
+Three things hold the cross-origin side in place, each with a test over there:
+an allowlist of two exact origins rather than a pattern, since a pattern for
+`*.poker` is a pattern for a domain somebody else can register; no
+`Access-Control-Allow-Credentials` and no `Set-Cookie` on the JSON answer, so
+the two ways of taking delivery cannot both be half-live at once; and the
+allowlist scoped to the two endpoints the apps use. Nothing newly reachable
+came with it, because those endpoints already answered a caller with no
+`Origin` at all, which is what has always let a native app in.
+
+**The screen is built**, in `src/features/account`, and phase 1 is done. Two
+steps, an address then the code mailed to it, and never the link, for the
+reason Untilt already found: mail opens links in the browser, so somebody
+tapping one on a phone is signed in to Safari and comes back to an app as
+signed out as they left it.
+
+The copy carries the rule the endpoint is built around, at the last place it
+can die. `/api/signin` answers the same whether or not Stripe has heard of the
+address, on purpose, and a screen saying *check your inbox* throws that away on
+the client where nobody reviewing the server would see it. So the confirmation
+is conditional, the code refusal never guesses why, and both are asserted.
+
+**It is behind `ALLOW_SIGN_IN`, which is `__DEV__`.** Signing in unlocks
+nothing until there is something to sync to, and somebody who typed an address,
+waited for mail and read a code off a phone would arrive back at a screen that
+looks exactly as it did before. That is worse than an absence. Flipping the one
+constant when phase 2 lands is the whole of shipping it.
+
+What it buys meanwhile is the thing nothing else could do: the chain runs end to
+end in a browser. Ask, redeem, hold, reload, sign out; both requests carrying
+`Accept: application/json`; the token parsed from a genuinely signed fixture and
+still held after a reload, which is the `localStorage` adapter doing its job.
+Two halves tested against fakes and joined by a written contract is exactly the
+arrangement that hides a bug from both sides, and it had already hidden one.
+
+Two things worth carrying forward from building it. The token counts its expiry
+in **seconds** where everything in Log counts milliseconds, which is a factor of
+a thousand and therefore about fifty years if it goes unnoticed; it is converted
+at the boundary and tested there. And the client **cannot verify a signature**,
+because that needs the gate secret and a secret shipped inside a downloadable
+app is not one: a claim read on this side decides what to show and what is worth
+sending, never what is allowed, and the server re-derives on every request.
+
+### What phase 2 landed
+
+**The endpoint is on Log, not on the host that mints the token.** The web app is
+served from `log.poker/app` and this answers on `log.poker`, which is one
+origin, so unlike the family sign-in there is nothing to allowlist and no
+preflight to answer. Native sends no `Origin` at all. Deciding to make it
+cross-origin later should be a decision rather than a discovery.
+
+`netlify/functions/sync.mts` is the thin part: a token, a blob, the merge, the
+blob back. It is TypeScript rather than the `.mjs` the scan counter is written
+in, precisely so it can import `src/sync/bundle.ts`. **Two implementations of a
+merge is two merges that disagree in a year.**
+
+The bundle is one object per person in Netlify Blobs, keyed by an HMAC of the
+subject so the store never holds a customer id, and the wire carries deltas
+against it. The cursor is `updatedAt` and the comparison is `>=`, which costs
+one millisecond of re-sent records per sync and closes a hole that would
+otherwise lose a record roughly once a year, unreproducibly.
+
+**Two bugs came out of the two-device test and neither would have come out of
+anything else.** A write that landed while a push was in flight was never sent,
+because joining an in-flight run is not the same as being sent by it. And one
+cursor cannot do both jobs: the server's cursor moves past stamps this device
+wrote and never sent, so `pulled` and `pushed` are now two numbers and the
+second is taken from the records actually sent rather than from a clock. Both
+were silent, both lost data, and both were found by asking the question a player
+would ask rather than the question a unit test asks.
+
+**What is left is an environment variable.** `GATE_SECRET` has to be set on
+Log's Netlify site, the same value Untilt signs with, and then `ALLOW_SIGN_IN`
+flips. Until that is true the endpoint answers 503 to everything, which is the
+state to leave it in.
+
+### Collecting tombstones
+
+Built, and it turned out to be the one piece where the obvious implementation is
+wrong in a way that only shows up months later. **Collecting a tombstone too
+early resurrects the record**: a device still holding the live row meets a server
+with nothing left to refuse it, and a session deleted in March is back on every
+device in June.
+
+So the window is a floor rather than the rule. Ninety days says how long a
+device can be switched off and still come back coherent; the bundle also holds a
+map of device to last-seen, and the line is the earlier of *ninety days ago* and
+*the least recently seen device*. A device unseen for a hundred and eighty days
+is presumed gone, because one lost phone should not freeze collection forever.
+
+**Twice the window rather than once, and this was a real bug before it was a
+decision.** The first version forgot a device at exactly the retention window,
+which meant every remembered device was newer than the window and the minimum
+could never be the binding one: the whole device map was decoration, and the
+test that was supposed to prove it worked was passing for another reason.
+
+**Two more things came out of writing it.** The collection line only moves when
+a sweep actually removed something, because it arms a refusal and arming it on
+an empty sweep would turn away records from any device that had merely been
+away. And the sweep runs last in the merge, after the three constraint rules, so
+it cannot collect a tombstone one of them has just written.
+
+The backstop for a device gone past the forget threshold is that **a record the
+server has never seen, older than everything collected, is refused**. That can
+lose a record such a device created and never sent. It is the worse thing to
+lose and much the rarer: it needs six months offline and a write that never
+left, where the alternative needs only the six months.
 
 Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
 no dependency on each other and can be built in either order or at once.
@@ -321,14 +498,17 @@ quietly during work like this.
 2. **Does the first release sync Log only, or is the shared account across all
    three apps a launch requirement?** Log-only is smaller and can use the same
    token without the App User ID work landing anywhere else.
-3. **Netlify Blobs, or a real database?** The bundle-at-rest shape fits Blobs and
-   keeps the family on one piece of infrastructure. A player with ten years of
-   history and a device that has been offline for a month is the case that would
-   argue otherwise, and it is not a case anybody has yet.
-4. **How much of the merge is server-side?** This document puts per-record
-   last-write-wins on the server, next to the store, so a device that has been
-   away does not have to be trusted to resolve. Client-side is also defensible
-   and would keep the endpoint a dumb blob store.
+3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
+   bundle-at-rest shape fits them and keeps the family on one piece of
+   infrastructure. A player with ten years of history and a device that has been
+   offline for a month is still the case that would argue otherwise, and still
+   not a case anybody has.
+4. ~~**How much of the merge is server-side?**~~ **Settled: all of it.** A
+   device that has been in a drawer for a month has a month-old view of the
+   world and possibly a wrong clock, so resolving there would make the answer
+   depend on which device asked. One place holds the outcome, every device
+   converges on it, and the rules are exercised by one test suite rather than by
+   however many app versions are still installed.
 
 ---
 

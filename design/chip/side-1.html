@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Log chip -- side 1</title>
+
+<!-- The identity face: the family mark over log.poker, and nothing else on it.
+     This is the side somebody turns over in their fingers while they decide
+     whether to ask what it is. Side 2 is the side that answers.
+
+     Rasterized by `npm run chip`.
+
+     No ring, no edge spots, no denomination. A denomination would make this
+     gambling scrip rather than a card protector, which is the same line the
+     family draws around taking money from the gambling side of the business,
+     and it applies to objects as much as to revenue.
+
+     **The mark is the family's, so no ring is lit.** An app icon turns exactly
+     one canopy ring gold; this disc stands for all three apps and its back
+     names them, so it lights none. That is also what keeps the object from
+     reading as Log-the-app's merchandise when it is the family's front door.
+
+     The domain is set at full size here because the back carries no wordmark
+     at all. The code there says where to go better than any typed URL does,
+     but an object with no name on either face is anonymous once it is off the
+     table, so the name lives on this one. -->
+
+<link rel="stylesheet" href="face.css">
+<script src="face.js"></script>
+<style>
+  /* The viewBox is the mark's own ink on the 200 grid, stroke widths included,
+     rather than the full square.
+
+     The paths run x 34..166 and y 37..163, and the outer stroke is 6 wide, so
+     the ink reaches 31 and 169 across and 34 and 166 down. On a square canvas
+     that margin is padding; here it is what "center the mark over the word"
+     has to mean the mark rather than the mark's empty air, so it is cropped
+     out. Getting this wrong is not subtle: Untilt's chip inherited a box cut
+     for a different drawing and printed the baseline's round caps sliced flat
+     at both ends. */
+  .mark {
+    display: block;
+    width: 690px;
+    height: 659px;
+  }
+
+  h1 {
+    /* The bottom margin is not space under the word. Flex centers the column
+       and a line box carries its ink high inside itself, so the pair sat below
+       the middle of the disc; growing the column downward lifts it back. */
+    margin: 54px 0 96px;
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 208px;
+    line-height: 1;
+    /* Tighter than the site's, for the same reason the share card is: this is
+       display size, where the page's tracking reads loose. */
+    letter-spacing: -0.02em;
+    color: var(--cream);
+    white-space: nowrap;
+  }
+
+  /* The extension, quieter than the name. Same trick as the site's app cards,
+     where the host sits under the app's name in the dim. */
+  h1 .tld { color: var(--gold); }
+</style>
+
+<div class="face">
+  <!-- The family mark, on the 200 grid it is drawn on in public/home.html and
+       404.html: canopy in one green ramp, gold on the trunk, nothing lit. -->
+  <svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="31 34 138 132"
+       role="img" aria-label="Three nested triangles sharing a baseline">
+    <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </svg>
+
+  <h1>log<span class="tld">.poker</span></h1>
+</div>

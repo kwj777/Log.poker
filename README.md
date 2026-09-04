@@ -409,6 +409,19 @@ Each page answers its question in full before it mentions an app. A page that
 withholds the answer to make you install something is the genre this is trying
 not to be in.
 
+## The chip
+
+The card protector itself: a 47mm ceramic disc with the family mark over
+`log.poker` on one face and a scannable code on the other. `design/chip/`
+holds the two faces, the proof sheet and its own README; `npm run chip`
+regenerates the code from `chipUrl('qr')` and rasterizes everything.
+
+The code is checked three ways, and the third exists because the first two
+cannot do its job: the matrix is asserted to come from the campaign URL, the
+rendered PNG is decoded by a real scanner, and the physical module size is
+computed in millimeters. A 2000px artboard decodes at any tile size; a 47mm
+disc does not.
+
 ## The chip campaign
 
 `log.poker/chip` is the landing a ceramic card protector points at, and it is
@@ -518,6 +531,170 @@ in the test suite -- so the class that ships to iOS and Android is the class the
 tests exercise, against a real SQLite engine, rather than a fake that would
 agree with whatever the repository happens to do.
 
+### Deletes are tombstones
+
+Nothing in the data layer removes a row any more. `deleteSession` and its four
+siblings set `deleted_at` and leave the record where it is; every read filters
+on it, so from a screen's point of view nothing changed at all. On IndexedDB it
+needed no version bump, because the property is not indexed and a record written
+before it reads as live.
+
+The reason is not local. Across two devices, a row that is absent because
+somebody deleted it and a row that is absent because this device has not been
+told about it yet are **the same absence**, so a merge that unions rows brings
+back every session anybody ever removed. Delete a mis-entered session on the
+phone, watch it come back from the laptop, watch the bankroll curve disagree
+with itself.
+
+Four things fall out of that and are asserted in the conformance suite:
+
+- **Children take the parent's stamp.** A hand tombstoned a millisecond after
+  its session is a hand a later merge can revive on its own.
+- **Tombstoning a session clears its `importKey`.** Deleting an imported session
+  has always made it importable again, and a tombstone holding the key in a
+  unique index would end that quietly. The key is derived from the source row,
+  so a re-import mints it again.
+- **A tombstoned session stops holding its venue back**, but the venue is
+  tombstoned rather than removed, because the deleted session's `venueId` still
+  points at it and a foreign key that stops resolving is a broken read.
+- **`clearAll` is still a truncate.** It is the one delete that is not a
+  tombstone, and the distinction is the whole reason to be careful here: reset
+  means *this device*, not *every device*. Writing tombstones would let somebody
+  clearing a phone they are about to sell take five years of history off the
+  laptop with it.
+
+`listChangedSince(cursor)` is the only read that can see a tombstone, and the
+seam the sync engine plugs into. Nothing calls it yet. It exists because an
+invariant nothing can read is an invariant nothing can test.
+
+The merge rules themselves are pure functions in `src/domain/merge.ts`: per
+record last-write-wins, a clock clamp, and the three cases where the thing in
+conflict is a constraint rather than a field, so both devices are right and the
+pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
+something sweeps them, which is phase 2 work, and until then a heavy deleter's
+database grows where it used to shrink.
+
+### Signing in, and what it is for
+
+`src/auth` is the client half of the family's identity. It exists for exactly
+one feature, cross-device history, and **nothing else in the app has anything to
+do with it**: Log is free in its entirety and stays completely usable by
+somebody who never types an email address. There is no signed-out state to
+handle, because signed out is the state every screen already runs in.
+
+The token is minted by Untilt's sign-in and is the same string in all three
+apps. It has to be a bearer string rather than a cookie: `log.poker`,
+`untilt.poker` and `tiltproof.poker` are three registrable domains, so no cookie
+crosses them, and on iOS and Android there is no cookie jar at all.
+
+```
+<expiry>.<tier>.<subject>.<signature>
+```
+
+Three things about this are worth knowing before touching it.
+
+- **Nothing on this side verifies a signature.** Checking one needs the gate
+  secret, and a secret shipped inside an app anybody can download is not a
+  secret. A parsed claim decides what to show and what is worth sending; the
+  server re-derives on every request and is the only answer that counts.
+- **The expiry is in seconds** where every other timestamp in this app is
+  milliseconds. Converted at the boundary, and tested there, because the
+  difference is a factor of a thousand and therefore about fifty years.
+- **A tier is not enough to sync; the holder needs a subject of their own.**
+  Everybody who typed a passcode shares one subject, so syncing them together
+  would pour every preview visitor's history into a single bucket.
+
+`SessionManager` holds the token over a three-method `TokenStore`, the same
+trick `SqlRepository` plays on `SqlDriver`: the keychain on device and
+`localStorage` on web are a dozen lines each, and everything worth testing runs
+against an in-memory one. Both adapters answer as if nothing were stored when
+storage is unavailable, which is ordinary rather than exceptional -- a locked
+device, a private window, a prerender with no `window` at all.
+
+The server side is built too, in Untilt. Its sign-in answers a browser with a
+redirect carrying an `HttpOnly` cookie, which Log can neither read across
+domains nor receive on native, so it answers a caller sending
+`Accept: application/json` with the token in the body instead. That header is
+the whole of what separates the two shapes. `src/auth/signin.ts` speaks that
+contract and is tested against a fake `fetch`, which is as far as a client in a
+different repository can prove anything.
+
+The screen is in `src/features/account`: an address, then the code mailed to
+it, and never the link, because mail opens links in the browser and an installed
+app keeps its own storage.
+
+**It is behind `ALLOW_SIGN_IN`, which is `__DEV__`**, the same treatment the
+demo seeder gets and for the same reason: signing in unlocks nothing until there
+is something to sync to, and a form that cannot succeed is worse than an
+absence. One constant flips when phase 2 lands.
+
+The copy has tests, which most copy should not. `/api/signin` answers the same
+whether or not it has heard of an address, deliberately, so that nobody can use
+it to ask which addresses have bought. A screen that said *check your inbox*
+would throw that away on the client, where no review of the server would catch
+it. So the confirmation is conditional and the refusal never guesses why.
+
+### Cross-device history
+
+Off unless somebody signs in, and unbuilt in the sense that matters until
+`GATE_SECRET` is set on this site: the endpoint answers 503 to everything
+without it, and `ALLOW_SIGN_IN` stays `__DEV__` until it is set.
+
+**One round trip does both halves.** A device sends what it changed and what it
+last saw; it gets back everything it has not seen. `netlify/functions/sync.mts`
+is the thin part around `src/sync/bundle.ts`, and it is TypeScript rather than
+`.mjs` precisely so it can import that file: two implementations of a merge is
+two merges that disagree in a year.
+
+- **The server merges.** A device that has been in a drawer for a month has a
+  month-old view of the world and possibly a wrong clock, so resolving there
+  would make the answer depend on which device asked. One place holds the
+  outcome and every device converges on it.
+- **Delta on the wire, bundle at rest.** One object per person in Netlify
+  Blobs, keyed by an HMAC of the subject so the store never holds a customer id.
+- **Two cursors, not one.** `pulled` is what the server has told this device
+  about; `pushed` is what this device has sent. They look like one number and
+  are not: the server's cursor moves past stamps this device wrote and never
+  sent, and collapsing them loses exactly those records.
+- **Both comparisons read one millisecond back.** A record written in the very
+  millisecond of the last sync is otherwise invisible forever, and a venue and
+  the session started on it are routinely the same millisecond. Re-sending a
+  millisecond is free, because applying a record twice is a no-op.
+- **Writes never wait on it.** Everything commits locally and returns; the push
+  happens after. A card room has no wifi and that is the normal case.
+
+`src/data/index.ts` is where the wrapper is composed in, which is what keeps all
+of this out of every feature folder: a screen asks for a repository and gets
+one, and whether it talks to a server is not a question it can ask.
+
+#### Tombstones are collected, carefully
+
+A tombstone is kept for **ninety days**, and then only goes if nobody is still
+waiting to hear about it. **Collecting one too early resurrects the record**: a
+device still holding the live row meets a server with nothing left to refuse it,
+pushes, and a session somebody deleted in March is back on every device in June.
+
+Time alone is a guess at that, so the bundle counts. It holds a map of device to
+last-seen, and the line is the earlier of *ninety days ago* and *the least
+recently seen device*. A device unseen for **a hundred and eighty** days is
+presumed gone -- sold, or replaced -- because one lost phone should not freeze
+collection for the rest of somebody's life. Twice the window rather than once,
+or the rule would be decorative: every remembered device would be newer than the
+window and the minimum would never bind.
+
+That leaves one hole and one backstop. A device gone longer than the forget
+threshold comes back holding rows whose tombstones are gone, so **a record the
+server has never seen, older than everything it has collected, is refused.**
+That can lose a record such a device really did create and never sent, which is
+the worse thing to lose and much the rarer: it takes six months offline and a
+write that never left. The alternative is a deleted session reappearing on every
+device, which takes only the six months.
+
+A device that never signs in collects on the window alone, having nothing to
+disagree with. One that does sync never collects further back than the server
+says it has: the server draws that line from every device, and this one only
+knows about itself.
+
 ### Testing
 
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
@@ -526,29 +703,40 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 21 passed
-Tests:       645 passed
+Test Suites: 32 passed
+Tests:       910 passed
 
-  sqlRepository      75   the SQLite path, against real SQLite
-  dexieRepository    75   the IndexedDB path, against real IndexedDB
+  sqlRepository     104   the SQLite path, against real SQLite
+  dexieRepository   104   the IndexedDB path, against real IndexedDB
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   stats              45   P/L, rebuys, duration, win rate, groupings
+  bundle             39   what ships to each platform, against the real output
+  site               37   the marketing/app split, the PWA, the sitemap
   values             36   money, dates, durations, stakes, formats, counts
-  site               35   the marketing/app split, the PWA, the sitemap
   variance           35   win rate, σ, confidence bands, verdicts
   blog               28   the post grammar, the share cards, and what it refuses
+  merge              28   two devices disagreeing, and who wins
   palette            27   the theme matches BRAND.md
+  chip               23   /chip resolves, offline, and never quotes a price
+  migrations         22   a filled v2 database walked forward, both engines
+  copy               19   what the sign-in and the sync are allowed to say
   csv                19   quoting, delimiters, line endings
-  chip               18   /chip resolves, offline, and never quotes a price
   money              18   cents arithmetic, parsing, formatting
   handNotation       16   parse, round-trip, hand classes
+  syncingRepository  16   two devices and one server, no fakes in between
+  token              16   the family token grammar, against signed fixtures
+  verify             16   checking a token, and every way past it that must not work
+  client             14   the sync client, against a fake fetch
   seed               14   the demo dataset stays coherent
-  migrations         13   a filled v2 database opened at v3, both engines
+  session            12   holding a token, and stores that fail as real ones do
+  signin             12   the sign-in client, against a fake fetch
+  endpoint           11   the sync endpoint, end to end
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
+  tokenStore.web      8   the browser token store
   columns             7   header matching
 ```
 
@@ -768,9 +956,14 @@ Ordered roughly by how much each is worth against how much it costs.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
    id and an `updatedAt`, and the one feature the family pass adds to this app.
    **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
-   starting: three quarters of the server already exists in Untilt, and the work
-   that does not is mostly that nothing here records a delete, so a merge
-   resurrects every session anybody removed.
+   starting: three quarters of the server already exists in Untilt.
+   **Phases 0, 1 and 2 have landed**; see
+   [Cross-device history](#cross-device-history). Deletes are tombstones, the merge rules are written
+   and tested, and `listChangedSince` is the seam the engine plugs into. See
+   [Deletes are tombstones](#deletes-are-tombstones). **Phase 1's client half
+   has landed too**, in `src/auth`; see
+   [Signing in](#signing-in-and-what-it-is-for). **Phase 1 is done**, screen and
+   all. What is left is the engine itself.
    A syncing repository wraps the existing one behind the same interface, and
    `src/data/index.ts` is the single place it gets composed in; no feature
    folder changes. Last-write-wins per record to start, with the timestamps

@@ -16,9 +16,10 @@ import { Card } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
-import { ALLOW_DEMO_SEED } from '../../src/config';
+import { ALLOW_DEMO_SEED, ALLOW_SIGN_IN } from '../../src/config';
 import { getRepository, STORAGE_ENGINE } from '../../src/data';
 import { seedDemoData } from '../../src/data/seed';
+import { SignInCard } from '../../src/features/account/SignInCard';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
@@ -135,6 +136,13 @@ export default function SettingsScreen() {
           </Text>
         ) : null}
       </Card>
+
+      {ALLOW_SIGN_IN ? (
+        <>
+          <SectionHeader title="Your other devices" />
+          <SignInCard />
+        </>
+      ) : null}
 
       {ALLOW_DEMO_SEED ? (
         <>

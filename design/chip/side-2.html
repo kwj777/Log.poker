@@ -1,0 +1,170 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Log chip -- side 2</title>
+
+<!-- The ask face, and the reason this is the chip the family makes rather than
+     Untilt's: it carries a scannable code, the code lands on a free app, and
+     the three words around it name all three.
+
+     Rasterized by `npm run chip`. The code itself comes from qr.js, which
+     scripts/make-qr.mjs writes from `chipUrl('qr')` in src/campaign/chip.ts.
+     Nothing here retypes that URL.
+
+     ## The reading order is the whole layout
+
+     LEARN on the left, OBSERVE on the right, GROUND underneath. Left, right,
+     down spells L-O-G, and side 1 says log.poker, so the two faces give the
+     acronym and its expansion between them without either one explaining it.
+
+     A `Be the LOG` line sat under the three words and has been taken out. It
+     was the only thing on the disc doing the pointing out loud, and the object
+     reads better without it: three words around a code, and a domain on the
+     back of them. The room it used went to the code taking the exact middle of
+     the disc and to the verbs standing clear of each other.
+
+     An earlier arrangement put GROUND on the right and OBSERVE at the bottom
+     and spelled L-G-O, which was cosmetic until the gold line went mixed case
+     and then was a defect. GROUND takes the bottom because **the ground is the
+     bottom**, which decodes for anybody holding the object cold; OBSERVE under
+     the QR only decoded for somebody who already knew Observe meant Log.
+
+     ## What the side words cost
+
+     OBSERVE is the longest of the three and it sits in a channel, so it is set
+     turned rather than across. Both side words read bottom to top, the same
+     way, so one turn of the disc reads both: a left word one way and a right
+     word the other is a convention from book spines, where the object is never
+     rotated at all.
+
+     Their margins are the first thing to check on a printed proof. -->
+
+<link rel="stylesheet" href="face.css">
+<script src="face.js"></script>
+<script src="qr.js"></script>
+<style>
+  /* Everything on this face is placed from the disc's own center rather than
+     stacked in flow: a chip has no reading direction until the words give it
+     one, and the QR has to sit exactly on the middle. */
+  .face > * { position: absolute; }
+
+  /* The mark, small, at the top, centered in the band above the code the same
+     way GROUND is centered in the band below it. Same ink-cropped viewBox as
+     side 1. */
+  .mark {
+    top: 316px;
+    width: 261px;
+    height: 250px;
+  }
+
+  /* The code, on a cream tile.
+     
+     680px is 15.3mm at the 39mm draw, which is 18.4mm once this is rendered at
+     47mm. The matrix is 37 modules and the quiet zone is 3 on each side, so 43
+     module widths land 0.43mm each. Below about 0.4mm a phone starts needing a
+     second try, and that floor is why the tile took its room back off the mark
+     and the type rather than the other way round: everything else on this face
+     can lose a millimeter and still read. */
+  .qr {
+    top: 660px;
+    width: 680px;
+    height: 680px;
+    background: var(--cream);
+    /* Barely rounded. A hard square reads as a sticker on a round object and a
+       soft one starts eating the quiet zone at the corners. */
+    border-radius: 26px;
+  }
+
+  .qr svg { display: block; width: 100%; height: 100%; }
+
+  /* The three words. 1.5mm of cap is the floor the vendor's own art guide
+     gives, and these sit just over it at the 39mm draw, so they clear it with
+     room once the art is scaled to 47mm. */
+  .verb {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 88px;
+    line-height: 1;
+    letter-spacing: 0.2em;
+    color: var(--canopy-outer);
+    white-space: nowrap;
+  }
+
+  /* Turned, reading bottom to top, centered in the channel beside the tile. */
+  /* Centered on the tile rather than on the disc, so the pair reads as a
+     caption to the code rather than as a band across the whole face. */
+  .verb.side {
+    top: 1000px;
+    transform-origin: center;
+  }
+  .verb.learn {
+    left: 443px;
+    transform: translate(-50%, -50%) rotate(-90deg);
+  }
+  .verb.observe {
+    left: 1557px;
+    /* Tighter than its siblings: OBSERVE is a letter longer than LEARN and two
+       longer than GROUND, and it is the one that decides whether the channel
+       holds. */
+    letter-spacing: 0.14em;
+    transform: translate(-50%, -50%) rotate(-90deg);
+  }
+
+  /* Centered in the channel below the code rather than sitting just under it.
+     The code takes the middle of the disc, which leaves two equal bands of
+     438px, and the mark and this word are each centered in their own. Tucked
+     up against the tile it read as a caption to the code with a void beneath
+     it, which is what the face looked like when the line under it was removed
+     and nothing else moved. */
+  .verb.ground {
+    top: 1514px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+</style>
+
+<div class="face">
+  <svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="31 34 138 132"
+       role="img" aria-label="Three nested triangles sharing a baseline">
+    <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </svg>
+
+  <div class="qr" id="qr"></div>
+
+  <div class="verb side learn">LEARN</div>
+  <div class="verb side observe">OBSERVE</div>
+  <div class="verb ground">GROUND</div>
+</div>
+
+<script>
+  /* One rect per dark module, on a viewBox of the matrix plus its quiet zone,
+     so the tile's own edge is the quiet zone and nothing has to be reserved
+     inside it. Drawn from qr.js rather than encoded here: the string that gets
+     fired is generated from the campaign URL and committed. */
+  (function () {
+    const qr = window.CHIP_QR;
+    const QUIET = 3;
+    const span = qr.size + QUIET * 2;
+    let rects = "";
+
+    for (var y = 0; y < qr.size; y += 1) {
+      for (var x = 0; x < qr.size; x += 1) {
+        if (qr.modules[y * qr.size + x] !== "1") continue;
+        /* Modules are drawn a hair over one unit wide. At this scale a printer
+           leaves a hairline between neighbors that should be one solid block,
+           and a scanner reads the seam. */
+        rects +=
+          '<rect x="' + (x + QUIET) + '" y="' + (y + QUIET) +
+          '" width="1.02" height="1.02"/>';
+      }
+    }
+
+    document.getElementById("qr").innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + span + " " + span +
+      '" shape-rendering="crispEdges" fill="#0d1110">' + rects + "</svg>";
+  })();
+</script>

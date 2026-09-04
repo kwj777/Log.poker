@@ -22,6 +22,7 @@ import { StatTile, type StatTileProps } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { BarBreakdown } from '../../src/components/chart/BarBreakdown';
 import { LineChart } from '../../src/components/chart/LineChart';
+import { GUIDES } from '../../src/config';
 import { formatMoney, formatMoneyCompact } from '../../src/domain/money';
 import {
   bankrollCurve,
@@ -40,6 +41,7 @@ import {
   toEntryResults,
   tournamentTotals,
 } from '../../src/domain/tournaments';
+import { openHandOff } from '../../src/features/family/hooks';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useLogStore } from '../../src/store/useLogStore';
@@ -252,6 +254,28 @@ export default function DashboardScreen() {
         </View>
       ))}
 
+      {/*
+        The tiles above are the swings, stated. This is the question they
+        raise and this app deliberately does not answer: how much has to sit
+        behind them. That answer is arithmetic rather than a rule of thumb,
+        and it lives on the site rather than here because it needs a page.
+      */}
+      <Card style={styles.guideCard}>
+        <Text color={colors.textSecondary} style={styles.guideBody}>
+          A worst session is only alarming next to a bankroll. How big that has
+          to be is arithmetic, and it turns on your win rate far more than on
+          the number of buy-ins anybody quotes.
+        </Text>
+        <Button
+          label="How big a bankroll?"
+          variant="secondary"
+          size="small"
+          href={GUIDES.bankroll}
+          onPress={() => openHandOff(GUIDES.bankroll)}
+          style={styles.guideLink}
+        />
+      </Card>
+
       <SectionHeader
         title="Where the money comes from"
         action={
@@ -309,5 +333,15 @@ const styles = StyleSheet.create({
   },
   listCard: {
     paddingVertical: 0,
+  },
+  guideCard: {
+    marginTop: spacing.lg,
+  },
+  guideBody: {
+    lineHeight: 23,
+  },
+  guideLink: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
   },
 });

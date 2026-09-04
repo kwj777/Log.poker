@@ -11,6 +11,7 @@
     "build:web": "node scripts/build-web.mjs",
     "build:blog": "node scripts/build-blog.mjs",
     "build:content": "node scripts/build-content.mjs",
+    "chip": "node scripts/make-chip.mjs",
     "build:og": "node scripts/build-og.mjs",
     "test": "npm run check:prose && jest",
     "test:watch": "jest --watch",
@@ -28,6 +29,7 @@
     "expo-haptics": "~57.0.2",
     "expo-linking": "~57.0.8",
     "expo-router": "~57.0.17",
+    "expo-secure-store": "~57.0.3",
     "expo-splash-screen": "~57.0.8",
     "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
@@ -50,6 +52,8 @@
     "eslint-config-expo": "~57.0.2",
     "fake-indexeddb": "^6.2.5",
     "jest": "^29.7.0",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4",
     "ts-jest": "^29.4.12",
     "typescript": "~6.0.3"
   }

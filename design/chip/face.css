@@ -1,0 +1,71 @@
+/* Shared ground and geometry for both chip faces.
+
+   The artboard is 2000x2000 and stands for 45mm square: a 39mm art circle plus
+   3mm of bleed on every side. That makes the scale 44.44px/mm, and the three
+   circles that matter fall at:
+
+     trim      39mm   r = 867px   where the vendor cuts
+     safe      35mm   r = 778px   keep anything that must survive inside this
+     inlay     25mm   r = 555px   the printed disc if these come back as clay
+                                  composite with a label rather than ceramic
+
+   The drawing is authored once at 39mm and every other diameter is the same
+   drawing scaled, which is what you want: a bigger circle is not a different
+   design. face.js works out by how much.
+
+   Nothing here draws those circles. Guides in uploaded art get printed, so the
+   version with them is proof.html, which is for looking at rather than for
+   sending.
+
+   Ported from Untilt's chip exploration, which worked the object out. What is
+   new here is the family's palette and the fact that this one is being made. */
+
+html,
+.face {
+  position: relative;
+  width: 2000px;
+  height: 2000px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: scale(var(--scale, 1));
+  transform-origin: center;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 2000px;
+  height: 2000px;
+  overflow: hidden;
+  /* Log's own ground, relit for a square. The app puts the light off the top
+     edge of a portrait phone; on a chip there is no up, so it comes from
+     directly above center and the falloff is pulled in so the darkest stop
+     lands at the trim rather than past the corners. */
+  background-image:
+    radial-gradient(120% 120% at 50% 0%, #232a27 0%, #1c211f 52%, #0d1110 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-kerning: normal;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The site's two stacks, in the site's order. public/home.html sets Georgia
+   first and this follows it, so the chip and the page it points at set in the
+   same face on the machine that renders both. */
+:root {
+  --serif: Georgia, "Times New Roman", "Nimbus Roman", "Bitstream Charter", Charter, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+          "Liberation Sans", Arial, sans-serif;
+
+  /* The family palette, from BRAND.md. The canopy is one green ramp and the
+     gold is on the trunk: this is the family mark, so no ring is lit. */
+  --gold: #c9a86a;
+  --cream: #f2efe6;
+  --canopy-outer: #9aae80;
+  --canopy-middle: #75886a;
+  --canopy-inner: #55665e;
+}

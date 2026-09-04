@@ -16,12 +16,12 @@ import { Dexie } from 'dexie';
 import { createDatabase } from '../dexie/db';
 import { DexieRepository } from '../dexie/DexieRepository';
 import { SqlRepository } from '../sql/SqlRepository';
-import { MIGRATIONS } from '../sql/schema';
+import { LATEST_VERSION, MIGRATIONS } from '../sql/schema';
 import { NodeSqliteDriver } from './support/nodeSqliteDriver';
 
 const T0 = 1_700_000_000_000;
 
-describe('SQLite: a v2 database upgraded to v3', () => {
+describe('SQLite: a v2 database upgraded to the current version', () => {
   let driver: NodeSqliteDriver;
   let repository: SqlRepository;
 
@@ -63,12 +63,52 @@ describe('SQLite: a v2 database upgraded to v3', () => {
   });
 
   it('walks the database to the current version', async () => {
+    // Read from the schema rather than written down again, so that adding a
+    // migration cannot leave this quietly asserting an old version.
     const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
-    expect(row.user_version).toBe(3);
+    expect(row.user_version).toBe(LATEST_VERSION);
+  });
+
+  it('reads everything already stored as live rather than as deleted', async () => {
+    // The tombstone column decides whether a row is visible at all, so a
+    // migration landing it as anything but null would hide a player's entire
+    // history behind an upgrade, with nothing erroring.
+    const rows = await driver.all<{ deleted_at: number | null }>(
+      `SELECT deleted_at FROM sessions UNION ALL SELECT deleted_at FROM venues`,
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row.deleted_at).toBeNull();
+  });
+
+  it('reports them all as changed since the beginning of time, and none as gone', async () => {
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
+    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
+  });
+
+  it('can tombstone a migrated session, which frees its import key', async () => {
+    await repository.deleteSession('s2');
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual([]);
   });
 
   it('keeps every session', async () => {
     expect(await repository.listSessions()).toHaveLength(2);
+  });
+
+  it('reads records written without the tombstone property as live', async () => {
+    // The asymmetry with SQLite: no migration added anything here, so these
+    // rows carry no `deletedAt` at all rather than a null one, and absent has
+    // to mean live or an upgrade hides the whole log.
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
+    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
+  });
+
+  it('can tombstone a migrated session, which frees its import key', async () => {
+    await repository.deleteSession('s2');
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual([]);
   });
 
   it('reads existing sessions as cash games', async () => {
@@ -117,7 +157,7 @@ describe('SQLite: a v2 database upgraded to v3', () => {
   });
 });
 
-describe('IndexedDB: a v2 database upgraded to v3', () => {
+describe('IndexedDB: a v2 database upgraded to the current version', () => {
   const name = 'log-poker-upgrade-test';
   let repository: DexieRepository;
   let db: ReturnType<typeof createDatabase>;
@@ -193,6 +233,21 @@ describe('IndexedDB: a v2 database upgraded to v3', () => {
     expect(await repository.listSessions()).toHaveLength(2);
   });
 
+  it('reads records written without the tombstone property as live', async () => {
+    // The asymmetry with SQLite: no migration added anything here, so these
+    // rows carry no `deletedAt` at all rather than a null one, and absent has
+    // to mean live or an upgrade hides the whole log.
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
+    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
+  });
+
+  it('can tombstone a migrated session, which frees its import key', async () => {
+    await repository.deleteSession('s2');
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual([]);
+  });
+
   it('reads existing sessions as cash games', async () => {
     const session = await repository.getSession('s1');
     expect(session?.format).toBe('cash');
@@ -234,5 +289,26 @@ describe('IndexedDB: a v2 database upgraded to v3', () => {
       entrants: 210,
       finishPosition: 12,
     });
+  });
+});
+
+describe('the migration list', () => {
+  it('is append only, and every shipped version still says what it said', () => {
+    // A device that ran version 3 last month will never run it again, so
+    // editing one changes nothing there and everything on a fresh install, and
+    // the two stop agreeing without anything erroring.
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4]);
+    expect(MIGRATIONS[1].statements).toEqual([
+      'ALTER TABLE sessions ADD COLUMN import_key TEXT',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)',
+    ]);
+  });
+
+  it('puts the tombstone column on every table that syncs', () => {
+    const tombstones = MIGRATIONS[3].statements;
+    expect(tombstones).toHaveLength(5);
+    for (const table of ['venues', 'sessions', 'rebuys', 'hands', 'mood_entries']) {
+      expect(tombstones).toContain(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
+    }
   });
 });

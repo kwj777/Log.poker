@@ -1,0 +1,143 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Log chip -- proof</title>
+
+<!-- The whole object, both faces, at true relative scale: a 47mm chip with the
+     art filling the window inside its border, and the safe circle dashed over
+     the top so it is obvious at a glance that nothing important is riding the
+     edge.
+
+     Two things to check here before anything is sent. OBSERVE's margins, since
+     it is the longest of the three words in the narrowest channel. And whether
+     the innermost canopy ring still reads: it is the quietest stroke in the
+     mark by design, at 3.0:1 on this ground against the outer ring's 7.7, and
+     a matte fire is where that would go from quiet to absent.
+
+     The border is drawn solid black, which is the recommendation. It is the
+     vendor's to print rather than ours to supply -- see README.md -- so what
+     this is really showing is how much of the chip our art is and is not.
+
+     This file is for looking at and never for sending. A guide in the art is a
+     guide on the chip. It pulls the two faces in through iframes rather than
+     copying them, so what is being checked is the file that actually goes.
+
+     ?mm= is the art window and ?chip= the finished diameter.
+     Rasterized by `npm run chip`. -->
+
+<style>
+  html, body { margin: 0; padding: 0; width: 2400px; height: 1400px; overflow: hidden; }
+
+  body {
+    background: #161a19;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 200px;
+    font-family: "Liberation Sans", Arial, sans-serif;
+  }
+
+  figure { margin: 0; }
+
+  /* The chip is the border; the art sits on top of it and leaves a ring. */
+  .chip {
+    position: relative;
+    width: 1000px;
+    height: 1000px;
+    border-radius: 50%;
+    background: #0b0e0d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Ceramic in matte has a soft shoulder rather than a printed edge; a
+       hairline and a drop stop these reading as flat circles on a flat page. */
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.09),
+      0 26px 60px rgba(0, 0, 0, 0.55);
+  }
+
+  .art {
+    position: relative;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  .art iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2000px;
+    height: 2000px;
+    border: 0;
+    transform-origin: top left;
+  }
+
+  .safe { position: absolute; inset: 0; }
+
+  figcaption {
+    margin: 46px 0 0;
+    text-align: center;
+    font-size: 30px;
+    letter-spacing: 0.12em;
+    color: #8b9a92;
+  }
+
+  figcaption b { display: block; margin-bottom: 14px; color: #e8e4d9; font-weight: 500; }
+</style>
+
+<figure>
+  <div class="chip">
+    <div class="art"><iframe data-face="side-1.html" scrolling="no"></iframe></div>
+    <svg class="safe" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+      <circle cx="500" cy="500" fill="none" stroke="#ff4d6a"
+              stroke-width="2" stroke-dasharray="10 9" opacity=".5"/>
+    </svg>
+  </div>
+  <figcaption><b>SIDE 1</b><span></span></figcaption>
+</figure>
+
+<figure>
+  <div class="chip">
+    <div class="art"><iframe data-face="side-2.html" scrolling="no"></iframe></div>
+    <svg class="safe" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+      <circle cx="500" cy="500" fill="none" stroke="#ff4d6a"
+              stroke-width="2" stroke-dasharray="10 9" opacity=".5"/>
+    </svg>
+  </div>
+  <figcaption><b>SIDE 2</b><span></span></figcaption>
+</figure>
+
+<script>
+  /* A face's artboard is 2000px standing for (mm + 6): the art window plus 3mm
+     of bleed on each side. Showing the chip at 1000px fixes the scale at
+     1000/chip px per mm, and everything else falls out of that. The translate
+     is written before the scale so it is spent in artboard pixels. */
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var mm = Number(params.get("mm")) || 43;        // the art window
+    var chip = Number(params.get("chip")) || 47;    // the finished chip
+    var px = 1000 / chip;
+
+    var art = mm * px;
+    var bleed = 3 / (mm + 6) * 2000;
+    var scale = art / (2000 * (mm / (mm + 6)));
+
+    document.querySelectorAll(".art").forEach(function (box) {
+      box.style.width = art + "px";
+      box.style.height = art + "px";
+      var frame = box.querySelector("iframe");
+      frame.src = frame.dataset.face + "?mm=" + mm;
+      frame.style.transform =
+        "scale(" + scale + ") translate(" + -bleed + "px, " + -bleed + "px)";
+    });
+
+    /* Safe is the art window less 2mm on every side. */
+    var safe = mm - 4;
+    document.querySelectorAll(".safe circle").forEach(function (c) {
+      c.setAttribute("r", String(safe * px / 2 - 1));
+    });
+
+    document.querySelectorAll("figcaption span").forEach(function (s) {
+      s.textContent = chip + "mm CHIP · " + mm + "mm ART · " + safe + "mm SAFE DASHED";
+    });
+  })();
+</script>

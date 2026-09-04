@@ -1,0 +1,68 @@
+/**
+ * The README's test table, checked from the inside.
+ *
+ * `npm run test:table` generates it from a real run, and `-- --check` proves it
+ * matches one. Neither can run inside `npm test`, because finding out what the
+ * suite does means running the suite. What can run here is everything that does
+ * not need the suite's results: that the table is internally consistent, and
+ * that nobody left a placeholder where a sentence belongs.
+ *
+ * The generator handles the numbers; this handles the part a person still owns.
+ * A suite that exists but is missing from the table is the one thing only
+ * `--check` can see, because seeing it means knowing what suites there are.
+ */
+
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+
+const ROOT = resolve(dirname(__filename), '..', '..', '..');
+const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+
+const block = /```\nTest Suites: (\d+) passed\nTests:\s+(\d+) passed\n\n([\s\S]*?)```/.exec(readme);
+
+interface Row {
+  name: string;
+  count: number;
+  description: string;
+}
+
+const rows: Row[] = (block?.[3] ?? '')
+  .split('\n')
+  .filter((line) => line.trim() !== '')
+  .map((line) => {
+    const parsed = /^ {2}(\S+)\s+(\d+)\s{2,}(.+)$/.exec(line);
+    if (!parsed) throw new Error(`Unreadable row in the README test table: ${JSON.stringify(line)}`);
+    return { name: parsed[1], count: Number(parsed[2]), description: parsed[3].trim() };
+  });
+
+describe('the README test table', () => {
+  it('is there at all', () => {
+    expect(block).not.toBeNull();
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('counts its own rows correctly', () => {
+    expect(rows).toHaveLength(Number(block?.[1]));
+  });
+
+  it('adds up to the total it states', () => {
+    const summed = rows.reduce((total, row) => total + row.count, 0);
+    expect(summed).toBe(Number(block?.[2]));
+  });
+
+  it('names every suite once', () => {
+    expect(new Set(rows.map((row) => row.name)).size).toBe(rows.length);
+  });
+
+  it('is ordered by size, then by name', () => {
+    const sorted = [...rows].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    expect(rows.map((row) => row.name)).toEqual(sorted.map((row) => row.name));
+  });
+
+  it('says what every suite is for', () => {
+    // A new suite lands with a placeholder from the generator. This is the
+    // nudge to replace it with a sentence somebody wrote.
+    const undescribed = rows.filter((row) => /^TODO/.test(row.description));
+    expect(undescribed.map((row) => row.name)).toEqual([]);
+  });
+});

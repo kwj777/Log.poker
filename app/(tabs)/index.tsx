@@ -36,7 +36,9 @@ import {
   totals,
 } from '../../src/domain/stats';
 import {
-  MIN_TOURNAMENTS_FOR_ROI,
+  bootstrapRoi,
+  formatRoi,
+  toEntryResults,
   tournamentTotals,
 } from '../../src/domain/tournaments';
 import { openHandOff } from '../../src/features/family/hooks';
@@ -57,6 +59,7 @@ export default function DashboardScreen() {
   const summary = useMemo(() => totals(sessions), [sessions]);
   const winRate = useMemo(() => cashWinRate(sessions), [sessions]);
   const tourneys = useMemo(() => tournamentTotals(sessions), [sessions]);
+  const roiInterval = useMemo(() => bootstrapRoi(toEntryResults(sessions)), [sessions]);
   const curve = useMemo(() => bankrollCurve(sessions), [sessions]);
 
   /**
@@ -135,17 +138,15 @@ export default function DashboardScreen() {
       });
       tiles.push({
         label: 'ROI',
-        value:
-          tourneys.roi === null
-            ? '--'
-            : `${tourneys.roi >= 0 ? '+' : ''}${Math.round(tourneys.roi * 100)}%`,
+        value: tourneys.roi === null ? '--' : formatRoi(tourneys.roi),
         valueColor: resultColor(tourneys.net),
-        // The same caveat the variance page carries: an ROI over a few dozen
-        // entries is a record of what happened, not a measurement.
+        // The range rather than the entry count: a bare ROI reads like a
+        // measurement, and the hint is the only place to say how wide the
+        // honest version of it is. The variance page has the long form.
         hint:
-          tourneys.entries >= MIN_TOURNAMENTS_FOR_ROI
-            ? `${tourneys.entries} entries`
-            : 'too few entries to mean much',
+          roiInterval === null
+            ? 'too few entries for a range'
+            : `${formatRoi(roiInterval.lower)} to ${formatRoi(roiInterval.upper)}`,
       });
     }
 
@@ -166,7 +167,7 @@ export default function DashboardScreen() {
     return Array.from({ length: Math.ceil(tiles.length / 2) }, (_, index) =>
       tiles.slice(index * 2, index * 2 + 2),
     );
-  }, [summary, winRate, tourneys]);
+  }, [summary, winRate, tourneys, roiInterval]);
 
   const recent = useMemo(
     () => sessions.filter((session) => session.endedAt !== null).slice(0, 5),

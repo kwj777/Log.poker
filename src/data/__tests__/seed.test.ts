@@ -6,7 +6,12 @@
 
 import { estimatePlayer, toObservations } from '../../domain/variance';
 import { bankrollCurve, totals } from '../../domain/stats';
-import { tournamentTotals } from '../../domain/tournaments';
+import {
+  MIN_ENTRIES_FOR_INTERVAL,
+  bootstrapRoi,
+  toEntryResults,
+  tournamentTotals,
+} from '../../domain/tournaments';
 import { DEMO_SESSION_COUNT, DEMO_TOURNAMENT_COUNT, seedDemoData } from '../seed';
 import { SqlRepository } from '../sql/SqlRepository';
 import type { Repository } from '../repository';
@@ -32,7 +37,7 @@ describe('demo dataset', () => {
   it('seeds every planned session across four venues, all finished', async () => {
     const sessions = await repository.listSessions();
     expect(sessions).toHaveLength(DEMO_SESSION_COUNT);
-    expect(DEMO_SESSION_COUNT).toBe(27);
+    expect(DEMO_SESSION_COUNT).toBe(32);
     expect(sessions.every((session) => session.endedAt !== null)).toBe(true);
     expect(await repository.listVenues()).toHaveLength(4);
   });
@@ -41,18 +46,34 @@ describe('demo dataset', () => {
     const sessions = await repository.listSessions();
     const tournaments = sessions.filter((session) => session.format === 'tournament');
     expect(tournaments).toHaveLength(DEMO_TOURNAMENT_COUNT);
-    expect(DEMO_TOURNAMENT_COUNT).toBe(7);
+    expect(DEMO_TOURNAMENT_COUNT).toBe(12);
     expect(sessions.filter((session) => session.format === 'cash')).toHaveLength(20);
   });
 
   it('gives tournaments the shape tournaments actually have', async () => {
     const result = tournamentTotals(await repository.listSessions());
     // Mostly losses, carried by one deep run: the shape the copy describes.
-    expect(result.cashes).toBe(2);
-    expect(result.entries).toBe(7);
+    expect(result.cashes).toBe(3);
+    expect(result.entries).toBe(12);
     expect(result.net).toBeGreaterThan(0);
     expect(result.bestFinish).toBe(3);
     expect(result.fees).toBeGreaterThan(0);
+  });
+
+  it('has enough tournaments for the ROI range to draw, which is the point of it', async () => {
+    // The demo is the fixture every screenshot is taken against. A tournament
+    // count below the interval's floor would leave that card reading "not
+    // enough entries" forever, and the feature invisible in the demo.
+    const sessions = await repository.listSessions();
+    const results = toEntryResults(sessions);
+    expect(results.length).toBeGreaterThanOrEqual(MIN_ENTRIES_FOR_INTERVAL);
+
+    const interval = bootstrapRoi(results);
+    expect(interval).not.toBeNull();
+    // Twelve entries carried by one score: the range is enormous and straddles
+    // break even, which is the honest answer and the one the copy is about.
+    expect(interval!.verdict).toBe('undetermined');
+    expect(interval!.upper - interval!.lower).toBeGreaterThan(1);
   });
 
   it('keeps tournaments out of the cash-game variance estimate', async () => {

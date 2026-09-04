@@ -33,8 +33,15 @@ import {
 } from '../../src/domain/variance';
 import { formatMoney } from '../../src/domain/money';
 import {
+  assessRoi,
   assessTournaments,
+  bootstrapRoi,
+  formatRoi,
+  roiConcentration,
+  toEntryResults,
   tournamentTotals,
+  type RoiAssessment,
+  type RoiInterval,
   type TournamentAssessment,
   type TournamentTotals,
 } from '../../src/domain/tournaments';
@@ -52,6 +59,19 @@ const RECENT_SESSIONS = 10;
  * shown in plain text on purpose -- painting an ordinary bad week red is exactly
  * the reflex this screen exists to interrupt.
  */
+/**
+ * The same restraint as the cash verdicts: only a range that has actually
+ * cleared break even gets a color. An undetermined one is the ordinary case
+ * after any realistic number of entries, and painting it would suggest the
+ * player had failed a test rather than not yet taken one.
+ */
+const ROI_COLORS: Record<RoiAssessment['verdict'], string> = {
+  insufficient_data: colors.text,
+  undetermined: colors.text,
+  winning: colors.profit,
+  losing: colors.loss,
+};
+
 const VERDICT_COLORS: Record<StretchVerdict, string> = {
   insufficient_data: colors.text,
   running_bad: colors.loss,
@@ -67,6 +87,24 @@ export default function VarianceScreen() {
   const observations = useMemo(() => toObservations(sessions), [sessions]);
   const tournaments = useMemo(() => tournamentTotals(sessions), [sessions]);
   const tournamentAssessment = useMemo(() => assessTournaments(tournaments), [tournaments]);
+
+  /**
+   * The bootstrap resamples every entry a couple of thousand times, so it is
+   * memoized on the sessions rather than run per render. It is deterministic,
+   * so the interval a player reads is the same one they read a minute ago.
+   */
+  const roiInterval = useMemo(() => {
+    const results = toEntryResults(sessions);
+    return {
+      interval: bootstrapRoi(results),
+      concentration: roiConcentration(results),
+      entries: results.length,
+    };
+  }, [sessions]);
+  const roiAssessment = useMemo(
+    () => assessRoi(roiInterval.interval, roiInterval.concentration, roiInterval.entries),
+    [roiInterval],
+  );
   const estimate = useMemo(() => estimatePlayer(observations), [observations]);
   const assessment = useMemo(
     () => assessRecentStretch(observations, estimate, RECENT_SESSIONS),
@@ -133,7 +171,12 @@ export default function VarianceScreen() {
         </View>
         <EmptyState title={assessment.headline} body={assessment.body} />
         {tournaments.entries > 0 ? (
-          <TournamentCard totals={tournaments} assessment={tournamentAssessment} />
+          <TournamentCard
+            totals={tournaments}
+            assessment={tournamentAssessment}
+            interval={roiInterval.interval}
+            roi={roiAssessment}
+          />
         ) : null}
         <Card style={styles.explainer}>
           <Text variant="bodyStrong">Why this needs a sample</Text>
@@ -170,7 +213,12 @@ export default function VarianceScreen() {
       </Card>
 
       {tournaments.entries > 0 ? (
-        <TournamentCard totals={tournaments} assessment={tournamentAssessment} />
+        <TournamentCard
+            totals={tournaments}
+            assessment={tournamentAssessment}
+            interval={roiInterval.interval}
+            roi={roiAssessment}
+          />
       ) : null}
 
       <SectionHeader title="Your results inside your normal range" />
@@ -284,9 +332,13 @@ const LegendItem = ({
 const TournamentCard = ({
   totals,
   assessment,
+  interval,
+  roi,
 }: {
   totals: TournamentTotals;
   assessment: TournamentAssessment;
+  interval: RoiInterval | null;
+  roi: RoiAssessment;
 }) => (
   <>
     <SectionHeader title="Tournaments" />
@@ -300,7 +352,11 @@ const TournamentCard = ({
           label="ROI"
           value={totals.roi === null ? '--' : `${totals.roi >= 0 ? '+' : ''}${Math.round(totals.roi * 100)}%`}
           valueColor={resultColor(totals.net)}
-          hint={assessment.roiIsMeaningful ? `${totals.entries} entries` : 'too few entries to mean much'}
+          hint={
+            interval === null
+              ? 'too few entries to mean much'
+              : `${formatRoi(interval.lower)} to ${formatRoi(interval.upper)}`
+          }
         />
         <StatTile
           label="Cashed"
@@ -324,6 +380,21 @@ const TournamentCard = ({
           hint="never coming back"
         />
       </View>
+    </Card>
+
+    <SectionHeader title="What that ROI is worth" />
+    <Card>
+      <Text variant="heading" color={ROI_COLORS[roi.verdict]}>
+        {roi.headline}
+      </Text>
+      <Text color={colors.textSecondary} style={styles.verdictBody}>
+        {roi.body}
+      </Text>
+      {roi.concentrationNote === null ? null : (
+        <Text variant="caption" color={colors.textTertiary} style={styles.concentration}>
+          {roi.concentrationNote}
+        </Text>
+      )}
     </Card>
   </>
 );
@@ -401,6 +472,10 @@ const styles = StyleSheet.create({
   explainerBody: {
     marginTop: spacing.sm,
     lineHeight: 23,
+  },
+  concentration: {
+    marginTop: spacing.lg,
+    lineHeight: 18,
   },
   tournamentTiles: {
     flexDirection: 'row',

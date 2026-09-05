@@ -288,17 +288,50 @@ export class SqlRepository implements Repository {
   /**
    * Sync's write. Upserts verbatim, parents first, skipping orphans.
    *
-   * `INSERT OR REPLACE` rather than an update, because most of what arrives is
-   * a row this device has never seen, and the ones it has seen are being
-   * overwritten wholesale anyway: these records were already resolved.
+   * **`ON CONFLICT DO UPDATE`, never `INSERT OR REPLACE`.** They read as
+   * synonyms and are not: SQLite implements REPLACE as a DELETE followed by an
+   * INSERT, and that delete fires `ON DELETE CASCADE`. So replacing a session
+   * row silently took every hand, rebuy and mood entry under it with it -- not
+   * tombstoned, removed -- and since those children sit below the sync cursor,
+   * nothing ever brought them back. Editing a session's notes on a laptop
+   * destroyed the hands logged against it on the phone.
+   *
+   * A genuine upsert leaves the row in place and writes over its columns, so no
+   * delete happens and no cascade fires. The same trap applies to venues, where
+   * the cascade is absent but the foreign key is not: REPLACE would try to
+   * delete a venue that sessions still reference and be refused.
    */
   async applyChanges(changes: ChangeSet): Promise<void> {
     await this.driver.transaction(async () => {
       for (const { record, deletedAt } of changes.venues) {
         await this.driver.run(
-          `INSERT OR REPLACE INTO venues (id, name, is_home_game, created_at, updated_at, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO venues (id, name, is_home_game, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             name = excluded.name,
+             is_home_game = excluded.is_home_game,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at,
+             deleted_at = excluded.deleted_at`,
           [record.id, record.name, bool(record.isHomeGame), record.createdAt, record.updatedAt, deletedAt],
+        );
+      }
+
+      // An incoming session can carry an import key that a *different* local
+      // row still holds, which the unique index would refuse. The server is
+      // authoritative here: its merge folds two imports of one row into one
+      // session and clears the loser's key, so the local holder is stale and
+      // the key is released before the insert rather than after it fails.
+      //
+      // The displaced row keeps every field and every child; it loses only the
+      // provenance it was about to lose anyway. Its stamps are left alone,
+      // because this is reconciling with a decision already made rather than
+      // an edit worth pushing back.
+      for (const { record } of changes.sessions) {
+        if (typeof record.importKey !== 'string' || record.importKey === '') continue;
+        await this.driver.run(
+          `UPDATE sessions SET import_key = NULL WHERE import_key = ? AND id <> ?`,
+          [record.importKey, record.id],
         );
       }
 
@@ -312,11 +345,31 @@ export class SqlRepository implements Repository {
       for (const { record, deletedAt } of changes.sessions) {
         if (!known.has(record.venueId)) continue;
         await this.driver.run(
-          `INSERT OR REPLACE INTO sessions (
+          `INSERT INTO sessions (
              id, venue_id, format, game_type, small_blind, big_blind, ante, currency,
              buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
              notes, import_key, created_at, updated_at, deleted_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             venue_id = excluded.venue_id,
+             format = excluded.format,
+             game_type = excluded.game_type,
+             small_blind = excluded.small_blind,
+             big_blind = excluded.big_blind,
+             ante = excluded.ante,
+             currency = excluded.currency,
+             buy_in = excluded.buy_in,
+             fee = excluded.fee,
+             cash_out = excluded.cash_out,
+             entrants = excluded.entrants,
+             finish_position = excluded.finish_position,
+             started_at = excluded.started_at,
+             ended_at = excluded.ended_at,
+             notes = excluded.notes,
+             import_key = excluded.import_key,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at,
+             deleted_at = excluded.deleted_at`,
           [
             record.id, record.venueId, record.format, record.gameType,
             record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
@@ -337,8 +390,15 @@ export class SqlRepository implements Repository {
       for (const { record, deletedAt } of changes.rebuys) {
         if (!sessions.has(record.sessionId)) continue;
         await this.driver.run(
-          `INSERT OR REPLACE INTO rebuys (id, session_id, amount, at, created_at, updated_at, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO rebuys (id, session_id, amount, at, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             session_id = excluded.session_id,
+             amount = excluded.amount,
+             at = excluded.at,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at,
+             deleted_at = excluded.deleted_at`,
           [record.id, record.sessionId, record.amount, record.at, record.createdAt, record.updatedAt, deletedAt],
         );
       }
@@ -346,10 +406,21 @@ export class SqlRepository implements Repository {
       for (const { record, deletedAt } of changes.hands) {
         if (!sessions.has(record.sessionId)) continue;
         await this.driver.run(
-          `INSERT OR REPLACE INTO hands (
+          `INSERT INTO hands (
              id, session_id, hole_cards, position, note, tags, amount, at,
              created_at, updated_at, deleted_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             session_id = excluded.session_id,
+             hole_cards = excluded.hole_cards,
+             position = excluded.position,
+             note = excluded.note,
+             tags = excluded.tags,
+             amount = excluded.amount,
+             at = excluded.at,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at,
+             deleted_at = excluded.deleted_at`,
           [
             record.id, record.sessionId, record.holeCards, record.position, record.note,
             JSON.stringify(record.tags ?? []), record.amount, record.at,
@@ -361,9 +432,17 @@ export class SqlRepository implements Repository {
       for (const { record, deletedAt } of changes.moodEntries) {
         if (!sessions.has(record.sessionId)) continue;
         await this.driver.run(
-          `INSERT OR REPLACE INTO mood_entries (
+          `INSERT INTO mood_entries (
              id, session_id, phase, score, at, created_at, updated_at, deleted_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             session_id = excluded.session_id,
+             phase = excluded.phase,
+             score = excluded.score,
+             at = excluded.at,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at,
+             deleted_at = excluded.deleted_at`,
           [
             record.id, record.sessionId, record.phase, record.score, record.at,
             record.createdAt, record.updatedAt, deletedAt,

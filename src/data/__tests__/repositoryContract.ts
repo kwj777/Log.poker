@@ -1031,6 +1031,72 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(hands[0].holeCards).toBe('AsKd');
       });
 
+      it('KEEPS THE CHILDREN when a session arrives edited from elsewhere', async () => {
+        // The bug this exists for destroyed data on every sync. SQLite spells
+        // REPLACE as DELETE-then-INSERT, and that delete fired ON DELETE
+        // CASCADE, so applying an edited session hard-removed every hand,
+        // rebuy and mood entry under it. Not tombstoned, removed -- and they
+        // sit below the sync cursor, so nothing ever brought them back.
+        const session = await newSession();
+        await repository.addRebuy({ sessionId: session.id, amount: 20_000, at: T0 });
+        await repository.createHand({ sessionId: session.id, holeCards: 'AsKd', at: T0 });
+        await repository.createMoodEntry({
+          sessionId: session.id, phase: 'start', score: 3, at: T0,
+        });
+
+        await repository.applyChanges(set({
+          sessions: [change({ ...session, notes: 'edited on the laptop', updatedAt: T0 + HOUR })],
+        }));
+
+        expect(await repository.listHands()).toHaveLength(1);
+        expect(await repository.listRebuys(session.id)).toHaveLength(1);
+        expect(await repository.listMoodEntries()).toHaveLength(1);
+        expect((await repository.getSession(session.id))?.notes).toBe('edited on the laptop');
+      });
+
+      it('and keeps them through several updates in a row', async () => {
+        const session = await newSession();
+        await repository.createHand({ sessionId: session.id, at: T0 });
+        for (const notes of ['one', 'two', 'three']) {
+          await repository.applyChanges(set({
+            sessions: [change({ ...session, notes, updatedAt: T0 + HOUR })],
+          }));
+        }
+        expect(await repository.listHands()).toHaveLength(1);
+      });
+
+      it('updates a venue that sessions still reference', async () => {
+        // The same trap without the cascade: REPLACE would delete a venue rows
+        // point at, and the foreign key would refuse it.
+        const venue = await newVenue('Before');
+        await newSession({ venueId: venue.id });
+        await repository.applyChanges(set({
+          venues: [change({ ...venue, name: 'After', updatedAt: T0 + HOUR })],
+        }));
+        expect((await repository.getVenue(venue.id))?.name).toBe('After');
+      });
+
+      it('releases an import key a different local session is still holding', async () => {
+        // The server folds two imports of one row into one session and clears
+        // the loser's key. Until that update arrives, the local holder would
+        // make the unique index refuse the incoming row -- which, once REPLACE
+        // was gone, meant a throw that wedges the whole sync loop.
+        const venue = await newVenue();
+        const mine = await newSession({ venueId: venue.id, importKey: 'csv|1' });
+        await repository.createHand({ sessionId: mine.id, at: T0 });
+
+        await repository.applyChanges(set({
+          sessions: [change({ ...mine, id: 'theirs', importKey: 'csv|1', updatedAt: T0 + HOUR })],
+        }));
+
+        // Both rows survive, and so does everything logged against the local one.
+        expect((await repository.listSessions()).map((s) => s.id).sort())
+          .toEqual([mine.id, 'theirs'].sort());
+        expect(await repository.listHands()).toHaveLength(1);
+        expect((await repository.getSession(mine.id))?.importKey).toBeNull();
+        expect((await repository.getSession('theirs'))?.importKey).toBe('csv|1');
+      });
+
       it('is safe to apply the same change twice', async () => {
         const changes = set({ venues: [change(foreignVenue('v-remote', T0))] });
         await repository.applyChanges(changes);

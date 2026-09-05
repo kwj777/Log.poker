@@ -430,14 +430,18 @@ describe('collecting tombstones, once nobody is still waiting', () => {
     await laptop.push(true);
     expect(await laptop.getSession(session.id)).toBeNull();
 
-    // Both devices have to have been seen past the window before the server
-    // will draw a line, and each one then sweeps on its own next sync. So it
-    // takes a round each, which is exactly the caution the rule is for.
+    // Both devices have to have been answered past the window before the server
+    // will draw a line, and each one then sweeps on its own next sync. So it is
+    // two rounds each: the first hands the tombstone over and records the
+    // device as caught up, the second is the one allowed to sweep. That is
+    // exactly the caution the rule is for, and it is cheap -- a sync is a
+    // request, and this is a row that has been dead for three months.
     tick(RETENTION + DAY);
     await phone.push(true);
     await laptop.push(true);
     tick(DAY);
     await phone.push(true);
+    await laptop.push(true);
 
     // Gone for real on both, not merely invisible.
     for (const repository of [phone, laptop]) {

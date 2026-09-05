@@ -53,6 +53,30 @@ export interface SyncRow {
 }
 
 /**
+ * A stored change: what a device sent, plus when this server took it.
+ *
+ * `heardAt` exists because `deletedAt` is a fact about a phone and retention is
+ * a fact about this server. A row deleted in a drawer carries the moment it was
+ * deleted, which can be months before that phone next has signal, so the
+ * tombstone arrives already older than the window and would be swept in the
+ * same request that first delivered it -- while every other device is still
+ * holding the live row and will push it straight back. Ninety days of retention
+ * has to mean ninety days the server has held the thing, and this is the only
+ * clock that can say that.
+ *
+ * Stamped whenever the stored entry actually changes and left alone when it
+ * does not, so a device retrying a push it already sent cannot restart the
+ * clock on its own delete.
+ *
+ * Optional because a bundle written before this existed has none, and a
+ * tombstone with no stamp falls back to `deletedAt`: the behavior it already
+ * had, rather than an unbounded one.
+ */
+export interface StoredChange extends Change<SyncRow> {
+  heardAt?: Timestamp;
+}
+
+/**
  * What the server keeps: every record it has ever been told about, by id.
  *
  * Keyed rather than listed so a merge is a lookup per incoming record instead
@@ -61,13 +85,17 @@ export interface SyncRow {
  */
 export interface Bundle {
   version: number;
-  records: { [T in SyncTable]: Record<string, Change<SyncRow>> };
+  records: { [T in SyncTable]: Record<string, StoredChange> };
   /**
-   * When each device was last seen, by its own opaque id.
+   * When each device was last **answered**, by its own opaque id.
    *
    * The only thing this is for is deciding when a tombstone may be collected,
    * and it is the difference between a rule and a guess. Time alone says "no
    * device is plausibly older than ninety days"; this says "no device *is*".
+   *
+   * Answered rather than asked, and the distinction is the whole of it: a
+   * device is stamped after the sweep has run, never before, or the request in
+   * which it asks is the request that collects what it was asking for.
    *
    * It holds no more than an id somebody's app invented and a timestamp. A
    * device that has not been seen for the retention window is forgotten, so a

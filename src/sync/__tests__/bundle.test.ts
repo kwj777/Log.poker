@@ -351,11 +351,72 @@ describe('collecting tombstones', () => {
     expect(bundle.collectedThrough).toBe(0);
   });
 
-  it('collects one past the window when the only device has seen it', () => {
-    const { bundle, collectedThrough } = mergeIntoBundle(
+  it('will not sweep a tombstone out of the very answer that delivers it', () => {
+    // The bug the device map had all along, and the one it existed to prevent.
+    // This device was stamped with the time of its own request before the sweep
+    // ran, so it stopped being the oldest thing on the map the instant it
+    // asked, the horizon jumped to the present, and the tombstone it had come
+    // for went in the sweep -- out of the answer it was about to be handed.
+    const { bundle, changes, collectedThrough } = mergeIntoBundle(
       withADeletedSession(), changeSet({}), 0, LATER, 'device-aaaa0001');
+
+    expect(bundle.records.sessions.s1).toBeDefined();
+    expect(collectedThrough).toBe(0);
+    // Delivered, which is the whole reason it was kept.
+    expect(changes.sessions.map((change) => change.record.id)).toContain('s1');
+  });
+
+  it('collects one past the window on the sync after the only device has seen it', () => {
+    const delivered = mergeIntoBundle(
+      withADeletedSession(), changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
+    const { bundle, collectedThrough } = mergeIntoBundle(
+      delivered, changeSet({}), 0, LATER + HOUR, 'device-aaaa0001');
     expect(bundle.records.sessions.s1).toBeUndefined();
     expect(collectedThrough).toBeGreaterThan(T0);
+  });
+
+  it('measures the window from when it heard, not from the phone that deleted', () => {
+    // A session deleted on a phone with no signal carries the moment it was
+    // deleted. Four months later that phone finds wifi and pushes a tombstone
+    // that is already older than the window, and on the deleting device's clock
+    // there is nothing left to wait for -- while the second device, which last
+    // synced an hour ago, is still holding the live row.
+    let bundle: unknown = mergeIntoBundle(
+      null,
+      changeSet({ venues: [venue('v1')], sessions: [session('s1')] }),
+      0, T0, 'device-aaaa0001',
+    ).bundle;
+    bundle = mergeIntoBundle(bundle, changeSet({}), 0, LATER - HOUR, 'device-bbbb0002').bundle;
+    bundle = mergeIntoBundle(bundle, changeSet({}), 0, LATER - HOUR, 'device-aaaa0001').bundle;
+
+    // Deleted back at T0, arriving now, a hundred days late.
+    const arrived = mergeIntoBundle(
+      bundle,
+      changeSet({ sessions: [{ ...session('s1', T0), deletedAt: T0 }] }),
+      0, LATER, 'device-aaaa0001',
+    );
+    expect(arrived.bundle.records.sessions.s1).toBeDefined();
+    expect(arrived.bundle.records.sessions.s1.deletedAt).toBe(T0);
+
+    // And it stays until the second device has actually been answered.
+    const later = mergeIntoBundle(arrived.bundle, changeSet({}), 0, LATER + HOUR,
+      'device-aaaa0001');
+    expect(later.bundle.records.sessions.s1).toBeDefined();
+  });
+
+  it('does not restart that clock when a device retries a push it already sent', () => {
+    // Otherwise a retry loop is a tombstone that is never old enough, and a
+    // sync loop is mostly retries.
+    const tombstone = changeSet({ sessions: [{ ...session('s1', T0), deletedAt: T0 }] });
+    let bundle: unknown = mergeIntoBundle(
+      null, changeSet({ venues: [venue('v1')], sessions: [session('s1')] }), 0, T0,
+      'device-aaaa0001',
+    ).bundle;
+    bundle = mergeIntoBundle(bundle, tombstone, 0, T0, 'device-aaaa0001').bundle;
+    const heardAt = (bundle as Bundle).records.sessions.s1.heardAt;
+
+    bundle = mergeIntoBundle(bundle, tombstone, 0, T0 + 10 * DAY, 'device-aaaa0001').bundle;
+    expect((bundle as Bundle).records.sessions.s1.heardAt).toBe(heardAt);
   });
 
   it('will not collect one a second device has not seen', () => {
@@ -470,7 +531,10 @@ describe('a device that was away longer than the whole window', () => {
       changeSet({ sessions: [{ ...session('deleted-long-ago', T0), deletedAt: T0 }] }),
       0, T0, 'device-aaaa0001',
     ).bundle;
-    return mergeIntoBundle(bundle, changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
+    // Two syncs past the window, not one: the first is the one that hands the
+    // tombstone over, and only the second may sweep it. See `collect`.
+    bundle = mergeIntoBundle(bundle, changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
+    return mergeIntoBundle(bundle, changeSet({}), 0, LATER + HOUR, 'device-aaaa0001').bundle;
   };
 
   it('cannot resurrect a row whose tombstone was collected', () => {

@@ -301,6 +301,24 @@ export class SqlRepository implements Repository {
    * the cascade is absent but the foreign key is not: REPLACE would try to
    * delete a venue that sessions still reference and be refused.
    */
+  /**
+   * Take what the server sent, without stepping on a write it has not seen.
+   *
+   * Every upsert below carries `WHERE excluded.updated_at >= <table>.updated_at`
+   * and that clause is the whole of the local merge rule. It is not the device
+   * resolving anything: the server still decides, and this row is on its way up
+   * to be decided. It is the device refusing to destroy the evidence first.
+   *
+   * The case is ordinary rather than exotic. Every answer contains the records
+   * this device just pushed, because the server heard them in the request being
+   * answered. So a note typed while the request was in flight meets its own
+   * pre-edit self coming back, and without the clause the edit is overwritten,
+   * falls below the push mark, and is never sent anywhere.
+   *
+   * `>=` and not `>`, so a tombstone still beats an edit made in the same
+   * millisecond, which is what the merge decided and what it means everywhere
+   * else.
+   */
   async applyChanges(changes: ChangeSet): Promise<void> {
     await this.driver.transaction(async () => {
       for (const { record, deletedAt } of changes.venues) {
@@ -312,10 +330,18 @@ export class SqlRepository implements Repository {
              is_home_game = excluded.is_home_game,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at,
-             deleted_at = excluded.deleted_at`,
+             deleted_at = excluded.deleted_at
+           WHERE excluded.updated_at >= venues.updated_at`,
           [record.id, record.name, bool(record.isHomeGame), record.createdAt, record.updatedAt, deletedAt],
         );
       }
+
+      // A session naming a venue that is still missing is skipped rather than
+      // thrown on: foreign keys are on, and one inconsistent row should cost
+      // that row rather than the whole sync.
+      const known = new Set(
+        (await this.driver.all<{ id: string }>(`SELECT id FROM venues`)).map((row) => row.id),
+      );
 
       // An incoming session can carry an import key that a *different* local
       // row still holds, which the unique index would refuse. The server is
@@ -327,20 +353,20 @@ export class SqlRepository implements Repository {
       // provenance it was about to lose anyway. Its stamps are left alone,
       // because this is reconciling with a decision already made rather than
       // an edit worth pushing back.
+      //
+      // After the venue set is known, and only for sessions that will actually
+      // be written: releasing a key for a row that is then skipped strips the
+      // provenance off a local session in favour of one that never arrived, and
+      // the same CSV row can be imported a second time.
       for (const { record } of changes.sessions) {
         if (typeof record.importKey !== 'string' || record.importKey === '') continue;
+        if (!known.has(record.venueId)) continue;
         await this.driver.run(
           `UPDATE sessions SET import_key = NULL WHERE import_key = ? AND id <> ?`,
           [record.importKey, record.id],
         );
       }
 
-      // A session naming a venue that is still missing is skipped rather than
-      // thrown on: foreign keys are on, and one inconsistent row should cost
-      // that row rather than the whole sync.
-      const known = new Set(
-        (await this.driver.all<{ id: string }>(`SELECT id FROM venues`)).map((row) => row.id),
-      );
       const stored = new Set<string>();
       for (const { record, deletedAt } of changes.sessions) {
         if (!known.has(record.venueId)) continue;
@@ -369,7 +395,8 @@ export class SqlRepository implements Repository {
              import_key = excluded.import_key,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at,
-             deleted_at = excluded.deleted_at`,
+             deleted_at = excluded.deleted_at
+           WHERE excluded.updated_at >= sessions.updated_at`,
           [
             record.id, record.venueId, record.format, record.gameType,
             record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
@@ -398,7 +425,8 @@ export class SqlRepository implements Repository {
              at = excluded.at,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at,
-             deleted_at = excluded.deleted_at`,
+             deleted_at = excluded.deleted_at
+           WHERE excluded.updated_at >= rebuys.updated_at`,
           [record.id, record.sessionId, record.amount, record.at, record.createdAt, record.updatedAt, deletedAt],
         );
       }
@@ -420,7 +448,8 @@ export class SqlRepository implements Repository {
              at = excluded.at,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at,
-             deleted_at = excluded.deleted_at`,
+             deleted_at = excluded.deleted_at
+           WHERE excluded.updated_at >= hands.updated_at`,
           [
             record.id, record.sessionId, record.holeCards, record.position, record.note,
             JSON.stringify(record.tags ?? []), record.amount, record.at,
@@ -442,7 +471,8 @@ export class SqlRepository implements Repository {
              at = excluded.at,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at,
-             deleted_at = excluded.deleted_at`,
+             deleted_at = excluded.deleted_at
+           WHERE excluded.updated_at >= mood_entries.updated_at`,
           [
             record.id, record.sessionId, record.phase, record.score, record.at,
             record.createdAt, record.updatedAt, deletedAt,

@@ -41,7 +41,7 @@ describe('composing the repository', () => {
     // The branch this used to fall through to, and the only one where the
     // sweep can destroy a delete nobody else has heard about yet.
     const tokenless = source.slice(at('const token = await getToken();'),
-                                   at('return new SyncingRepository('));
+                                   at('const syncing = new SyncingRepository('));
     expect(tokenless).toContain('return local;');
     expect(tokenless).not.toContain('collectTombstones');
   });
@@ -54,5 +54,14 @@ describe('composing the repository', () => {
     // Not a rule this file applies: it hands the local repository to the
     // wrapper, and the wrapper collects to `collectedThrough` and no further.
     expect(source).toContain('new SyncingRepository(local, token, cursorStore)');
+  });
+
+  it('pulls once on the way up, so a device nobody writes on still syncs', () => {
+    // Every other sync in the app is the tail of a write. Without this, a
+    // laptop signed in and only ever read from takes one answer and stays on
+    // it, which is the one question the feature exists to answer.
+    const started = source.slice(at('new SyncingRepository(local, token, cursorStore)'));
+    expect(started).toMatch(/void syncing\.push\(\)/);
+    expect(started.indexOf('void syncing.push()')).toBeLessThan(started.indexOf('return syncing;'));
   });
 });

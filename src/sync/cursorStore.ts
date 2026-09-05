@@ -31,7 +31,23 @@ const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
  */
 const mint = (): string => randomId().replace(/[^A-Za-z0-9_-]/g, '').padEnd(16, '0').slice(0, 32);
 
-export const freshCursors = (): Cursors => ({ pulled: 0, pushed: 0, device: mint() });
+/**
+ * The id this run invented, minted once and then reused.
+ *
+ * Every path below that cannot read a stored id falls back to a fresh one, and
+ * a store that is failing rather than empty takes that path on every sync. A
+ * new id each time would have the server counting one phone as hundreds of
+ * devices, each of them holding a tombstone back for six months, and the log
+ * re-sent from nothing every time. One id per run is wrong in a way that
+ * settles; a new one per call is wrong in a way that grows.
+ */
+let invented: string | null = null;
+
+export const freshCursors = (): Cursors => ({
+  pulled: 0,
+  pushed: 0,
+  device: (invented ??= mint()),
+});
 
 const parse = (held: string | null): Cursors => {
   const fresh = freshCursors();

@@ -207,21 +207,67 @@ export class DexieRepository implements Repository {
   }
 
   /** Sync's write. Upserts verbatim, parents first, skipping orphans. */
+  /**
+   * Take what the server sent, without stepping on a write it has not seen.
+   *
+   * The `stale` check below is SQLite's `WHERE excluded.updated_at >= ...`
+   * written out, and it is here for the same reason and with the same meaning.
+   * It is not the device resolving anything: the server still decides, and the
+   * row it is protecting is on its way up to be decided. It is the device
+   * refusing to destroy the evidence first.
+   *
+   * The case is ordinary. Every answer contains the records this device just
+   * pushed, because the server heard them in the request being answered, so a
+   * note typed while the request was in flight meets its own pre-edit self
+   * coming back. Overwritten, that edit also falls below the push mark and is
+   * never sent anywhere.
+   */
   async applyChanges(changes: ChangeSet): Promise<void> {
     await this.db.transaction(
       'rw',
       [this.db.venues, this.db.sessions, this.db.rebuys, this.db.hands, this.db.moodEntries],
       async () => {
+        /**
+         * Ids whose local row is strictly newer than what arrived.
+         *
+         * `>` and not `>=`, so a tombstone still beats an edit made in the same
+         * millisecond, which is what the merge decided everywhere else.
+         */
+        const newerHere = async (
+          table: { bulkGet(ids: string[]): Promise<({ updatedAt: Timestamp } | undefined)[]> },
+          incoming: readonly { record: { id: string; updatedAt: Timestamp } }[],
+        ): Promise<Set<string>> => {
+          const skip = new Set<string>();
+          if (incoming.length === 0) return skip;
+          const held = await table.bulkGet(incoming.map((change) => change.record.id));
+          held.forEach((row, index) => {
+            const arriving = incoming[index].record;
+            if (row !== undefined && row.updatedAt > arriving.updatedAt) skip.add(arriving.id);
+          });
+          return skip;
+        };
+
+        const staleVenues = await newerHere(this.db.venues, changes.venues);
         for (const { record, deletedAt } of changes.venues) {
+          if (staleVenues.has(record.id)) continue;
           await this.db.venues.put({ ...fromVenue(record), deletedAt });
         }
 
+        // No foreign keys here to throw, but the same skip: a session whose
+        // venue never arrived would render with no venue at all, which is a
+        // worse outcome than one row waiting for the next sync.
+        const known = new Set((await this.db.venues.toArray()).map((venue) => venue.id));
+
         // The same import-key release SQLite needs, for the same reason: the
         // `&importKey` index here is unique too, and `put` would reject the
-        // incoming row rather than the stale local one. See SqlRepository.
+        // incoming row rather than the stale local one. Only for sessions that
+        // will actually be written, or a row that is then skipped takes a local
+        // session's provenance with it. See SqlRepository.
         const claimed = new Map(
           changes.sessions
-            .filter((change) => typeof change.record.importKey === 'string' && change.record.importKey !== '')
+            .filter((change) => typeof change.record.importKey === 'string'
+              && change.record.importKey !== ''
+              && known.has(change.record.venueId))
             .map((change) => [change.record.importKey, change.record.id]),
         );
         if (claimed.size > 0) {
@@ -232,14 +278,10 @@ export class DexieRepository implements Repository {
             await this.db.sessions.put(rest);
           }
         }
-
-        // No foreign keys here to throw, but the same skip: a session whose
-        // venue never arrived would render with no venue at all, which is a
-        // worse outcome than one row waiting for the next sync.
-        const known = new Set((await this.db.venues.toArray()).map((venue) => venue.id));
+        const staleSessions = await newerHere(this.db.sessions, changes.sessions);
         const stored = new Set<string>();
         for (const { record, deletedAt } of changes.sessions) {
-          if (!known.has(record.venueId)) continue;
+          if (!known.has(record.venueId) || staleSessions.has(record.id)) continue;
           await this.db.sessions.put({ ...fromSession(record), deletedAt });
           stored.add(record.id);
         }
@@ -249,16 +291,19 @@ export class DexieRepository implements Repository {
           ...(await this.db.sessions.toArray()).map((session) => session.id),
         ]);
 
+        const staleRebuys = await newerHere(this.db.rebuys, changes.rebuys);
         for (const { record, deletedAt } of changes.rebuys) {
-          if (!sessions.has(record.sessionId)) continue;
+          if (!sessions.has(record.sessionId) || staleRebuys.has(record.id)) continue;
           await this.db.rebuys.put({ ...record, deletedAt });
         }
+        const staleHands = await newerHere(this.db.hands, changes.hands);
         for (const { record, deletedAt } of changes.hands) {
-          if (!sessions.has(record.sessionId)) continue;
+          if (!sessions.has(record.sessionId) || staleHands.has(record.id)) continue;
           await this.db.hands.put({ ...record, tags: [...record.tags], deletedAt });
         }
+        const staleMoods = await newerHere(this.db.moodEntries, changes.moodEntries);
         for (const { record, deletedAt } of changes.moodEntries) {
-          if (!sessions.has(record.sessionId)) continue;
+          if (!sessions.has(record.sessionId) || staleMoods.has(record.id)) continue;
           await this.db.moodEntries.put({ ...record, deletedAt });
         }
       },

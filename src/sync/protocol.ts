@@ -15,24 +15,45 @@
  * players the feature exists for, and a rebuy tapped at a table on one bar of
  * signal would send five years of history to record 200 dollars. See SYNC.md.
  *
- * ## The cursor is `updatedAt`, and the comparison is `>=`
+ * ## The cursor is the server's stamp, and the comparison is `>=`
  *
- * No sequence numbers, no vector clocks: every record already carries the one
- * stamp the merge sorts by, so there is nothing for two devices to keep in step.
+ * A cursor answers one question: what has this device not been told yet. So it
+ * has to be measured in the order the **server** learned things, not in the
+ * order they happened on whichever phone wrote them.
  *
- * `>=` rather than `>` is deliberate and costs one millisecond of records on
- * every sync. With `>`, a record written by another device in the very
- * millisecond this one last synced is invisible forever, which is a bug that
- * would appear once a year and be unreproducible when it did. Re-sending is
- * free because applying a record twice is a no-op: the merge is idempotent by
- * construction, which is the property that makes this safe rather than lucky.
+ * This was `record.updatedAt` and that was wrong, in a way that lost data
+ * quietly. A delete made in a card room carries the moment it was made. If the
+ * other device syncs before that phone finds signal, its cursor is already past
+ * that moment, so when the tombstone finally lands it is never handed over:
+ * not collected, not refused, simply never sent. The two devices then disagree
+ * for as long as they both exist.
+ *
+ * So the server stamps each entry with `heardAt` when it writes it, and both
+ * the answer and the cursor are cut on that. The device never interprets the
+ * number; it echoes back whatever it was last given. There are still no
+ * sequence numbers and no vector clocks, because there is still only one writer.
+ *
+ * `>=` rather than `>` is deliberate and costs one stamp's worth of records on
+ * every sync. With `>`, anything sharing the cursor's exact millisecond is
+ * invisible forever, which is a bug that would appear once a year and be
+ * unreproducible when it did. Re-sending is free because applying a record
+ * twice is a no-op: the merge is idempotent by construction, which is the
+ * property that makes this safe rather than lucky.
  */
 
 import type { Change, ChangeSet } from '../data/repository';
 import type { Timestamp } from '../domain/types';
 
-/** Bumped only if a change would make an older client read a bundle wrongly. */
-export const BUNDLE_VERSION = 1;
+/**
+ * Bumped only if a change would make an older client read a bundle wrongly.
+ *
+ * 2: the answer and the cursor are cut on `heardAt`, the server's own stamp,
+ * rather than on `record.updatedAt`, which belongs to whichever device wrote
+ * the record. A bundle stored under 1 is read by stamping every entry as heard
+ * now, which costs each device one full re-pull and is the only reading of an
+ * old bundle that cannot skip anything. See `readBundle`.
+ */
+export const BUNDLE_VERSION = 2;
 
 /** The tables that sync, in the order a merge has to apply them. */
 export const SYNC_TABLES = ['venues', 'sessions', 'rebuys', 'hands', 'moodEntries'] as const;
@@ -53,27 +74,28 @@ export interface SyncRow {
 }
 
 /**
- * A stored change: what a device sent, plus when this server took it.
+ * A stored change: what a device sent, plus when this server wrote it.
  *
- * `heardAt` exists because `deletedAt` is a fact about a phone and retention is
- * a fact about this server. A row deleted in a drawer carries the moment it was
- * deleted, which can be months before that phone next has signal, so the
- * tombstone arrives already older than the window and would be swept in the
- * same request that first delivered it -- while every other device is still
- * holding the live row and will push it straight back. Ninety days of retention
- * has to mean ninety days the server has held the thing, and this is the only
- * clock that can say that.
+ * `heardAt` is the one clock in the system that belongs to the server, and two
+ * separate things need it.
+ *
+ * **Delivery.** It is the cursor. A device is served everything heard at or
+ * after the stamp it sends back, which is the only ordering that cannot skip a
+ * record that arrived late. See the header of this file.
+ *
+ * **Retention.** `deletedAt` is a fact about a phone. A row deleted in a drawer
+ * carries the moment it was deleted, which can be months before that phone next
+ * has signal, so a tombstone arrives already older than the window and would be
+ * swept in the request that first delivered it, while every other device is
+ * still holding the live row. Ninety days of retention has to mean ninety days
+ * the server has held the thing.
  *
  * Stamped whenever the stored entry actually changes and left alone when it
- * does not, so a device retrying a push it already sent cannot restart the
- * clock on its own delete.
- *
- * Optional because a bundle written before this existed has none, and a
- * tombstone with no stamp falls back to `deletedAt`: the behavior it already
- * had, rather than an unbounded one.
+ * does not, so a device retrying a push it already sent neither restarts the
+ * clock on its own delete nor re-sends the record to everybody else.
  */
 export interface StoredChange extends Change<SyncRow> {
-  heardAt?: Timestamp;
+  heardAt: Timestamp;
 }
 
 /**
@@ -87,21 +109,28 @@ export interface Bundle {
   version: number;
   records: { [T in SyncTable]: Record<string, StoredChange> };
   /**
-   * When each device was last **answered**, by its own opaque id.
+   * What each device has taken, and when it was last here, by its opaque id.
    *
    * The only thing this is for is deciding when a tombstone may be collected,
    * and it is the difference between a rule and a guess. Time alone says "no
    * device is plausibly older than ninety days"; this says "no device *is*".
    *
-   * Answered rather than asked, and the distinction is the whole of it: a
-   * device is stamped after the sweep has run, never before, or the request in
-   * which it asks is the request that collects what it was asking for.
-   *
-   * It holds no more than an id somebody's app invented and a timestamp. A
-   * device that has not been seen for the retention window is forgotten, so a
-   * phone that was lost cannot hold collection up forever.
+   * It holds no more than an id somebody's app invented and two numbers. A
+   * device not here for twice the window is forgotten, so a phone that was lost
+   * cannot hold collection up forever.
    */
-  devices: Record<string, Timestamp>;
+  devices: Record<string, DeviceMark>;
+  /**
+   * The newest stamp this server has issued, and never a stamp it will reuse.
+   *
+   * Every `heardAt` comes from here rather than straight from the clock, and
+   * it only ever moves forward: a stamp is the later of the wall clock and one
+   * past this. Functions run on many machines and their clocks agree to within
+   * milliseconds rather than exactly, and a stamp that went backwards would put
+   * a record behind a cursor already handed out, which is the same lost record
+   * this whole scheme exists to prevent.
+   */
+  heardThrough: Timestamp;
   /**
    * Tombstones deleted before this have been collected and are gone.
    *
@@ -112,15 +141,39 @@ export interface Bundle {
   collectedThrough: Timestamp;
 }
 
+/**
+ * Two numbers about one device, on two different clocks, and they have to stay
+ * apart because they answer two different questions.
+ *
+ * `acked` is the cursor it last sent, which is in the same space as `heardAt`
+ * and is proof: a device writes its cursor only once it has applied the answer
+ * that produced it. That is what decides whether anybody is still owed a
+ * tombstone.
+ *
+ * `seen` is the wall clock, and it decides only whether this device still
+ * exists. The two were one number until the cursor stopped being a record's own
+ * stamp, and keeping them one meant a device that was perfectly caught up on a
+ * server nobody had written to for months looked exactly like a phone that had
+ * been sold.
+ */
+export interface DeviceMark {
+  acked: Timestamp;
+  seen: Timestamp;
+}
+
 export const emptyBundle = (): Bundle => ({
   version: BUNDLE_VERSION,
   records: { venues: {}, sessions: {}, rebuys: {}, hands: {}, moodEntries: {} },
   devices: {},
+  heardThrough: 0,
   collectedThrough: 0,
 });
 
 export interface SyncRequest {
-  /** What this device has already seen. 0 on a device that has never synced. */
+  /**
+   * The last cursor the server gave this device. 0 on one that has never
+   * synced. Opaque: it is the server's stamp, and no device reads it.
+   */
   since: Timestamp;
   /** Everything it has changed since it last pushed. Empty is a plain pull. */
   changes: ChangeSet;
@@ -133,9 +186,9 @@ export interface SyncRequest {
 }
 
 export interface SyncResponse {
-  /** What to send as `since` next time. */
+  /** What to send as `since` next time. Not a record's stamp; see above. */
   cursor: Timestamp;
-  /** Everything at or after the request's `since`, once the merge has run. */
+  /** Everything heard at or after the request's `since`, once the merge ran. */
   changes: ChangeSet;
   /**
    * How far back the server has collected. A device may safely drop its own

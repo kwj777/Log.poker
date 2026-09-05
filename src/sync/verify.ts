@@ -71,16 +71,28 @@ export const verifyToken = async (
 };
 
 /**
+ * Whether this claim names somebody who can have a bucket at all.
+ *
+ * **A passcode holder has no subject of their own**: everybody who typed one
+ * shares the literal string, so giving them a bucket would pour every preview
+ * visitor's log into a single one. Untilt's sync refuses that subject by name
+ * and this refuses it here, explicitly, rather than by never happening to meet
+ * one.
+ *
+ * Separate from the tier below because the two answer different questions, and
+ * one endpoint asks only this one: see the DELETE path in `sync.mts`.
+ */
+export const hasOwnBucket = (claim: Claim | null): claim is Claim =>
+  claim !== null && claim.subject !== SUBJECT_PASSCODE;
+
+/**
  * Whether this claim may sync, which is two questions rather than one.
  *
- * The tier is the obvious half. The other is that **a passcode holder has no
- * subject of their own**: everybody who typed one shares the literal string,
- * so syncing them together would pour every preview visitor's log into a single
- * bucket. Untilt's sync refuses that subject by name and this refuses it here,
- * explicitly, rather than by never happening to meet one.
+ * A subject of their own, and the paid tier. Erasing needs the first and not
+ * the second, which is why they are written apart.
  */
 export const maySync = (claim: Claim | null): boolean =>
-  claim !== null && claim.tier === 'full' && claim.subject !== SUBJECT_PASSCODE;
+  hasOwnBucket(claim) && claim.tier === 'full';
 
 /**
  * Which bucket this person's log lives in.

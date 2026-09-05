@@ -185,7 +185,14 @@ export const resolveImportCollisions = (
 ): ImportCollision[] => {
   const byKey = new Map<string, Session[]>();
   for (const session of sessions) {
-    if (session.importKey === null) continue;
+    // Not `!== null`. The server calls this on records it deliberately does not
+    // validate field by field, so a session can reach here with no import key
+    // at all or with an empty one, and both used to group. Every session
+    // without a key would then collide with every other, and all but one of
+    // somebody's history would be tombstoned with its hands moved onto the
+    // survivor. The same check `applyChanges` makes before it touches the
+    // unique index.
+    if (typeof session.importKey !== 'string' || session.importKey === '') continue;
     const group = byKey.get(session.importKey);
     if (group) group.push(session);
     else byKey.set(session.importKey, [session]);

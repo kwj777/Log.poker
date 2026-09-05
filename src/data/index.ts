@@ -60,7 +60,17 @@ const compose = async (): Promise<Repository> => {
     // A syncing device does not decide this for itself: the server draws the
     // line from every device it has heard from, and this one only knows about
     // itself. See `SyncingRepository`.
-    return new SyncingRepository(local, token, cursorStore);
+    const syncing = new SyncingRepository(local, token, cursorStore);
+
+    // One pull on the way up, because otherwise a device that only reads never
+    // syncs again. Every other sync in the app is the tail of a write, so a
+    // laptop somebody signs in on, reads their history on, and never types into
+    // would take its first answer and then stay on it for good -- which is the
+    // one question this feature exists to answer, asked on the one device most
+    // likely to ask it. Not awaited: the app opens on the local database and
+    // whatever arrives, arrives.
+    void syncing.push().catch(() => undefined);
+    return syncing;
   } catch {
     return local;
   }

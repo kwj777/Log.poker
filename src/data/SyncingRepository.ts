@@ -14,11 +14,12 @@
  *
  * ## The cursor
  *
- * One number, the newest `updatedAt` this device has been told about. Kept
- * beside the token rather than in the database, because it is a fact about this
- * device's conversation with the server and not part of the log: `clearAll`
- * wipes the log and the cursor has to survive that, or a reset device would
- * re-pull nothing and sit there looking empty.
+ * The last stamp the server gave this device, echoed back untouched. It is the
+ * server's number and this side never reads it. Kept beside the token rather
+ * than in the database, because it is a fact about this device's conversation
+ * with the server and not part of the log: `clearAll` wipes the log and the
+ * cursor has to survive that, or a reset device would re-pull nothing and sit
+ * there looking empty.
  *
  * ## What it does not do
  *
@@ -31,6 +32,7 @@
 import type { Timestamp } from '../domain/types';
 import { backoffMs, sync, type SyncOptions } from '../sync/client';
 import { SYNC_TABLES, countChanges, isEmptyChangeSet, type SyncFailure } from '../sync/protocol';
+import { TOMBSTONE_RETENTION_MS } from './repository';
 import type {
   ChangeSet,
   HandPatch,
@@ -41,20 +43,23 @@ import type {
 } from './repository';
 
 /**
- * Two cursors, because one cannot do both jobs.
+ * Two cursors, because one cannot do both jobs, and they are not even in the
+ * same units.
  *
- * `pulled` is the newest stamp the server has told this device about. `pushed`
- * is the newest stamp this device has sent. They look like they should be the
- * same number and they are not, because the server's cursor includes records
- * from other devices: sync a laptop while a phone is busy and `pulled` jumps
- * past stamps the laptop wrote and never sent, which would make those records
- * invisible to the next push and lost for good.
+ * `pulled` is the server's own stamp, handed back untouched and never read
+ * here. `pushed` is a local `updatedAt`, off this device's clock, marking the
+ * newest record it has actually sent. Collapsing them would lose data twice
+ * over: the server's stamp moves past records this device wrote and never sent,
+ * so the next push would skip them, and a local stamp means nothing at all to
+ * the server's answer.
  *
  * So one tracks the conversation in each direction, and neither is ever asked
  * about the other's.
  */
 export interface Cursors {
+  /** The server's stamp, opaque here. Sent back as `since`. */
   pulled: Timestamp;
+  /** The newest local `updatedAt` this device has sent. Its own clock. */
   pushed: Timestamp;
   /**
    * This install's own id, invented once and kept.
@@ -105,8 +110,26 @@ export class SyncingRepository implements Repository {
 
   /** Set by every write. Cleared only once the server has taken the change. */
   private dirty = true;
+  /**
+   * Bumped by `clearAll`, so a request already in flight cannot land after it.
+   *
+   * A reset is the one thing that invalidates an answer already asked for. The
+   * run would apply rows into a database that was just emptied, and then write
+   * back the cursors it read before the reset, which is much the worse half:
+   * the device would believe it had seen everything, and sit there empty and
+   * convinced, exactly the state the reset is documented as avoiding.
+   */
+  private epoch = 0;
   private failures = 0;
   private nextAttemptAt = 0;
+  /**
+   * Set once the token has stopped meaning anything, and never cleared here.
+   *
+   * A flag rather than a backoff far in the future, because a backoff is an
+   * instant on a clock this device can move and this is not a wait: somebody
+   * has to sign in again, and signing in composes a new repository.
+   */
+  private halted = false;
   private inFlight: Promise<void> | null = null;
   private state: SyncState = {
     lastSyncedAt: null,
@@ -157,8 +180,9 @@ export class SyncingRepository implements Repository {
    */
   async push(force = false): Promise<void> {
     if (this.inFlight) return this.inFlight;
+    if (this.halted) return;
     if (!force && !this.dirty && this.state.lastSyncedAt !== null) return;
-    if (!force && this.clock() < this.nextAttemptAt) return;
+    if (!force && this.waiting()) return;
 
     this.inFlight = (async () => {
       // Around again while writes keep landing. Joining an in-flight run is
@@ -168,7 +192,7 @@ export class SyncingRepository implements Repository {
       // here; the next write's own push picks up whatever is left.
       let rounds = 0;
       do {
-        await this.run();
+        await this.attempt();
         rounds += 1;
       } while (this.dirty && this.state.problem === null && rounds < 5);
     })();
@@ -180,6 +204,41 @@ export class SyncingRepository implements Repository {
     }
   }
 
+  /**
+   * Whether the backoff window is still open.
+   *
+   * The window is an instant on a clock that can move. A phone that steps its
+   * date backwards -- which is what a phone does when it finds the network
+   * after being wrong -- would otherwise sit out the whole size of the jump
+   * with no way to notice, so a wait longer than the longest backoff there is
+   * cannot be a real one.
+   */
+  private waiting(): boolean {
+    const left = this.nextAttemptAt - this.clock();
+    return left > 0 && left <= backoffMs(this.failures);
+  }
+
+  /**
+   * One round, and never a throw that takes the loop with it.
+   *
+   * `run` clears the dirty flag before it reads anything, so a throw after that
+   * point loses the write it was clearing for, records no failure, arms no
+   * backoff, and leaves the state saying a sync is in progress. The local
+   * database can throw: it is a real database, on a real disk, applying records
+   * another device wrote. Treated as the failure it is, so the loop retries it
+   * on the same terms as a dead network.
+   */
+  private async attempt(): Promise<void> {
+    try {
+      await this.run();
+    } catch {
+      this.dirty = true;
+      this.failures += 1;
+      this.nextAttemptAt = this.clock() + backoffMs(this.failures);
+      this.announce({ running: false, problem: 'unreachable' });
+    }
+  }
+
   private async run(): Promise<void> {
     this.announce({ running: true });
 
@@ -187,23 +246,31 @@ export class SyncingRepository implements Repository {
     // on sets it again and is sent by the next round; clearing afterwards would
     // swallow exactly those writes.
     this.dirty = false;
+    const epoch = this.epoch;
+    const startedAt = this.clock();
 
     const cursors = await this.cursors.read();
-    // One millisecond back, for the reason the pull side reads `>=`: a record
-    // written in the very millisecond of the last one sent is otherwise never
-    // sent at all, and a venue and the session started on it are routinely the
-    // same millisecond. Re-sending that millisecond is free, because applying a
-    // record twice is a no-op.
-    const changes = await this.local.listChangedSince(
-      cursors.pushed === 0 ? 0 : cursors.pushed - 1,
-    );
+    // Never past this device's own clock, which is the one way a mark like this
+    // can silence a device for good. A phone with the wrong date writes a
+    // record stamped a year out and pushes it; the mark goes there, and the
+    // moment the date is corrected every later write is below it and
+    // `listChangedSince` answers with nothing, for a year, while Settings says
+    // the sync succeeded. The clamp costs re-sending that one future record on
+    // every sync until real time passes it, and re-sending is free.
+    //
+    // One millisecond back on top of that, for the reason the pull side reads
+    // `>=`: a record written in the very millisecond of the last one sent is
+    // otherwise never sent at all, and a venue and the session started on it
+    // are routinely the same millisecond.
+    const floor = Math.min(cursors.pushed, startedAt);
+    const changes = await this.local.listChangedSince(floor <= 0 ? 0 : floor - 1);
     const outgoing = countChanges(changes);
     this.announce({ pending: outgoing });
 
     // The high-water mark of what is actually going up, which is what `pushed`
     // becomes if this succeeds. Taken from the records rather than from the
     // clock, so a record written during the request stays newer than it.
-    let sent = cursors.pushed;
+    let sent = floor;
     for (const table of SYNC_TABLES) {
       for (const change of changes[table]) {
         if (change.record.updatedAt > sent) sent = change.record.updatedAt;
@@ -219,27 +286,77 @@ export class SyncingRepository implements Repository {
     if (!outcome.ok) {
       this.dirty = true;
       this.failures += 1;
-      this.nextAttemptAt =
-        // An unauthorized answer is not a thing waiting fixes. Somebody has to
-        // sign in again, so the loop stops rather than spending a battery.
-        outcome.reason === 'unauthorized'
-          ? Number.MAX_SAFE_INTEGER
-          : this.clock() + backoffMs(this.failures);
+      // An unauthorized answer is not a thing waiting fixes. Somebody has to
+      // sign in again, so the loop stops rather than spending a battery.
+      if (outcome.reason === 'unauthorized') this.halted = true;
+      else this.nextAttemptAt = this.clock() + backoffMs(this.failures);
       this.announce({ running: false, problem: outcome.reason });
       return;
+    }
+
+    // Nothing below may land if a reset happened while this was in flight: the
+    // answer is about a log that no longer exists. Twice, because
+    // `applyChanges` yields and the reset can arrive inside it, and because the
+    // two halves fail differently. Applying would put rows back into a database
+    // the player just emptied. Writing the cursor is the worse one: the device
+    // would believe it had seen everything, and sit there empty and convinced,
+    // which is the exact state `clearAll` is documented as avoiding.
+    //
+    // Dropped whole rather than merged: `clearAll` has already set the flag
+    // that brings the next round straight back here with the cursors it wrote.
+    if (epoch !== this.epoch) {
+      this.announce({ running: false, problem: null });
+      return;
+    }
+
+    // What came down, which counts as pushed: it is on the server by
+    // definition. `applyChanges` stores an incoming record under the stamp the
+    // device that wrote it chose, so without this every record just pulled sits
+    // above the mark and is sent straight back up on the next round. On a
+    // device that has just taken years of somebody's history, the first note
+    // they type uploads all of it again.
+    //
+    // Capped at the moment this round began, so a write made during the request
+    // is still below the mark and still goes next time. Everything at or below
+    // that moment has been sent already: it was either in this round's changes
+    // or under the floor they were read from.
+    let applied = 0;
+    for (const table of SYNC_TABLES) {
+      for (const change of outcome.response.changes[table]) {
+        if (change.record.updatedAt > applied) applied = change.record.updatedAt;
+      }
     }
 
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
     }
-    await this.cursors.write({ ...cursors, pulled: outcome.response.cursor, pushed: sent });
+
+    if (epoch !== this.epoch) {
+      this.announce({ running: false, problem: null });
+      return;
+    }
+
+    await this.cursors.write({
+      ...cursors,
+      pulled: outcome.response.cursor,
+      pushed: Math.max(sent, Math.min(applied, startedAt)),
+    });
 
     // Collect what the server has, and never more. Its line is drawn from every
     // device it has heard from; this one only knows about itself, and guessing
     // wider would drop a tombstone that had not reached the others yet.
-    if (outcome.response.collectedThrough > 0) {
-      await this.local.collectTombstones(outcome.response.collectedThrough);
-    }
+    //
+    // Floored at this device's own window, because the two numbers are on two
+    // clocks: the server draws its line in the stamps it issued, and this
+    // compares it against `deleted_at`, which came off whichever phone did the
+    // deleting. The floor costs nothing when the clocks agree and bounds the
+    // one case that hurts, a tombstone this device has never managed to push
+    // being swept before it goes anywhere.
+    const line = Math.min(
+      outcome.response.collectedThrough,
+      this.clock() - TOMBSTONE_RETENTION_MS,
+    );
+    if (line > 0) await this.local.collectTombstones(line);
 
     this.failures = 0;
     this.nextAttemptAt = 0;
@@ -367,6 +484,7 @@ export class SyncingRepository implements Repository {
    * which is what makes this "start again here" rather than "lose everything".
    */
   async clearAll(): Promise<void> {
+    this.epoch += 1;
     await this.local.clearAll();
     const { device } = await this.cursors.read();
     // The device id survives a reset, because forgetting it would make this

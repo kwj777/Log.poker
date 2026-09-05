@@ -32,16 +32,31 @@ const compose = async (): Promise<Repository> => {
   const local = await createRepository();
   try {
     const session = await getSession();
-    const token = session !== null && session.syncs ? await getToken() : null;
-    if (token === null) {
-      // Nothing to disagree with, so this device collects on the window alone.
-      // Without it, an app that never signs in keeps every tombstone forever
-      // and grows where it used to shrink. Failing is not worth a launch.
+    if (session === null || !session.syncs) {
+      // Nobody else is holding a copy, so this device collects on the window
+      // alone. Without it, an app that never signs in keeps every tombstone
+      // forever and grows where it used to shrink. Failing is not worth a
+      // launch.
       void local
         .collectTombstones(Date.now() - TOMBSTONE_RETENTION_MS)
         .catch(() => undefined);
       return local;
     }
+
+    const token = await getToken();
+    if (token === null) {
+      // A session that syncs but no token to sync with: an expired sign-in, or
+      // a keychain that would not open. The local app, and **no sweep**.
+      //
+      // This is the one branch that used to fall through to the line above, and
+      // it is the one place that sweep is unsafe: this device may be holding
+      // tombstones it has never managed to push, and the server is still
+      // holding the live rows. Dropping them here does not lose a delete
+      // quietly -- it loses it loudly, on the next sync, when the rows this
+      // person deleted come back down and land on every device they own.
+      return local;
+    }
+
     // A syncing device does not decide this for itself: the server draws the
     // line from every device it has heard from, and this one only knows about
     // itself. See `SyncingRepository`.

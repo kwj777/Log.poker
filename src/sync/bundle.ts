@@ -30,6 +30,9 @@
  * 3. **Apply the three constraint rules**, which is the part a per-record merge
  *    cannot do, because each of them is about a pair of records that are each
  *    fine alone. See `src/domain/merge.ts`.
+ * 4. **Sweep, and only then record who asked.** A device is stamped as caught
+ *    up after the sweep rather than before it, or the request in which it asks
+ *    for a tombstone is the request that decides nobody is waiting for one.
  *
  * The rules themselves live in the domain and are shared with the client, which
  * calls none of them today. One implementation, two possible callers, is the
@@ -57,6 +60,7 @@ import {
   SYNC_TABLES,
   emptyBundle,
   type Bundle,
+  type StoredChange,
   type SyncRow,
   type SyncTable,
 } from './protocol';
@@ -129,13 +133,29 @@ export const readBundle = (stored: unknown): Bundle => {
       // rather than gaining an entry.
       if (id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
       const clean = sanitize(change, Number.MAX_SAFE_INTEGER);
-      if (clean && clean.record.id === id) bundle.records[table][id] = clean;
+      if (!clean || clean.record.id !== id) continue;
+      // The server's own stamp, kept as written. A bundle from before it
+      // existed has none, and `collect` falls back for exactly those.
+      const { heardAt } = change as { heardAt?: unknown };
+      bundle.records[table][id] =
+        typeof heardAt === 'number' && Number.isFinite(heardAt) ? { ...clean, heardAt } : clean;
     }
   }
   return bundle;
 };
 
 const versioned = (change: Change<Row>): Versioned<Row> => change as Versioned<Row>;
+
+/**
+ * When the server last wrote this entry, which is what retention is measured in.
+ *
+ * Only moved when the entry really changed. `resolve` hands back one of the two
+ * objects it was given, so identity is the test: getting the held one back
+ * means the push changed nothing, and a retry of a push that already landed
+ * must not restart the clock on the tombstone it carried.
+ */
+const heard = (next: StoredChange, held: StoredChange | undefined, now: Timestamp): StoredChange =>
+  next === held ? next : { ...next, heardAt: now };
 
 /**
  * Two sessions cannot both be running, and only the bundle knows there are two.
@@ -175,6 +195,7 @@ const settleActiveSessions = (bundle: Bundle, now: Timestamp): void => {
     sessions[closed.session.id] = {
       record: { ...held.record, endedAt: closed.endedAt, cashOut: null, updatedAt: now },
       deletedAt: null,
+      heardAt: now,
     };
   }
 };
@@ -200,6 +221,7 @@ const settleImportCollisions = (bundle: Bundle, now: Timestamp): void => {
       sessions[loser.id] = {
         record: { ...held.record, importKey: null, updatedAt: now },
         deletedAt: now,
+        heardAt: now,
       };
     }
 
@@ -213,6 +235,7 @@ const settleImportCollisions = (bundle: Bundle, now: Timestamp): void => {
         bundle.records[table][id] = {
           record: { ...change.record, sessionId: collision.keep.id, updatedAt: now },
           deletedAt: null,
+          heardAt: now,
         };
       }
     }
@@ -236,6 +259,7 @@ const settleVenueTombstones = (bundle: Bundle, now: Timestamp): void => {
     bundle.records.venues[id] = {
       record: { ...change.record, updatedAt: now },
       deletedAt: null,
+      heardAt: now,
     };
   }
 };
@@ -247,7 +271,12 @@ const settleVenueTombstones = (bundle: Bundle, now: Timestamp): void => {
  * a guess.
  *
  * **Old enough.** Older than the retention window, which answers "how long can
- * a device be switched off and still come back coherent".
+ * a device be switched off and still come back coherent". Measured in server
+ * time, from `heardAt`, and not from the `deletedAt` the deleting device wrote:
+ * a session deleted on a phone with no signal arrives whenever that phone next
+ * has some, and on its own clock it is already older than the window. Trusting
+ * that stamp collects the tombstone in the same request that delivered it, with
+ * every other device still holding the row.
  *
  * **And seen by everybody.** A tombstone newer than the least recently seen
  * device has not reached that device, and collecting it would let that device
@@ -280,7 +309,8 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
   let collected = 0;
   for (const table of SYNC_TABLES) {
     for (const [id, change] of Object.entries(bundle.records[table])) {
-      if (change.deletedAt === null || change.deletedAt >= horizon) continue;
+      if (change.deletedAt === null) continue;
+      if ((change.heardAt ?? change.deletedAt) >= horizon) continue;
       // A venue stays while anything still points at it, tombstoned or not, for
       // the same reason the local sweep keeps it: a session whose venue is gone
       // renders with no venue at all.
@@ -324,7 +354,6 @@ export const mergeIntoBundle = (
 ): MergeResult => {
   const bundle = readBundle(stored);
   bundle.version = BUNDLE_VERSION;
-  if (device !== null && DEVICE_ID.test(device)) bundle.devices[device] = now;
 
   const sent = (incoming ?? {}) as Record<string, unknown>;
   for (const table of SYNC_TABLES) {
@@ -345,9 +374,10 @@ export const mergeIntoBundle = (
       // that never left. See SYNC.md.
       if (!held && change.record.updatedAt < bundle.collectedThrough) continue;
 
-      bundle.records[table][change.record.id] = held
-        ? (resolve(versioned(held), versioned(change)) as Change<Row>)
-        : change;
+      const next = held
+        ? (resolve(versioned(held), versioned(change)) as StoredChange)
+        : (change as StoredChange);
+      bundle.records[table][change.record.id] = heard(next, held, now);
     }
   }
 
@@ -361,6 +391,17 @@ export const mergeIntoBundle = (
   // and so an un-tombstoned venue is live again before anything looks at it.
   collect(bundle, now);
 
+  // And the device is stamped after that sweep, never before it.
+  //
+  // Before, this device's own entry read `now`, so it stopped being the oldest
+  // one the moment it asked -- and the horizon jumped forward to exactly the
+  // tombstones it had come to collect, which were then swept out of the answer
+  // it was about to be handed. The one device the map was there to protect was
+  // the one device it could not protect. Stamped here, the sweep is decided by
+  // where every device stood before this request, and this one is only recorded
+  // as caught up once the answer below is built from a bundle it can see.
+  if (device !== null && DEVICE_ID.test(device)) bundle.devices[device] = now;
+
   // Built loose and named once, because a `ChangeSet` is five differently
   // typed arrays and the server is deliberately indifferent to which is which.
   const collected: Record<SyncTable, Change<Row>[]> = {
@@ -370,7 +411,11 @@ export const mergeIntoBundle = (
   for (const table of SYNC_TABLES) {
     for (const change of Object.values(bundle.records[table])) {
       if (change.record.updatedAt > cursor) cursor = change.record.updatedAt;
-      if (change.record.updatedAt >= since) collected[table].push(change);
+      // `heardAt` is the server's own note to itself and no part of what a
+      // device was promised, so it is left here rather than put on the wire.
+      if (change.record.updatedAt >= since) {
+        collected[table].push({ record: change.record, deletedAt: change.deletedAt });
+      }
     }
   }
   const changes = collected as unknown as ChangeSet;
@@ -379,5 +424,5 @@ export const mergeIntoBundle = (
 };
 
 /** Every table, for a caller that wants to walk one at a time. */
-export const tablesOf = (bundle: Bundle): [SyncTable, Record<string, Change<Row>>][] =>
-  SYNC_TABLES.map((table) => [table, bundle.records[table] as Record<string, Change<Row>>]);
+export const tablesOf = (bundle: Bundle): [SyncTable, Record<string, StoredChange>][] =>
+  SYNC_TABLES.map((table) => [table, bundle.records[table]]);

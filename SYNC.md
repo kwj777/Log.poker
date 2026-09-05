@@ -476,6 +476,66 @@ lose a record such a device created and never sent. It is the worse thing to
 lose and much the rarer: it needs six months offline and a write that never
 left, where the alternative needs only the six months.
 
+### Three ways collection was still wrong
+
+An adversarial audit of the merge found the rule above correct and its
+implementation not. All three failures share a shape: each one collected a
+tombstone that somebody was still owed, and each one showed up as a deleted
+session coming back rather than as anything going wrong at the time.
+
+**The device stamped itself before the sweep.** `mergeIntoBundle` recorded the
+asking device as last-seen *now* on the first line, and swept on the last. So a
+device that had been away three months stopped being the oldest thing on the map
+the instant it asked, the horizon jumped to the present, and the tombstones it
+had come to collect were swept out of the answer it was about to be handed. The
+one device the map existed to protect was the only one it could not protect. The
+stamp now happens after the sweep, which makes the rule what it always claimed
+to be: a tombstone goes only once every remembered device has been *answered*
+with it, not merely once every device has asked. It costs one extra sync before
+a row is collected, on a row that has been dead for three months.
+
+**Retention was measured on the deleting phone's clock.** `deletedAt` is the
+moment a person deleted a session, which on a phone with no signal can be months
+before the server hears about it. A delete made in a card room in March and
+pushed in July arrived already older than the window and was swept in the same
+request that delivered it, while every other device was still holding the live
+row. Ninety days of retention has to mean ninety days *the server has held the
+thing*, so a stored change now also carries `heardAt`, the server's own stamp,
+and that is what the sweep measures. It moves only when the entry really
+changes, so a device retrying a push it already sent cannot restart the clock on
+its own delete.
+
+**A device with no token swept its own tombstones.** The local sweep in
+`src/data/index.ts` exists so an app that never signs in does not keep every
+tombstone it ever wrote. But "no token" covered two different devices: one that
+never syncs, and one that syncs and whose sign-in has lapsed. The second may be
+holding tombstones it never managed to push, with the server still holding the
+live rows, so sweeping there lost the deletes and the next sync put every one of
+those sessions back on every device the person owns. The sweep is now gated on
+the session rather than on the token: no session, or a session that does not
+sync, collects on the window; a syncing session with no token gets the local app
+and no sweep at all.
+
+### Two the same audit found and this did not fix
+
+Both are confirmed against the two-device suite, both are in `mergeIntoBundle`,
+and both belong with the cursor work rather than with collection.
+
+**A record can arrive too old to be delivered.** The cursor is `updatedAt`, and a
+device is served everything at or after the `since` it sent. A delete made
+offline carries the stamp of the moment it was made, so if any other device has
+synced in the meantime, the second device's cursor is already past it and the
+tombstone is never sent -- not collected, not refused, simply never delivered.
+The two devices then disagree forever. The fix is for the answer to be cut on
+`heardAt`, the stamp this change already adds, rather than on a clock that
+belongs to whichever phone wrote the record.
+
+**A constraint rule can discard a push that is still in flight.** The three
+settle rules write `updatedAt: now`. A device that was offline while one of them
+ran comes back with an edit or a delete stamped earlier, loses the comparison,
+and is silently dropped: close somebody's forgotten running session on one
+device and the delete the other device made an hour earlier never lands.
+
 Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
 no dependency on each other and can be built in either order or at once.
 

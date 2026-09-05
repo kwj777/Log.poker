@@ -14,9 +14,11 @@
  */
 
 import { SqlRepository } from '../sql/SqlRepository';
-import { SyncingRepository, memoryCursorStore } from '../SyncingRepository';
+import { SyncingRepository, memoryCursorStore, type CursorStore } from '../SyncingRepository';
 import { mergeIntoBundle } from '../../sync/bundle';
+import { countChanges } from '../../sync/protocol';
 import type { Fetch } from '../../sync/client';
+import type { ChangeSet, Repository } from '../repository';
 import { NodeSqliteDriver } from './support/nodeSqliteDriver';
 
 const T0 = 1_700_000_000_000;
@@ -35,15 +37,24 @@ const tick = (ms: number) => {
  * meaning anything, which the loop has to treat differently from a bad signal.
  */
 const server = () => {
-  const held: { bundle: unknown; offline: boolean; unauthorized: boolean; calls: number } = {
+  const held: {
+    bundle: unknown;
+    offline: boolean;
+    unauthorized: boolean;
+    calls: number;
+    /** Set to hold the answer open, which is where a write lands mid-request. */
+    hold: (() => Promise<void>) | null;
+  } = {
     bundle: null,
     offline: false,
     unauthorized: false,
     calls: 0,
+    hold: null,
   };
 
   const fetch = (async (_url: string, init: RequestInit) => {
     held.calls += 1;
+    if (held.hold) await held.hold();
     if (held.offline) throw new TypeError('Network request failed');
     if (held.unauthorized) return { ok: false, status: 401, json: async () => ({}) } as Response;
     if (init.method === 'DELETE') {
@@ -252,6 +263,116 @@ describe('a session deleted on one device', () => {
     expect(await laptop.listSessions()).toEqual([]);
     expect(await phone.listSessions()).toEqual([]);
   });
+
+  it('even when it was deleted with no signal and pushed days later', async () => {
+    // The cursor is what makes this hard. A delete carries the moment it was
+    // made, and if the other device syncs in between, its cursor is already
+    // past that moment: the tombstone lands on the server and is then never
+    // handed to the one device still holding the row. Nothing refuses it and
+    // nothing collects it. The two devices simply disagree, forever.
+    const DAY = 24 * HOUR;
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.endSession(session.id, 40_000, now);
+    await phone.push();
+    await laptop.push(true);
+    expect(await laptop.getSession(session.id)).not.toBeNull();
+
+    // Deleted at the table, where there is no wifi.
+    tick(DAY);
+    held.offline = true;
+    await phone.deleteSession(session.id);
+    await phone.push(true);
+    held.offline = false;
+
+    // Three days later the laptop is used, and its cursor moves well past the
+    // moment the phone deleted anything.
+    tick(3 * DAY);
+    await startSession(laptop, 'Bellagio');
+    await laptop.push(true);
+
+    // The phone finds wifi and sends the delete it has been holding.
+    tick(HOUR);
+    await phone.push(true);
+    await laptop.push(true);
+
+    expect(await laptop.getSession(session.id)).toBeNull();
+  });
+
+  it('and is not undone by a rule the server ran while it was in flight', async () => {
+    // The three constraint rules stamp the records they write with the
+    // server's clock. A device that was offline while one of them ran comes
+    // back with a delete stamped earlier, loses the comparison, and is thrown
+    // away: the session the player deleted is closed instead, and comes back
+    // down to the device that deleted it.
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.push();
+    await laptop.push(true);
+
+    tick(HOUR);
+    held.offline = true;
+    await phone.deleteSession(session.id);
+    await phone.push(true);
+    held.offline = false;
+
+    // The laptop starts a session of its own. The server now sees two running
+    // and closes the older one, which is the rule working as intended.
+    tick(HOUR);
+    await startSession(laptop, 'Bellagio');
+    await laptop.push(true);
+
+    tick(HOUR);
+    await phone.push(true);
+    await laptop.push(true);
+
+    expect(await phone.getSession(session.id)).toBeNull();
+    expect(await laptop.getSession(session.id)).toBeNull();
+  });
+});
+
+describe('a note typed while the sync was in flight', () => {
+  it('is not overwritten by its own pre-edit self coming back', async () => {
+    // Every answer carries back the records the device just pushed, because
+    // the server heard them in the request it is answering. So the round trip
+    // routinely delivers an older copy of a row this device is still editing,
+    // and applying it blind loses the edit twice over: off the screen, and off
+    // the list of things still waiting to go up.
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+
+    const session = await startSession(phone);
+    await phone.push();
+
+    // The request goes out, and the note is typed before the answer lands.
+    let release: (() => void) | null = null;
+    held.hold = () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    const inFlight = phone.push(true);
+    for (let spin = 0; spin < 50 && release === null; spin += 1) await Promise.resolve();
+    tick(HOUR);
+    await phone.updateSession(session.id, { notes: 'raised the straddle' });
+    (release as unknown as () => void)();
+    held.hold = null;
+    await inFlight;
+
+    expect((await phone.getSession(session.id))?.notes).toBe('raised the straddle');
+
+    // And it reaches the other device, which is the half that would have gone
+    // silently: overwritten, the note also drops below the push mark.
+    const laptop = await device(fetch, 'laptop');
+    await phone.push(true);
+    await laptop.push(true);
+    expect((await laptop.getSession(session.id))?.notes).toBe('raised the straddle');
+  });
 });
 
 describe('both devices used while neither could sync', () => {
@@ -389,6 +510,119 @@ describe('the loop around it', () => {
   });
 });
 
+describe('what the loop does with a bad day', () => {
+  it('does not send back up everything it has just pulled down', async () => {
+    // `applyChanges` stores an incoming record under the stamp the device that
+    // wrote it chose, so without a mark that covers them, every record just
+    // pulled sits above the push cursor. On a laptop that has taken years of
+    // somebody's history, the first note they type uploads all of it again,
+    // and past the endpoint's body cap that is a wedge rather than a waste.
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    tick(HOUR);
+    await phone.createHand({ sessionId: session.id, holeCards: 'AsKd', at: now });
+    tick(HOUR);
+    await phone.addRebuy({ sessionId: session.id, amount: 20_000, at: now });
+    tick(HOUR);
+    await phone.push(true);
+    await laptop.push(true);
+    expect(await laptop.listHands()).toHaveLength(1);
+    expect(countChanges(await laptop.listChangedSince(0))).toBe(4);
+
+    // One local write on the laptop. What goes up is that write and, at most,
+    // the one stamp of overlap the push mark always re-reads.
+    tick(HOUR);
+    const sent: number[] = [];
+    const counting = ((url: string, init: RequestInit) => {
+      const { changes } = JSON.parse(init.body as string);
+      sent.push(countChanges(changes));
+      return (fetch as unknown as (u: string, i: RequestInit) => unknown)(url, init);
+    }) as unknown as typeof fetch;
+    const writer = new SyncingRepository(
+      (laptop as unknown as { local: Repository }).local,
+      'a.b.c.d',
+      memoryCursorStore(await (laptop as unknown as { cursors: CursorStore }).cursors.read()),
+      { fetch: counting },
+      () => now,
+    );
+    await writer.createVenue({ name: 'Bellagio', isHomeGame: false });
+    await writer.push(true);
+
+    expect(held.calls).toBeGreaterThan(0);
+    expect(Math.max(...sent)).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps trying after the local database throws, rather than going quiet', async () => {
+    // `run` clears the dirty flag before it reads anything, so a throw past
+    // that point loses the write, records no failure, arms no backoff, and
+    // leaves the state saying a sync is in progress. Forever.
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const session = await startSession(phone);
+    await phone.push();
+
+    let failing = true;
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const plain = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `reader-${String(now)}` },
+    });
+    await plain.init();
+    const brittle = new Proxy(plain, {
+      get(target, property, receiver) {
+        if (property === 'applyChanges') {
+          return async (changes: ChangeSet) => {
+            if (failing) throw new Error('disk full');
+            await target.applyChanges(changes);
+          };
+        }
+        const value: unknown = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }) as Repository;
+    const reader = new SyncingRepository(
+      brittle,
+      'a.b.c.d',
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reader001' }),
+      { fetch },
+      () => now,
+    );
+
+    await reader.push(true);
+    // Named as a failure and armed to try again, not silently still running.
+    expect(reader.current().running).toBe(false);
+    expect(reader.current().problem).toBe('unreachable');
+
+    failing = false;
+    await reader.push(true);
+    expect((await reader.getSession(session.id))?.id).toBe(session.id);
+  });
+
+  it('does not sit out a backward clock correction', async () => {
+    // The backoff window is an instant on a clock the phone can move, and
+    // moving it backwards is exactly what a phone does when it finds the
+    // network after being wrong. A wait longer than the longest backoff there
+    // is cannot be a real one.
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+    await startSession(phone);
+
+    held.offline = true;
+    await phone.push(true);
+    expect(phone.current().problem).toBe('unreachable');
+
+    held.offline = false;
+    now -= 30 * 24 * HOUR;
+    const spent = held.calls;
+    await phone.push();
+    expect(held.calls).toBeGreaterThan(spent);
+  });
+});
+
 describe('collecting tombstones, once nobody is still waiting', () => {
   const DAY = 24 * HOUR;
   const RETENTION = 90 * DAY;
@@ -500,6 +734,83 @@ describe('resetting a device', () => {
     tick(HOUR);
     await laptop.push(true);
     expect((await laptop.getSession(session.id))?.id).toBe(session.id);
+
+    // And the phone still has it, which is the half that would be a disaster.
+    expect(await phone.getSession(session.id)).not.toBeNull();
+  });
+
+  it('and a request already in flight cannot undo it', async () => {
+    // The reset is a tap, and a push is in flight after every write, so the
+    // two overlap by construction. The order that costs the log is this one:
+    // the answer has already been applied when the reset lands, and the run
+    // then records the cursors it read before it. The device is left empty and
+    // holding a cursor that says it has seen everything, so the next sync
+    // brings back nothing and it stays empty for good.
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+
+    const session = await startSession(phone);
+    await phone.push();
+
+    // A local repository whose next `applyChanges` yields once it has written,
+    // which is where a tap on reset can land. Everything else delegates.
+    let release: (() => void) | null = null;
+    let hold = false;
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const plain = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `reading-${String(now)}` },
+    });
+    await plain.init();
+    const gated = new Proxy(plain, {
+      get(target, property, receiver) {
+        if (property === 'applyChanges') {
+          return async (changes: ChangeSet) => {
+            await target.applyChanges(changes);
+            if (!hold) return;
+            hold = false;
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+          };
+        }
+        const value: unknown = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }) as Repository;
+    const reading = new SyncingRepository(
+      gated,
+      'a.b.c.d',
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reading01' }),
+      { fetch },
+      () => now,
+    );
+
+    // One ordinary sync first, so the cursor a stale write would restore is
+    // strictly past the session and could never bring it back.
+    await reading.push(true);
+    expect(await reading.getSession(session.id)).not.toBeNull();
+    tick(HOUR);
+    await phone.createHand({ sessionId: session.id, holeCards: 'AsKd', at: now });
+    await phone.push(true);
+
+    hold = true;
+    const inFlight = reading.push(true);
+    for (let spin = 0; spin < 50 && release === null; spin += 1) await Promise.resolve();
+    expect(await reading.listHands()).toHaveLength(1);
+
+    await reading.clearAll();
+    expect(await reading.listSessions()).toEqual([]);
+
+    (release as unknown as () => void)();
+    await inFlight;
+
+    // The cursors the reset wrote have to be the ones that survive, so the
+    // next sync brings the whole log back down.
+    tick(HOUR);
+    await reading.push(true);
+    expect((await reading.getSession(session.id))?.id).toBe(session.id);
 
     // And the phone still has it, which is the half that would be a disaster.
     expect(await phone.getSession(session.id)).not.toBeNull();

@@ -84,6 +84,27 @@ describe('last write wins', () => {
     expect(resolve(once, theirs)).toEqual(once);
     expect(resolve(once, mine)).toEqual(once);
   });
+
+  it('hands back one of the two it was given, never a third object', () => {
+    // Load-bearing outside this file. The server decides whether a push
+    // changed anything by comparing what came out of this against what it
+    // already held, by reference (`heard` in `src/sync/bundle.ts`). Build a new
+    // object here and every retry restamps the record, which re-sends it to
+    // every device and restarts the retention clock on any tombstone it
+    // carries. Cheap to keep true, and silent when it stops being.
+    const mine = live(plain({ notes: 'mine' }));
+    const cases: [ReturnType<typeof live>, ReturnType<typeof live>][] = [
+      [mine, live(plain({ notes: 'later', updatedAt: T0 + 1 }))],
+      [live(plain({ notes: 'later', updatedAt: T0 + 1 })), mine],
+      [mine, live(plain({ notes: 'same millisecond' }))],
+      [mine, dead(plain({ notes: 'mine' }), T0)],
+      [mine, mine],
+    ];
+    for (const [left, right] of cases) {
+      const held = resolve(left, right);
+      expect(held === left || held === right).toBe(true);
+    }
+  });
 });
 
 describe('clock skew', () => {
@@ -197,6 +218,20 @@ describe('the same file imported on two devices', () => {
       imported('b', 'key', T0 + HOUR),
     ]);
     expect(collision.reparent).toEqual([{ from: 'b', to: 'a' }]);
+  });
+
+  it('does not treat a missing or empty import key as a real one', () => {
+    // The server calls this on records it deliberately does not validate field
+    // by field, so a session can arrive with no key at all. Grouped on that,
+    // every hand-logged session in somebody's history collides with every
+    // other, and all but one is tombstoned with its hands moved onto the
+    // survivor. Only `null` was excluded, and `undefined` is not `null`.
+    const { importKey: _absent, ...none } = plain({ id: 'a' });
+    const alsoNone = { ...none, id: 'b' };
+    expect(resolveImportCollisions([none as Session, alsoNone as Session])).toEqual([]);
+    expect(
+      resolveImportCollisions([plain({ id: 'c', importKey: '' }), plain({ id: 'd', importKey: '' })]),
+    ).toEqual([]);
   });
 
   it('does not depend on the order the merge saw them in', () => {

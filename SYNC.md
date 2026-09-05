@@ -516,25 +516,168 @@ the session rather than on the token: no session, or a session that does not
 sync, collects on the window; a syncing session with no token gets the local app
 and no sweep at all.
 
-### Two the same audit found and this did not fix
+### The cursor stops being a record's own stamp
 
-Both are confirmed against the two-device suite, both are in `mergeIntoBundle`,
-and both belong with the cursor work rather than with collection.
+Both of the defects the collection work left open came from the same thing: one
+number, `record.updatedAt`, was doing three jobs. It was when a person changed a
+row, it was how two versions of a row were ranked against each other, and it was
+the cursor. The first two belong together. The third does not belong with them
+at all.
 
-**A record can arrive too old to be delivered.** The cursor is `updatedAt`, and a
-device is served everything at or after the `since` it sent. A delete made
-offline carries the stamp of the moment it was made, so if any other device has
-synced in the meantime, the second device's cursor is already past it and the
-tombstone is never sent -- not collected, not refused, simply never delivered.
-The two devices then disagree forever. The fix is for the answer to be cut on
-`heardAt`, the stamp this change already adds, rather than on a clock that
-belongs to whichever phone wrote the record.
+**A record could arrive too old to be delivered.** A device is served everything
+at or after the `since` it sent. A delete made in a card room carries the moment
+it was made, so if the other device syncs before that phone finds signal, its
+cursor is already past that moment and the tombstone is never handed over: not
+collected, not refused, simply never sent. The two devices then disagree for as
+long as they both exist. Reproduced end to end in the two-device suite.
 
-**A constraint rule can discard a push that is still in flight.** The three
-settle rules write `updatedAt: now`. A device that was offline while one of them
-ran comes back with an edit or a delete stamped earlier, loses the comparison,
-and is silently dropped: close somebody's forgotten running session on one
-device and the delete the other device made an hour earlier never lands.
+**A constraint rule could discard a push still in flight.** The three settle
+rules wrote `updatedAt: now`, which made every conclusion the server drew newer
+than everything a device was still holding. A phone that deleted a session
+offline came back with a tombstone stamped an hour earlier, lost the comparison,
+and had the delete thrown away: the session was closed instead and came back
+down to the device that deleted it. Also reproduced.
+
+So the answer and the cursor are now cut on `heardAt`, the stamp the server
+writes when it stores an entry, and the device echoes back a number it never
+reads. That is the whole of the first fix, and it is what makes the second one
+possible: with delivery no longer riding on `updatedAt`, the settle rules can
+stop lying about it. They stamp one millisecond past the row they replace, which
+is exactly enough to beat that row and any stale copy of it, and not enough to
+beat anything a person did afterwards.
+
+Three things came out of building it.
+
+**The stamp is `max(clock, last issued + 1)`, not the clock.** Functions run on
+many machines and their clocks agree to within milliseconds rather than exactly.
+A stamp that went backwards would put a record behind a cursor already handed
+out, which is the same lost record the whole scheme exists to prevent. Monotone
+per bundle is enough; a sequence number in a new field is not needed, and would
+have been a second thing to keep in step.
+
+**A cursor the bundle cannot place is read as zero.** The bucket can be erased,
+and the next request starts a fresh bundle whose stamps begin again from
+nothing. Without the clamp a device still holding a cursor from the old bundle
+asks for everything after a number no record will ever reach, and is answered
+with silence for the rest of its life.
+
+**The device map holds an acknowledgement.** It used to hold the moment a device
+was answered, which trusts an answer that may never have arrived. A device
+writes its cursor only once it has applied what that cursor covers, so the
+number it sends back is the one thing in the protocol that is proof rather than
+assumption, and now that a cursor and a `heardAt` are the same kind of number,
+using it costs nothing. A mark now holds two numbers on two clocks: what the
+device took, and when it was last here. They have to stay apart, or a device
+perfectly caught up on a server nobody has written to for months looks exactly
+like a phone that was sold.
+
+### Everything else in the same pass
+
+An adversarial audit of the cursor and endpoint surface ran alongside the work.
+Four independent designs were produced for the change above and judged against
+each other; the smallest won on all three judging lenses, and the monotone stamp
+was grafted in from another. The same audit turned up a list, of which these
+were confirmed and fixed here.
+
+On the endpoint:
+
+- **The read-modify-write had no compare-and-swap, and read at the store's
+  default eventual consistency.** Two devices syncing seconds apart could each
+  merge into a bundle that predated the other and write it back, and one push
+  was gone with its device told it had succeeded. Now a strongly consistent read
+  and a conditional write, retried against a fresh read on a lost race.
+- **DELETE was gated by exactly the check its own comment said it skipped**, so
+  a lapsed subscriber could not erase their history. The tier check now sits
+  below it; the rule about a subject of one's own still sits above.
+- **The merge and the erase were the two unguarded calls.** A throw in either
+  was a 500 or a 204 that promised something that had not happened.
+- **The file was not typechecked at all.** `tsconfig.json` matched `**/*.ts`,
+  which does not match `.mts`.
+
+On the device:
+
+- **A reset landing mid-request was undone by it**, leaving a truncated device
+  holding a cursor that said it had seen everything, so the next sync brought
+  back nothing and it stayed empty. Guarded by an epoch, checked twice, because
+  applying and recording fail differently.
+- **A device nobody wrote on never pulled again.** Every sync in the app is the
+  tail of a write, so a laptop somebody signs in on, reads their history on, and
+  never types into took one answer and stayed on it. It pulls once on the way
+  up now, which is the one question the feature exists to answer.
+- **The push mark could pass this device's own clock.** A phone with next year's
+  date pushes a record stamped next year, and the moment the date is corrected
+  every later write is below the mark and nothing is ever sent again, while
+  Settings reports success.
+- **The push mark did not cover what came down.** Records arrive stamped by the
+  device that wrote them, so every record just pulled sat above the mark and
+  went straight back up on the next round: on a laptop that had taken years of
+  history, the first note typed uploaded all of it again.
+- **A throw inside the loop killed it silently**, with the dirty flag already
+  cleared, no failure recorded, no backoff armed and the state still saying a
+  sync was in progress.
+- **The backoff window was an instant on a clock the phone can move**, so a
+  backward correction sat the device out for the length of the jump. The
+  unauthorized latch is now a flag rather than a wait far in the future, which
+  is what it always meant.
+- **Applying an answer overwrote a newer local row.** Every answer carries back
+  the records the device just pushed, because the server heard them in the
+  request being answered, so a note typed during the round trip met its own
+  pre-edit self coming down. Overwritten, the note also fell below the push mark
+  and was never sent anywhere. Both engines now refuse to write over something
+  newer, which is not the device resolving anything: it is the device declining
+  to destroy the evidence before the server has seen it.
+- **A cursor store that fails reads is not one that is empty.** It minted a new
+  device id on every sync, which had the server counting one phone as hundreds
+  and each of them holding a tombstone back for six months.
+
+In the merge:
+
+- **A session started on a wrong clock closed every real session.** The rule
+  ranks on `startedAt`, and `sanitize` deliberately validates an id and a stamp
+  and nothing else, so a session stamped next year won that ranking against
+  every real session on every device for a year. The rule clamps what it ranks
+  on now, and skips a session it cannot place in time at all -- because
+  `Math.max` over a missing stamp is NaN, JSON writes NaN as null, and a null
+  `endedAt` is a running session, so the rule would have closed it again on
+  every request forever, re-sending it to every device each time.
+- **A missing import key was treated as a real one.** `resolveImportCollisions`
+  excluded `null` and nothing else, and `undefined` is not `null`. Grouped on
+  that, every hand-logged session in somebody's history collides with every
+  other and all but one is tombstoned with its hands moved onto the survivor.
+- **A record could name itself `__proto__`.** A bundle is a map built by
+  assignment, and the guard the stored-records loop had did not cover the
+  incoming ids or the device map, whose id pattern admits all three reserved
+  names.
+- **The device map was the one unbounded part of a bundle**, and the minimum
+  over it was taken with a spread, which throws rather than answering past a few
+  hundred thousand arguments.
+- **An import key was released for a session that was then skipped**, taking the
+  provenance off a real local session in favour of one that never arrived, so
+  the same CSV row could be imported twice.
+
+### Still wrong, and known
+
+- **A first push over 2MB is refused forever.** The device is answered 400, the
+  client reads that as `refused`, and it retries the identical body every five
+  minutes. Fixing the push mark above removes the likeliest way to get there,
+  but a genuinely enormous first sync still cannot go up. Paging it is not a
+  one-line change: cut by time, and a batch boundary can put a hand on the
+  server without its session, which every other device then skips forever
+  because the cursor moves past it regardless. That wants an ordering guarantee
+  first. The answer has no size cap at all, which is the same problem pointing
+  the other way.
+- **The import-collision fold happens once.** A child pushed after two imports
+  have been folded together is stranded on the tombstoned duplicate, because the
+  collision that justified moving it no longer exists for the rule to see.
+- **A session closed by the active-session rule is not revised** if a later hand
+  arrives showing it ran longer, so the same pushes in a different order leave
+  different end times.
+- **`collectTombstones` diverges between the engines** for a live child under a
+  collected session: SQLite cascades it away, Dexie leaves it an orphan.
+- **Two accounts on one device share one local log and one cursor store.** The
+  unplaceable-cursor clamp above stops the second account being answered with
+  silence, but the first account's records are still in the database the second
+  one pushes from.
 
 Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
 no dependency on each other and can be built in either order or at once.

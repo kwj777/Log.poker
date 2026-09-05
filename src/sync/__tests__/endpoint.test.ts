@@ -52,7 +52,31 @@ describe('the sync endpoint', () => {
     const opened = source.indexOf("getStore('log-sync')");
     expect(opened).toBeGreaterThan(-1);
     expect(source.indexOf('await verifyToken(')).toBeLessThan(opened);
-    expect(source.indexOf('if (!maySync(claim))')).toBeLessThan(opened);
+    expect(source.indexOf('if (!hasOwnBucket(claim))')).toBeLessThan(opened);
+  });
+
+  it('puts erasure above the tier check, which is what its own comment claims', () => {
+    // It sat below one for three merges. What the tier buys is the syncing,
+    // and a purchase that was refunded does not make the history behind it
+    // less theirs to remove.
+    const erasing = source.indexOf("request.method === 'DELETE'");
+    expect(erasing).toBeGreaterThan(-1);
+    expect(erasing).toBeLessThan(source.indexOf('if (!maySync(claim))'));
+    // And still above the subject rule, which is not about paying for anything.
+    expect(source.indexOf('if (!hasOwnBucket(claim))')).toBeLessThan(erasing);
+  });
+
+  it('reads strongly and writes conditionally, so no push is lost to a race', () => {
+    // Read, decide, write, with two devices doing it at once. An eventual read
+    // can hand back a bundle from before the last push, and an unconditional
+    // write then puts it back over the top: the other device's records are
+    // gone and it was told it succeeded.
+    expect(source).toContain("consistency: 'strong'");
+    expect(source).toContain('onlyIfMatch');
+    expect(source).toContain('onlyIfNew');
+    expect(source).toMatch(/if \(!written\.modified\) continue;/);
+    // Bounded, so a contended bucket fails rather than holding a function open.
+    expect(source).toContain('round < ROUNDS');
   });
 
   it('keys the bucket by an HMAC rather than by the subject', () => {

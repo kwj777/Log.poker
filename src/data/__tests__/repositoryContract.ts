@@ -968,6 +968,54 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.getSession(session.id)).toBeNull();
       });
 
+      it('leaves a local row alone when it is newer than what arrived', async () => {
+        // Every answer carries back the records this device just pushed, so a
+        // note typed while the request was in flight meets its own pre-edit
+        // self coming down. Overwritten, that edit also falls below the push
+        // mark and is never sent anywhere: it is simply gone.
+        const venue = await newVenue('Before');
+        context.tick(HOUR);
+        const edited = await repository.updateVenue(venue.id, { name: 'Typed while syncing' });
+
+        await repository.applyChanges(set({ venues: [change({ ...venue, name: 'Before' })] }));
+        const held = await repository.getVenue(venue.id);
+        expect(held?.name).toBe('Typed while syncing');
+        expect(held?.updatedAt).toBe(edited.updatedAt);
+
+        // And it is still waiting to go up, which is the half that matters.
+        const { venues } = await repository.listChangedSince(T0);
+        expect(venues.map((v) => v.record.name)).toEqual(['Typed while syncing']);
+      });
+
+      it('but takes a tombstone stamped in the same millisecond', async () => {
+        // The merge decided this one: of the two ways to be wrong, only a row
+        // that comes back is invisible to the player.
+        const venue = await newVenue();
+        const held = await repository.getVenue(venue.id);
+        await repository.applyChanges(set({ venues: [change({ ...held }, held?.updatedAt ?? T0)] }));
+        expect(await repository.listVenues()).toEqual([]);
+      });
+
+      it('keeps a local import key when the session claiming it is skipped', async () => {
+        // The release is there so the unique index does not refuse the
+        // incoming row. Doing it for a row that is then skipped strips the
+        // provenance off a real session in favour of one that never arrived,
+        // and the same CSV row can be imported all over again.
+        const venue = await newVenue();
+        const [imported] = await repository.createSessions([
+          { venueId: venue.id, format: 'cash', gameType: 'NLHE',
+            stakes: { smallBlind: 100, bigBlind: 200 }, buyIn: 1, startedAt: T0,
+            importKey: 'row-7' },
+        ]);
+
+        await repository.applyChanges(set({
+          sessions: [change({ ...imported, id: 'from-elsewhere', venueId: 'never-arrived' })],
+        }));
+
+        expect(await repository.getSession('from-elsewhere')).toBeNull();
+        expect(await repository.listImportKeys()).toEqual(['row-7']);
+      });
+
       it('brings a record back when the server says it is live again', async () => {
         // The venue-tombstone rule can do exactly this: a delete that lost.
         const venue = await newVenue();

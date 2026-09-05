@@ -160,6 +160,56 @@ describe('a log written on one device and read on another', () => {
   });
 });
 
+describe('editing a session on one device', () => {
+  it('does not destroy the hands logged on the other', async () => {
+    // This is the question the rest of this file was supposed to be asking and
+    // was not. Every case here applied a session in the SAME delta as its
+    // children -- a fresh insert. The ordinary case is an edit arriving for a
+    // session whose children this device already has, and that was silently
+    // hard-deleting all of them on the native engine.
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.createHand({ sessionId: session.id, holeCards: 'AsKd', at: now });
+    await phone.addRebuy({ sessionId: session.id, amount: 20_000, at: now });
+    await phone.push();
+    await laptop.push(true);
+    expect(await laptop.listHands()).toHaveLength(1);
+
+    // The laptop edits nothing but the notes. The phone pulls that edit.
+    tick(HOUR);
+    await laptop.updateSession(session.id, { notes: 'table broke at 1am' });
+    await laptop.push();
+    await phone.push(true);
+
+    expect((await phone.getSession(session.id))?.notes).toBe('table broke at 1am');
+    expect(await phone.listHands()).toHaveLength(1);
+    expect(await phone.listRebuys(session.id)).toHaveLength(1);
+  });
+
+  it('and the hands survive an edit made on the device that owns them', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.createHand({ sessionId: session.id, holeCards: 'AsKd', at: now });
+    await phone.push();
+    await laptop.push(true);
+
+    // Round trip: the phone's own edit comes back to it from the server.
+    tick(HOUR);
+    await phone.updateSession(session.id, { notes: 'mine' });
+    await phone.push();
+    await phone.push(true);
+
+    expect(await phone.listHands()).toHaveLength(1);
+    expect(await laptop.listHands()).toHaveLength(1);
+  });
+});
+
 describe('a session deleted on one device', () => {
   it('stays deleted on the other, which is the whole reason for tombstones', async () => {
     const { fetch } = server();

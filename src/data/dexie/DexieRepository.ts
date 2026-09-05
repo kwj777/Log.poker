@@ -216,6 +216,23 @@ export class DexieRepository implements Repository {
           await this.db.venues.put({ ...fromVenue(record), deletedAt });
         }
 
+        // The same import-key release SQLite needs, for the same reason: the
+        // `&importKey` index here is unique too, and `put` would reject the
+        // incoming row rather than the stale local one. See SqlRepository.
+        const claimed = new Map(
+          changes.sessions
+            .filter((change) => typeof change.record.importKey === 'string' && change.record.importKey !== '')
+            .map((change) => [change.record.importKey, change.record.id]),
+        );
+        if (claimed.size > 0) {
+          for (const held of await this.db.sessions.toArray()) {
+            const owner = held.importKey === undefined ? undefined : claimed.get(held.importKey);
+            if (owner === undefined || owner === held.id) continue;
+            const { importKey: _released, ...rest } = held;
+            await this.db.sessions.put(rest);
+          }
+        }
+
         // No foreign keys here to throw, but the same skip: a session whose
         // venue never arrived would render with no venue at all, which is a
         // worse outcome than one row waiting for the next sync.

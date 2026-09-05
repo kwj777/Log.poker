@@ -388,6 +388,29 @@ because that needs the gate secret and a secret shipped inside a downloadable
 app is not one: a claim read on this side decides what to show and what is worth
 sending, never what is allowed, and the server re-derives on every request.
 
+### The bug that was in this for four merges
+
+`applyChanges` wrote with `INSERT OR REPLACE`. SQLite spells REPLACE as a DELETE
+followed by an INSERT, and that delete fires `ON DELETE CASCADE`. So the most
+ordinary thing sync does -- receiving a session somebody edited on another
+device -- **hard-deleted every hand, rebuy and mood entry under it** on the
+native engine. Not tombstoned. Removed, and below the sync cursor, so nothing
+ever brought them back. Edit a session's notes on a laptop and the phone
+discards the hands logged at the table.
+
+It is now `ON CONFLICT(id) DO UPDATE`, which leaves the row in place and writes
+over its columns, so no delete happens and no cascade fires. The same trap
+applied to venues, where the cascade is absent but the foreign key is not.
+
+Two things are worth keeping from how it was missed. **Every test applied a
+session in the same delta as its children** -- a fresh insert, never an update
+over children that were already there -- so the whole suite, including the
+two-device one written to ask a player's question, walked straight past it. And
+removing REPLACE turned a *second* latent bug visible: an incoming session whose
+import key a different local row still holds was being silently annihilated by
+the REPLACE, and would then have thrown instead. The stale key is now released
+before the insert, because the server has already decided who owns it.
+
 ### What phase 2 landed
 
 **The endpoint is on Log, not on the host that mints the token.** The web app is

@@ -45,7 +45,7 @@ describe('one round trip', () => {
 
     expect(outcome).toEqual({
       ok: true,
-      response: { cursor: 5, changes: emptyChangeSet(), collectedThrough: 0 },
+      response: { cursor: 5, changes: emptyChangeSet(), more: false, collectedThrough: 0 },
     });
     expect(JSON.parse(calls[0].init.body as string).device).toBe('device-00000001');
     expect(calls[0].url).toBe(SYNC_URL);
@@ -98,7 +98,7 @@ describe('one round trip', () => {
     const outcome = await sync(request, 'x', { fetch });
     expect(outcome).toEqual({
       ok: true,
-      response: { cursor: 9, changes: emptyChangeSet(), collectedThrough: 0 },
+      response: { cursor: 9, changes: emptyChangeSet(), more: false, collectedThrough: 0 },
     });
   });
 

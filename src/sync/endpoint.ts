@@ -298,6 +298,7 @@ export const handleSync = async (
       {
         cursor: merged.cursor,
         changes: merged.changes,
+        more: merged.more,
         collectedThrough: merged.collectedThrough,
         version: BUNDLE_VERSION,
       },

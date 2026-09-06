@@ -190,7 +190,23 @@ export class SyncingRepository implements Repository {
    * the caller is every write in the app.
    */
   async push(force = false): Promise<void> {
-    if (this.inFlight) return this.inFlight;
+    if (this.inFlight) {
+      await this.inFlight;
+      // A run lets go of its flag one microtask after it decides to stop, and a
+      // write can land in that gap: it sets `dirty`, calls here, joins a run
+      // that has already decided there is nothing more to send, and is never
+      // sent by anything. Settings then says nothing is waiting, and the write
+      // reaches the other device only when the player happens to type something
+      // else. So a joiner asks again rather than taking the answer.
+      //
+      // **Not covered by a test.** The window is one microtask wide and needs a
+      // local write to resolve inside it; two attempts at a reproduction passed
+      // against the unfixed code, which makes them worse than nothing. The fix
+      // is here because it is three lines and cannot make anything worse, not
+      // because it was demonstrated.
+      if (!this.dirty) return;
+      if (this.inFlight) return this.inFlight;
+    }
     if (this.halted) return;
     if (!force && !this.dirty && this.state.lastSyncedAt !== null) return;
     if (!force && this.waiting()) return;
@@ -337,6 +353,11 @@ export class SyncingRepository implements Repository {
       }
     }
 
+    // The answer was cut too, so come straight back for the rest. A first pull
+    // of years of history is the one that does not fit, and it is the one the
+    // feature exists for.
+    if (outcome.response.more === true) this.dirty = true;
+
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
     }
@@ -390,7 +411,13 @@ export class SyncingRepository implements Repository {
     this.announce({
       running: false,
       problem: null,
-      pending: 0,
+      // What is still waiting, which on a round that held records back is not
+      // zero. The loop comes round again while it can, and each round
+      // overwrites this with the truth, so the lie only ever showed on the
+      // round the loop stopped on -- which is the one a player reads: a backlog
+      // above five rounds ended here reporting a sync that had just succeeded
+      // with nothing left to send, and thousands of records still here.
+      pending: batch.more ? countChanges(pending) - countChanges(batch.changes) : 0,
       lastSyncedAt: this.clock(),
     });
   }
@@ -520,5 +547,15 @@ export class SyncingRepository implements Repository {
     await this.cursors.write({ pulled: 0, pushed: 0, device });
     this.dirty = true;
     this.announce({ lastSyncedAt: null, pending: 0 });
+
+    // And ask for it back, which the comment above has always promised and this
+    // never did. Every other write on this class goes through `touched`, which
+    // pushes; this one did not, so a reset device sat empty until the player
+    // typed something into it or quit and reopened the app -- and the device
+    // this is most likely to be used on is the one nobody types into.
+    void this.push().catch(() => {
+      // The truncate has already happened, which is what was asked for. The
+      // log comes back on the next sync either way.
+    });
   }
 }

@@ -30,9 +30,10 @@
  * 3. **Apply the three constraint rules**, which is the part a per-record merge
  *    cannot do, because each of them is about a pair of records that are each
  *    fine alone. See `src/domain/merge.ts`.
- * 4. **Sweep, and only then record who asked.** A device is stamped as caught
- *    up after the sweep rather than before it, or the request in which it asks
- *    for a tombstone is the request that decides nobody is waiting for one.
+ * 4. **Sweep, against what every device has said it has.** A device is recorded
+ *    at the cursor it sent, never at the clock and never at the answer it is
+ *    about to be handed: an answer proves nothing until the device comes back
+ *    with a number that covers it.
  *
  * The rules themselves live in the domain and are shared with the client, which
  * calls none of them today. One implementation, two possible callers, is the
@@ -56,6 +57,7 @@ import {
   type Change,
   type ChangeSet,
 } from '../data/repository';
+import { answerFrom } from './batch';
 import {
   BUNDLE_VERSION,
   SYNC_TABLES,
@@ -93,15 +95,28 @@ const isRow = (value: unknown): value is Row => {
  * person can only ever corrupt their own bundle, and "only their own" is not a
  * reason to let them.
  */
-const sanitize = (change: unknown, now: Timestamp): Change<Row> | null => {
+interface Sanitized {
+  change: Change<Row>;
+  /** Whether this server had to pull the stamp back to its own clock. */
+  clamped: boolean;
+  /** The stamp the device sent, which is what identifies the write. */
+  raw: Timestamp;
+}
+
+const sanitize = (change: unknown, now: Timestamp): Sanitized | null => {
   if (typeof change !== 'object' || change === null) return null;
   const { record, deletedAt } = change as { record?: unknown; deletedAt?: unknown };
   if (!isRow(record)) return null;
 
-  const stamped: Row = { ...record, updatedAt: clampStamp(record.updatedAt, now) };
-  if (deletedAt === null || deletedAt === undefined) return { record: stamped, deletedAt: null };
+  const raw = record.updatedAt;
+  const stamp = clampStamp(raw, now);
+  const clamped = stamp !== raw;
+  const stamped: Row = { ...record, updatedAt: stamp };
+  if (deletedAt === null || deletedAt === undefined) {
+    return { change: { record: stamped, deletedAt: null }, clamped, raw };
+  }
   if (typeof deletedAt !== 'number' || !Number.isFinite(deletedAt)) return null;
-  return { record: stamped, deletedAt: clampStamp(deletedAt, now) };
+  return { change: { record: stamped, deletedAt: clampStamp(deletedAt, now) }, clamped, raw };
 };
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -195,14 +210,27 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
     if (typeof held !== 'object' || held === null) continue;
     for (const [id, change] of Object.entries(held as Record<string, unknown>)) {
       if (RESERVED.has(id)) continue;
-      const clean = sanitize(change, Number.MAX_SAFE_INTEGER);
-      if (!clean || clean.record.id !== id) continue;
+      const sane = sanitize(change, Number.MAX_SAFE_INTEGER);
+      if (!sane || sane.change.record.id !== id) continue;
+      const clean = sane.change;
       // The server's own stamp, kept as written. An entry with none was stored
       // by a version that had none, and is stamped now: see above.
-      const { heardAt } = change as { heardAt?: unknown };
+      const { heardAt, clamped: wasClamped } = change as { heardAt?: unknown; clamped?: unknown };
       const at =
         !migrating && typeof heardAt === 'number' && Number.isFinite(heardAt) ? heardAt : now;
-      bundle.records[table][id] = { ...clean, heardAt: at };
+      const entry: StoredChange = { ...clean, heardAt: at };
+      // What this server already decided about a stamp from the future, kept so
+      // it is not decided again every time that record is re-sent.
+      if (typeof wasClamped === 'object' && wasClamped !== null) {
+        const { from, to } = wasClamped as { from?: unknown; to?: unknown };
+        if (
+          typeof from === 'number' && Number.isFinite(from) &&
+          typeof to === 'number' && Number.isFinite(to)
+        ) {
+          entry.clamped = { from, to };
+        }
+      }
+      bundle.records[table][id] = entry;
       if (at > bundle.heardThrough) bundle.heardThrough = at;
     }
   }
@@ -585,6 +613,27 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
     }
   }
 
+  // And whatever is left pointing at a session that is not here any more.
+  //
+  // A live child can sit under a session tombstone: another device logs a hand
+  // on a session this one has already deleted, and nothing reconciles the pair.
+  // Both device engines take that child with the session when they sweep, and
+  // this did not, so collecting the tombstone left the hand behind pointing at
+  // an id that exists nowhere. Nothing could ever remove it: it is live, so the
+  // sweep above skips it; no rule touches it; and no device will push a
+  // tombstone for it, because every device already dropped it in its own sweep.
+  // It is served in every full pull from then on and skipped by every device
+  // that receives it, one row per hand logged on a session somebody else had
+  // just deleted.
+  for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
+    for (const [id, change] of Object.entries(bundle.records[table])) {
+      const sessionId = change.record.sessionId;
+      if (typeof sessionId !== 'string' || bundle.records.sessions[sessionId]) continue;
+      delete bundle.records[table][id];
+      collected += 1;
+    }
+  }
+
   // A fold is remembered only for as long as the tombstone it names. Once that
   // is collected there is nothing left to move anything off, and a child still
   // pointing at it went in the same sweep.
@@ -601,10 +650,12 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
 
 export interface MergeResult {
   bundle: Bundle;
-  /** Everything at or after `since` once the merge has run. */
+  /** Everything heard at or after `since`, or as much of it as will fit. */
   changes: ChangeSet;
   /** What the device should send as `since` next time. */
   cursor: Timestamp;
+  /** Whether the answer was cut, and so whether to come straight back. */
+  more: boolean;
   /** How far back this bundle has been collected, for the device to match. */
   collectedThrough: Timestamp;
 }
@@ -623,6 +674,8 @@ export const mergeIntoBundle = (
   since: Timestamp,
   now: Timestamp,
   device: string | null = null,
+  /** Only ever lowered by a test, which cannot otherwise meet the cap. */
+  answerBudget?: number,
 ): MergeResult => {
   const bundle = readBundle(stored, now);
   bundle.version = BUNDLE_VERSION;
@@ -638,31 +691,56 @@ export const mergeIntoBundle = (
   // from somebody else's backup. Re-pulling is free; being told nothing is not.
   const from = since > bundle.heardThrough ? 0 : Math.max(0, since);
 
-  // What this device has acknowledged, which is not the same as when it asked.
+  // What this device has acknowledged, which is the number it sent and nothing
+  // else.
   //
   // The map exists so a tombstone is not collected before every device has it,
   // and the only proof of that is the cursor a device sends: it writes one only
-  // after it has applied the answer that produced it. Recording the moment of
-  // the request instead trusts an answer that may never have arrived, and now
-  // that a cursor and a `heardAt` are the same kind of number, the honest
-  // version costs nothing.
+  // after it has applied the answer that produced it.
   //
-  // A device asking from nothing is recorded at this request's own stamp
-  // instead, because it is about to be handed the whole bundle and so cannot be
-  // waiting on any part of it. Recording its zero would freeze collection until
-  // it came back.
-  if (namesADevice(device)) {
-    bundle.devices[device] = { acked: from > 0 ? from : at, seen: now };
-  }
+  // Two other values have been tried here and both were wrong. The moment of
+  // the request credits an answer that may never have arrived. The stamp this
+  // request minted credits a number the device is not even handed, because the
+  // stamp is only spent if something was written -- and now that an answer can
+  // be cut short, the cursor is the cut rather than the end of the bundle, so
+  // crediting the answer would have a device claiming records it is still
+  // waiting for the moment a pull is paged.
+  //
+  // A device asking from nothing is recorded at nothing, and collection stalls
+  // until it comes back and says where it got to. That is the honest answer:
+  // this server does not know what it has. It costs tombstones sitting a while
+  // longer, and it is bounded by the forget threshold either way.
+  //
+  // Recorded before the sweep, because the number is the device's own and the
+  // sweep is the thing it has to be allowed to hold up.
+  if (namesADevice(device)) bundle.devices[device] = { acked: from, seen: now };
 
   const sent = (incoming ?? {}) as Record<string, unknown>;
   for (const table of SYNC_TABLES) {
     const list = sent[table];
     if (!Array.isArray(list)) continue;
-    for (const raw of list) {
-      const change = sanitize(raw, now);
-      if (change === null) continue;
+    for (const item of list) {
+      const sane = sanitize(item, now);
+      if (sane === null) continue;
+      const { change, clamped, raw } = sane;
       const held = bundle.records[table][change.record.id];
+
+      // Clamped once, not once per request.
+      //
+      // A row above its own device's clock stays above that device's push mark,
+      // so it is re-sent on every sync. Clamped afresh each time, it was given
+      // a stamp later than anything anybody else had written, so it beat every
+      // real edit, was broadcast to everyone, and could not be corrected: the
+      // device holding it refuses the corrected copy coming back, because its
+      // own stamp is still a year larger.
+      //
+      // The raw stamp identifies the write, so a push carrying one this server
+      // has clamped before is answered with the stamp it gave that write the
+      // first time. A genuinely new edit from the same wrong clock carries a
+      // different raw stamp and is clamped fresh, so it still lands.
+      if (clamped && held?.clamped?.from === raw) {
+        change.record.updatedAt = held.clamped.to;
+      }
 
       // The backstop for a device that was away longer than the whole retention
       // window and has already been forgotten. A record the server has never
@@ -674,56 +752,92 @@ export const mergeIntoBundle = (
       // that never left. See SYNC.md.
       if (!held && change.record.updatedAt < bundle.collectedThrough) continue;
 
+      // A record whose parent this server does not have is refused rather than
+      // stored. The tables are walked parents first, so a parent arriving in
+      // this same push is already here; one that is not here at all was either
+      // never sent or refused by the line below, and storing the child anyway
+      // leaves the bundle holding a row that resolves to nothing. Every device
+      // is then served it and skips it, forever, while its cursor moves past.
+      // The pager already refuses to *hand over* a child without its parent;
+      // this is the same rule on the way in.
+      const parent =
+        table === 'sessions'
+          ? change.record.venueId
+          : table === 'venues'
+            ? null
+            : change.record.sessionId;
+      if (typeof parent === 'string' && !bundle.records[table === 'sessions' ? 'venues' : 'sessions'][parent]) {
+        continue;
+      }
+
       const next = held ? (resolve(versioned(held), versioned(change)) as StoredChange) : change;
-      bundle.records[table][change.record.id] = heard(next, held, at);
+      const stored = heard(next, held, at);
+      // Kept across a write from anybody else, because the mapping is about
+      // the device that keeps sending that stamp, not about who last touched
+      // the record. Dropping it here is what let the stale row win again the
+      // moment somebody edited what it was overwriting.
+      const memory = clamped ? { from: raw, to: change.record.updatedAt } : held?.clamped;
+      bundle.records[table][change.record.id] = memory
+        ? { ...stored, clamped: memory }
+        : stored;
     }
   }
 
-  // In order, and the order matters: closing a session changes which sessions
-  // are live, which is what the venue rule reads.
+  // In order, and the order matters twice over.
+  //
+  // Collisions first, because that rule *removes* sessions: a duplicate that
+  // exists only until the end of this merge could otherwise win the
+  // one-active-session contest and close the session the player is actually
+  // sitting in, permanently, on the word of a row that no longer exists. Which
+  // of the two happened depended on which push carried the duplicate, so the
+  // merge was not even commutative.
+  //
+  // Then the folding, so the activity read below counts a hand under the
+  // session it has just been moved onto rather than the one it left.
+  //
+  // And the venue rule last, because closing a session changes which sessions
+  // are live and that is what it reads.
+  settleImportCollisions(bundle, at);
+  settleFoldedChildren(bundle, at);
   const activity = lastActivity(bundle, now);
   settleActiveSessions(bundle, at, now, activity);
   settleSessionEnds(bundle, at, activity);
-  settleImportCollisions(bundle, at);
-  settleFoldedChildren(bundle, at);
   settleVenueTombstones(bundle, at);
 
   // Last, so it never collects a tombstone one of the rules above just wrote,
   // and so an un-tombstoned venue is live again before anything looks at it.
   collect(bundle, now);
 
-  // Built loose and named once, because a `ChangeSet` is five differently
-  // typed arrays and the server is deliberately indifferent to which is which.
-  const collected: Record<SyncTable, Change<Row>[]> = {
-    venues: [], sessions: [], rebuys: [], hands: [], moodEntries: [],
-  };
   let wrote = false;
   for (const table of SYNC_TABLES) {
     for (const change of Object.values(bundle.records[table])) {
       if (change.heardAt === at) wrote = true;
-      // Cut on when this server heard the record, never on the stamp the
-      // device that wrote it chose. A push that arrives late carries an old
-      // `updatedAt` and would fall behind a cursor another device is already
-      // holding, and would then never be delivered to it at all.
-      //
-      // `heardAt` itself is the server's note to itself and no part of what a
-      // device was promised, so it is left here rather than put on the wire.
-      if (change.heardAt >= from) {
-        collected[table].push({ record: change.record, deletedAt: change.deletedAt });
-      }
     }
   }
-  const changes = collected as unknown as ChangeSet;
 
   // Recorded only now, and only if this request wrote something. A stamp that
   // was never used must stay available, or a merge that changed nothing would
   // still move the bundle and no push would ever be idempotent.
   if (wrote) bundle.heardThrough = at;
 
-  // The stamp this request issued, not the newest record in the bundle: a
-  // device that echoes it back is asking for everything heard after this
+  // Cut on when this server heard each record, never on the stamp the device
+  // that wrote it chose: a push that arrives late carries an old `updatedAt`
+  // and would fall behind a cursor another device is already holding, and would
+  // then never be delivered to it at all.
+  //
+  // And bounded, which it was not. See `answerFrom`. When nothing is held back
+  // the cursor is the stamp this request issued rather than the newest record,
+  // because a device echoing it back is asking for everything heard after this
   // request, which is exactly what it has now been told.
-  return { bundle, changes, cursor: bundle.heardThrough, collectedThrough: bundle.collectedThrough };
+  const answer = answerFrom(bundle.records, from, bundle.heardThrough, answerBudget);
+
+  return {
+    bundle,
+    changes: answer.changes,
+    cursor: answer.cursor,
+    more: answer.more,
+    collectedThrough: bundle.collectedThrough,
+  };
 };
 
 /** Every table, for a caller that wants to walk one at a time. */

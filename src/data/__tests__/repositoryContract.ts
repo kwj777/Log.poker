@@ -516,6 +516,39 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         ).resolves.toBeDefined();
       });
 
+      it('lists a key a tombstone is still holding, because the index does', async () => {
+        // A delete made here clears the key, but `applyChanges` writes a record
+        // exactly as given, tombstone and key together. One of those used to be
+        // invisible to this answer on SQLite and visible on Dexie, so the same
+        // CSV imported on the web and failed on a phone with a raw constraint
+        // error from underneath the domain check.
+        const venue = await newVenue();
+        await repository.applyChanges({
+          venues: [], rebuys: [], hands: [], moodEntries: [],
+          sessions: [{
+            record: {
+              id: 'from-elsewhere', venueId: venue.id, format: 'cash', gameType: 'NLHE',
+              stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 1,
+              fee: null, cashOut: null, entrants: null, finishPosition: null,
+              startedAt: T0, endedAt: null, notes: null, importKey: 'row-9',
+              createdAt: T0, updatedAt: T0,
+            },
+            deletedAt: T0,
+          }],
+        } as Parameters<Repository['applyChanges']>[0]);
+
+        expect(await repository.listImportKeys()).toEqual(['row-9']);
+
+        // And the refusal is the domain's, rather than the storage engine's.
+        await expect(
+          repository.createSessions([
+            { venueId: venue.id, format: 'cash', gameType: 'NLHE',
+              stakes: { smallBlind: 100, bigBlind: 200 }, buyIn: 1, startedAt: T0,
+              importKey: 'row-9' },
+          ]),
+        ).rejects.toThrow(/already been imported/i);
+      });
+
       it('clears import keys with everything else', async () => {
         const venue = await newVenue('PokerStars');
         await repository.createSession({ venueId: venue.id, ...imported('csv|1') });
@@ -937,6 +970,19 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         id, name: id, isHomeGame: false, sessionCount: 0, createdAt: T0, updatedAt,
       });
 
+      /** The same for a session: every field the engines need, none of it interesting. */
+      const foreignSession = (
+        id: string,
+        venueId: string,
+        overrides: Record<string, unknown> = {},
+      ) => ({
+        id, venueId, format: 'cash', gameType: 'NLHE',
+        stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 30_000,
+        fee: null, cashOut: null, entrants: null, finishPosition: null,
+        startedAt: T0, endedAt: null, notes: null, importKey: null,
+        createdAt: T0, updatedAt: T0, ...overrides,
+      });
+
       it('writes a record this device has never seen', async () => {
         await repository.applyChanges(set({ venues: [change(foreignVenue('v-remote', T0))] }));
         const venues = await repository.listVenues();
@@ -1014,6 +1060,31 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
 
         expect(await repository.getSession('from-elsewhere')).toBeNull();
         expect(await repository.listImportKeys()).toEqual(['row-7']);
+      });
+
+      it('keeps a local import key when the session claiming it is refused as stale', async () => {
+        // The other way a row gets refused, and the release was only watching
+        // for the first one. A session edited here after the server heard it
+        // loses to the local row, is never written, and still took a real
+        // import key down with it on the way past.
+        const venue = await newVenue();
+        await repository.createSessions([
+          { venueId: venue.id, format: 'cash', gameType: 'NLHE',
+            stakes: { smallBlind: 100, bigBlind: 200 }, buyIn: 1, startedAt: T0,
+            importKey: 'row-8' },
+        ]);
+
+        const mine = await newSession({ venueId: venue.id });
+        context.tick(HOUR);
+        await repository.updateSession(mine.id, { notes: 'typed here' });
+
+        await repository.applyChanges(set({
+          sessions: [change({ ...mine, importKey: 'row-8', updatedAt: T0 })],
+        }));
+
+        expect((await repository.getSession(mine.id))?.notes).toBe('typed here');
+        expect((await repository.getSession(mine.id))?.importKey).toBeNull();
+        expect(await repository.listImportKeys()).toEqual(['row-8']);
       });
 
       it('brings a record back when the server says it is live again', async () => {
@@ -1143,6 +1214,37 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listHands()).toHaveLength(1);
         expect((await repository.getSession(mine.id))?.importKey).toBeNull();
         expect((await repository.getSession('theirs'))?.importKey).toBe('csv|1');
+      });
+
+      it('stores both when two arriving sessions claim one import key', async () => {
+        // The index is unique and the write that discovers that throws inside
+        // the transaction, so one inconsistent row rolled back the whole
+        // answer. The next sync is handed the same answer, so it failed the
+        // same way, for as long as both rows existed.
+        const venue = await newVenue();
+
+        await expect(repository.applyChanges(set({
+          sessions: [
+            change(foreignSession('later', venue.id,
+              { importKey: 'csv|9', createdAt: T0 + HOUR })),
+            change(foreignSession('first', venue.id, { importKey: 'csv|9' })),
+          ],
+          hands: [change({
+            id: 'h', sessionId: 'later', holeCards: null, position: null, note: null,
+            tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0,
+          })],
+        }))).resolves.toBeUndefined();
+
+        // Both rows, and the hand that came with them: the answer was applied.
+        expect((await repository.listSessions()).map((s) => s.id).sort())
+          .toEqual(['first', 'later']);
+        expect(await repository.listHands()).toHaveLength(1);
+
+        // And the key sits on the row the server's own fold will keep, so the
+        // next answer confirms this rather than moving it.
+        expect((await repository.getSession('first'))?.importKey).toBe('csv|9');
+        expect((await repository.getSession('later'))?.importKey).toBeNull();
+        expect(await repository.listImportKeys()).toEqual(['csv|9']);
       });
 
       it('is safe to apply the same change twice', async () => {

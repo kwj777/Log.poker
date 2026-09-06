@@ -50,6 +50,8 @@ import {
   buildSession,
   buildVenue,
   defaultContext,
+  importKeyFor,
+  importKeyOwners,
   type RepositoryContext,
 } from '../support';
 import { first, type SqlDriver, type SqlValue } from './driver';
@@ -356,20 +358,44 @@ export class SqlRepository implements Repository {
       //
       // After the venue set is known, and only for sessions that will actually
       // be written: releasing a key for a row that is then skipped strips the
-      // provenance off a local session in favour of one that never arrived, and
-      // the same CSV row can be imported a second time.
-      for (const { record } of changes.sessions) {
-        if (typeof record.importKey !== 'string' || record.importKey === '') continue;
-        if (!known.has(record.venueId)) continue;
+      // provenance off a local session on behalf of one that never arrived, and
+      // the same CSV row can then be imported a second time.
+      //
+      // Which is why the local stamps are read here rather than leaving
+      // staleness to the `WHERE` clause on the upsert. That clause refuses a
+      // row as flatly as a missing venue does, and the release was reading only
+      // the venue, so an answer that lost the race to a local edit still took
+      // the key with it.
+      const stamps = new Map(
+        (
+          await this.driver.all<{ id: string; updated_at: Timestamp }>(
+            `SELECT id, updated_at FROM sessions`,
+          )
+        ).map((row) => [row.id, row.updated_at]),
+      );
+      const arriving = changes.sessions.filter(({ record }) => {
+        if (!known.has(record.venueId)) return false;
+        const mine = stamps.get(record.id);
+        // The same `>=` the upsert applies, asked in advance.
+        return mine === undefined || record.updatedAt >= mine;
+      });
+
+      // And two arriving sessions can claim one key between them, which the
+      // unique index would refuse in the middle of the transaction and take the
+      // whole answer down with. One of them keeps it; see `importKeyOwners`.
+      const owners = importKeyOwners(arriving);
+
+      for (const { record } of arriving) {
+        const key = importKeyFor(record, owners);
+        if (key === null) continue;
         await this.driver.run(
           `UPDATE sessions SET import_key = NULL WHERE import_key = ? AND id <> ?`,
-          [record.importKey, record.id],
+          [key, record.id],
         );
       }
 
       const stored = new Set<string>();
-      for (const { record, deletedAt } of changes.sessions) {
-        if (!known.has(record.venueId)) continue;
+      for (const { record, deletedAt } of arriving) {
         await this.driver.run(
           `INSERT INTO sessions (
              id, venue_id, format, game_type, small_blind, big_blind, ante, currency,
@@ -402,7 +428,7 @@ export class SqlRepository implements Repository {
             record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
             record.stakes?.ante ?? null, record.currency, record.buyIn, record.fee,
             record.cashOut, record.entrants, record.finishPosition, record.startedAt,
-            record.endedAt, record.notes, record.importKey, record.createdAt,
+            record.endedAt, record.notes, importKeyFor(record, owners), record.createdAt,
             record.updatedAt, deletedAt,
           ],
         );
@@ -749,10 +775,17 @@ export class SqlRepository implements Repository {
 
   async listImportKeys(): Promise<string[]> {
     const rows = await this.driver.all<{ import_key: string }>(
-      // `deleted_at` is redundant beside the key check, since tombstoning a
-      // session clears its key, and it is here so that the guarantee reads as
-      // one query rather than as two facts a reader has to hold at once.
-      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL AND deleted_at IS NULL`,
+      // Every key held, tombstoned or not, because that is what the unique
+      // index enforces. It used to add `AND deleted_at IS NULL` on the argument
+      // that tombstoning a session clears its key -- true of a delete made
+      // here, and not true of `applyChanges`, which writes a record exactly as
+      // it is given, tombstone and key together. One of those arriving made
+      // this answer disagree with the index it exists to guard, and with the
+      // web engine, which never filtered: the importer offered a row as new,
+      // the domain check passed, and the insert failed with a raw
+      // `UNIQUE constraint failed` that no screen knows how to say. The same
+      // file, on the same account, imported on the web and refused on a phone.
+      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL`,
     );
     return rows.map((row) => row.import_key);
   }

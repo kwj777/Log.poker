@@ -9,7 +9,7 @@
  * offered to it again. Both failures are silent and both are permanent.
  */
 
-import { batchFor } from '../batch';
+import { answerFrom, batchFor } from '../batch';
 import { emptyChangeSet } from '../protocol';
 import type { ChangeSet } from '../../data/repository';
 
@@ -216,5 +216,96 @@ describe('never a child without its parent', () => {
     loop.record.venueId = 's1';
     const batch = batchFor(changeSet({ sessions: [loop] }), 0, 10_000);
     expect(idsIn(batch.changes)).toEqual(['s1']);
+  });
+});
+
+describe('an answer that does not fit', () => {
+  /** The records map the merge keeps, which is what an answer is cut from. */
+  const stored = (
+    entries: [string, { record: Rec; deletedAt: null; heardAt: number }][],
+  ) => {
+    const records = {
+      venues: {} as Record<string, never>,
+      sessions: {} as Record<string, never>,
+      rebuys: {} as Record<string, never>,
+      hands: {} as Record<string, never>,
+      moodEntries: {} as Record<string, never>,
+    } as unknown as Parameters<typeof answerFrom>[0];
+    for (const [table, change] of entries) {
+      (records as unknown as Record<string, Record<string, unknown>>)[table][
+        change.record.id as string
+      ] = change;
+    }
+    return records;
+  };
+
+  const heard = (change: { record: Rec; deletedAt: null }, at: number) => ({
+    record: change.record,
+    deletedAt: null as null,
+    heardAt: at,
+  });
+
+  it('hands over everything when everything fits, and the cursor is the request stamp', () => {
+    const records = stored([
+      ['venues', heard(venue('v1', T0), 10)],
+      ['sessions', heard(session('s1', 'v1', T0), 11)],
+    ]);
+    const answer = answerFrom(records, 0, 99, 10_000);
+    expect(answer.more).toBe(false);
+    expect(answer.cursor).toBe(99);
+    expect(idsIn(answer.changes).sort()).toEqual(['s1', 'v1']);
+  });
+
+  it('cuts on the server stamp and says there is more', () => {
+    const records = stored([
+      ['venues', heard(venue('v1', T0), 10)],
+      ['venues', heard(venue('v2', T0), 11)],
+      ['venues', heard(venue('v3', T0), 12)],
+    ]);
+    const answer = answerFrom(records, 0, 99, 700);
+    expect(answer.more).toBe(true);
+    expect(idsIn(answer.changes)).toEqual(['v1', 'v2']);
+    // The cursor is the cut, not the request stamp, or the rest is skipped.
+    expect(answer.cursor).toBe(11);
+  });
+
+  it('never hands over a child whose parent it is holding back', () => {
+    // A settle rule can raise a session's stamp above the hands under it, and
+    // the receiving device skips an orphan while its cursor moves past it.
+    const records = stored([
+      ['venues', heard(venue('v1', T0), 1)],
+      ['hands', heard(hand('h1', 's1', T0), 2)],
+      ['hands', heard(hand('h2', 's1', T0), 3)],
+      ['sessions', heard(session('s1', 'v1', T0), 500)],
+    ]);
+    const answer = answerFrom(records, 0, 999, 1400);
+    expect(answer.more).toBe(true);
+    expect(idsIn(answer.changes)).toContain('h1');
+    expect(idsIn(answer.changes)).toContain('s1');
+    expect(answer.cursor).toBeLessThan(500);
+  });
+
+  it('leaves the server bookkeeping off the wire', () => {
+    const records = stored([['venues', heard(venue('v1', T0), 10)]]);
+    const [change] = answerFrom(records, 0, 99, 10_000).changes.venues;
+    expect(Object.keys(change).sort()).toEqual(['deletedAt', 'record']);
+  });
+
+  it('and drains across rounds rather than stalling', () => {
+    const records = stored(
+      Array.from({ length: 8 }, (_, index) =>
+        ['venues', heard(venue(`v${index}`, T0), 10 + index)] as [string, ReturnType<typeof heard>],
+      ),
+    );
+    const seen = new Set<string>();
+    let from = 0;
+    for (let round = 0; round < 12; round += 1) {
+      const answer = answerFrom(records, from, 999, 700);
+      for (const id of idsIn(answer.changes)) seen.add(id);
+      if (!answer.more) break;
+      expect(answer.cursor).toBeGreaterThan(from);
+      from = answer.cursor;
+    }
+    expect(seen.size).toBe(8);
   });
 });

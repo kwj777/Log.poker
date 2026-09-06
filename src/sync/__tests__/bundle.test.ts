@@ -165,7 +165,85 @@ describe('a device whose clock is wrong', () => {
   });
 });
 
+describe('a device whose clock was wrong once', () => {
+  it('does not win every merge forever by being re-clamped each time', () => {
+    // A row above the device's own clock stays above its push mark, so it is
+    // re-sent on every sync. Clamping it to a fresh `now` each time made it
+    // later than anything anybody else had written, so it beat every real edit,
+    // was broadcast to everyone, and could not be corrected: the device holding
+    // it refuses the corrected copy coming back, because its own stamp is still
+    // a year larger.
+    const YEAR = 365 * 24 * HOUR;
+    const wrong = changeSet({ venues: [venue('v1', NOW + YEAR, { name: 'Aria' })] });
+
+    const first = mergeIntoBundle(null, wrong, 0, NOW);
+    expect(first.bundle.records.venues.v1.record.updatedAt).toBe(NOW);
+
+    // Somebody else renames it two hours later.
+    const renamed = mergeIntoBundle(
+      first.bundle,
+      changeSet({ venues: [venue('v1', NOW + 2 * HOUR, { name: 'Bellagio' })] }),
+      0, NOW + 2 * HOUR,
+    );
+    expect(renamed.bundle.records.venues.v1.record.name).toBe('Bellagio');
+
+    // The wrong-clocked device syncs again, having typed nothing.
+    const again = mergeIntoBundle(renamed.bundle, wrong, 0, NOW + 3 * HOUR);
+    expect(again.bundle.records.venues.v1.record.name).toBe('Bellagio');
+    // And nothing moved, so nobody is told about it either.
+    expect(again.bundle.records.venues.v1.heardAt)
+      .toBe(renamed.bundle.records.venues.v1.heardAt);
+  });
+
+  it('but a real edit from that device still lands', () => {
+    // Not a blanket refusal of a device with a bad clock: what is refused is
+    // re-sending the same row, not changing it.
+    const YEAR = 365 * 24 * HOUR;
+    const first = mergeIntoBundle(
+      null, changeSet({ venues: [venue('v1', NOW + YEAR, { name: 'Aria' })] }), 0, NOW,
+    );
+    // A wrong clock still advances, so a later write carries a later stamp.
+    const edited = mergeIntoBundle(
+      first.bundle,
+      changeSet({ venues: [venue('v1', NOW + YEAR + HOUR, { name: 'Aria Poker Room' })] }),
+      0, NOW + HOUR,
+    );
+    expect(edited.bundle.records.venues.v1.record.name).toBe('Aria Poker Room');
+  });
+});
+
 describe('what it refuses to store', () => {
+  it('refuses a record whose parent it does not have', () => {
+    // The backstop can refuse an old venue while accepting the session that
+    // points at it, and the bundle then holds a row that resolves to nothing:
+    // served to every device, skipped by every device, forever, with each
+    // cursor moving past it. The pager already refuses to hand a child over
+    // without its parent; this is the same rule on the way in.
+    const { bundle } = mergeIntoBundle(
+      null,
+      changeSet({
+        sessions: [session('s1', T0, { venueId: 'never-sent' })],
+        hands: [hand('h1', 's1', T0)],
+      }),
+      0, NOW,
+    );
+    expect(bundle.records.sessions.s1).toBeUndefined();
+    expect(bundle.records.hands.h1).toBeUndefined();
+  });
+
+  it('but takes one whose parent is in the same push', () => {
+    const { bundle } = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('s1', T0)],
+        hands: [hand('h1', 's1', T0)],
+      }),
+      0, NOW,
+    );
+    expect(bundle.records.hands.h1).toBeDefined();
+  });
+
   it('drops a record with no id or no stamp', () => {
     const { bundle } = mergeIntoBundle(
       null,
@@ -417,6 +495,36 @@ describe('the three constraints, applied where the whole picture is', () => {
     }
   });
 
+  it('does not close a real session for a duplicate it is about to delete', () => {
+    // The rules run in a fixed order, and the collision rule removes sessions.
+    // Running the contest first let a duplicate that exists only until the end
+    // of this merge close the session the player was actually sitting in, on
+    // the word of a row that no longer exists -- and which of the two happened
+    // depended on which push carried the duplicate, so the merge was not even
+    // commutative.
+    const first = changeSet({
+      venues: [venue('v1')],
+      sessions: [session('mine', T0, { endedAt: null, startedAt: T0 + HOUR })],
+    });
+    const second = changeSet({
+      sessions: [
+        session('kept', T0, { importKey: 'k', createdAt: T0, endedAt: T0 + HOUR }),
+        session('dupe', T0, {
+          importKey: 'k', createdAt: T0 + HOUR, endedAt: null, startedAt: T0 + 2 * HOUR,
+        }),
+      ],
+    });
+
+    const both = mergeIntoBundle(mergeIntoBundle(null, first, 0, NOW).bundle, second, 0, NOW).bundle;
+    expect(both.records.sessions.dupe.deletedAt).not.toBeNull();
+    expect(both.records.sessions.mine.record.endedAt).toBeNull();
+
+    // And the other way round gives the same answer, which is the property the
+    // ordering is really there for.
+    const other = mergeIntoBundle(mergeIntoBundle(null, second, 0, NOW).bundle, first, 0, NOW).bundle;
+    expect(other.records.sessions.mine.record.endedAt).toBeNull();
+  });
+
   it('leaves one running session alone', () => {
     const bundle = after(
       changeSet({ venues: [venue('v1')] }),
@@ -529,10 +637,14 @@ describe('the three constraints, applied where the whole picture is', () => {
     ).bundle;
     expect(bundle.folded.b).toBe('a');
 
-    // Two rounds past the window, which is what it takes for one device to
-    // acknowledge and then sweep.
+    // Threading the cursor back in, because a device that keeps asking from
+    // nothing is a device that has never confirmed anything, and collection
+    // waits for it.
+    let cursor = 0;
     for (const clock of [T0 + 100 * DAY, T0 + 100 * DAY + HOUR, T0 + 100 * DAY + 2 * HOUR]) {
-      bundle = mergeIntoBundle(bundle, changeSet({}), 0, clock, only).bundle;
+      const merged = mergeIntoBundle(bundle, changeSet({}), cursor, clock, only);
+      bundle = merged.bundle;
+      cursor = merged.cursor;
     }
     expect(bundle.records.sessions.b).toBeUndefined();
     expect(bundle.folded).toEqual({});
@@ -562,8 +674,15 @@ describe('the three constraints, applied where the whole picture is', () => {
       changeSet({ hands: [hand('h1', 'toString', T0 + HOUR), hand('h2', '__proto__', T0 + HOUR)] }),
       0, NOW + HOUR,
     ).bundle;
-    expect(after.records.hands.h1.record.sessionId).toBe('toString');
-    expect(after.records.hands.h2.record.sessionId).toBe('__proto__');
+    // Whatever else becomes of them, neither is handed a function to store.
+    // (They name no session, so the sweep may take them as unattachable, which
+    // is a different rule and the right one.)
+    for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
+      for (const change of Object.values(after.records[table])) {
+        expect(typeof change.record.sessionId).toBe('string');
+      }
+    }
+    expect(after.records.hands.h1?.record.sessionId ?? 'toString').toBe('toString');
   });
 
   it('and a record can call itself anything without breaking the merge', () => {
@@ -833,6 +952,31 @@ describe('collecting tombstones', () => {
     expect(Object.keys(settled.devices)).toEqual(['device-aaaa0001']);
   });
 
+  it('takes a live child left pointing at a session it collected', () => {
+    // Another device logs a hand on a session this one has already deleted, and
+    // nothing reconciles the pair. Both device engines take that child with the
+    // session when they sweep; this did not, so the hand stayed in the bundle
+    // pointing at an id that exists nowhere -- live, so the sweep skipped it,
+    // and unreachable by any rule or any device, forever.
+    const only = syncer('device-aaaa0001');
+    let bundle = only.sync(
+      null, changeSet({ venues: [venue('v1')], sessions: [session('s1')] }), T0,
+    ).bundle;
+    bundle = only.sync(
+      bundle,
+      changeSet({
+        sessions: [{ ...session('s1', T0), deletedAt: T0 }],
+        hands: [hand('h1', 's1', T0)],
+      }),
+      T0,
+    ).bundle;
+    expect(bundle.records.hands.h1).toBeDefined();
+
+    const settled = settle(bundle, [only], LATER);
+    expect(settled.records.sessions.s1).toBeUndefined();
+    expect(settled.records.hands.h1).toBeUndefined();
+  });
+
   it('keeps a collected venue while a session still names it', () => {
     const only = syncer('device-aaaa0001');
     let bundle = only.sync(
@@ -860,6 +1004,24 @@ describe('collecting tombstones', () => {
     ).bundle;
     expect(bundle.records.sessions.b.deletedAt).not.toBeNull();
     expect(bundle.records.sessions.b).toBeDefined();
+  });
+
+  it('never credits a device with a cursor it was not given', () => {
+    // Two wrong values have been in here. The stamp the request minted is only
+    // spent if something is written, so a plain pull recorded a device as
+    // having taken a number it was never handed. And the answer's own cursor
+    // credits an answer that may never have arrived, which is the one thing
+    // acknowledgements exist to stop.
+    const phone = syncer('device-aaaa0001');
+    const first = phone.sync(null, changeSet({ venues: [venue('v1')] }), T0);
+    expect(first.bundle.devices['device-aaaa0001'].acked).toBe(0);
+
+    // A pull that writes nothing still hands back a cursor, and the mark moves
+    // to what the device sent, which is the cursor it took last time.
+    const second = phone.sync(first.bundle, changeSet({}), T0 + HOUR);
+    expect(second.bundle.devices['device-aaaa0001'].acked).toBe(first.cursor);
+    expect(second.bundle.devices['device-aaaa0001'].acked)
+      .toBeLessThanOrEqual(second.bundle.heardThrough);
   });
 
   it('records a device that names itself, and serves one that does not', () => {
@@ -916,20 +1078,23 @@ describe('a device that was away longer than the whole window', () => {
    * ever deleted.
    */
   const swept = () => {
-    let bundle: unknown = mergeIntoBundle(
-      null,
-      changeSet({ venues: [venue('v1')], sessions: [session('deleted-long-ago')] }),
-      0, T0, 'device-aaaa0001',
-    ).bundle;
-    bundle = mergeIntoBundle(
-      bundle,
-      changeSet({ sessions: [{ ...session('deleted-long-ago', T0), deletedAt: T0 }] }),
-      0, T0, 'device-aaaa0001',
-    ).bundle;
+    // The cursor is threaded back in, as a real device does: a device that
+    // keeps asking from nothing has never confirmed anything, and collection
+    // waits for it rather than guessing.
+    let bundle: unknown = null;
+    let cursor = 0;
+    const round = (changes: unknown, clock: number) => {
+      const merged = mergeIntoBundle(bundle, changes, cursor, clock, 'device-aaaa0001');
+      bundle = merged.bundle;
+      cursor = merged.cursor;
+    };
+    round(changeSet({ venues: [venue('v1')], sessions: [session('deleted-long-ago')] }), T0);
+    round(changeSet({ sessions: [{ ...session('deleted-long-ago', T0), deletedAt: T0 }] }), T0);
     // Two syncs past the window, not one: the first is the one that hands the
     // tombstone over, and only the second may sweep it. See `collect`.
-    bundle = mergeIntoBundle(bundle, changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
-    return mergeIntoBundle(bundle, changeSet({}), 0, LATER + HOUR, 'device-aaaa0001').bundle;
+    round(changeSet({}), LATER);
+    round(changeSet({}), LATER + HOUR);
+    return bundle as Bundle;
   };
 
   it('cannot resurrect a row whose tombstone was collected', () => {

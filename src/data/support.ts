@@ -19,7 +19,7 @@ import type {
   Venue,
 } from '../domain/types';
 import { DEFAULT_CURRENCY } from '../domain/money';
-import { ConstraintError } from './repository';
+import { ConstraintError, type Change } from './repository';
 
 /** Injected so tests can pin ids and timestamps and still exercise real code. */
 export interface Clock {
@@ -147,6 +147,76 @@ export const assertImportKeysAvailable = (
     }
     batch.add(key);
   }
+};
+
+/**
+ * Which arriving session keeps each import key, where more than one claims it.
+ *
+ * The key is unique in both engines, so two arriving rows carrying the same one
+ * cannot both be stored. What makes that worth deciding here rather than
+ * leaving to the index is where the failure lands: the write that discovers it
+ * throws in the middle of a transaction, so one inconsistent row rolls back the
+ * whole answer, and the next sync is handed the same answer and fails the same
+ * way, for as long as the two rows both exist. `applyChanges` promises the
+ * opposite, and keeps that promise for every other kind of inconsistency by
+ * skipping the row rather than the sync.
+ *
+ * The winner is the one the server's own collision rule picks: earliest
+ * `createdAt`, then lowest id. Same rule, same winner, so the provenance ends
+ * up on the same row here as it does there, and the next answer confirms what
+ * is already stored instead of moving it again.
+ *
+ * Ahead of both, a live row beats a tombstoned one. A tombstone has no
+ * provenance left to lose, and one holding a unique key blocks the next honest
+ * import of that row, which is why `deleteSession` clears the key on the way
+ * out.
+ *
+ * Only contested keys appear. A loser is stored with no key and loses nothing
+ * else: its id, its fields and its children all stay, and it keeps the stamp it
+ * arrived with, so this reconciles with a decision the server is already in the
+ * middle of making rather than becoming an edit to push back.
+ */
+export const importKeyOwners = (arriving: readonly Change<Session>[]): Map<string, string> => {
+  const byKey = new Map<string, Change<Session>[]>();
+  for (const change of arriving) {
+    const key = change.record.importKey;
+    // The same test the index makes, and the same one the server's rule makes:
+    // a record can reach here with no key at all, and an empty one is not a
+    // claim on anything.
+    if (typeof key !== 'string' || key === '') continue;
+    const group = byKey.get(key);
+    if (group) group.push(change);
+    else byKey.set(key, [change]);
+  }
+
+  const owners = new Map<string, string>();
+  for (const [key, group] of byKey) {
+    if (group.length < 2) continue;
+    const [keep] = [...group].sort(
+      (a, b) =>
+        Number(a.deletedAt !== null) - Number(b.deletedAt !== null) ||
+        a.record.createdAt - b.record.createdAt ||
+        (a.record.id < b.record.id ? -1 : a.record.id > b.record.id ? 1 : 0),
+    );
+    owners.set(key, keep.record.id);
+  }
+  return owners;
+};
+
+/**
+ * The key an arriving session is actually stored with: its own, or none.
+ *
+ * Paired with `importKeyOwners` so both engines answer the question the same
+ * way in both of the places they ask it, the release and the write.
+ */
+export const importKeyFor = (
+  record: Session,
+  owners: ReadonlyMap<string, string>,
+): string | null => {
+  const key = record.importKey;
+  if (typeof key !== 'string' || key === '') return null;
+  const owner = owners.get(key);
+  return owner === undefined || owner === record.id ? key : null;
 };
 
 export const buildRebuy = (input: NewRebuy, ctx: RepositoryContext): Rebuy => {

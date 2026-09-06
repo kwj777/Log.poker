@@ -345,18 +345,48 @@ describe('the three constraints, applied where the whole picture is', () => {
       0, NOW,
     ).bundle;
 
+    // Started an hour ago, which is what sitting down at a table looks like.
+    // Clamped, the runaway ranks at the merge's own clock and so beats it.
     const real = mergeIntoBundle(
       runaway,
       changeSet({
         sessions: [session('real', NOW + 10 * HOUR, {
-          endedAt: null, startedAt: NOW + 10 * HOUR, createdAt: NOW + 10 * HOUR,
+          endedAt: null, startedAt: NOW + 9 * HOUR, createdAt: NOW + 9 * HOUR,
         })],
       }),
       0, NOW + 10 * HOUR,
     ).bundle;
 
+    // The real one is still running, which is the whole point. The runaway is
+    // left alone rather than closed: the server cannot place it in time, so it
+    // neither wins the contest nor loses it.
     expect(real.records.sessions.real.record.endedAt).toBeNull();
-    expect(real.records.sessions.wrong.record.endedAt).not.toBeNull();
+    expect(real.records.sessions.wrong.record.startedAt).toBe(NOW + YEAR);
+  });
+
+  it('and stops rewriting a session it cannot place, request after request', () => {
+    // A stamp beyond the allowance used to be clamped to `now`, and `now`
+    // moves: the rule compared what it stored last time against a later number
+    // every second, wrote the session again, and re-sent it to every device.
+    // Forever, on a bundle nobody was touching.
+    const first = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('s1', T0, { endedAt: T0 + HOUR, cashOut: null })],
+        hands: [hand('h1', 's1', T0, { at: NOW + 365 * 24 * HOUR })],
+      }),
+      0, NOW,
+    );
+    const endedAt = first.bundle.records.sessions.s1.record.endedAt;
+
+    const later = mergeIntoBundle(first.bundle, changeSet({}), 0, NOW + 5 * HOUR);
+    expect(later.bundle.records.sessions.s1.record.endedAt).toBe(endedAt);
+    // The stamp standing still is what says the rule did not fire again, and
+    // so that nothing was re-sent to anybody.
+    expect(later.bundle.records.sessions.s1.heardAt)
+      .toBe(first.bundle.records.sessions.s1.heardAt);
+    expect(later.bundle.heardThrough).toBe(first.bundle.heardThrough);
   });
 
   it('will not close a session it cannot place in time, however many are running', () => {
@@ -506,6 +536,58 @@ describe('the three constraints, applied where the whole picture is', () => {
     }
     expect(bundle.records.sessions.b).toBeUndefined();
     expect(bundle.folded).toEqual({});
+  });
+
+  it('will not be handed a function to store as a session', () => {
+    // `settleFoldedChildren` reads its map with a bare index. On an ordinary
+    // object `folded['toString']` is a function rather than undefined, so a
+    // child naming one got that function written into its `sessionId`, where
+    // JSON drops it and every device then skips the row for good. The reserved
+    // list would not have caught it: `toString` is not on the list. Every map
+    // in a bundle has no prototype now, which is the property rather than a
+    // list to keep in step with.
+    const folded = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('a', T0, { importKey: 'k', createdAt: T0 }),
+                   session('b', T0, { importKey: 'k', createdAt: T0 + HOUR })],
+      }),
+      0, NOW,
+    ).bundle;
+    expect(folded.folded.b).toBe('a');
+
+    const after = mergeIntoBundle(
+      folded,
+      changeSet({ hands: [hand('h1', 'toString', T0 + HOUR), hand('h2', '__proto__', T0 + HOUR)] }),
+      0, NOW + HOUR,
+    ).bundle;
+    expect(after.records.hands.h1.record.sessionId).toBe('toString');
+    expect(after.records.hands.h2.record.sessionId).toBe('__proto__');
+  });
+
+  it('and a record can call itself anything without breaking the merge', () => {
+    // Every map here is keyed by an id off the wire, and `isRow` only ever
+    // refused three names. `toString`, `valueOf` and `hasOwnProperty` all
+    // reached something by inheritance instead.
+    const named = mergeIntoBundle(
+      null,
+      changeSet({ venues: [venue('toString'), venue('valueOf'), venue('hasOwnProperty')] }),
+      0, NOW,
+    );
+    expect(named.changes.venues.map((change) => change.record.id).sort())
+      .toEqual(['hasOwnProperty', 'toString', 'valueOf']);
+
+    // And again, through a real store round trip, which is where the prototype
+    // comes back on.
+    const stored: unknown = JSON.parse(JSON.stringify(named.bundle));
+    const again = mergeIntoBundle(
+      stored, changeSet({ venues: [venue('toString', T0 + HOUR)] }), 0, NOW + HOUR,
+    );
+    // Bracket, and cast, because the type of a `Record<string, T>` still
+    // carries Object's own members even where the value at runtime does not.
+    const held = again.bundle.records.venues as unknown as Record<string, { record: Rec }>;
+    expect(held['toString'].record.updatedAt).toBe(T0 + HOUR);
   });
 
   it('refuses a venue tombstone while a live session points at it', () => {
@@ -793,8 +875,10 @@ describe('collecting tombstones', () => {
   it('ignores a device id that is not one', () => {
     for (const id of ['', 'short', 'x'.repeat(65), 'has spaces', '../../etc', '__proto__']) {
       const { bundle } = mergeIntoBundle(null, changeSet({}), 0, T0, id);
-      expect(bundle.devices).toEqual({});
-      expect(Object.getPrototypeOf(bundle.devices)).toBe(Object.prototype);
+      expect({ ...bundle.devices }).toEqual({});
+      // No prototype at all, which is what makes every lookup in here mean
+      // what it says rather than answering for a dozen names nobody stored.
+      expect(Object.getPrototypeOf(bundle.devices)).toBeNull();
     }
   });
 });

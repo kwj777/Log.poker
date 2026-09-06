@@ -18,7 +18,8 @@
     "test:table": "node scripts/build-test-table.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
-    "check:prose": "node scripts/check-prose.mjs"
+    "check:prose": "node scripts/check-prose.mjs",
+    "check:gate": "node scripts/check-gate.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.14",

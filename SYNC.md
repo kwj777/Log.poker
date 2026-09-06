@@ -655,37 +655,57 @@ In the merge:
   provenance off a real local session in favour of one that never arrived, so
   the same CSV row could be imported twice.
 
-### Still wrong, and known
+### Four of the five that were left
 
-- **A first push over 2MB is refused forever.** The device is answered 400, the
-  client reads that as `refused`, and it retries the identical body every five
-  minutes. Fixing the push mark above removes the likeliest way to get there,
-  but a genuinely enormous first sync still cannot go up. Paging it is not a
-  one-line change: cut by time, and a batch boundary can put a hand on the
-  server without its session, which every other device then skips forever
-  because the cursor moves past it regardless. That wants an ordering guarantee
-  first. The answer has no size cap at all, which is the same problem pointing
-  the other way.
-- **The import-collision fold happens once.** A child pushed after two imports
-  have been folded together is stranded on the tombstoned duplicate, because the
-  collision that justified moving it no longer exists for the rule to see.
-- **A session closed by the active-session rule is not revised** if a later hand
-  arrives showing it ran longer, so the same pushes in a different order leave
-  different end times.
-- **`collectTombstones` diverges between the engines** for a live child under a
-  collected session: SQLite cascades it away, Dexie leaves it an orphan.
-- **Two accounts on one device share one local log and one cursor store.** The
-  unplaceable-cursor clamp above stops the second account being answered with
-  silence, but the first account's records are still in the database the second
-  one pushes from.
+**A first push over 2MB was refused forever.** Over the endpoint's cap the body
+is answered 400, which the client reads as `refused`, so it retried the
+identical body every five minutes for the life of the install: the player the
+feature exists for was the one it locked out. It pages now, and the interesting
+half is why paging is not just a size limit. **The receiving device skips a
+record whose parent is missing, and moves its cursor past it anyway**, so a hand
+that reaches the server before its session is never offered to that device
+again. Ordering by `updatedAt` almost avoids that, because a session is created
+before its hands; almost, because a session *edited* afterwards carries a stamp
+later than the hands under it. So a batch is a time prefix **plus whatever
+parents that prefix needs**, and the mark it earns stays under the time cut
+rather than over the parents it reached forward for. The extra records are sent
+again next round, which costs bytes and nothing else.
 
-Phase 0 dominates the risk and phase 2 dominates the hours. Phases 0 and 1 have
-no dependency on each other and can be built in either order or at once.
+**The import fold happened once.** The rule tombstones a duplicate and moves
+what was logged against it onto the survivor, and it could only move what was in
+the bundle at the moment it fired. A hand logged on the losing session before
+that device heard about the fold sat on a tombstone, invisible, until the sweep
+took it. The decision is remembered in the bundle now rather than re-derived,
+because by the second merge there is no collision left to notice, and it is
+forgotten again when the tombstone it names is collected.
 
-The estimate assumes the merge rules survive contact with the conformance suite,
-which is where a rule that reads well tends to stop being one. If any of the
-three turns out to need a schema change beyond `deleted_at`, phase 0 grows and
-nothing else does.
+**A session closed by the rule was never revised.** It is closed at whatever
+activity had reached the server by then, so a hand pushed afterwards left the
+session holding a hand that happened outside it. The end moves forward now,
+and only where there is no cash-out: a completed session's end is the player's
+answer to what came off the table, and nothing here revises that.
+
+**The sweep disagreed with itself across the two engines.** A live child can sit
+under a tombstoned session, because another device logs a hand on a session this
+one has already deleted and nothing reconciles the pair. SQLite's foreign key
+took it with the session; Dexie left it an orphan. So the same sweep lost a hand
+on the phone and kept it in the browser. Both take it now, written out rather
+than left to a cascade only one engine has.
+
+### And the fifth, which is a question rather than a bug
+
+**Two accounts on one device share one local log and one cursor store.** Signing
+out and in as somebody else leaves the first account's history in the database
+the second one pushes from. The unplaceable-cursor clamp stops the second
+account being answered with silence, so it is no longer silent data loss, but it
+is somebody's poker history in another person's bucket.
+
+Fixing it means answering what signing out should do to the log, and that is a
+product question rather than a merge one. Log is free and local-first: the log
+belongs to the device as much as to the account, and wiping it on sign-out would
+make signing in feel like a thing you could lose your history to. Keying the
+database by subject is the other answer, and it means a device holds several
+logs and the free app has to pick one before anybody has signed in.
 
 ---
 

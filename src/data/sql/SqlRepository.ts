@@ -487,14 +487,37 @@ export class SqlRepository implements Repository {
     let removed = 0;
     await this.driver.transaction(async () => {
       // Children first: a session cannot go while its rows still point at it.
-      for (const table of ['mood_entries', 'hands', 'rebuys', 'sessions']) {
-        const before_ = await this.count(table);
+      for (const table of ['mood_entries', 'hands', 'rebuys']) {
+        const held = await this.count(table);
         await this.driver.run(
           `DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < ?`,
           [before],
         );
-        removed += before_ - (await this.count(table));
+        removed += held - (await this.count(table));
       }
+
+      // And then whatever is left under a session that is going, tombstoned or
+      // not. A live row can be under one: another device logs a hand on a
+      // session this one has already deleted, and nothing reconciles the pair.
+      //
+      // Written out rather than left to `ON DELETE CASCADE`, which is the same
+      // answer and only on this engine: the web build has no foreign keys, so
+      // the cascade there was an orphan instead, and the same sweep lost a hand
+      // on the phone and kept it in the browser. A rule that reads differently
+      // on two engines is not a rule.
+      const going = `SELECT id FROM sessions WHERE deleted_at IS NOT NULL AND deleted_at < ?`;
+      for (const table of ['mood_entries', 'hands', 'rebuys']) {
+        const held = await this.count(table);
+        await this.driver.run(`DELETE FROM ${table} WHERE session_id IN (${going})`, [before]);
+        removed += held - (await this.count(table));
+      }
+
+      const sessions = await this.count('sessions');
+      await this.driver.run(
+        `DELETE FROM sessions WHERE deleted_at IS NOT NULL AND deleted_at < ?`,
+        [before],
+      );
+      removed += sessions - (await this.count('sessions'));
 
       // And a venue only when nothing references it at all, live or tombstoned.
       // Foreign keys are on, so the alternative is a throw halfway through.

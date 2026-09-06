@@ -1178,6 +1178,33 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(rebuys).toEqual([]);
       });
 
+      it('takes a live child down with the session it belonged to', async () => {
+        // Another device logs a hand on a session this one has already
+        // deleted, and nothing reconciles that pair, so a live row can sit
+        // under a tombstone. SQLite's foreign key took it with the session and
+        // Dexie left it an orphan, so the same sweep lost a hand on the phone
+        // and kept it in the browser. Both do the same thing now, and it is
+        // written out rather than left to a cascade only one engine has.
+        const session = await newSession();
+        await repository.deleteSession(session.id);
+        await repository.applyChanges({
+          venues: [], sessions: [], rebuys: [], moodEntries: [],
+          hands: [{
+            record: {
+              id: 'logged-elsewhere', sessionId: session.id, holeCards: 'AsKd',
+              position: null, note: null, tags: [], amount: null, at: T0,
+              createdAt: T0, updatedAt: T0,
+            },
+            deletedAt: null,
+          }],
+        } as Parameters<Repository['applyChanges']>[0]);
+        expect((await repository.listChangedSince(0)).hands).toHaveLength(1);
+
+        const removed = await repository.collectTombstones(T0 + DAY);
+        expect(removed).toBe(2);
+        expect((await repository.listChangedSince(0)).hands).toEqual([]);
+      });
+
       it('leaves a tombstone newer than the line exactly where it is', async () => {
         const session = await newSession();
         context.tick(HOUR);

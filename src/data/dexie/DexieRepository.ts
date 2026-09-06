@@ -324,14 +324,21 @@ export class DexieRepository implements Repository {
 
         // Children first, for the same reason as SQLite even without a foreign
         // key to enforce it: a hand whose session is gone is not a hand.
+        const sessions = (await this.db.sessions.toArray()).filter(stale);
+        const orphaning = new Set(sessions.map((session) => session.id));
         for (const table of [this.db.moodEntries, this.db.hands, this.db.rebuys] as const) {
-          const going = (await table.toArray()).filter(stale).map((record) => record.id);
+          // Tombstoned, or under a session that is going whether it is
+          // tombstoned or not. SQLite's foreign key took the second kind with
+          // the session and this did not, so the same sweep lost a hand on the
+          // phone and kept it in the browser.
+          const going = (await table.toArray())
+            .filter((record) => stale(record) || orphaning.has(record.sessionId))
+            .map((record) => record.id);
           if (going.length === 0) continue;
           await table.bulkDelete(going);
           removed += going.length;
         }
 
-        const sessions = (await this.db.sessions.toArray()).filter(stale);
         if (sessions.length > 0) {
           await this.db.sessions.bulkDelete(sessions.map((session) => session.id));
           removed += sessions.length;

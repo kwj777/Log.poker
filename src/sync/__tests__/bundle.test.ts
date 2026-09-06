@@ -395,6 +395,45 @@ describe('the three constraints, applied where the whole picture is', () => {
     expect(bundle.records.sessions.a.record.endedAt).toBeNull();
   });
 
+  it('moves the end of a closed session forward when a later hand arrives', () => {
+    // The rule closes a session at whatever activity had reached the server by
+    // then. A hand pushed afterwards used to leave the end where it was, so a
+    // session held a hand that happened outside it.
+    const both = changeSet({
+      venues: [venue('v1')],
+      sessions: [
+        session('early', T0, { endedAt: null, startedAt: T0 }),
+        session('late', T0, { endedAt: null, startedAt: T0 + HOUR }),
+      ],
+    });
+    const closed = mergeIntoBundle(null, both, 0, NOW).bundle;
+    const endedAt = closed.records.sessions.early.record.endedAt;
+    expect(endedAt).not.toBeNull();
+
+    const after = mergeIntoBundle(
+      closed,
+      changeSet({ hands: [hand('h1', 'early', T0, { at: (endedAt as number) + 5 * HOUR })] }),
+      0,
+      NOW + HOUR,
+    ).bundle;
+    expect(after.records.sessions.early.record.endedAt).toBe((endedAt as number) + 5 * HOUR);
+    // And settles: the next request has nothing left to move.
+    const again = mergeIntoBundle(after, changeSet({}), 0, NOW + 2 * HOUR);
+    expect(again.bundle.records.sessions.early.heardAt)
+      .toBe(after.records.sessions.early.heardAt);
+  });
+
+  it('but never revises a session the player has cashed out of', () => {
+    // That end is their answer to what came off the table.
+    const done = changeSet({
+      venues: [venue('v1')],
+      sessions: [session('s1', T0, { endedAt: T0 + HOUR, cashOut: 40_000 })],
+      hands: [hand('h1', 's1', T0, { at: T0 + 9 * HOUR })],
+    });
+    const bundle = mergeIntoBundle(null, done, 0, NOW).bundle;
+    expect(bundle.records.sessions.s1.record.endedAt).toBe(T0 + HOUR);
+  });
+
   it('folds two imports of the same row into one session', () => {
     const bundle = after(
       changeSet({ venues: [venue('v1')] }),
@@ -418,6 +457,55 @@ describe('the three constraints, applied where the whole picture is', () => {
     );
     expect(bundle.records.hands.h1.record.sessionId).toBe('a');
     expect(bundle.records.hands.h1.deletedAt).toBeNull();
+  });
+
+  it('moves a hand pushed after the fold, not only the ones present for it', () => {
+    // The collision is gone by the second merge: the loser is a tombstone and
+    // there is nothing left for the rule to notice. A hand logged on the losing
+    // session before that device heard about the fold used to sit on a
+    // tombstone, invisible, until the sweep took it.
+    const folded = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('a', T0, { importKey: 'k', createdAt: T0 }),
+                   session('b', T0, { importKey: 'k', createdAt: T0 + HOUR })],
+      }),
+      0, NOW,
+    ).bundle;
+    expect(folded.records.sessions.b.deletedAt).not.toBeNull();
+
+    const later = mergeIntoBundle(
+      folded, changeSet({ hands: [hand('h1', 'b', T0 + HOUR)] }), 0, NOW + HOUR,
+    ).bundle;
+    expect(later.records.hands.h1.record.sessionId).toBe('a');
+
+    // And it settles rather than rewriting the hand on every request.
+    const again = mergeIntoBundle(later, changeSet({}), 0, NOW + 2 * HOUR);
+    expect(again.bundle.records.hands.h1.heardAt).toBe(later.records.hands.h1.heardAt);
+  });
+
+  it('forgets a fold once the tombstone that named it has been collected', () => {
+    const DAY = 24 * HOUR;
+    const only = 'device-aaaa0001';
+    let bundle = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('a', T0, { importKey: 'k', createdAt: T0 }),
+                   session('b', T0, { importKey: 'k', createdAt: T0 + HOUR })],
+      }),
+      0, T0, only,
+    ).bundle;
+    expect(bundle.folded.b).toBe('a');
+
+    // Two rounds past the window, which is what it takes for one device to
+    // acknowledge and then sweep.
+    for (const clock of [T0 + 100 * DAY, T0 + 100 * DAY + HOUR, T0 + 100 * DAY + 2 * HOUR]) {
+      bundle = mergeIntoBundle(bundle, changeSet({}), 0, clock, only).bundle;
+    }
+    expect(bundle.records.sessions.b).toBeUndefined();
+    expect(bundle.folded).toEqual({});
   });
 
   it('refuses a venue tombstone while a live session points at it', () => {

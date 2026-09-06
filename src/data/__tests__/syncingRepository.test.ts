@@ -555,6 +555,69 @@ describe('what the loop does with a bad day', () => {
     expect(Math.max(...sent)).toBeLessThanOrEqual(2);
   });
 
+  it('gets a backlog too big for one request up, a piece at a time', async () => {
+    // Over the endpoint's cap the whole push is refused, the client reads that
+    // as `refused`, and it retries the identical body every five minutes for
+    // the life of the install. The player this feature exists for is the one
+    // it locked out.
+    const { held, fetch } = server();
+    const CAP = 3_000;
+    const refusing = (async (url: string, init: RequestInit) => {
+      if ((init.body as string).length > CAP) {
+        return { ok: false, status: 400, json: async () => ({ error: 'refused' }) } as Response;
+      }
+      return (fetch as unknown as (u: string, i: RequestInit) => Promise<Response>)(url, init);
+    }) as unknown as typeof fetch;
+
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    let counter = 0;
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `full-${String(++counter).padStart(3, '0')}` },
+    });
+    await local.init();
+    const phone = new SyncingRepository(
+      local,
+      'a.b.c.d',
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-loaded01' }),
+      { fetch: refusing, budget: 1_200 },
+      () => now,
+    );
+
+    // Years of it, written before this device ever managed to sync: otherwise
+    // the push after each write drains the backlog as it is made, and there is
+    // never a big one to send.
+    held.offline = true;
+    const venue = await phone.createVenue({ name: 'Aria', isHomeGame: false });
+    const sessions = [];
+    for (let index = 0; index < 6; index += 1) {
+      tick(HOUR);
+      const session = await phone.createSession({
+        venueId: venue.id, format: 'cash', gameType: 'NLHE',
+        stakes: { smallBlind: 100, bigBlind: 200 }, buyIn: 30_000, startedAt: now,
+      });
+      tick(HOUR);
+      await phone.createHand({ sessionId: session.id, holeCards: 'AsKd', at: now });
+      // Edited afterwards, which is what puts a session's stamp above its own
+      // hands and makes a plain time prefix unsafe.
+      tick(HOUR);
+      await phone.updateSession(session.id, { notes: `table ${index}`.padEnd(120, '.') });
+      sessions.push(session.id);
+    }
+
+    held.offline = false;
+    for (let round = 0; round < 12; round += 1) await phone.push(true);
+    expect(phone.current().problem).toBeNull();
+
+    const laptop = await device(refusing, 'laptop');
+    await laptop.push(true);
+    expect((await laptop.listSessions()).map((session) => session.id).sort())
+      .toEqual([...sessions].sort());
+    expect(await laptop.listHands()).toHaveLength(6);
+    expect(held.calls).toBeGreaterThan(2);
+  });
+
   it('keeps trying after the local database throws, rather than going quiet', async () => {
     // `run` clears the dirty flag before it reads anything, so a throw past
     // that point loses the write, records no failure, arms no backoff, and

@@ -509,6 +509,20 @@ under the same key, so changing it later does not rotate anything: it orphans
 every bucket that exists, and the history in them is no longer reachable from
 any token.
 
+**`npm run check:gate` asks the endpoint whether it worked**, which is worth
+doing before `ALLOW_SIGN_IN` flips rather than after, because after the flip a
+wrong key is a dead form in front of real people. It prompts for the key with
+the echo off, mints a token for the subject `gatecheck`, sends an empty push,
+and says in plain words what came back. On a 200 it erases the bucket it just
+made. On anything else it says which of the reasons it was.
+
+That answers half the question. Minting proves the key stored on the site is
+byte for byte the key you typed, which rules out paste damage and nothing else.
+`npm run check:gate -- --token <t>`, with a token from a signed-in dev build,
+is the half that proves the key is Untilt's, because Untilt is what signed that
+one. In that mode nothing is ever erased: the token names a person, and their
+history is not a check's to tidy away.
+
 ### Collecting tombstones
 
 Built, and it turned out to be the one piece where the obvious implementation is

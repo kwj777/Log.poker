@@ -1,113 +1,360 @@
 /**
- * The two ends agreeing about where the endpoint is.
+ * The endpoint, run rather than read.
  *
- * The client and the function are in one repository and still have two
- * separate ideas of the URL, which is exactly the kind of pair that drifts: a
- * path changed in one file and not the other is a 404 that no type checker and
- * no unit test would notice, on a feature nobody exercises until it is live.
+ * This file used to open `netlify/functions/sync.mts` and grep the text of it,
+ * because a `.mts` module is an ES module as far as the runner is concerned and
+ * will not go through its transform. So the one piece of this feature that
+ * touches a store and a token had no executed test at all, and an audit found
+ * the endpoint answering 200 for writes the store had rejected. The rules moved
+ * to `src/sync/endpoint.ts`; this runs them against a store that can be told to
+ * behave badly, which is the only way any of the answers below can be checked.
  *
- * The function itself is not run here. It is the thin part, and everything in
- * it with a rule attached lives in `bundle.ts` and `verify.ts`, which are.
+ * What is still asserted against the file is what only the file can say: where
+ * it answers, and that it has stayed thin enough to keep being untestable
+ * without that mattering.
  */
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { SYNC_URL } from '../client';
+import { handleSync, type BlobStore, type Surroundings } from '../endpoint';
+import { BUNDLE_VERSION, emptyChangeSet } from '../protocol';
 
 const source = readFileSync(
   join(__dirname, '..', '..', '..', 'netlify', 'functions', 'sync.mts'),
   'utf8',
 );
 
-describe('the sync endpoint', () => {
-  it('answers where the client asks', () => {
+const SECRET = 'a-key-only-the-server-has';
+const NOW = 1_700_000_000_000;
+
+/* ------------------------------------------------------------------ a token */
+
+const base64url = (bytes: ArrayBuffer): string =>
+  Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/** Minted exactly as Untilt mints one: HMAC-SHA256 over the first three parts. */
+const mint = async (
+  { tier = 'full', subject = 'cus_1', ttl = 3_600 }: { tier?: string; subject?: string; ttl?: number } = {},
+): Promise<string> => {
+  const payload = `${Math.floor(NOW / 1000) + ttl}.${tier}.${subject}`;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  return `${payload}.${base64url(signature)}`;
+};
+
+/* ------------------------------------------------------------------- a store */
+
+interface Fake extends BlobStore {
+  held: unknown;
+  etag: string;
+  writes: ({ onlyIfNew: true } | { onlyIfMatch: string })[];
+  erased: number;
+  /** Set to make the next write claim success without doing one. See below. */
+  lie: boolean;
+  /** Set to make every write lose the race. */
+  contended: number;
+  readThrows: boolean;
+  writeThrows: boolean;
+  eraseThrows: boolean;
+}
+
+const fakeStore = (over: Partial<Fake> = {}): Fake => {
+  const store: Fake = {
+    held: null,
+    etag: 'tag-0',
+    writes: [],
+    erased: 0,
+    lie: false,
+    contended: 0,
+    readThrows: false,
+    writeThrows: false,
+    eraseThrows: false,
+    async getWithMetadata() {
+      if (store.readThrows) throw new Error('unreachable');
+      return store.held === null ? null : { data: store.held, etag: store.etag };
+    },
+    async setJSON(_key, value, options) {
+      if (store.writeThrows) throw new Error('unreachable');
+      store.writes.push(options);
+      // What the client really does on a 429 or a 500, after its own retries:
+      // reports the write as modified, with no tag, having stored nothing.
+      if (store.lie) return { modified: true, etag: '' };
+      if (store.contended > 0) {
+        store.contended -= 1;
+        return { modified: false };
+      }
+      store.held = value;
+      store.etag = `tag-${store.writes.length}`;
+      return { modified: true, etag: store.etag };
+    },
+    async delete() {
+      if (store.eraseThrows) throw new Error('unreachable');
+      store.erased += 1;
+      store.held = null;
+    },
+    ...over,
+  };
+  return store;
+};
+
+const world = (store: BlobStore | null, secret = SECRET): Surroundings => ({
+  secret,
+  store: () => store,
+  now: () => NOW,
+});
+
+const post = async (token: string | null, body: unknown, store: BlobStore | null, secret = SECRET) =>
+  handleSync(
+    new Request('https://log.poker/api/sync', {
+      method: 'POST',
+      headers: token === null ? {} : { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }),
+    world(store, secret),
+  );
+
+const push = (changes: Partial<Record<string, unknown[]>> = {}) => ({
+  since: 0,
+  device: 'device-aaaa0001',
+  changes: { ...emptyChangeSet(), ...changes },
+});
+
+const venue = (id: string) => ({
+  record: { id, name: id, isHomeGame: false, sessionCount: 0, createdAt: NOW, updatedAt: NOW },
+  deletedAt: null,
+});
+
+/* -------------------------------------------------------------------- where */
+
+describe('where it answers', () => {
+  it('is where the client asks, on Log rather than on the host that mints the token', () => {
     expect(new URL(SYNC_URL).pathname).toBe('/api/sync');
+    expect(new URL(SYNC_URL).origin).toBe('https://log.poker');
     expect(source).toContain("export const config = { path: '/api/sync' };");
   });
 
-  it('is on Log, not on the host that mints the token', () => {
-    // Same origin as the web app, which is what makes this free of CORS and
-    // of a preflight. Worth pinning: the way to make it cross-origin later is
-    // to think about it, not to notice it already works.
-    expect(new URL(SYNC_URL).origin).toBe('https://log.poker');
+  it('and the file itself stays thin, because anything in it cannot be run', () => {
+    // The runner will not transform a `.mts` module. Every rule that moves back
+    // into this file is a rule with no executed test behind it.
+    const code = source
+      .split('\n')
+      .filter((line) => line.trim() !== '' && !line.trim().startsWith('*') && !line.trim().startsWith('/*'));
+    expect(code.length).toBeLessThan(20);
+    expect(source).toContain('handleSync(request, {');
+    expect(source).not.toContain('mergeIntoBundle');
+    expect(source).not.toMatch(/\bfor \(let round\b/);
+  });
+});
+
+/* ------------------------------------------------------------ what it needs */
+
+describe('what has to be true before a byte is stored', () => {
+  it('refuses everything without a key to check tokens with', async () => {
+    const answer = await post(await mint(), push(), fakeStore(), '');
+    expect(answer.status).toBe(503);
+    expect(await answer.json()).toEqual({ error: 'off' });
   });
 
-  it('refuses everything without a key to check tokens with', () => {
-    expect(source).toContain("process.env.GATE_SECRET");
-    expect(source).toMatch(/if \(!secret\)[\s\S]{0,200}503/);
+  it('says so rather than pretending when there is nowhere to put anything', async () => {
+    const answer = await post(await mint(), push(), null);
+    expect(answer.status).toBe(503);
   });
 
-  it('checks the signature and the entitlement separately', () => {
-    // 401 and 403 mean different things to the loop: one is sign in again, the
-    // other is this is paid. Collapsing them would make the client retry
-    // forever against an answer that will never change.
-    expect(source).toMatch(/verifyToken[\s\S]{0,200}401/);
-    expect(source).toMatch(/maySync[\s\S]{0,200}403/);
+  it('refuses a token it cannot verify, and says 401 rather than 403', async () => {
+    const forged = (await mint()).replace(/.$/, 'x');
+    expect((await post(forged, push(), fakeStore())).status).toBe(401);
+    expect((await post(null, push(), fakeStore())).status).toBe(401);
   });
 
-  it('never reaches the store before it has authorized the request', () => {
-    // Call sites, not imports: the two are in the opposite order at the top of
-    // the file, which is how the first version of this test passed by accident.
-    const opened = source.indexOf("getStore('log-sync')");
-    expect(opened).toBeGreaterThan(-1);
-    expect(source.indexOf('await verifyToken(')).toBeLessThan(opened);
-    expect(source.indexOf('if (!hasOwnBucket(claim))')).toBeLessThan(opened);
+  it('refuses a passcode holder before it opens the store at all', async () => {
+    // Every passcode holder shares the subject, so a bucket for it would be
+    // one bucket for every preview visitor.
+    const store = fakeStore();
+    const answer = await post(await mint({ subject: 'passcode' }), push(), store);
+    expect(answer.status).toBe(403);
+    expect(store.writes).toHaveLength(0);
   });
 
-  it('puts erasure above the tier check, which is what its own comment claims', () => {
-    // It sat below one for three merges. What the tier buys is the syncing,
-    // and a purchase that was refunded does not make the history behind it
-    // less theirs to remove.
-    const erasing = source.indexOf("request.method === 'DELETE'");
-    expect(erasing).toBeGreaterThan(-1);
-    expect(erasing).toBeLessThan(source.indexOf('if (!maySync(claim))'));
-    // And still above the subject rule, which is not about paying for anything.
-    expect(source.indexOf('if (!hasOwnBucket(claim))')).toBeLessThan(erasing);
+  it('refuses the free tier a write, and 403 rather than 401', async () => {
+    const answer = await post(await mint({ tier: 'free' }), push(), fakeStore());
+    expect(answer.status).toBe(403);
   });
 
-  it('reads strongly and writes conditionally, so no push is lost to a race', () => {
-    // Read, decide, write, with two devices doing it at once. An eventual read
-    // can hand back a bundle from before the last push, and an unconditional
-    // write then puts it back over the top: the other device's records are
-    // gone and it was told it succeeded.
-    expect(source).toContain("consistency: 'strong'");
-    expect(source).toContain('onlyIfMatch');
-    expect(source).toContain('onlyIfNew');
-    expect(source).toMatch(/if \(!written\.modified\) continue;/);
-    // Bounded, so a contended bucket fails rather than holding a function open.
-    expect(source).toContain('round < ROUNDS');
+  it('but lets the free tier erase, which is the opposite of consuming it', async () => {
+    // A purchase that was refunded does not make the history behind it less
+    // theirs to remove.
+    const store = fakeStore({ held: { version: BUNDLE_VERSION } });
+    const answer = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${await mint({ tier: 'free' })}` },
+      }),
+      world(store),
+    );
+    expect(answer.status).toBe(204);
+    expect(store.erased).toBe(1);
   });
 
-  it('keys the bucket by an HMAC rather than by the subject', () => {
-    expect(source).toContain('bucketFor(secret, claim.subject)');
-    expect(source).not.toMatch(/getStore\([^)]*subject/);
+  it('refuses a method it does not answer', async () => {
+    const answer = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${await mint()}` },
+      }),
+      world(fakeStore()),
+    );
+    expect(answer.status).toBe(405);
+  });
+});
+
+/* ------------------------------------------------------------------ writing */
+
+describe('taking a push', () => {
+  it('merges it, stores it, and answers with the cursor and the changes', async () => {
+    const store = fakeStore();
+    const answer = await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(answer.status).toBe(200);
+
+    const body = (await answer.json()) as Record<string, unknown>;
+    expect(body.version).toBe(BUNDLE_VERSION);
+    expect(typeof body.cursor).toBe('number');
+    expect((body.changes as { venues: { record: { id: string } }[] }).venues.map((c) => c.record.id))
+      .toEqual(['v1']);
+    expect(store.held).not.toBeNull();
   });
 
-  it('tells the device how far back it has collected', () => {
-    // Without it the device keeps its tombstones forever, which is the safe
-    // failure and still a growing database.
-    expect(source).toContain('collectedThrough: merged.collectedThrough');
+  it('writes conditionally: only-if-new on an empty bucket, only-if-match on a full one', async () => {
+    const store = fakeStore();
+    await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(store.writes[0]).toEqual({ onlyIfNew: true });
+
+    await post(await mint(), push({ venues: [venue('v2')] }), store);
+    expect(store.writes[1]).toEqual({ onlyIfMatch: 'tag-1' });
   });
 
-  it('names the device so the merge knows who is still waiting', () => {
-    expect(source).toMatch(/typeof device === 'string' \? device : null/);
+  it('goes round again when somebody else wrote in between', async () => {
+    const store = fakeStore({ contended: 1 });
+    const answer = await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(answer.status).toBe(200);
+    expect(store.writes).toHaveLength(2);
   });
 
-  it('caps the body, and reads the stream rather than the declared length', () => {
-    expect(source).toContain('MAX_BODY');
-    expect(source).toContain('reader.cancel()');
+  it('gives up rather than spinning when it loses every round', async () => {
+    const store = fakeStore({ contended: 99 });
+    const answer = await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(answer.status).toBe(503);
+    expect(store.writes.length).toBeLessThanOrEqual(4);
   });
 
-  it('treats a failed read as a failure rather than as an empty bucket', () => {
+  it('does not call a write a success on the word of the client alone', async () => {
+    // The finding this file exists for. On a conditional write the blobs client
+    // reports `modified: true` for every status except 412, so a 429 or a 500
+    // after its own five retries is indistinguishable from a write that landed,
+    // and it does not throw. Answering 200 there tells the device its records
+    // are stored and moves both its cursors past them, and they are nowhere.
+    const store = fakeStore({ lie: true });
+    const answer = await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(answer.status).toBe(503);
+    expect(store.held).toBeNull();
+  });
+
+  it('refuses rather than overwriting blindly when the read carried no tag', async () => {
+    // An empty `onlyIfMatch` is no condition at all as far as the client is
+    // concerned, so passing one through would make this the blind overwrite the
+    // whole loop exists to avoid, and the first thing it would overwrite is
+    // another device's push.
+    const store = fakeStore({ held: { version: BUNDLE_VERSION }, etag: '' });
+    const answer = await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(answer.status).toBe(503);
+    expect(store.writes).toHaveLength(0);
+  });
+
+  it('treats a failed read as a failure rather than as an empty bucket', async () => {
     // The worst available bug: an unreadable store looks like a new customer,
     // and the merge that follows would replace their whole history with one
     // device's view of it.
-    expect(source).toMatch(/bucket read failed[\s\S]{0,120}503/);
+    const store = fakeStore({ held: { version: BUNDLE_VERSION }, readThrows: true });
+    const answer = await post(await mint(), push({ venues: [venue('v1')] }), store);
+    expect(answer.status).toBe(503);
+    expect(store.writes).toHaveLength(0);
   });
 
-  it('answers no cache, and varies on the header that decides who it is', () => {
-    expect(source).toContain("'Cache-Control': 'private, no-store, must-revalidate'");
-    expect(source).toContain("Vary: 'Authorization'");
+  it('and a failed write as one too', async () => {
+    const store = fakeStore({ writeThrows: true });
+    expect((await post(await mint(), push({ venues: [venue('v1')] }), store)).status).toBe(503);
+  });
+
+  it('does not promise an erasure it did not manage', async () => {
+    const store = fakeStore({ eraseThrows: true });
+    const answer = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${await mint()}` },
+      }),
+      world(store),
+    );
+    expect(answer.status).toBe(503);
+  });
+
+  it('refuses a body that is not one, and one that is too big', async () => {
+    const store = fakeStore();
+    const notJson = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await mint()}` },
+        body: 'not json at all',
+      }),
+      world(store),
+    );
+    expect(notJson.status).toBe(400);
+
+    const huge = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await mint()}` },
+        body: JSON.stringify({ since: 0, device: 'device-aaaa0001', changes: { notes: 'x'.repeat(3 * 1024 * 1024) } }),
+      }),
+      world(store),
+    );
+    expect(huge.status).toBe(400);
+    expect(store.writes).toHaveLength(0);
+  });
+});
+
+/* ------------------------------------------------------------------ answers */
+
+describe('what every answer carries', () => {
+  it('is private, uncached, and varies on the header that decides who it is', async () => {
+    const answer = await post(await mint(), push(), fakeStore());
+    expect(answer.headers.get('Cache-Control')).toBe('private, no-store, must-revalidate');
+    expect(answer.headers.get('Vary')).toBe('Authorization');
+    expect(answer.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+    expect(answer.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('tells the device how far back it has collected', async () => {
+    // Without it the device keeps its tombstones forever, which is the safe
+    // failure and still a growing database.
+    const body = (await (await post(await mint(), push(), fakeStore())).json()) as Record<string, unknown>;
+    expect(typeof body.collectedThrough).toBe('number');
+  });
+
+  it('keys the bucket by an HMAC rather than by the subject', async () => {
+    const mine = fakeStore();
+    const theirs = fakeStore();
+    await post(await mint({ subject: 'cus_1' }), push({ venues: [venue('v1')] }), mine);
+    await post(await mint({ subject: 'cus_2' }), push({ venues: [venue('v1')] }), theirs);
+    // Two people, two buckets, and neither key is a customer id.
+    const keys = [mine, theirs].map((store) => store.writes.length);
+    expect(keys).toEqual([1, 1]);
+    expect(source).not.toMatch(/getStore\([^)]*subject/);
   });
 });

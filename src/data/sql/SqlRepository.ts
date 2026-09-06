@@ -749,10 +749,17 @@ export class SqlRepository implements Repository {
 
   async listImportKeys(): Promise<string[]> {
     const rows = await this.driver.all<{ import_key: string }>(
-      // `deleted_at` is redundant beside the key check, since tombstoning a
-      // session clears its key, and it is here so that the guarantee reads as
-      // one query rather than as two facts a reader has to hold at once.
-      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL AND deleted_at IS NULL`,
+      // Every key held, tombstoned or not, because that is what the unique
+      // index enforces. It used to add `AND deleted_at IS NULL` on the argument
+      // that tombstoning a session clears its key -- true of a delete made
+      // here, and not true of `applyChanges`, which writes a record exactly as
+      // it is given, tombstone and key together. One of those arriving made
+      // this answer disagree with the index it exists to guard, and with the
+      // web engine, which never filtered: the importer offered a row as new,
+      // the domain check passed, and the insert failed with a raw
+      // `UNIQUE constraint failed` that no screen knows how to say. The same
+      // file, on the same account, imported on the web and refused on a phone.
+      `SELECT import_key FROM sessions WHERE import_key IS NOT NULL`,
     );
     return rows.map((row) => row.import_key);
   }

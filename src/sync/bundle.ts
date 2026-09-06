@@ -56,6 +56,7 @@ import {
   type Change,
   type ChangeSet,
 } from '../data/repository';
+import { answerFrom } from './batch';
 import {
   BUNDLE_VERSION,
   SYNC_TABLES,
@@ -601,10 +602,12 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
 
 export interface MergeResult {
   bundle: Bundle;
-  /** Everything at or after `since` once the merge has run. */
+  /** Everything heard at or after `since`, or as much of it as will fit. */
   changes: ChangeSet;
   /** What the device should send as `since` next time. */
   cursor: Timestamp;
+  /** Whether the answer was cut, and so whether to come straight back. */
+  more: boolean;
   /** How far back this bundle has been collected, for the device to match. */
   collectedThrough: Timestamp;
 }
@@ -623,6 +626,8 @@ export const mergeIntoBundle = (
   since: Timestamp,
   now: Timestamp,
   device: string | null = null,
+  /** Only ever lowered by a test, which cannot otherwise meet the cap. */
+  answerBudget?: number,
 ): MergeResult => {
   const bundle = readBundle(stored, now);
   bundle.version = BUNDLE_VERSION;
@@ -692,38 +697,36 @@ export const mergeIntoBundle = (
   // and so an un-tombstoned venue is live again before anything looks at it.
   collect(bundle, now);
 
-  // Built loose and named once, because a `ChangeSet` is five differently
-  // typed arrays and the server is deliberately indifferent to which is which.
-  const collected: Record<SyncTable, Change<Row>[]> = {
-    venues: [], sessions: [], rebuys: [], hands: [], moodEntries: [],
-  };
   let wrote = false;
   for (const table of SYNC_TABLES) {
     for (const change of Object.values(bundle.records[table])) {
       if (change.heardAt === at) wrote = true;
-      // Cut on when this server heard the record, never on the stamp the
-      // device that wrote it chose. A push that arrives late carries an old
-      // `updatedAt` and would fall behind a cursor another device is already
-      // holding, and would then never be delivered to it at all.
-      //
-      // `heardAt` itself is the server's note to itself and no part of what a
-      // device was promised, so it is left here rather than put on the wire.
-      if (change.heardAt >= from) {
-        collected[table].push({ record: change.record, deletedAt: change.deletedAt });
-      }
     }
   }
-  const changes = collected as unknown as ChangeSet;
 
   // Recorded only now, and only if this request wrote something. A stamp that
   // was never used must stay available, or a merge that changed nothing would
   // still move the bundle and no push would ever be idempotent.
   if (wrote) bundle.heardThrough = at;
 
-  // The stamp this request issued, not the newest record in the bundle: a
-  // device that echoes it back is asking for everything heard after this
+  // Cut on when this server heard each record, never on the stamp the device
+  // that wrote it chose: a push that arrives late carries an old `updatedAt`
+  // and would fall behind a cursor another device is already holding, and would
+  // then never be delivered to it at all.
+  //
+  // And bounded, which it was not. See `answerFrom`. When nothing is held back
+  // the cursor is the stamp this request issued rather than the newest record,
+  // because a device echoing it back is asking for everything heard after this
   // request, which is exactly what it has now been told.
-  return { bundle, changes, cursor: bundle.heardThrough, collectedThrough: bundle.collectedThrough };
+  const answer = answerFrom(bundle.records, from, bundle.heardThrough, answerBudget);
+
+  return {
+    bundle,
+    changes: answer.changes,
+    cursor: answer.cursor,
+    more: answer.more,
+    collectedThrough: bundle.collectedThrough,
+  };
 };
 
 /** Every table, for a caller that wants to walk one at a time. */

@@ -337,6 +337,11 @@ export class SyncingRepository implements Repository {
       }
     }
 
+    // The answer was cut too, so come straight back for the rest. A first pull
+    // of years of history is the one that does not fit, and it is the one the
+    // feature exists for.
+    if (outcome.response.more === true) this.dirty = true;
+
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
     }

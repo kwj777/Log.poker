@@ -516,6 +516,39 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         ).resolves.toBeDefined();
       });
 
+      it('lists a key a tombstone is still holding, because the index does', async () => {
+        // A delete made here clears the key, but `applyChanges` writes a record
+        // exactly as given, tombstone and key together. One of those used to be
+        // invisible to this answer on SQLite and visible on Dexie, so the same
+        // CSV imported on the web and failed on a phone with a raw constraint
+        // error from underneath the domain check.
+        const venue = await newVenue();
+        await repository.applyChanges({
+          venues: [], rebuys: [], hands: [], moodEntries: [],
+          sessions: [{
+            record: {
+              id: 'from-elsewhere', venueId: venue.id, format: 'cash', gameType: 'NLHE',
+              stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 1,
+              fee: null, cashOut: null, entrants: null, finishPosition: null,
+              startedAt: T0, endedAt: null, notes: null, importKey: 'row-9',
+              createdAt: T0, updatedAt: T0,
+            },
+            deletedAt: T0,
+          }],
+        } as Parameters<Repository['applyChanges']>[0]);
+
+        expect(await repository.listImportKeys()).toEqual(['row-9']);
+
+        // And the refusal is the domain's, rather than the storage engine's.
+        await expect(
+          repository.createSessions([
+            { venueId: venue.id, format: 'cash', gameType: 'NLHE',
+              stakes: { smallBlind: 100, bigBlind: 200 }, buyIn: 1, startedAt: T0,
+              importKey: 'row-9' },
+          ]),
+        ).rejects.toThrow(/already been imported/i);
+      });
+
       it('clears import keys with everything else', async () => {
         const venue = await newVenue('PokerStars');
         await repository.createSession({ venueId: venue.id, ...imported('csv|1') });

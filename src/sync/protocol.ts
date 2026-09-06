@@ -222,8 +222,15 @@ export interface SyncRequest {
 export interface SyncResponse {
   /** What to send as `since` next time. Not a record's stamp; see above. */
   cursor: Timestamp;
-  /** Everything heard at or after the request's `since`, once the merge ran. */
+  /** Everything heard at or after the request's `since`, or as much as fits. */
   changes: ChangeSet;
+  /**
+   * Whether the answer was cut, and so whether to ask again straight away.
+   *
+   * Absent reads as false, which costs a device on an older build nothing it
+   * did not already have: it asks again on its next write and gets the rest.
+   */
+  more?: boolean;
   /**
    * How far back the server has collected. A device may safely drop its own
    * tombstones this old, because nothing will ever ask about them again.

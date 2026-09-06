@@ -89,9 +89,10 @@ export const sync = async (
 
   try {
     const body: unknown = await response.json();
-    const { cursor, changes, collectedThrough } = (body ?? {}) as {
+    const { cursor, changes, more, collectedThrough } = (body ?? {}) as {
       cursor?: unknown;
       changes?: unknown;
+      more?: unknown;
       collectedThrough?: unknown;
     };
     if (typeof cursor !== 'number' || !Number.isFinite(cursor)) {
@@ -102,6 +103,10 @@ export const sync = async (
       response: {
         cursor,
         changes: shapedLikeAChangeSet(changes) ? changes : emptyChangeSet(),
+        // Absent reads as nothing held back, which is what a server that does
+        // not page means and is the safe reading either way: the device asks
+        // again on its next write rather than looping.
+        more: more === true,
         // Absent reads as nothing collected, which makes this device keep its
         // tombstones. Keeping one too long costs a few hundred bytes; dropping
         // one too early costs a resurrected session.

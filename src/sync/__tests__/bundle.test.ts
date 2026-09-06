@@ -213,6 +213,37 @@ describe('a device whose clock was wrong once', () => {
 });
 
 describe('what it refuses to store', () => {
+  it('refuses a record whose parent it does not have', () => {
+    // The backstop can refuse an old venue while accepting the session that
+    // points at it, and the bundle then holds a row that resolves to nothing:
+    // served to every device, skipped by every device, forever, with each
+    // cursor moving past it. The pager already refuses to hand a child over
+    // without its parent; this is the same rule on the way in.
+    const { bundle } = mergeIntoBundle(
+      null,
+      changeSet({
+        sessions: [session('s1', T0, { venueId: 'never-sent' })],
+        hands: [hand('h1', 's1', T0)],
+      }),
+      0, NOW,
+    );
+    expect(bundle.records.sessions.s1).toBeUndefined();
+    expect(bundle.records.hands.h1).toBeUndefined();
+  });
+
+  it('but takes one whose parent is in the same push', () => {
+    const { bundle } = mergeIntoBundle(
+      null,
+      changeSet({
+        venues: [venue('v1')],
+        sessions: [session('s1', T0)],
+        hands: [hand('h1', 's1', T0)],
+      }),
+      0, NOW,
+    );
+    expect(bundle.records.hands.h1).toBeDefined();
+  });
+
   it('drops a record with no id or no stamp', () => {
     const { bundle } = mergeIntoBundle(
       null,
@@ -462,6 +493,36 @@ describe('the three constraints, applied where the whole picture is', () => {
       expect(again.bundle.records.sessions[id].heardAt)
         .toBe(first.bundle.records.sessions[id].heardAt);
     }
+  });
+
+  it('does not close a real session for a duplicate it is about to delete', () => {
+    // The rules run in a fixed order, and the collision rule removes sessions.
+    // Running the contest first let a duplicate that exists only until the end
+    // of this merge close the session the player was actually sitting in, on
+    // the word of a row that no longer exists -- and which of the two happened
+    // depended on which push carried the duplicate, so the merge was not even
+    // commutative.
+    const first = changeSet({
+      venues: [venue('v1')],
+      sessions: [session('mine', T0, { endedAt: null, startedAt: T0 + HOUR })],
+    });
+    const second = changeSet({
+      sessions: [
+        session('kept', T0, { importKey: 'k', createdAt: T0, endedAt: T0 + HOUR }),
+        session('dupe', T0, {
+          importKey: 'k', createdAt: T0 + HOUR, endedAt: null, startedAt: T0 + 2 * HOUR,
+        }),
+      ],
+    });
+
+    const both = mergeIntoBundle(mergeIntoBundle(null, first, 0, NOW).bundle, second, 0, NOW).bundle;
+    expect(both.records.sessions.dupe.deletedAt).not.toBeNull();
+    expect(both.records.sessions.mine.record.endedAt).toBeNull();
+
+    // And the other way round gives the same answer, which is the property the
+    // ordering is really there for.
+    const other = mergeIntoBundle(mergeIntoBundle(null, second, 0, NOW).bundle, first, 0, NOW).bundle;
+    expect(other.records.sessions.mine.record.endedAt).toBeNull();
   });
 
   it('leaves one running session alone', () => {

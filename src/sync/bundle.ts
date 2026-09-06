@@ -752,6 +752,24 @@ export const mergeIntoBundle = (
       // that never left. See SYNC.md.
       if (!held && change.record.updatedAt < bundle.collectedThrough) continue;
 
+      // A record whose parent this server does not have is refused rather than
+      // stored. The tables are walked parents first, so a parent arriving in
+      // this same push is already here; one that is not here at all was either
+      // never sent or refused by the line below, and storing the child anyway
+      // leaves the bundle holding a row that resolves to nothing. Every device
+      // is then served it and skips it, forever, while its cursor moves past.
+      // The pager already refuses to *hand over* a child without its parent;
+      // this is the same rule on the way in.
+      const parent =
+        table === 'sessions'
+          ? change.record.venueId
+          : table === 'venues'
+            ? null
+            : change.record.sessionId;
+      if (typeof parent === 'string' && !bundle.records[table === 'sessions' ? 'venues' : 'sessions'][parent]) {
+        continue;
+      }
+
       const next = held ? (resolve(versioned(held), versioned(change)) as StoredChange) : change;
       const stored = heard(next, held, at);
       // Kept across a write from anybody else, because the mapping is about
@@ -765,13 +783,25 @@ export const mergeIntoBundle = (
     }
   }
 
-  // In order, and the order matters: closing a session changes which sessions
-  // are live, which is what the venue rule reads.
+  // In order, and the order matters twice over.
+  //
+  // Collisions first, because that rule *removes* sessions: a duplicate that
+  // exists only until the end of this merge could otherwise win the
+  // one-active-session contest and close the session the player is actually
+  // sitting in, permanently, on the word of a row that no longer exists. Which
+  // of the two happened depended on which push carried the duplicate, so the
+  // merge was not even commutative.
+  //
+  // Then the folding, so the activity read below counts a hand under the
+  // session it has just been moved onto rather than the one it left.
+  //
+  // And the venue rule last, because closing a session changes which sessions
+  // are live and that is what it reads.
+  settleImportCollisions(bundle, at);
+  settleFoldedChildren(bundle, at);
   const activity = lastActivity(bundle, now);
   settleActiveSessions(bundle, at, now, activity);
   settleSessionEnds(bundle, at, activity);
-  settleImportCollisions(bundle, at);
-  settleFoldedChildren(bundle, at);
   settleVenueTombstones(bundle, at);
 
   // Last, so it never collects a tombstone one of the rules above just wrote,

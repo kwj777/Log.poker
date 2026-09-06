@@ -39,6 +39,8 @@ import {
   buildSession,
   buildVenue,
   defaultContext,
+  importKeyFor,
+  importKeyOwners,
   type RepositoryContext,
 } from '../support';
 import {
@@ -258,18 +260,28 @@ export class DexieRepository implements Repository {
         // worse outcome than one row waiting for the next sync.
         const known = new Set((await this.db.venues.toArray()).map((venue) => venue.id));
 
+        // What will actually be written, worked out before anything is,
+        // because the import-key release below has to agree with it. A key
+        // released for a row that is then skipped strips the provenance off a
+        // local session on behalf of one that never arrived, and the staleness
+        // test refuses a row as flatly as a missing venue does.
+        const staleSessions = await newerHere(this.db.sessions, changes.sessions);
+        const arriving = changes.sessions.filter(
+          ({ record }) => known.has(record.venueId) && !staleSessions.has(record.id),
+        );
+
         // The same import-key release SQLite needs, for the same reason: the
         // `&importKey` index here is unique too, and `put` would reject the
-        // incoming row rather than the stale local one. Only for sessions that
-        // will actually be written, or a row that is then skipped takes a local
-        // session's provenance with it. See SqlRepository.
-        const claimed = new Map(
-          changes.sessions
-            .filter((change) => typeof change.record.importKey === 'string'
-              && change.record.importKey !== ''
-              && known.has(change.record.venueId))
-            .map((change) => [change.record.importKey, change.record.id]),
-        );
+        // incoming row rather than the stale local one. And the same tie to
+        // break when two arriving rows claim one key, for the same reason
+        // again: the rejection is thrown inside the transaction, so it costs
+        // the whole answer rather than the one row. See `importKeyOwners`.
+        const owners = importKeyOwners(arriving);
+        const claimed = new Map<string, string>();
+        for (const { record } of arriving) {
+          const key = importKeyFor(record, owners);
+          if (key !== null) claimed.set(key, record.id);
+        }
         if (claimed.size > 0) {
           for (const held of await this.db.sessions.toArray()) {
             const owner = held.importKey === undefined ? undefined : claimed.get(held.importKey);
@@ -278,11 +290,14 @@ export class DexieRepository implements Repository {
             await this.db.sessions.put(rest);
           }
         }
-        const staleSessions = await newerHere(this.db.sessions, changes.sessions);
+
         const stored = new Set<string>();
-        for (const { record, deletedAt } of changes.sessions) {
-          if (!known.has(record.venueId) || staleSessions.has(record.id)) continue;
-          await this.db.sessions.put({ ...fromSession(record), deletedAt });
+        for (const { record, deletedAt } of arriving) {
+          const key = importKeyFor(record, owners);
+          // Through `fromSession` rather than around it: a key it does not keep
+          // has to be absent from the record, not null, or every loser lands in
+          // the unique index under the same key. See `SessionRecord.importKey`.
+          await this.db.sessions.put({ ...fromSession({ ...record, importKey: key }), deletedAt });
           stored.add(record.id);
         }
 

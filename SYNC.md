@@ -753,6 +753,47 @@ make signing in feel like a thing you could lose your history to. Keying the
 database by subject is the other answer, and it means a device holds several
 logs and the free app has to pick one before anybody has signed in.
 
+### Four more, three of them about one row costing the whole sync
+
+**The merge was not commutative, and the loser was the session somebody was
+sitting in.** The rules ran in the order they were written, so the
+one-active-session contest read a duplicate that the collision rule was about to
+tombstone. A row that existed only until the end of that same merge could win
+the contest and close, permanently, the session the player was actually at the
+table for; which of the two got closed depended on which push happened to carry
+the duplicate. The collision rule runs first now, because it is the one that
+*removes* sessions, then the fold, then the activity read, and the venue rule
+last because closing a session changes what it looks at.
+
+**A record whose parent the server did not hold was stored anyway.** The pager
+takes care never to send a child ahead of its parent, and the intake took
+anything. So a session naming a venue that never arrived, or one lost to a
+device that never came back, sat in the bundle and was handed to every other
+device, each of which skipped it and moved its cursor past it: gone everywhere,
+for good. Intake refuses it now, which is the same rule the pager already keeps
+on the way out.
+
+**The import-key release still fired for a row that was then refused.** The
+release was gated on the venue having arrived, and a missing venue is only one
+of the two ways an answer gets refused. A session edited on this device after
+the server heard it loses to the local row and is never written, and the key
+went with it anyway: a real local session stripped of its provenance on behalf
+of a row that never landed, and the same CSV row importable a second time. Both
+refusals are decided up front now, before anything is released.
+
+**And one inconsistent row rolled back the whole answer.** Two arriving sessions
+can claim one import key, the index is unique in both engines, and the write
+that discovers that throws inside the transaction. So the answer was applied in
+full or not at all, against what `applyChanges` promises everywhere else, and
+the next sync was handed the same answer and failed the same way, for as long as
+both rows existed. One of them keeps the key now, picked by the rule the
+server's own fold uses (earliest `createdAt`, then lowest id, and a live row
+ahead of a tombstoned one) so that the provenance lands where the next answer
+will confirm it. The loser is stored without a key and loses nothing else: its
+id, its fields and its children all stay, and its stamp is untouched, because
+this is reconciling with a decision the server is already in the middle of
+making rather than an edit worth pushing back.
+
 ---
 
 ## What must not break

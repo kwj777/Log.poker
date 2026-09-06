@@ -50,6 +50,8 @@ import {
   buildSession,
   buildVenue,
   defaultContext,
+  importKeyFor,
+  importKeyOwners,
   type RepositoryContext,
 } from '../support';
 import { first, type SqlDriver, type SqlValue } from './driver';
@@ -356,20 +358,44 @@ export class SqlRepository implements Repository {
       //
       // After the venue set is known, and only for sessions that will actually
       // be written: releasing a key for a row that is then skipped strips the
-      // provenance off a local session in favour of one that never arrived, and
-      // the same CSV row can be imported a second time.
-      for (const { record } of changes.sessions) {
-        if (typeof record.importKey !== 'string' || record.importKey === '') continue;
-        if (!known.has(record.venueId)) continue;
+      // provenance off a local session on behalf of one that never arrived, and
+      // the same CSV row can then be imported a second time.
+      //
+      // Which is why the local stamps are read here rather than leaving
+      // staleness to the `WHERE` clause on the upsert. That clause refuses a
+      // row as flatly as a missing venue does, and the release was reading only
+      // the venue, so an answer that lost the race to a local edit still took
+      // the key with it.
+      const stamps = new Map(
+        (
+          await this.driver.all<{ id: string; updated_at: Timestamp }>(
+            `SELECT id, updated_at FROM sessions`,
+          )
+        ).map((row) => [row.id, row.updated_at]),
+      );
+      const arriving = changes.sessions.filter(({ record }) => {
+        if (!known.has(record.venueId)) return false;
+        const mine = stamps.get(record.id);
+        // The same `>=` the upsert applies, asked in advance.
+        return mine === undefined || record.updatedAt >= mine;
+      });
+
+      // And two arriving sessions can claim one key between them, which the
+      // unique index would refuse in the middle of the transaction and take the
+      // whole answer down with. One of them keeps it; see `importKeyOwners`.
+      const owners = importKeyOwners(arriving);
+
+      for (const { record } of arriving) {
+        const key = importKeyFor(record, owners);
+        if (key === null) continue;
         await this.driver.run(
           `UPDATE sessions SET import_key = NULL WHERE import_key = ? AND id <> ?`,
-          [record.importKey, record.id],
+          [key, record.id],
         );
       }
 
       const stored = new Set<string>();
-      for (const { record, deletedAt } of changes.sessions) {
-        if (!known.has(record.venueId)) continue;
+      for (const { record, deletedAt } of arriving) {
         await this.driver.run(
           `INSERT INTO sessions (
              id, venue_id, format, game_type, small_blind, big_blind, ante, currency,
@@ -402,7 +428,7 @@ export class SqlRepository implements Repository {
             record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
             record.stakes?.ante ?? null, record.currency, record.buyIn, record.fee,
             record.cashOut, record.entrants, record.finishPosition, record.startedAt,
-            record.endedAt, record.notes, record.importKey, record.createdAt,
+            record.endedAt, record.notes, importKeyFor(record, owners), record.createdAt,
             record.updatedAt, deletedAt,
           ],
         );

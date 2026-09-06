@@ -103,6 +103,41 @@ describe('a backlog that does not fit', () => {
     expect(batch.more).toBe(true);
   });
 
+  it('always moves the mark, even when the first record was already sent', () => {
+    // The floor is read one millisecond back, so the record that set the mark
+    // comes round again every time. Counting what has been taken rather than
+    // where the mark is let that record fill the batch, satisfy the test and
+    // break the loop at the same place forever: the mark never moved, the next
+    // round rebuilt the identical batch, and the device pushed nothing again
+    // for the rest of its life while reporting every round a success.
+    const alreadySent = venue('v1', T0);
+    const oversized = venue('v2', T0 + 1, { name: 'x'.repeat(4000) });
+    const after = venue('v3', T0 + 2);
+    const pending = changeSet({ venues: [alreadySent, oversized, after] });
+
+    const batch = batchFor(pending, T0, 700);
+    expect(batch.sent).toBeGreaterThan(T0);
+    expect(idsIn(batch.changes)).toContain('v2');
+  });
+
+  it('and keeps moving it round after round until the backlog is gone', () => {
+    // The property the one above buys: a loop that terminates.
+    const venues = Array.from({ length: 8 }, (_, index) => venue(`v${index}`, T0 + index));
+    let floor = 0;
+    const seen = new Set();
+    for (let round = 0; round < 12; round += 1) {
+      const left = venues.filter((change) => change.record.updatedAt > floor - 1);
+      if (left.length === 0) break;
+      const batch = batchFor(changeSet({ venues: left }), floor, 700);
+      for (const id of idsIn(batch.changes)) seen.add(id);
+      expect(batch.sent).toBeGreaterThanOrEqual(floor);
+      if (!batch.more) { floor = batch.sent; break; }
+      expect(batch.sent).toBeGreaterThan(floor);
+      floor = batch.sent;
+    }
+    expect(seen.size).toBe(8);
+  });
+
   it('cuts the same way twice, so a retry is the same request', () => {
     const pending = changeSet({
       venues: [venue('v1', T0), venue('v2', T0), venue('v3', T0)],

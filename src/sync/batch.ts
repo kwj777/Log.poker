@@ -150,9 +150,20 @@ export const batchFor = (
 
     const chain = closureOf(item);
     const cost = chain.reduce((sum, one) => sum + one.size, 0);
-    // The first record always goes, however large it is with its parents.
-    // Somewhere to make progress beats a budget nothing can fit inside.
-    if (taken.size > 0 && size + cost > cap) break;
+    // Over budget, and stopping here is only allowed once the mark has actually
+    // moved. `taken.size > 0` was the wrong test: a record that had already
+    // been sent is re-read every round, because the floor is read one
+    // millisecond back, so it filled the batch, satisfied that test, and let
+    // the loop break at the same place forever. The mark stayed where it was,
+    // the next round rebuilt the identical batch, and the device pushed nothing
+    // again for the rest of its life while reporting every round a success.
+    //
+    // Measured against the mark instead, the batch always contains at least one
+    // record the mark can move past, so every round makes progress. The cost is
+    // that a single record bigger than the budget goes anyway rather than
+    // wedging everything behind it -- and the budget is a quarter of what the
+    // endpoint will take, so it very likely still lands.
+    if (sent > floor && size + cost > cap) break;
 
     for (const one of chain) {
       batch[one.table].push(one.change);

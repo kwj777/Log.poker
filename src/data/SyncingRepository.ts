@@ -261,19 +261,20 @@ export class SyncingRepository implements Repository {
     const startedAt = this.clock();
 
     const cursors = await this.cursors.read();
-    // Never past this device's own clock, which is the one way a mark like this
-    // can silence a device for good. A phone with the wrong date writes a
-    // record stamped a year out and pushes it; the mark goes there, and the
-    // moment the date is corrected every later write is below it and
-    // `listChangedSince` answers with nothing, for a year, while Settings says
-    // the sync succeeded. The clamp costs re-sending that one future record on
-    // every sync until real time passes it, and re-sending is free.
+    // The floor is the mark and nothing else. It was briefly
+    // `Math.min(pushed, startedAt)`, which is the clock, and a floor at the
+    // clock excludes everything written before the clock: a device whose mark
+    // sat above its own time -- which is every device that has pulled a record
+    // from a device running a few minutes ahead -- read from *now* and so sent
+    // nothing it had written since the last sync, on every sync, while
+    // reporting each one a success. The case that clamp was for is handled
+    // where it belongs, on the mark itself: see the write below.
     //
-    // One millisecond back on top of that, for the reason the pull side reads
-    // `>=`: a record written in the very millisecond of the last one sent is
-    // otherwise never sent at all, and a venue and the session started on it
-    // are routinely the same millisecond.
-    const floor = Math.min(cursors.pushed, startedAt);
+    // One millisecond back, for the reason the pull side reads `>=`: a record
+    // written in the very millisecond of the last one sent is otherwise never
+    // sent at all, and a venue and the session started on it are routinely the
+    // same millisecond.
+    const floor = cursors.pushed;
     const pending = await this.local.listChangedSince(floor <= 0 ? 0 : floor - 1);
     // What is waiting, not what is going: a backlog too big for one request is
     // still a backlog, and reporting the batch would show zero left with years
@@ -345,15 +346,21 @@ export class SyncingRepository implements Repository {
       return;
     }
 
+    // Never above this device's own clock, which is the one way a mark can
+    // silence a device for good: a phone with next year's date pushes a record
+    // stamped next year, and once the date is corrected every later write is
+    // below the mark and nothing is ever read again. Capping here rather than
+    // at the floor costs re-sending whatever sits above the clock on each sync
+    // until real time passes it, and re-sending is free.
+    //
+    // The applied mark is only safe on a whole push. With a batch held back, it
+    // can sit above records this round did not send, and the mark would step
+    // over them for good.
+    const reached = batch.more ? batch.sent : Math.max(batch.sent, applied);
     await this.cursors.write({
       ...cursors,
       pulled: outcome.response.cursor,
-      // The applied mark is only safe on a whole push. With a batch held back,
-      // it can sit above records this round did not send, and the mark would
-      // step over them for good.
-      pushed: batch.more
-        ? batch.sent
-        : Math.max(batch.sent, Math.min(applied, startedAt)),
+      pushed: Math.min(reached, startedAt),
     });
 
     // Collect what the server has, and never more. Its line is drawn from every
@@ -366,11 +373,17 @@ export class SyncingRepository implements Repository {
     // deleting. The floor costs nothing when the clocks agree and bounds the
     // one case that hurts, a tombstone this device has never managed to push
     // being swept before it goes anywhere.
+    // And never at all on a round that held records back. The sweep deletes by
+    // `deletedAt` while the batch cuts by `updatedAt`, so a tombstone above the
+    // time cut was not in this body and is still older than the line: swept
+    // here, the delete is destroyed before it was ever offered to the server,
+    // and the row comes back down on the next pull. The same hazard the mark
+    // two blocks up is guarded against, on the half that was not.
     const line = Math.min(
       outcome.response.collectedThrough,
       this.clock() - TOMBSTONE_RETENTION_MS,
     );
-    if (line > 0) await this.local.collectTombstones(line);
+    if (!batch.more && line > 0) await this.local.collectTombstones(line);
 
     this.failures = 0;
     this.nextAttemptAt = 0;

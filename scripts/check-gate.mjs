@@ -12,23 +12,32 @@
  * `ALLOW_SIGN_IN` flips and a wrong key becomes a dead form in front of real
  * people.
  *
- *   npm run check:gate                  mint a token from a key you type
- *   npm run check:gate -- --token <t>   send a real one from a signed-in build
+ *   npm run check:gate                   mint a token from a key you type
+ *   npm run check:gate -- --signin <you@example.com>
+ *   npm run check:gate -- --token <t>    one you already have
  *   npm run check:gate -- --print-token
  *   npm run check:gate -- --origin https://deploy-preview-1--log.netlify.app
+ *   npm run check:gate -- --signin-origin https://deploy-preview-1--untilt.netlify.app
  *
  * Two different questions, and it is worth being clear which one is being
  * asked. Minting proves the key stored on the site is byte for byte the key you
- * typed here, and nothing more: paste damage, and only paste damage. A real
- * token from a signed-in build is the one that proves the key is *Untilt's*,
- * because Untilt is what signed it.
+ * typed here, and nothing more: paste damage, and only paste damage. A token
+ * Untilt signed is the one that proves the key is *Untilt's*, which is the
+ * question that actually matters, because the two apps agreeing is the whole
+ * feature.
+ *
+ * `--signin` gets that second token the way the app will: it asks Untilt to
+ * mail a code, takes the code, and trades it for a token. Two endpoints and no
+ * browser, which beats reading `localStorage` out of a dev build.
  *
  * The token this mints names the subject `gatecheck`, so a successful run
- * writes a bucket, and the run erases it again on the way out. A token you
- * supply belongs to a person, so nothing is ever erased in that mode.
+ * writes a bucket, and the run erases it again on the way out. A token that
+ * came from signing in belongs to a person, and nothing is ever erased in that
+ * mode.
  */
 
 import { createHmac } from 'node:crypto';
+import { createInterface } from 'node:readline/promises';
 
 /** Untilt's format, and the same one `src/sync/verify.ts` re-derives. */
 const TTL_SECONDS = 3600;
@@ -53,7 +62,18 @@ const valueOf = (name) => {
 
 const origin = valueOf('--origin') ?? 'https://log.poker';
 const given = valueOf('--token');
+const email = valueOf('--signin');
 const printing = args.includes('--print-token');
+
+/**
+ * Where the family's sign-in lives. One host mints for all three apps.
+ *
+ * Overridable for the same reason `--origin` is: a deploy preview of one half
+ * has to be checkable against the other. It is also what makes this flow
+ * testable end to end, which matters more than it sounds, because the sign-in
+ * path is the half that cannot be checked by reading it.
+ */
+const SIGNIN_ORIGIN = valueOf('--signin-origin') ?? 'https://untilt.poker';
 
 /* ------------------------------------------------------------- the reading */
 
@@ -131,8 +151,10 @@ const explain = (status, body, minted) => {
           'The key on the site is exactly the key you typed.',
           '',
           'That rules out a mangled paste. It does not yet prove the key is the one',
-          'Untilt signs with. For that, sign in on a dev build and run this again',
-          'with --token and the token it stored.',
+          'Untilt signs with, which is the half that matters, because the two apps',
+          'agreeing is the whole feature. For that:',
+          '',
+          '  npm run check:gate -- --signin <your email>',
         ]
       : [
           'That token verified. The key on the site is the key Untilt signs with,',
@@ -192,6 +214,86 @@ const explain = (status, body, minted) => {
   return [`Unexpected: ${status}. The body is above.`];
 };
 
+/* -------------------------------------------------------------- signing in */
+
+/** Echoed, unlike the key: a mailed code is not a secret once it is used. */
+const readLine = async (question) => {
+  const asking = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await asking.question(question)).trim();
+  } finally {
+    asking.close();
+  }
+};
+
+const askUntilt = async (path, body) => {
+  try {
+    return await fetch(`${SIGNIN_ORIGIN}${path}`, {
+      method: 'POST',
+      // Accept is what the endpoint keys on. Without it it answers the way it
+      // answers a browser, with a page and a cookie that cannot cross a
+      // registrable domain, and there would be no token in the body at all.
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return null;
+  }
+};
+
+const stop = (...lines) => {
+  say(...lines);
+  process.exit(1);
+};
+
+/**
+ * A token, minted by Untilt, the way the app will ask for one.
+ *
+ * The code and never the link. Mail opens a link in a browser, and a browser
+ * is the one place this token is no use, which is the reason the code flow
+ * exists at all.
+ */
+const signIn = async (address) => {
+  say(`Asking ${SIGNIN_ORIGIN} to mail a code to ${address}.`, '');
+
+  const asked = await askUntilt('/api/signin', { email: address });
+  if (asked === null) stop(`Could not reach ${SIGNIN_ORIGIN}.`);
+  if (asked.status === 429) stop('Asked too often. Untilt rate limits this; wait and retry.');
+  if (!asked.ok) stop(`Sign-in would not take that address (HTTP ${asked.status}).`);
+
+  say(
+    'Sent, if there was anywhere to send it.',
+    '',
+    'The endpoint answers the same whether or not it has heard of an address, on',
+    'purpose, so that nobody can use it to ask who has bought. So a 202 is not a',
+    'promise that mail is coming: if none arrives, that address has not bought.',
+    '',
+  );
+
+  const code = await readLine('Code from the email: ');
+  if (!code) stop('No code, so there is nothing to trade.');
+
+  const traded = await askUntilt('/api/signin/code', { email: address, code });
+  if (traded === null) stop(`Could not reach ${SIGNIN_ORIGIN}.`);
+  if (traded.status === 429) stop('Asked too often. Wait and retry.');
+  if (!traded.ok) stop(`That code was refused (HTTP ${traded.status}). Codes expire; ask again.`);
+
+  let token = null;
+  try {
+    token = (await traded.json())?.token ?? null;
+  } catch {
+    token = null;
+  }
+  // A 200 carrying something else is a server that changed under us, and
+  // sending a non-token onward as a token would report a wrong key.
+  if (typeof token !== 'string' || token === '') {
+    stop('Sign-in answered 200 without a token in it, which it should never do.');
+  }
+
+  say('', 'Untilt signed a token. Now to see whether Log agrees.', '');
+  return token;
+};
+
 /* --------------------------------------------------------------- the check */
 
 const send = async (method, token, body) => {
@@ -215,15 +317,20 @@ const send = async (method, token, body) => {
 
 const run = async () => {
   let token = given;
-  const minted = token === null;
+  // Only ever the one this run signed for itself. Everything downstream that
+  // is allowed to erase reads this, so it is set in exactly one place.
+  let minted = false;
 
-  if (minted) {
+  if (token === null && email !== null) {
+    token = await signIn(email);
+  } else if (token === null) {
     const secret = process.env.GATE_SECRET ?? (await readSecret());
     if (!secret) {
       say('No key given, so there is nothing to check.');
       process.exit(1);
     }
     token = mint(secret);
+    minted = true;
   }
 
   if (printing) {

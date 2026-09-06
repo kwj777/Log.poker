@@ -518,10 +518,15 @@ made. On anything else it says which of the reasons it was.
 
 That answers half the question. Minting proves the key stored on the site is
 byte for byte the key you typed, which rules out paste damage and nothing else.
-`npm run check:gate -- --token <t>`, with a token from a signed-in dev build,
-is the half that proves the key is Untilt's, because Untilt is what signed that
-one. In that mode nothing is ever erased: the token names a person, and their
-history is not a check's to tidy away.
+The half that matters is whether the key is *Untilt's*, because the two apps
+agreeing is the whole feature, and only a token Untilt signed can answer it.
+
+`npm run check:gate -- --signin <address>` gets one, the same way the app will:
+it asks Untilt to mail a code, takes the code, trades it for a token, and
+pushes that at Log. Two endpoints and no browser, which beats reading
+`localStorage` out of a dev build. `--token` takes one you already have.
+Nothing is ever erased in either of those modes: the token names a person, and
+their history is not a check's to tidy away.
 
 ### Collecting tombstones
 

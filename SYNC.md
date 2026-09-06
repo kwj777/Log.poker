@@ -175,6 +175,52 @@ by name, because every passcode holder shares it and syncing them would pour
 every preview visitor's history into one bucket. Log inherits that refusal and
 must inherit it explicitly rather than by luck.
 
+#### The token lasts thirty days, and nothing here renews it
+
+Checked against Untilt's `lib/access.js` as deployed. The two implementations of
+the format agree field for field -- four parts, the same expiry pattern, the
+same tiers, the same subject pattern, HMAC-SHA256 over the first three joined by
+dots, base64url unpadded -- and Log converts the expiry from seconds to
+milliseconds at the boundary, which is the one place the two would silently
+disagree if anybody moved it. Log will accept exactly the tokens Untilt mints.
+
+For thirty days. `COOKIE_MAX_AGE` is thirty days, `issueToken` stamps the expiry
+from it, and **there is no renewal path a bearer holder can use.**
+
+Untilt renews its own holders on every app open: `library.js` reads the aging
+cookie, asks Stripe what that customer is owed today, and slides the expiry.
+Its comment says why it exists, and the sentence is worth quoting because Log is
+now in the state it describes: *"A cookie lasts thirty days and used to be
+renewed never, which signed every paying customer out monthly -- and the first
+thing the app showed them next was the paywall, asking for money they had
+already paid."*
+
+None of that reaches Log. `library.js` reads the token with `readCookie` and
+returns it with `Set-Cookie`, and the cookie is `__Host-` prefixed, so it is
+scoped to Untilt's own origin with no `Domain` and a native app has no jar for
+it at all. That is not an oversight in `library.js`; it is the whole reason Log
+was given a bearer token in the first place.
+
+So on day thirty, on a device that has been syncing happily: `readClaim` returns
+null, `SessionManager.current()` **clears the stored token**, `getSession()`
+answers null, and `compose()` hands back the plain local repository. No wrapper
+is constructed, so there is no 401, no `problem` in the sync state, and nothing
+in Settings but the sign-in form quietly back where it was. Cross-device history
+stops, and the app gives no account of itself. The device also resumes sweeping
+its own tombstones on the local window, because that branch is the one it now
+takes.
+
+The fix is the treatment `signin.js` already got: an endpoint that will take
+`Authorization: Bearer <token>`, verify it, run the renewal Stripe check that
+`library.js` runs, and answer a family origin -- or a caller with no `Origin` at
+all, which is the native case -- with `{ token }` as JSON. Log then asks for a
+fresh one on launch whenever the one it holds is inside the renew window, which
+is the ten days of thirty `library.js` already uses. Most of that work is in
+Untilt's repository rather than this one, exactly as the sign-in half was.
+
+Until it exists, sync is a thirty-day feature, and that is worth knowing before
+`GATE_SECRET` is set rather than a month afterwards.
+
 ### 4. The entitlement
 
 One non-consumable, `log_plus`, checked at the store layer. Log's offering sells

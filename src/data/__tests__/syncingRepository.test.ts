@@ -618,6 +618,58 @@ describe('what the loop does with a bad day', () => {
     expect(held.calls).toBeGreaterThan(2);
   });
 
+  it('sends what a slow-clocked device wrote between syncs', async () => {
+    // The push mark rises to whatever the newest record in the backlog says,
+    // and that includes records pulled from a device running a few minutes
+    // ahead. Once the mark sits above this device's own clock, a floor that
+    // clamped to the clock read from *now* and so skipped everything written
+    // before now: every write between syncs, on every sync, silently, with
+    // each round reported a success.
+    const SKEW = 10 * 60_000;
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    let counter = 0;
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now - SKEW },
+      ids: { next: () => `slow-${String(++counter).padStart(3, '0')}` },
+    });
+    await local.init();
+    const laptop = new SyncingRepository(
+      local,
+      'a.b.c.d',
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-slow0001' }),
+      { fetch },
+      () => now - SKEW,
+    );
+
+    await startSession(phone, 'Aria');
+    await phone.push(true);
+    tick(60_000);
+    await laptop.push(true);
+    tick(60_000);
+    await laptop.push(true);
+
+    // Written on the slow clock, with no signal, so it is still waiting when
+    // the next sync comes round.
+    tick(60_000);
+    held.offline = true;
+    const venue = await laptop.createVenue({ name: 'Bellagio', isHomeGame: false });
+    await laptop.push(true).catch(() => undefined);
+    held.offline = false;
+
+    // And several ordinary syncs later, it has to be on the other device.
+    for (const step of [2, 3, 4, 5]) {
+      tick(step * 60_000);
+      await laptop.push(true);
+    }
+    await phone.push(true);
+    expect((await phone.listVenues()).map((v) => v.name).sort()).toContain('Bellagio');
+    expect(await phone.getVenue(venue.id)).not.toBeNull();
+  });
+
   it('keeps trying after the local database throws, rather than going quiet', async () => {
     // `run` clears the dirty flag before it reads anything, so a throw past
     // that point loses the write, records no failure, arms no backoff, and

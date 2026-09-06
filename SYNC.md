@@ -490,6 +490,25 @@ Log's Netlify site, the same value Untilt signs with, and then `ALLOW_SIGN_IN`
 flips. Until that is true the endpoint answers 503 to everything, which is the
 state to leave it in.
 
+There is no code to write for the variable itself: `netlify/functions/sync.mts`
+reads it and hands it down, and nothing else in the repository looks for it.
+The one code change is `ALLOW_SIGN_IN` in `src/config.ts`, which is a
+build-time constant so that the sign-in card is stripped from a production
+bundle rather than merely hidden, and a test asserts its current value so it
+cannot flip by accident.
+
+Two things about the value. It has to be **byte for byte** what Untilt signs
+with, because the signature is re-derived rather than looked up; a key that is
+merely close answers 401 to everybody, forever, and that looks exactly like
+nobody having signed in. The endpoint writes the reason to the deploy log for
+that case, `signature` where the key is wrong and `expired` where it is not,
+never into the answer, which stays the 401 a stranger should get.
+
+And it is effectively **write once**. Bucket names are an HMAC of the subject
+under the same key, so changing it later does not rotate anything: it orphans
+every bucket that exists, and the history in them is no longer reachable from
+any token.
+
 ### Collecting tombstones
 
 Built, and it turned out to be the one piece where the obvious implementation is

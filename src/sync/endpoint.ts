@@ -40,7 +40,7 @@
 
 import { mergeIntoBundle } from './bundle';
 import { BUNDLE_VERSION } from './protocol';
-import { bearerFrom, bucketFor, hasOwnBucket, maySync, verifyToken } from './verify';
+import { bearerFrom, bucketFor, checkToken, hasOwnBucket, maySync } from './verify';
 
 /** What this needs from a blob store, and nothing more. */
 export interface BlobStore {
@@ -163,8 +163,24 @@ export const handleSync = async (
   }
 
   const now = clock();
-  const claim = await verifyToken(secret, bearerFrom(request.headers.get('authorization')), now);
-  if (claim === null) return json({ error: 'unauthorized' }, 401);
+  const checked = await checkToken(
+    secret,
+    bearerFrom(request.headers.get('authorization')),
+    now,
+  );
+  if ('refused' in checked) {
+    // The reason goes to the deploy log and never into the answer, which stays
+    // the same 401 it was: which half of a token is wrong is as useful to
+    // somebody guessing as it is to us.
+    //
+    // Everything but `absent`, which is not a diagnosis. A request with no
+    // bearer header at all is a scanner, and this is a public URL.
+    if (checked.refused !== 'absent') {
+      console.error(`sync: refusing a token: ${checked.refused}`);
+    }
+    return json({ error: 'unauthorized' }, 401);
+  }
+  const claim = checked.claim;
   // 403 rather than 401: the token is fine, the subject is not, and telling
   // them apart is the difference between "sign in again" and "not you".
   if (!hasOwnBucket(claim)) return json({ error: 'forbidden' }, 403);

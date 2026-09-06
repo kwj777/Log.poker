@@ -95,15 +95,28 @@ const isRow = (value: unknown): value is Row => {
  * person can only ever corrupt their own bundle, and "only their own" is not a
  * reason to let them.
  */
-const sanitize = (change: unknown, now: Timestamp): Change<Row> | null => {
+interface Sanitized {
+  change: Change<Row>;
+  /** Whether this server had to pull the stamp back to its own clock. */
+  clamped: boolean;
+  /** The stamp the device sent, which is what identifies the write. */
+  raw: Timestamp;
+}
+
+const sanitize = (change: unknown, now: Timestamp): Sanitized | null => {
   if (typeof change !== 'object' || change === null) return null;
   const { record, deletedAt } = change as { record?: unknown; deletedAt?: unknown };
   if (!isRow(record)) return null;
 
-  const stamped: Row = { ...record, updatedAt: clampStamp(record.updatedAt, now) };
-  if (deletedAt === null || deletedAt === undefined) return { record: stamped, deletedAt: null };
+  const raw = record.updatedAt;
+  const stamp = clampStamp(raw, now);
+  const clamped = stamp !== raw;
+  const stamped: Row = { ...record, updatedAt: stamp };
+  if (deletedAt === null || deletedAt === undefined) {
+    return { change: { record: stamped, deletedAt: null }, clamped, raw };
+  }
   if (typeof deletedAt !== 'number' || !Number.isFinite(deletedAt)) return null;
-  return { record: stamped, deletedAt: clampStamp(deletedAt, now) };
+  return { change: { record: stamped, deletedAt: clampStamp(deletedAt, now) }, clamped, raw };
 };
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -197,14 +210,27 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
     if (typeof held !== 'object' || held === null) continue;
     for (const [id, change] of Object.entries(held as Record<string, unknown>)) {
       if (RESERVED.has(id)) continue;
-      const clean = sanitize(change, Number.MAX_SAFE_INTEGER);
-      if (!clean || clean.record.id !== id) continue;
+      const sane = sanitize(change, Number.MAX_SAFE_INTEGER);
+      if (!sane || sane.change.record.id !== id) continue;
+      const clean = sane.change;
       // The server's own stamp, kept as written. An entry with none was stored
       // by a version that had none, and is stamped now: see above.
-      const { heardAt } = change as { heardAt?: unknown };
+      const { heardAt, clamped: wasClamped } = change as { heardAt?: unknown; clamped?: unknown };
       const at =
         !migrating && typeof heardAt === 'number' && Number.isFinite(heardAt) ? heardAt : now;
-      bundle.records[table][id] = { ...clean, heardAt: at };
+      const entry: StoredChange = { ...clean, heardAt: at };
+      // What this server already decided about a stamp from the future, kept so
+      // it is not decided again every time that record is re-sent.
+      if (typeof wasClamped === 'object' && wasClamped !== null) {
+        const { from, to } = wasClamped as { from?: unknown; to?: unknown };
+        if (
+          typeof from === 'number' && Number.isFinite(from) &&
+          typeof to === 'number' && Number.isFinite(to)
+        ) {
+          entry.clamped = { from, to };
+        }
+      }
+      bundle.records[table][id] = entry;
       if (at > bundle.heardThrough) bundle.heardThrough = at;
     }
   }
@@ -587,6 +613,27 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
     }
   }
 
+  // And whatever is left pointing at a session that is not here any more.
+  //
+  // A live child can sit under a session tombstone: another device logs a hand
+  // on a session this one has already deleted, and nothing reconciles the pair.
+  // Both device engines take that child with the session when they sweep, and
+  // this did not, so collecting the tombstone left the hand behind pointing at
+  // an id that exists nowhere. Nothing could ever remove it: it is live, so the
+  // sweep above skips it; no rule touches it; and no device will push a
+  // tombstone for it, because every device already dropped it in its own sweep.
+  // It is served in every full pull from then on and skipped by every device
+  // that receives it, one row per hand logged on a session somebody else had
+  // just deleted.
+  for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
+    for (const [id, change] of Object.entries(bundle.records[table])) {
+      const sessionId = change.record.sessionId;
+      if (typeof sessionId !== 'string' || bundle.records.sessions[sessionId]) continue;
+      delete bundle.records[table][id];
+      collected += 1;
+    }
+  }
+
   // A fold is remembered only for as long as the tombstone it names. Once that
   // is collected there is nothing left to move anything off, and a child still
   // pointing at it went in the same sweep.
@@ -672,10 +719,28 @@ export const mergeIntoBundle = (
   for (const table of SYNC_TABLES) {
     const list = sent[table];
     if (!Array.isArray(list)) continue;
-    for (const raw of list) {
-      const change = sanitize(raw, now);
-      if (change === null) continue;
+    for (const item of list) {
+      const sane = sanitize(item, now);
+      if (sane === null) continue;
+      const { change, clamped, raw } = sane;
       const held = bundle.records[table][change.record.id];
+
+      // Clamped once, not once per request.
+      //
+      // A row above its own device's clock stays above that device's push mark,
+      // so it is re-sent on every sync. Clamped afresh each time, it was given
+      // a stamp later than anything anybody else had written, so it beat every
+      // real edit, was broadcast to everyone, and could not be corrected: the
+      // device holding it refuses the corrected copy coming back, because its
+      // own stamp is still a year larger.
+      //
+      // The raw stamp identifies the write, so a push carrying one this server
+      // has clamped before is answered with the stamp it gave that write the
+      // first time. A genuinely new edit from the same wrong clock carries a
+      // different raw stamp and is clamped fresh, so it still lands.
+      if (clamped && held?.clamped?.from === raw) {
+        change.record.updatedAt = held.clamped.to;
+      }
 
       // The backstop for a device that was away longer than the whole retention
       // window and has already been forgotten. A record the server has never
@@ -688,7 +753,15 @@ export const mergeIntoBundle = (
       if (!held && change.record.updatedAt < bundle.collectedThrough) continue;
 
       const next = held ? (resolve(versioned(held), versioned(change)) as StoredChange) : change;
-      bundle.records[table][change.record.id] = heard(next, held, at);
+      const stored = heard(next, held, at);
+      // Kept across a write from anybody else, because the mapping is about
+      // the device that keeps sending that stamp, not about who last touched
+      // the record. Dropping it here is what let the stale row win again the
+      // moment somebody edited what it was overwriting.
+      const memory = clamped ? { from: raw, to: change.record.updatedAt } : held?.clamped;
+      bundle.records[table][change.record.id] = memory
+        ? { ...stored, clamped: memory }
+        : stored;
     }
   }
 

@@ -96,6 +96,17 @@ export interface SyncRow {
  */
 export interface StoredChange extends Change<SyncRow> {
   heardAt: Timestamp;
+  /**
+   * What this server did to a stamp from the future, remembered so it is only
+   * done once.
+   *
+   * A record above its own device's clock stays above that device's push mark,
+   * so it is re-sent on every sync. Clamping it afresh each time gave it a
+   * stamp later than anything anybody else had written, so it beat every real
+   * edit and could not be corrected. `from` is the stamp the device keeps
+   * sending, which identifies the write; `to` is what this server used instead.
+   */
+  clamped?: { from: Timestamp; to: Timestamp };
 }
 
 /**

@@ -190,7 +190,23 @@ export class SyncingRepository implements Repository {
    * the caller is every write in the app.
    */
   async push(force = false): Promise<void> {
-    if (this.inFlight) return this.inFlight;
+    if (this.inFlight) {
+      await this.inFlight;
+      // A run lets go of its flag one microtask after it decides to stop, and a
+      // write can land in that gap: it sets `dirty`, calls here, joins a run
+      // that has already decided there is nothing more to send, and is never
+      // sent by anything. Settings then says nothing is waiting, and the write
+      // reaches the other device only when the player happens to type something
+      // else. So a joiner asks again rather than taking the answer.
+      //
+      // **Not covered by a test.** The window is one microtask wide and needs a
+      // local write to resolve inside it; two attempts at a reproduction passed
+      // against the unfixed code, which makes them worse than nothing. The fix
+      // is here because it is three lines and cannot make anything worse, not
+      // because it was demonstrated.
+      if (!this.dirty) return;
+      if (this.inFlight) return this.inFlight;
+    }
     if (this.halted) return;
     if (!force && !this.dirty && this.state.lastSyncedAt !== null) return;
     if (!force && this.waiting()) return;

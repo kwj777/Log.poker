@@ -395,7 +395,13 @@ export class SyncingRepository implements Repository {
     this.announce({
       running: false,
       problem: null,
-      pending: 0,
+      // What is still waiting, which on a round that held records back is not
+      // zero. The loop comes round again while it can, and each round
+      // overwrites this with the truth, so the lie only ever showed on the
+      // round the loop stopped on -- which is the one a player reads: a backlog
+      // above five rounds ended here reporting a sync that had just succeeded
+      // with nothing left to send, and thousands of records still here.
+      pending: batch.more ? countChanges(pending) - countChanges(batch.changes) : 0,
       lastSyncedAt: this.clock(),
     });
   }
@@ -525,5 +531,15 @@ export class SyncingRepository implements Repository {
     await this.cursors.write({ pulled: 0, pushed: 0, device });
     this.dirty = true;
     this.announce({ lastSyncedAt: null, pending: 0 });
+
+    // And ask for it back, which the comment above has always promised and this
+    // never did. Every other write on this class goes through `touched`, which
+    // pushes; this one did not, so a reset device sat empty until the player
+    // typed something into it or quit and reopened the app -- and the device
+    // this is most likely to be used on is the one nobody types into.
+    void this.push().catch(() => {
+      // The truncate has already happened, which is what was asked for. The
+      // log comes back on the next sync either way.
+    });
   }
 }

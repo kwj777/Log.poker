@@ -727,6 +727,50 @@ describe('what the loop does with a bad day', () => {
     expect((await laptop.listSessions())).toHaveLength(6);
   });
 
+  it('says what is still waiting when a round could not send it all', async () => {
+    // Every round but the last overwrites this with the true count, so the lie
+    // only ever showed on the round the loop stopped on -- which is the one a
+    // player reads. A backlog above five rounds ended reporting a sync that had
+    // just succeeded with nothing left to send, and thousands of records here.
+    const { held, fetch } = server();
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    let counter = 0;
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `full-${String(++counter).padStart(3, '0')}` },
+    });
+    await local.init();
+    const phone = new SyncingRepository(
+      local,
+      'a.b.c.d',
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-heavy001' }),
+      { fetch, budget: 400 },
+      () => now,
+    );
+
+    held.offline = true;
+    const venue = await phone.createVenue({ name: 'Aria', isHomeGame: false });
+    for (let index = 0; index < 20; index += 1) {
+      tick(HOUR);
+      await phone.createSession({
+        venueId: venue.id, format: 'cash', gameType: 'NLHE',
+        stakes: { smallBlind: 100, bigBlind: 200 }, buyIn: 30_000, startedAt: now,
+      });
+    }
+    // Drained while still offline, so the forced push below is its own run
+    // rather than a join onto one that had already failed.
+    await phone.push(true).catch(() => undefined);
+    held.offline = false;
+
+    await phone.push(true);
+    // The loop stopped with records still to go, and it says so.
+    expect(phone.current().pending).toBeGreaterThan(0);
+    expect(countChanges(await phone.listChangedSince(0))).toBeGreaterThan(
+      phone.current().pending,
+    );
+  });
+
   it('keeps trying after the local database throws, rather than going quiet', async () => {
     // `run` clears the dirty flag before it reads anything, so a throw past
     // that point loses the write, records no failure, arms no backoff, and
@@ -903,8 +947,11 @@ describe('resetting a device', () => {
     await laptop.clearAll();
     expect(await laptop.listSessions()).toEqual([]);
 
-    tick(HOUR);
-    await laptop.push(true);
+    // Nothing is pushed here on purpose. `clearAll` promises the next sync
+    // brings the log back, and it has to be the one that asks for it: this test
+    // used to supply the call itself, which is why nothing noticed that a reset
+    // device sat empty until somebody typed into it or reopened the app.
+    for (let spin = 0; spin < 50; spin += 1) await Promise.resolve();
     expect((await laptop.getSession(session.id))?.id).toBe(session.id);
 
     // And the phone still has it, which is the half that would be a disaster.

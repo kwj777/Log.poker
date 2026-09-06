@@ -30,9 +30,10 @@
  * 3. **Apply the three constraint rules**, which is the part a per-record merge
  *    cannot do, because each of them is about a pair of records that are each
  *    fine alone. See `src/domain/merge.ts`.
- * 4. **Sweep, and only then record who asked.** A device is stamped as caught
- *    up after the sweep rather than before it, or the request in which it asks
- *    for a tombstone is the request that decides nobody is waiting for one.
+ * 4. **Sweep, against what every device has said it has.** A device is recorded
+ *    at the cursor it sent, never at the clock and never at the answer it is
+ *    about to be handed: an answer proves nothing until the device comes back
+ *    with a number that covers it.
  *
  * The rules themselves live in the domain and are shared with the client, which
  * calls none of them today. One implementation, two possible callers, is the
@@ -643,22 +644,29 @@ export const mergeIntoBundle = (
   // from somebody else's backup. Re-pulling is free; being told nothing is not.
   const from = since > bundle.heardThrough ? 0 : Math.max(0, since);
 
-  // What this device has acknowledged, which is not the same as when it asked.
+  // What this device has acknowledged, which is the number it sent and nothing
+  // else.
   //
   // The map exists so a tombstone is not collected before every device has it,
   // and the only proof of that is the cursor a device sends: it writes one only
-  // after it has applied the answer that produced it. Recording the moment of
-  // the request instead trusts an answer that may never have arrived, and now
-  // that a cursor and a `heardAt` are the same kind of number, the honest
-  // version costs nothing.
+  // after it has applied the answer that produced it.
   //
-  // A device asking from nothing is recorded at this request's own stamp
-  // instead, because it is about to be handed the whole bundle and so cannot be
-  // waiting on any part of it. Recording its zero would freeze collection until
-  // it came back.
-  if (namesADevice(device)) {
-    bundle.devices[device] = { acked: from > 0 ? from : at, seen: now };
-  }
+  // Two other values have been tried here and both were wrong. The moment of
+  // the request credits an answer that may never have arrived. The stamp this
+  // request minted credits a number the device is not even handed, because the
+  // stamp is only spent if something was written -- and now that an answer can
+  // be cut short, the cursor is the cut rather than the end of the bundle, so
+  // crediting the answer would have a device claiming records it is still
+  // waiting for the moment a pull is paged.
+  //
+  // A device asking from nothing is recorded at nothing, and collection stalls
+  // until it comes back and says where it got to. That is the honest answer:
+  // this server does not know what it has. It costs tombstones sitting a while
+  // longer, and it is bounded by the forget threshold either way.
+  //
+  // Recorded before the sweep, because the number is the device's own and the
+  // sweep is the thing it has to be allowed to hold up.
+  if (namesADevice(device)) bundle.devices[device] = { acked: from, seen: now };
 
   const sent = (incoming ?? {}) as Record<string, unknown>;
   for (const table of SYNC_TABLES) {

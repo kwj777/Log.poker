@@ -529,10 +529,14 @@ describe('the three constraints, applied where the whole picture is', () => {
     ).bundle;
     expect(bundle.folded.b).toBe('a');
 
-    // Two rounds past the window, which is what it takes for one device to
-    // acknowledge and then sweep.
+    // Threading the cursor back in, because a device that keeps asking from
+    // nothing is a device that has never confirmed anything, and collection
+    // waits for it.
+    let cursor = 0;
     for (const clock of [T0 + 100 * DAY, T0 + 100 * DAY + HOUR, T0 + 100 * DAY + 2 * HOUR]) {
-      bundle = mergeIntoBundle(bundle, changeSet({}), 0, clock, only).bundle;
+      const merged = mergeIntoBundle(bundle, changeSet({}), cursor, clock, only);
+      bundle = merged.bundle;
+      cursor = merged.cursor;
     }
     expect(bundle.records.sessions.b).toBeUndefined();
     expect(bundle.folded).toEqual({});
@@ -862,6 +866,24 @@ describe('collecting tombstones', () => {
     expect(bundle.records.sessions.b).toBeDefined();
   });
 
+  it('never credits a device with a cursor it was not given', () => {
+    // Two wrong values have been in here. The stamp the request minted is only
+    // spent if something is written, so a plain pull recorded a device as
+    // having taken a number it was never handed. And the answer's own cursor
+    // credits an answer that may never have arrived, which is the one thing
+    // acknowledgements exist to stop.
+    const phone = syncer('device-aaaa0001');
+    const first = phone.sync(null, changeSet({ venues: [venue('v1')] }), T0);
+    expect(first.bundle.devices['device-aaaa0001'].acked).toBe(0);
+
+    // A pull that writes nothing still hands back a cursor, and the mark moves
+    // to what the device sent, which is the cursor it took last time.
+    const second = phone.sync(first.bundle, changeSet({}), T0 + HOUR);
+    expect(second.bundle.devices['device-aaaa0001'].acked).toBe(first.cursor);
+    expect(second.bundle.devices['device-aaaa0001'].acked)
+      .toBeLessThanOrEqual(second.bundle.heardThrough);
+  });
+
   it('records a device that names itself, and serves one that does not', () => {
     const named = mergeIntoBundle(null, changeSet({}), 0, T0, 'device-aaaa0001');
     expect(Object.keys(named.bundle.devices)).toEqual(['device-aaaa0001']);
@@ -916,20 +938,23 @@ describe('a device that was away longer than the whole window', () => {
    * ever deleted.
    */
   const swept = () => {
-    let bundle: unknown = mergeIntoBundle(
-      null,
-      changeSet({ venues: [venue('v1')], sessions: [session('deleted-long-ago')] }),
-      0, T0, 'device-aaaa0001',
-    ).bundle;
-    bundle = mergeIntoBundle(
-      bundle,
-      changeSet({ sessions: [{ ...session('deleted-long-ago', T0), deletedAt: T0 }] }),
-      0, T0, 'device-aaaa0001',
-    ).bundle;
+    // The cursor is threaded back in, as a real device does: a device that
+    // keeps asking from nothing has never confirmed anything, and collection
+    // waits for it rather than guessing.
+    let bundle: unknown = null;
+    let cursor = 0;
+    const round = (changes: unknown, clock: number) => {
+      const merged = mergeIntoBundle(bundle, changes, cursor, clock, 'device-aaaa0001');
+      bundle = merged.bundle;
+      cursor = merged.cursor;
+    };
+    round(changeSet({ venues: [venue('v1')], sessions: [session('deleted-long-ago')] }), T0);
+    round(changeSet({ sessions: [{ ...session('deleted-long-ago', T0), deletedAt: T0 }] }), T0);
     // Two syncs past the window, not one: the first is the one that hands the
     // tombstone over, and only the second may sweep it. See `collect`.
-    bundle = mergeIntoBundle(bundle, changeSet({}), 0, LATER, 'device-aaaa0001').bundle;
-    return mergeIntoBundle(bundle, changeSet({}), 0, LATER + HOUR, 'device-aaaa0001').bundle;
+    round(changeSet({}), LATER);
+    round(changeSet({}), LATER + HOUR);
+    return bundle as Bundle;
   };
 
   it('cannot resurrect a row whose tombstone was collected', () => {

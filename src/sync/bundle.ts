@@ -144,9 +144,10 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
   const bundle = emptyBundle();
   if (typeof stored !== 'object' || stored === null) return bundle;
 
-  const { records, devices, collectedThrough, heardThrough, version } = stored as {
+  const { records, devices, folded, collectedThrough, heardThrough, version } = stored as {
     records?: unknown;
     devices?: unknown;
+    folded?: unknown;
     collectedThrough?: unknown;
     heardThrough?: unknown;
     version?: unknown;
@@ -171,6 +172,14 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
       if (typeof acked !== 'number' || !Number.isFinite(acked)) continue;
       if (typeof seen !== 'number' || !Number.isFinite(seen)) continue;
       bundle.devices[id] = { acked: Math.max(0, acked), seen: Math.max(0, seen) };
+    }
+  }
+
+  if (typeof folded === 'object' && folded !== null) {
+    for (const [loser, keeper] of Object.entries(folded as Record<string, unknown>)) {
+      if (RESERVED.has(loser) || typeof keeper !== 'string' || keeper === '') continue;
+      if (loser === keeper) continue;
+      bundle.folded[loser] = keeper;
     }
   }
 
@@ -251,25 +260,39 @@ const derived = (record: Row): Timestamp => record.updatedAt + 1;
  * `endedAt` and **no cash-out**, which leaves it neither active nor complete, so
  * it stays out of every total until the player says what came off the table.
  */
-const settleActiveSessions = (bundle: Bundle, at: Timestamp, now: Timestamp): void => {
-  const sessions = bundle.records.sessions;
-  const running = Object.values(sessions).filter(
-    (change) => change.deletedAt === null && change.record.endedAt === null,
-  );
-  if (running.length < 2) return;
-
-  const activityBySession = new Map<string, Timestamp>();
+/**
+ * The last thing logged against each session, on this clock.
+ *
+ * Clamped, because it is a stamp off whichever device wrote the hand and it
+ * ends up in a session's `endedAt`, where a wrong one is visible for years.
+ */
+const lastActivity = (bundle: Bundle, now: Timestamp): Map<string, Timestamp> => {
+  const activity = new Map<string, Timestamp>();
   for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
     for (const change of Object.values(bundle.records[table])) {
       if (change.deletedAt !== null) continue;
       const sessionId = change.record.sessionId;
       const at = change.record.at;
       if (typeof sessionId !== 'string' || !Number.isFinite(at)) continue;
-      const seen = activityBySession.get(sessionId);
+      const seen = activity.get(sessionId);
       const stamped = clampStamp(at as Timestamp, now);
-      if (seen === undefined || stamped > seen) activityBySession.set(sessionId, stamped);
+      if (seen === undefined || stamped > seen) activity.set(sessionId, stamped);
     }
   }
+  return activity;
+};
+
+const settleActiveSessions = (
+  bundle: Bundle,
+  at: Timestamp,
+  now: Timestamp,
+  activityBySession: Map<string, Timestamp>,
+): void => {
+  const sessions = bundle.records.sessions;
+  const running = Object.values(sessions).filter(
+    (change) => change.deletedAt === null && change.record.endedAt === null,
+  );
+  if (running.length < 2) return;
 
   // This is the one rule that reads a field the server otherwise carries
   // through untouched, and `sanitize` validates only an id and a stamp. So the
@@ -318,6 +341,37 @@ const settleActiveSessions = (bundle: Bundle, at: Timestamp, now: Timestamp): vo
 };
 
 /**
+ * A session cannot end before the last thing logged inside it.
+ *
+ * The rule above closes a session at whatever activity had reached the server
+ * by then, and a hand pushed after that used to leave the end standing where it
+ * was: a session whose own last hand is outside it, which is wrong on the
+ * screen and wrong in every total that reads the span.
+ *
+ * Only where there is no cash-out, which is the state the rule leaves behind
+ * and the one the app calls "needs a cash-out". A completed session's end is
+ * the player's answer to what came off the table, and nothing here revises it.
+ */
+const settleSessionEnds = (
+  bundle: Bundle,
+  at: Timestamp,
+  activityBySession: Map<string, Timestamp>,
+): void => {
+  for (const [id, change] of Object.entries(bundle.records.sessions)) {
+    if (change.deletedAt !== null) continue;
+    const { endedAt, cashOut } = change.record;
+    if (!Number.isFinite(endedAt) || cashOut !== null) continue;
+    const activity = activityBySession.get(id);
+    if (activity === undefined || activity <= (endedAt as Timestamp)) continue;
+    bundle.records.sessions[id] = {
+      record: { ...change.record, endedAt: activity, updatedAt: derived(change.record) },
+      deletedAt: null,
+      heardAt: at,
+    };
+  }
+};
+
+/**
  * One import key is one session, however many devices imported the same file.
  *
  * The loser is tombstoned and anything logged against it moves across, because
@@ -342,23 +396,48 @@ const settleImportCollisions = (bundle: Bundle, at: Timestamp): void => {
       };
     }
 
-    const moving = new Set(collision.reparent.map((move) => move.from));
-    if (moving.size === 0) continue;
-    for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
-      for (const [id, change] of Object.entries(bundle.records[table])) {
-        if (change.deletedAt !== null) continue;
-        if (typeof change.record.sessionId !== 'string') continue;
-        if (!moving.has(change.record.sessionId)) continue;
-        bundle.records[table][id] = {
-          record: {
-            ...change.record,
-            sessionId: collision.keep.id,
-            updatedAt: derived(change.record),
-          },
-          deletedAt: null,
-          heardAt: at,
-        };
-      }
+    // Remembered rather than acted on here, so a child that arrives after the
+    // fold is moved too. `settleFoldedChildren` does the moving, every merge.
+    for (const move of collision.reparent) bundle.folded[move.from] = move.to;
+  }
+};
+
+/**
+ * Move what is logged against a folded session onto the one it was folded into.
+ *
+ * Runs every merge rather than only when a collision fires, which is the whole
+ * point: the collision is gone by the second merge, and a hand pushed after it
+ * would otherwise name a tombstone for the rest of its short life.
+ *
+ * The row was a duplicate. A hand somebody wrote a note on is not.
+ */
+const settleFoldedChildren = (bundle: Bundle, at: Timestamp): void => {
+  if (Object.keys(bundle.folded).length === 0) return;
+
+  /** Through a chain of folds, and never round one. */
+  const keeperFor = (id: string): string => {
+    const walked = new Set<string>([id]);
+    let held = id;
+    for (;;) {
+      const next = bundle.folded[held];
+      if (next === undefined || walked.has(next)) return held;
+      walked.add(next);
+      held = next;
+    }
+  };
+
+  for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
+    for (const [id, change] of Object.entries(bundle.records[table])) {
+      if (change.deletedAt !== null) continue;
+      const sessionId = change.record.sessionId;
+      if (typeof sessionId !== 'string' || bundle.folded[sessionId] === undefined) continue;
+      const keeper = keeperFor(sessionId);
+      if (keeper === sessionId) continue;
+      bundle.records[table][id] = {
+        record: { ...change.record, sessionId: keeper, updatedAt: derived(change.record) },
+        deletedAt: null,
+        heardAt: at,
+      };
     }
   }
 };
@@ -470,6 +549,13 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
     }
   }
 
+  // A fold is remembered only for as long as the tombstone it names. Once that
+  // is collected there is nothing left to move anything off, and a child still
+  // pointing at it went in the same sweep.
+  for (const loser of Object.keys(bundle.folded)) {
+    if (!bundle.records.sessions[loser]) delete bundle.folded[loser];
+  }
+
   // Only when something actually went. The line is "below here a tombstone may
   // have been removed", and it arms the refusal below; advancing it on a sweep
   // that removed nothing would refuse records from any device that had simply
@@ -559,8 +645,11 @@ export const mergeIntoBundle = (
 
   // In order, and the order matters: closing a session changes which sessions
   // are live, which is what the venue rule reads.
-  settleActiveSessions(bundle, at, now);
+  const activity = lastActivity(bundle, now);
+  settleActiveSessions(bundle, at, now, activity);
+  settleSessionEnds(bundle, at, activity);
   settleImportCollisions(bundle, at);
+  settleFoldedChildren(bundle, at);
   settleVenueTombstones(bundle, at);
 
   // Last, so it never collects a tombstone one of the rules above just wrote,

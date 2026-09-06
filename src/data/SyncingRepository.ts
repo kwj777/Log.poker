@@ -30,6 +30,7 @@
  */
 
 import type { Timestamp } from '../domain/types';
+import { batchFor } from '../sync/batch';
 import { backoffMs, sync, type SyncOptions } from '../sync/client';
 import { SYNC_TABLES, countChanges, isEmptyChangeSet, type SyncFailure } from '../sync/protocol';
 import { TOMBSTONE_RETENTION_MS } from './repository';
@@ -90,6 +91,16 @@ export const memoryCursorStore = (
   };
 };
 
+/**
+ * What the wrapper needs beyond the client's own options.
+ *
+ * The budget is the size of one push, and it exists as a knob only so a test
+ * can meet it with six records instead of six thousand. Nothing sets it.
+ */
+export interface SyncingOptions extends SyncOptions {
+  budget?: number;
+}
+
 export interface SyncState {
   /** When the last sync succeeded, or null if none has. */
   lastSyncedAt: Timestamp | null;
@@ -105,7 +116,7 @@ export class SyncingRepository implements Repository {
   private readonly local: Repository;
   private readonly token: string;
   private readonly cursors: CursorStore;
-  private readonly options: SyncOptions;
+  private readonly options: SyncingOptions;
   private readonly clock: () => Timestamp;
 
   /** Set by every write. Cleared only once the server has taken the change. */
@@ -143,7 +154,7 @@ export class SyncingRepository implements Repository {
     local: Repository,
     token: string,
     cursors: CursorStore = memoryCursorStore(),
-    options: SyncOptions = {},
+    options: SyncingOptions = {},
     clock: () => Timestamp = Date.now,
   ) {
     this.local = local;
@@ -263,22 +274,20 @@ export class SyncingRepository implements Repository {
     // otherwise never sent at all, and a venue and the session started on it
     // are routinely the same millisecond.
     const floor = Math.min(cursors.pushed, startedAt);
-    const changes = await this.local.listChangedSince(floor <= 0 ? 0 : floor - 1);
-    const outgoing = countChanges(changes);
-    this.announce({ pending: outgoing });
+    const pending = await this.local.listChangedSince(floor <= 0 ? 0 : floor - 1);
+    // What is waiting, not what is going: a backlog too big for one request is
+    // still a backlog, and reporting the batch would show zero left with years
+    // of it still here.
+    this.announce({ pending: countChanges(pending) });
 
-    // The high-water mark of what is actually going up, which is what `pushed`
-    // becomes if this succeeds. Taken from the records rather than from the
-    // clock, so a record written during the request stays newer than it.
-    let sent = floor;
-    for (const table of SYNC_TABLES) {
-      for (const change of changes[table]) {
-        if (change.record.updatedAt > sent) sent = change.record.updatedAt;
-      }
-    }
+    // Split when it has to be, which for every ordinary sync it does not.
+    // See `batchFor`: a first push with years behind it is over the endpoint's
+    // cap, and an oversized body is refused rather than trimmed.
+    const batch = batchFor(pending, floor, this.options.budget);
+    if (batch.more) this.dirty = true;
 
     const outcome = await sync(
-      { since: cursors.pulled, changes, device: cursors.device },
+      { since: cursors.pulled, changes: batch.changes, device: cursors.device },
       this.token,
       this.options,
     );
@@ -339,7 +348,12 @@ export class SyncingRepository implements Repository {
     await this.cursors.write({
       ...cursors,
       pulled: outcome.response.cursor,
-      pushed: Math.max(sent, Math.min(applied, startedAt)),
+      // The applied mark is only safe on a whole push. With a batch held back,
+      // it can sit above records this round did not send, and the mark would
+      // step over them for good.
+      pushed: batch.more
+        ? batch.sent
+        : Math.max(batch.sent, Math.min(applied, startedAt)),
     });
 
     // Collect what the server has, and never more. Its line is drawn from every

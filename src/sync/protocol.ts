@@ -121,6 +121,20 @@ export interface Bundle {
    */
   devices: Record<string, DeviceMark>;
   /**
+   * Which session each folded import was folded into, loser to keeper.
+   *
+   * The import rule tombstones a duplicate and moves what was logged against it
+   * onto the survivor, and it can only move what is in the bundle when it
+   * fires. A hand pushed after that names a session that is now a tombstone,
+   * and there is no collision left for the rule to notice: it sits there
+   * invisible until the tombstone is collected and takes it. So the decision is
+   * remembered rather than re-derived.
+   *
+   * Server bookkeeping, like `heardAt`. It never goes on the wire, and it is
+   * dropped for a loser once that tombstone has been collected.
+   */
+  folded: Record<string, string>;
+  /**
    * The newest stamp this server has issued, and never a stamp it will reuse.
    *
    * Every `heardAt` comes from here rather than straight from the clock, and
@@ -165,6 +179,7 @@ export const emptyBundle = (): Bundle => ({
   version: BUNDLE_VERSION,
   records: { venues: {}, sessions: {}, rebuys: {}, hands: {}, moodEntries: {} },
   devices: {},
+  folded: {},
   heardThrough: 0,
   collectedThrough: 0,
 });

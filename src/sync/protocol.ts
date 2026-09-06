@@ -175,11 +175,30 @@ export interface DeviceMark {
   seen: Timestamp;
 }
 
+/**
+ * A map with no prototype, which is the only kind safe to key on a string
+ * somebody else chose.
+ *
+ * Every map in a bundle is keyed by an id or a device name off the wire. On an
+ * ordinary object, `held['toString']` is a function and `held['__proto__']` is
+ * `Object.prototype`, so a lookup that means "is there an entry for this?"
+ * answers yes for a dozen names nobody ever stored, and an assignment to one of
+ * them either vanishes or rewrites the object. Guarding each read is a list to
+ * keep in step with; having no prototype is the property itself.
+ */
+const bare = <T>(): Record<string, T> => Object.create(null) as Record<string, T>;
+
 export const emptyBundle = (): Bundle => ({
   version: BUNDLE_VERSION,
-  records: { venues: {}, sessions: {}, rebuys: {}, hands: {}, moodEntries: {} },
-  devices: {},
-  folded: {},
+  records: {
+    venues: bare(),
+    sessions: bare(),
+    rebuys: bare(),
+    hands: bare(),
+    moodEntries: bare(),
+  },
+  devices: bare(),
+  folded: bare(),
   heardThrough: 0,
   collectedThrough: 0,
 });

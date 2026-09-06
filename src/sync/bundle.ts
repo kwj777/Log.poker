@@ -40,6 +40,7 @@
  */
 
 import {
+  CLOCK_ALLOWANCE_MS,
   clampStamp,
   resolve,
   resolveActiveSessions,
@@ -106,12 +107,16 @@ const sanitize = (change: unknown, now: Timestamp): Change<Row> | null => {
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 /**
- * Keys that are not keys.
+ * Keys that are not keys, kept as a second line rather than the only one.
  *
- * `__proto__` is an ordinary string in JSON and a setter on a plain object, so
- * a map built by assignment has its prototype rewritten rather than gaining an
- * entry. All three are nine characters or fewer of `[A-Za-z0-9_-]`, so the
- * device pattern above admits them too.
+ * Every map in a bundle is now built with no prototype (see `emptyBundle`), so
+ * none of these can reach anything by inheritance and none of them rewrites the
+ * object they are assigned to. This list stays because it is cheap and because
+ * it was the only defense for one merge: `settleFoldedChildren` read its map
+ * with a bare index, and a child naming `toString` was handed a function to
+ * store as its session. The list would not have caught that one -- `toString`
+ * is not on it -- which is the argument for fixing the shape rather than
+ * lengthening the list.
  */
 const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -261,10 +266,26 @@ const derived = (record: Row): Timestamp => record.updatedAt + 1;
  * it stays out of every total until the player says what came off the table.
  */
 /**
- * The last thing logged against each session, on this clock.
+ * A stamp this server is willing to believe, or null.
  *
- * Clamped, because it is a stamp off whichever device wrote the hand and it
- * ends up in a session's `endedAt`, where a wrong one is visible for years.
+ * Not clamped. Clamping a future stamp answers `now`, and `now` moves: a rule
+ * that stored the result compared it against the value it stored last time,
+ * found a later one, and wrote the record again -- on every request, for the
+ * life of the bundle, re-sending that session to every device each time. A
+ * stamp the server cannot place is not evidence of anything, so it is dropped
+ * rather than bent into a number that will be different next second.
+ */
+const believable = (stamp: unknown, now: Timestamp): Timestamp | null =>
+  typeof stamp === 'number' && Number.isFinite(stamp) && stamp <= now + CLOCK_ALLOWANCE_MS
+    ? stamp
+    : null;
+
+/**
+ * The last thing logged against each session that this server can place in time.
+ *
+ * It ends up in a session's `endedAt`, where a wrong one is visible for years,
+ * so a hand stamped next year contributes nothing rather than dragging the
+ * session's end along behind the clock.
  */
 const lastActivity = (bundle: Bundle, now: Timestamp): Map<string, Timestamp> => {
   const activity = new Map<string, Timestamp>();
@@ -272,11 +293,10 @@ const lastActivity = (bundle: Bundle, now: Timestamp): Map<string, Timestamp> =>
     for (const change of Object.values(bundle.records[table])) {
       if (change.deletedAt !== null) continue;
       const sessionId = change.record.sessionId;
-      const at = change.record.at;
-      if (typeof sessionId !== 'string' || !Number.isFinite(at)) continue;
+      const at = believable(change.record.at, now);
+      if (typeof sessionId !== 'string' || at === null) continue;
       const seen = activity.get(sessionId);
-      const stamped = clampStamp(at as Timestamp, now);
-      if (seen === undefined || stamped > seen) activity.set(sessionId, stamped);
+      if (seen === undefined || at > seen) activity.set(sessionId, at);
     }
   }
   return activity;
@@ -312,12 +332,24 @@ const settleActiveSessions = (
   const candidates: ActiveSession[] = [];
   for (const change of running) {
     const { startedAt, createdAt } = change.record;
-    if (!Number.isFinite(startedAt)) continue;
+    // A session this server cannot place in time is left out of the contest
+    // entirely: it cannot win it and it cannot be closed by it.
+    //
+    // It used to be clamped to `now` instead, which is worse than useless.
+    // `now` is later than every real session's start, so a session stamped next
+    // year won the contest on every request and closed whichever one the player
+    // was actually sitting in, for as long as it took real time to catch up.
+    // And it moves, so the ranking was different every second.
+    //
+    // Two sessions left running is a visible oddity. That was a session ending
+    // itself under somebody every time they sat down.
+    const ranked = believable(startedAt, now);
+    if (ranked === null) continue;
     candidates.push({
       session: {
         ...(change.record as unknown as Session),
-        startedAt: clampStamp(startedAt as Timestamp, now),
-        createdAt: Number.isFinite(createdAt) ? clampStamp(createdAt as Timestamp, now) : 0,
+        startedAt: ranked,
+        createdAt: believable(createdAt, now) ?? 0,
       },
       lastActivityAt: activityBySession.get(change.record.id) ?? null,
     });
@@ -326,7 +358,11 @@ const settleActiveSessions = (
 
   for (const closed of resolveActiveSessions(candidates).close) {
     const held = sessions[closed.session.id];
-    if (!held || !Number.isFinite(closed.endedAt)) continue;
+    // And never at or below zero. Zero is the web engine's sentinel for a
+    // session that has not ended (`OPEN_SESSION_ENDED_AT`), so a session
+    // written with it reads as still running in the browser and as ended in
+    // 1970 on the phone: the same row, two answers, forever.
+    if (!held || !Number.isFinite(closed.endedAt) || closed.endedAt <= 0) continue;
     sessions[closed.session.id] = {
       record: {
         ...held.record,

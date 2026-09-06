@@ -645,8 +645,9 @@ takes no code; flipping the flag afterwards is one line. The value has to be
 byte for byte what Untilt signs with, and it cannot be changed later without
 orphaning every bucket, because a bucket name is an HMAC of the subject under
 that same key. `npm run check:gate` asks the deployed endpoint whether the key
-it holds is the one you have, and says in plain words what came back. See
-SYNC.md.
+it holds is the one you have, and `npm run check:gate -- --signin <address>`
+asks the harder half, whether it is the key Untilt signs with. Both say in
+plain words what came back. See SYNC.md.
 
 **One round trip does both halves.** A device sends what it changed and what it
 last saw; it gets back everything it has not seen. `netlify/functions/sync.mts`

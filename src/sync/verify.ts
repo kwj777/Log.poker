@@ -48,26 +48,69 @@ const sign = async (secret: string, payload: string): Promise<string> => {
 };
 
 /**
- * What a token proves, or null if it proves nothing.
+ * Why a token proved nothing.
+ *
+ * Four answers where there used to be one, and they exist for the deploy log
+ * rather than for the caller: every one of them is still a 401 on the wire,
+ * because telling somebody which part of their token is wrong is telling an
+ * attacker the same thing.
+ *
+ * `signature` is the one worth having. It is the only symptom of the key here
+ * not being the key Untilt signs with, and on the day this endpoint is turned
+ * on that is the single likeliest thing to be wrong. Without it, a wrong key
+ * looks exactly like nobody having signed in: silence, and a 401.
+ */
+export type Refusal = 'absent' | 'malformed' | 'signature' | 'expired';
+
+export type Checked = { claim: Claim } | { refused: Refusal };
+
+/**
+ * What a token proves, and what was wrong with it if it proves nothing.
  *
  * Fails closed on everything: no secret, no token, a shape this build does not
- * recognize, an expiry in the past, a signature under another key. A caller
- * that forgets to check the result gets `null` and a `TypeError`, rather than
- * an object that quietly means "anybody".
+ * recognize, a signature under another key, an expiry in the past.
+ *
+ * The signature is checked before the expiry, which is the other way round from
+ * how this read before. Two reasons, and they agree. The useful one: a token
+ * that is both expired and wrongly signed says `signature`, because the expiry
+ * is one person's problem and the key is everybody's. The ordinary one: nothing
+ * should act on a claim it has not verified, and an expiry is a claim.
+ */
+export const checkToken = async (
+  secret: string,
+  token: string | null,
+  now: Timestamp,
+): Promise<Checked> => {
+  if (!secret || token === null) return { refused: 'absent' };
+
+  // Parsed with nothing to compare the expiry against, so that an expired token
+  // can be told apart from a malformed one. `readClaim` takes the moment rather
+  // than exposing the shape check separately, and this is the only caller that
+  // needs the two answers apart.
+  const claim = readClaim(token, Number.NEGATIVE_INFINITY);
+  if (claim === null) return { refused: 'malformed' };
+
+  const parts = token.split('.');
+  const expected = await sign(secret, parts.slice(0, 3).join('.'));
+  if (!safeEqual(parts[3], expected)) return { refused: 'signature' };
+
+  return claim.expiresAt <= now ? { refused: 'expired' } : { claim };
+};
+
+/**
+ * The same question with the reason thrown away.
+ *
+ * Every caller that only wants the gate goes through here, so there is one
+ * place that decides what counts as a valid token and one place that has ever
+ * decided it.
  */
 export const verifyToken = async (
   secret: string,
   token: string | null,
   now: Timestamp,
 ): Promise<Claim | null> => {
-  if (!secret || token === null) return null;
-
-  const claim = readClaim(token, now);
-  if (claim === null) return null;
-
-  const parts = token.split('.');
-  const expected = await sign(secret, parts.slice(0, 3).join('.'));
-  return safeEqual(parts[3], expected) ? claim : null;
+  const checked = await checkToken(secret, token, now);
+  return 'claim' in checked ? checked.claim : null;
 };
 
 /**

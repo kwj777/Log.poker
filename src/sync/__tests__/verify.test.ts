@@ -10,7 +10,7 @@
 
 import { createHmac } from 'node:crypto';
 
-import { bearerFrom, bucketFor, maySync, verifyToken } from '../verify';
+import { bearerFrom, bucketFor, checkToken, maySync, verifyToken } from '../verify';
 import { readClaim } from '../../auth/token';
 
 const NOW = 1_700_000_000_000;
@@ -62,6 +62,61 @@ describe('verifying a token', () => {
 
   it('refuses no token at all', async () => {
     expect(await verifyToken(SECRET, null, NOW)).toBeNull();
+  });
+});
+
+/**
+ * The same gate, asked for a reason as well as an answer.
+ *
+ * All four are still a 401 on the wire. They exist so that the deploy log can
+ * say which one, because on the day this endpoint is turned on the difference
+ * between "the key here is not Untilt's key" and "nobody has signed in" is the
+ * difference between an afternoon and a fortnight.
+ */
+describe('why a token was refused', () => {
+  it('says nothing was sent', async () => {
+    expect(await checkToken(SECRET, null, NOW)).toEqual({ refused: 'absent' });
+  });
+
+  it('says nothing was set, which is the same silence from this end', async () => {
+    expect(await checkToken('', mint(), NOW)).toEqual({ refused: 'absent' });
+  });
+
+  it('says malformed for something that is not a token at all', async () => {
+    expect(await checkToken(SECRET, 'hello', NOW)).toEqual({ refused: 'malformed' });
+    expect(await checkToken(SECRET, `${mint()}.extra`, NOW)).toEqual({ refused: 'malformed' });
+  });
+
+  it('says signature when the key is the wrong key', async () => {
+    // The one that matters. Every other symptom of a wrong `GATE_SECRET` is
+    // indistinguishable from nobody having signed in.
+    expect(await checkToken(SECRET, mint({ secret: OTHER }), NOW)).toEqual({
+      refused: 'signature',
+    });
+  });
+
+  it('says expired for a good token that has run out', async () => {
+    expect(await checkToken(SECRET, mint({ ttl: -1 }), NOW)).toEqual({ refused: 'expired' });
+  });
+
+  it('and says signature, not expired, when both are wrong', async () => {
+    // The expiry is one person's problem. The key is everybody's.
+    expect(await checkToken(SECRET, mint({ secret: OTHER, ttl: -1 }), NOW)).toEqual({
+      refused: 'signature',
+    });
+  });
+
+  it('hands back the claim when there is nothing wrong with it', async () => {
+    expect(await checkToken(SECRET, mint(), NOW)).toEqual({
+      claim: { expiresAt: expect.any(Number), tier: 'full', subject: 'cus_QRS123' },
+    });
+  });
+
+  it('and `verifyToken` is that answer with the reason dropped', async () => {
+    // One place decides what a valid token is, so the gate and the log can
+    // never come to different conclusions about the same request.
+    expect(await verifyToken(SECRET, mint({ ttl: -1 }), NOW)).toBeNull();
+    expect(await verifyToken(SECRET, mint(), NOW)).not.toBeNull();
   });
 });
 

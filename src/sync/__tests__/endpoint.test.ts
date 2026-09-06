@@ -174,6 +174,42 @@ describe('what has to be true before a byte is stored', () => {
     expect((await post(null, push(), fakeStore())).status).toBe(401);
   });
 
+  it('and writes down which half of it was wrong, without saying so in the answer', async () => {
+    // A 401 that never says why is the right answer to a stranger and a
+    // terrible one to whoever set the key. The reason goes to the deploy log,
+    // where only the person reading the deploy can see it.
+    const said: string[] = [];
+    const logged = jest.spyOn(console, 'error').mockImplementation((...parts) => {
+      said.push(parts.join(' '));
+    });
+    try {
+      const forged = (await mint()).replace(/.$/, 'x');
+      const answer = await post(forged, push(), fakeStore());
+
+      expect(answer.status).toBe(401);
+      expect(await answer.json()).toEqual({ error: 'unauthorized' });
+      // The one that means the key here is not the key Untilt signs with.
+      expect(said).toEqual(['sync: refusing a token: signature']);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('but stays quiet for a request with no token, which is a scanner', async () => {
+    // This is a public URL. A log line per unauthenticated GET is a log nobody
+    // can read on the one day they need to.
+    const said: string[] = [];
+    const logged = jest.spyOn(console, 'error').mockImplementation((...parts) => {
+      said.push(parts.join(' '));
+    });
+    try {
+      expect((await post(null, push(), fakeStore())).status).toBe(401);
+      expect(said).toEqual([]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   it('refuses a passcode holder before it opens the store at all', async () => {
     // Every passcode holder shares the subject, so a bucket for it would be
     // one bucket for every preview visitor.

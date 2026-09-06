@@ -24,7 +24,17 @@
  *   GATE_SECRET   required. The same key Untilt signs tokens with.
  *
  * Unset, this refuses every request, which is the state to leave it in until
- * there is something to sync.
+ * there is something to sync. There is no code to write to set it: it is read
+ * here and passed down, and nothing else in the repository looks for it.
+ *
+ * Two things about the value, both of which are easier to get right now than
+ * later. It has to be **byte for byte** what Untilt signs with, because the
+ * signature is re-derived rather than looked up, and a key that is merely close
+ * answers 401 to everybody forever; the deploy log says `signature` when that
+ * is what happened, which is the only way to tell it from nobody having signed
+ * in. And it is effectively **write once**: bucket names are an HMAC of the
+ * subject under this same key, so changing it later does not rotate anything,
+ * it orphans every bucket that exists.
  */
 
 import { getStore } from '@netlify/blobs';

@@ -12,6 +12,8 @@
 import type { ReactNode } from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';
 
+import { BOTTOM_BAR_ID } from '../src/config';
+
 /**
  * Registered from the document rather than from React so the worker is installed
  * even if the bundle is slow or fails, and only in a production build: a service
@@ -48,16 +50,31 @@ if ('serviceWorker' in navigator) {
  * intermittent: `overflow: hidden` on the body means Safari never gets the
  * scroll it collapses that toolbar for, so the toolbar is always there.
  *
- * `100dvh` is the height of what is actually visible, browser chrome excluded,
- * and it is the whole fix. Behind `@supports`, so a browser that does not know
- * the unit keeps exactly the behavior it has today rather than losing its
- * height entirely.
+ * `100dvh` is the height of the window as it currently stands, and it got most
+ * of the way. Not all of it, because Safari's compact toolbar **overlays** that
+ * height rather than reducing it, so the last of the bar was still underneath.
  *
- * The safe-area padding on the tab bar stays and does not double up with this.
- * The two never both apply: with a toolbar covering the bottom of the window
- * Safari reports no inset, because the toolbar already sits between the content
- * and the home indicator, and installed to the home screen there is no toolbar
- * and the inset is the whole of what lifts the bar clear.
+ * `100svh` is the height with every toolbar at its largest, which is the one
+ * measurement guaranteed to be clear of them. But sizing the app to it would
+ * leave a strip of page below the bar whenever the toolbar is smaller than its
+ * largest, which is most of the time.
+ *
+ * So: the app is `100dvh` and fills the window, and the bar carries the
+ * difference as padding.
+ *
+ *     max(env(safe-area-inset-bottom), calc(100dvh - 100svh))
+ *
+ * `100dvh - 100svh` is exactly how much of the window the browser is sitting on
+ * top of right now: zero when it is not, and the toolbar's height when it is.
+ * The `max` is the other case, and the two are never both non-zero. In a
+ * browser the toolbar is what clears the home indicator, so the inset is zero.
+ * Installed to the home screen there is no toolbar, the difference is zero, and
+ * the inset is the whole of what lifts the bar clear.
+ *
+ * It is written here rather than in `TabBar` because a React Native style
+ * cannot say `calc(100dvh - 100svh)`, and `!important` because the component
+ * writes the inset it can see into the same property. That inset is the left
+ * half of the `max` above, so nothing is lost by winning.
  */
 const BASE_STYLE = `
 html, body, #root { background-color: #1c211f; }
@@ -66,6 +83,12 @@ body { overscroll-behavior-y: none; }
 
 @supports (height: 100dvh) {
   html, body, #root { height: 100dvh; }
+}
+
+@supports (height: 100svh) {
+  #${BOTTOM_BAR_ID} {
+    padding-bottom: max(env(safe-area-inset-bottom), calc(100dvh - 100svh)) !important;
+  }
 }
 `;
 

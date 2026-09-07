@@ -311,6 +311,52 @@ describe('the app links out to the guides', () => {
   });
 });
 
+/**
+ * The one screen where the app is a web page on a phone.
+ *
+ * Every other layout question is the same on all three platforms. This one is
+ * not, and it is invisible everywhere the app is actually run during
+ * development: on a phone Log is a real app, and on a desktop browser the
+ * chrome is at the top.
+ */
+describe('the app shell in a phone browser', () => {
+  const shell = read('app', '+html.tsx');
+  const style = /const BASE_STYLE = `([\s\S]*?)`;/.exec(shell)?.[1] ?? '';
+
+  it('is as tall as the visible window rather than the layout viewport', () => {
+    // iOS Safari's layout viewport runs on behind its own bottom toolbar, so
+    // `height: 100%` puts the tab bar underneath it with the labels cut in
+    // half. `dvh` is the height of what can actually be seen.
+    expect(style).toContain('height: 100dvh');
+  });
+
+  it('and only inside `@supports`, or an older browser is left with no height', () => {
+    const guarded = /@supports \(height: 100dvh\) \{[^}]*\}[^}]*\}/.exec(style)?.[0] ?? '';
+    expect(guarded).toContain('html, body, #root { height: 100dvh; }');
+    // Nowhere else in the CSS, which is what makes the guard mean anything.
+    expect(style.match(/100dvh/g)).toHaveLength((guarded.match(/100dvh/g) ?? []).length);
+  });
+
+  it('and after the reset it is correcting, or the reset wins', () => {
+    expect(shell.indexOf('<ScrollViewStyleReset />')).toBeGreaterThan(-1);
+    expect(shell.indexOf('<ScrollViewStyleReset />')).toBeLessThan(shell.indexOf('BASE_STYLE }'));
+  });
+
+  it('and that reset still says the thing being corrected', () => {
+    // The fix is an override of somebody else's stylesheet. If expo changes
+    // what it sets, this file is either redundant or wrong, and either way
+    // somebody should find out here rather than on a phone.
+    const reset = readFileSync(require.resolve('expo-router/build/static/html.js'), 'utf8');
+    expect(reset).toContain('#root,body,html{height:100%}');
+  });
+
+  it('with `viewport-fit=cover`, or no inset ever reaches the layout', () => {
+    // The other half, and the one that keeps the bar off the home indicator
+    // once the app is installed to the home screen and there is no toolbar.
+    expect(shell).toContain('viewport-fit=cover');
+  });
+});
+
 describe('the family links', () => {
   it('point the app link at the app rather than the marketing site', () => {
     expect(FAMILY_LINKS.log).toBe('https://log.poker/app');

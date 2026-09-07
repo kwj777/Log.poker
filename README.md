@@ -752,7 +752,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 37 passed
-Tests:       1082 passed
+Tests:       1084 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -783,7 +783,7 @@ Tests:       1082 passed
   seed               14   the demo dataset stays coherent
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
-  gateCheck           9   the key-on-the-site script, run rather than read
+  gateCheck          11   the key-on-the-site script, run rather than read
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it

@@ -52,7 +52,7 @@ describe('the token the gate check mints', () => {
 /* ------------------------------------------------------------- signing in */
 
 /** One server standing in for both halves: Untilt's sign-in and Log's sync. */
-const stubs = (code: string) => {
+const stubs = (code: string, refuseSignIn: { status: number; body: string } | null = null) => {
   const seen: { method: string; path: string; accept?: string; body: string }[] = [];
   const server = createServer((request, response) => {
     let raw = '';
@@ -68,7 +68,14 @@ const stubs = (code: string) => {
         body: raw,
       });
 
-      if (path === '/api/signin') return void response.writeHead(202).end();
+      if (path === '/api/signin') {
+        if (refuseSignIn !== null) {
+          return void response
+            .writeHead(refuseSignIn.status, { 'content-type': 'application/json' })
+            .end(refuseSignIn.body);
+        }
+        return void response.writeHead(202).end();
+      }
 
       if (path === '/api/signin/code') {
         if (JSON.parse(raw).code !== code) {
@@ -107,6 +114,12 @@ describe('signing in for a token Untilt actually minted', () => {
   let server: Server;
   let seen: { method: string; path: string; accept?: string; body: string }[];
   let origin: string;
+
+  const stand = async (refuse: { status: number; body: string } | null = null) => {
+    server.close();
+    ({ server, seen } = stubs(CODE, refuse));
+    origin = await listening(server);
+  };
 
   beforeEach(async () => {
     ({ server, seen } = stubs(CODE));
@@ -173,6 +186,27 @@ describe('signing in for a token Untilt actually minted', () => {
     const said = await run('000000');
     expect(said).toContain('That code was refused');
     expect(seen.map((request) => request.path)).not.toContain('/api/sync');
+  });
+
+  it('reads a 503 as the site rather than as the address', async () => {
+    // The failure whoever is running this is likeliest to hit, because they are
+    // running it having just configured the site. Reporting it as "would not
+    // take that address" sends them to look at their own email.
+    await stand({ status: 503, body: '{"error":"unreachable"}' });
+    const said = await run(CODE);
+    expect(said).toContain('the site rather than the address');
+    expect(said).toContain('RESEND_API_KEY');
+    expect(said).toContain('SIGNIN_FROM');
+    expect(said).not.toContain('would not take that address');
+    expect(seen.map((request) => request.path)).not.toContain('/api/sync');
+  });
+
+  it('and names GATE_SECRET when that is the one the endpoint says is missing', async () => {
+    await stand({ status: 503, body: '{"error":"off"}' });
+    const said = await run(CODE);
+    expect(said).toContain('GATE_SECRET is not set');
+    // Not the mailer. The endpoint said which, so the check should not guess.
+    expect(said).not.toContain('RESEND_API_KEY');
   });
 });
 

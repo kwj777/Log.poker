@@ -10,8 +10,19 @@
 
 import { createHmac } from 'node:crypto';
 
-import { bearerFrom, bucketFor, checkToken, maySync, verifyToken } from '../verify';
-import { readClaim } from '../../auth/token';
+import {
+  SUBJECT_PREFIX,
+  TOKEN_TTL_MS,
+  bearerFrom,
+  bucketFor,
+  checkToken,
+  hasOwnBucket,
+  mintToken,
+  normalizeEmail,
+  subjectForEmail,
+  verifyToken,
+} from '../verify';
+import { readClaim, SUBJECT_PASSCODE } from '../../auth/token';
 
 const NOW = 1_700_000_000_000;
 const SECRET = 'a-gate-secret';
@@ -121,24 +132,28 @@ describe('why a token was refused', () => {
 });
 
 describe('who may sync', () => {
-  it('lets a paid subject through', async () => {
-    expect(maySync(await verifyToken(SECRET, mint(), NOW))).toBe(true);
+  it('lets a subject of their own through', async () => {
+    expect(hasOwnBucket(await verifyToken(SECRET, mint(), NOW))).toBe(true);
   });
 
-  it('refuses the free tier', async () => {
-    expect(maySync(await verifyToken(SECRET, mint({ tier: 'free' }), NOW))).toBe(false);
+  it('lets the free tier through too, because sync is free', async () => {
+    // The gate this replaces was `hasOwnBucket(claim) && claim.tier === 'full'`,
+    // and a free tier got 403 on every write. Nothing is sold here any more, so
+    // this is the assertion that would fail if a paid line came back.
+    expect(hasOwnBucket(await verifyToken(SECRET, mint({ tier: 'free' }), NOW))).toBe(true);
   });
 
   it('refuses a passcode, which is a door rather than a person', async () => {
     // Everybody who typed one shares this subject, so syncing them together
-    // would pour every preview visitor's log into a single bucket.
+    // would pour every preview visitor's log into a single bucket. The only
+    // refusal left, and it was never a price.
     const claim = await verifyToken(SECRET, mint({ subject: 'passcode' }), NOW);
     expect(claim).not.toBeNull();
-    expect(maySync(claim)).toBe(false);
+    expect(hasOwnBucket(claim)).toBe(false);
   });
 
   it('refuses nobody at all', () => {
-    expect(maySync(null)).toBe(false);
+    expect(hasOwnBucket(null)).toBe(false);
   });
 });
 
@@ -169,5 +184,103 @@ describe('reading the header', () => {
     for (const header of [null, undefined, '', 'abc.def', 'Basic abc', 'Bearer', 'Bearer a b']) {
       expect(bearerFrom(header)).toBeNull();
     }
+  });
+});
+
+describe('minting one', () => {
+  it('makes a token this file then accepts', async () => {
+    // The property both halves exist for. They are one format, so the check is
+    // a round trip rather than a string somebody typed out and believed.
+    const token = await mintToken(SECRET, {
+      subject: 'log_abc',
+      tier: 'free',
+      expiresAt: NOW + TOKEN_TTL_MS,
+    });
+    expect(await verifyToken(SECRET, token, NOW)).toMatchObject({
+      tier: 'free',
+      subject: 'log_abc',
+    });
+  });
+
+  it('and one nothing else accepts', async () => {
+    // A key that is merely close mints tokens that look right and are refused
+    // everywhere. This is the assertion that would catch it.
+    const token = await mintToken(OTHER, {
+      subject: 'log_abc',
+      tier: 'free',
+      expiresAt: NOW + TOKEN_TTL_MS,
+    });
+    expect(readClaim(token, NOW)).not.toBeNull();
+    expect(await verifyToken(SECRET, token, NOW)).toBeNull();
+  });
+
+  it('writes the expiry in seconds, which is what the grammar says', async () => {
+    // A factor of a thousand, and therefore about fifty years if it goes the
+    // wrong way unnoticed. Converted here so no caller has to remember.
+    const expiresAt = NOW + TOKEN_TTL_MS;
+    const token = await mintToken(SECRET, { subject: 'log_abc', tier: 'free', expiresAt });
+    expect(token.split('.')[0]).toBe(String(Math.floor(expiresAt / 1000)));
+    expect((await verifyToken(SECRET, token, NOW))?.expiresAt).toBe(
+      Math.floor(expiresAt / 1000) * 1000,
+    );
+  });
+
+  it('makes one that has already expired if told to', async () => {
+    const token = await mintToken(SECRET, {
+      subject: 'log_abc',
+      tier: 'free',
+      expiresAt: NOW - 1000,
+    });
+    expect(await verifyToken(SECRET, token, NOW)).toBeNull();
+  });
+});
+
+describe('the subject for an address', () => {
+  const EMAIL = 'player@example.com';
+
+  it('is the same one every time, so the same person gets the same log', async () => {
+    expect(await subjectForEmail(SECRET, EMAIL)).toBe(await subjectForEmail(SECRET, EMAIL));
+  });
+
+  it('and the same one however the address was typed', async () => {
+    // One inbox is one person. Two subjects for one inbox is a second, empty
+    // history and nothing on screen to explain it.
+    for (const spelling of ['Player@Example.com', 'PLAYER@EXAMPLE.COM', '  player@example.com  ']) {
+      expect(normalizeEmail(spelling)).toBe(EMAIL);
+      expect(await subjectForEmail(SECRET, spelling)).toBe(await subjectForEmail(SECRET, EMAIL));
+    }
+  });
+
+  it('is a different one for a different address', async () => {
+    expect(await subjectForEmail(SECRET, EMAIL)).not.toBe(
+      await subjectForEmail(SECRET, 'other@example.com'),
+    );
+  });
+
+  it('cannot be mistaken for a customer or for the shared passcode', async () => {
+    // A subject names a bucket. Two schemes that could ever collide are two
+    // people who could ever share a poker history.
+    const subject = await subjectForEmail(SECRET, EMAIL);
+    expect(subject.startsWith(SUBJECT_PREFIX)).toBe(true);
+    expect(subject.startsWith('cus_')).toBe(false);
+    expect(subject).not.toBe(SUBJECT_PASSCODE);
+    expect(hasOwnBucket({ expiresAt: NOW, tier: 'free', subject })).toBe(true);
+  });
+
+  it('fits the grammar, which is what the parser will hold it to', async () => {
+    const subject = await subjectForEmail(SECRET, EMAIL);
+    expect(subject).toMatch(/^[A-Za-z0-9_]{1,64}$/);
+    const token = await mintToken(SECRET, { subject, tier: 'free', expiresAt: NOW + 1000 });
+    expect(readClaim(token, NOW)?.subject).toBe(subject);
+  });
+
+  it('moves when the key does, exactly as a bucket does', async () => {
+    expect(await subjectForEmail(SECRET, EMAIL)).not.toBe(await subjectForEmail(OTHER, EMAIL));
+  });
+
+  it('does not leak the address it came from', async () => {
+    const subject = await subjectForEmail(SECRET, EMAIL);
+    expect(subject).not.toContain('player');
+    expect(subject).not.toContain('example');
   });
 });

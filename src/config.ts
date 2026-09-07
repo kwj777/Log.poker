@@ -20,8 +20,12 @@ export const ALLOW_DEMO_SEED = IS_DEV;
  * before. A dead end is worse than an absence, so it stays out of production
  * builds until there is something on the other side of it.
  *
- * **Flip this to `true` when sync lands.** That is the whole of what it takes;
- * the card, the client and the endpoint it talks to are all built. See SYNC.md.
+ * **Flip this to `true` when sync lands.** Every piece is built: the card, the
+ * client, Log's own sign-in in `netlify/functions/signin.mts`, and the sync
+ * endpoint behind it. What is left is not code. `GATE_SECRET` and
+ * `RESEND_API_KEY` have to be set on Log's Netlify site, and until they are,
+ * both endpoints answer 503 to everything. `npm run check:gate` asks a deploy
+ * whether the first one landed. See SYNC.md.
  */
 export const ALLOW_SIGN_IN = IS_DEV;
 

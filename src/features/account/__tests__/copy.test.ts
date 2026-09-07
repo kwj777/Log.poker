@@ -28,9 +28,20 @@ const FAILURES: SignInFailure[] = ['rejected', 'throttled', 'unreachable'];
 describe('what it says after asking for a code', () => {
   it('does not promise that a mail was sent', () => {
     // The property the endpoint is built around, at the last place it can die.
-    expect(CODE_SENT).toMatch(/^If /);
+    // 202 does not mean a mail went: the cooldown and the daily cap stop one
+    // silently, and reporting that would report how much mail an address has
+    // had.
+    expect(CODE_SENT).toMatch(/\b(if|unless)\b/i);
     expect(CODE_SENT).not.toMatch(/check your (inbox|email)/i);
     expect(CODE_SENT).not.toMatch(/\bwe (have )?(sent|emailed)\b/i);
+  });
+
+  it('and does not send somebody away who has bought nothing', () => {
+    // It said "if that address has a purchase behind it" while the family's
+    // only sign-in was Untilt's, which will not mail a stranger. Log mints its
+    // own now, cross-device history is free, and there is nothing to have
+    // bought. This is the sentence that would quietly put the price back.
+    expect(CODE_SENT).not.toMatch(/\b(purchase|purchased|bought|paid|subscription)\b/i);
   });
 
   it('says how long the code lasts, because the mail is not on screen', () => {
@@ -73,18 +84,23 @@ describe('what it says when something fails', () => {
 });
 
 describe('what it says once somebody is signed in', () => {
-  it('names what a paid session buys without naming a price', () => {
-    // Same rule as the marketing site: no number in front of somebody who has
-    // no way to value one.
+  it('says what a session carries, and that it carries it for nothing', () => {
     const said = describeSession(true);
-    expect(said).toMatch(/[Cc]ross-device history/);
+    expect(said).toMatch(/history follows you/i);
+    expect(said).toMatch(/no charge/i);
     expect(said).not.toMatch(/\$\s*\d/);
   });
 
-  it('points a free session at where the history actually comes from', () => {
+  it('tells the one session that cannot sync why, without inventing a price', () => {
+    // The false branch used to mean "has not bought" and now means "typed a
+    // shared passcode". Copy that still pointed at the other two apps would be
+    // selling something that is not for sale, to somebody whose problem is
+    // that their subject is not theirs.
     const said = describeSession(false);
-    expect(said).toMatch(/other two apps/);
+    expect(said).toMatch(/passcode/i);
+    expect(said).toMatch(/address of your own/i);
     expect(said).not.toMatch(/\$\s*\d/);
+    expect(said).not.toMatch(/buy|purchase|pay|upgrade|other two/i);
   });
 
   it('promises nothing leaves the device either way', () => {

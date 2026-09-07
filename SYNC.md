@@ -1,12 +1,18 @@
 # Cross-device history: what it takes
 
-Scoping for roadmap items 2 and 3, written before any of it is built.
+Scoping for roadmap item 2, written before any of it was built.
 
-Log is free in its entirety and stays that way. Carrying a log from the phone to
-the laptop is the one thing in this app that is ever paid for, it comes with
-owning the other two apps, and the front door
-[says so already](public/home.html). This document is what has to be true for
-that sentence to become a feature.
+Log is free in its entirety and stays that way, and that now includes carrying a
+log from the phone to the laptop. It was going to be the one paid thing in this
+app. It is not one, the front door [says so already](public/home.html), and this
+document is what has to be true for that sentence to become a feature.
+
+**That change is newer than most of what follows.** Where a paragraph below
+still reads as though sync were sold, it has been corrected in place rather than
+deleted, because the argument for charging was a good one and the reason it lost
+is worth keeping: every tracker worth using syncs for free, so the one paid thing
+in this app would also have been the one thing a player could get elsewhere for
+nothing.
 
 It is a scope rather than a specification. Where a decision is made here it is
 argued and can be overturned; where one is still open it is
@@ -167,8 +173,14 @@ is already built:
 
 What Log adds is storage for the token: `expo-secure-store` on native,
 `localStorage` on web, and a sign-out that clears it. Roughly a day, and the
-harder half of the phase is in Untilt's repo rather than this one, promoting one
-endpoint to answer for three apps.
+harder half of the phase was in Untilt's repo rather than this one, promoting
+one endpoint to answer for three apps.
+
+**That is no longer where the door is.** Untilt's sign-in still answers the
+three apps and still mints for paying customers; Log mints its own free-tier
+tokens on its own host, because sync stopped being sold and a door only buyers
+can open stopped being the right one. See
+[what the free door landed](#what-the-free-door-landed).
 
 **One thing to get right early.** Untilt's sync refuses the subject `passcode`
 by name, because every passcode holder shares it and syncing them would pour
@@ -221,23 +233,35 @@ Untilt's repository rather than this one, exactly as the sign-in half was.
 Until it exists, sync is a thirty-day feature, and that is worth knowing before
 `GATE_SECRET` is set rather than a month afterwards.
 
-### 4. The entitlement
+### 4. The entitlement, which there is not one of
 
-One non-consumable, `log_plus`, checked at the store layer. Log's offering sells
-the family pass alone, because Log has nothing to sell by itself, and Log checks
-only its own entitlement: which SKU paid for it is a fact about billing that no
-screen needs to know.
+This section was a plan for selling cross-device history: one non-consumable,
+`log_plus`, checked at the store layer, granted by the family pass and by holding
+both single-app entitlements. None of it is being built, and what replaced it is
+an absence worth writing down so that nobody rebuilds it by habit.
 
-Two details that are easy to miss:
+**Two functions decide who syncs, and they ask the same question.**
+`hasOwnSubject` in `src/auth/token.ts` for what to show, `hasOwnBucket` in
+`src/sync/verify.ts` for what to allow. Both ask only whether the token names a
+person rather than a shared passcode. Neither reads `claim.tier`, the endpoint
+has no paid line, and the DELETE path is no longer one check below a write
+because there is no check for it to sit below.
 
-- **Holding both single-app entitlements has to grant `log_plus`**, or *own the
-  other two and your history follows you* is false in a corner. Nobody buys two
-  singles when the pass costs less, but the page makes the promise unqualified.
-- **RevenueCat is not a prerequisite.** The token Untilt issues already carries a
-  tier, so Log can gate sync on that from day one and have RevenueCat replace the
-  check later. That takes an entire third-party integration off the critical
-  path of shipping the feature, and it is the single biggest de-risking move
-  available here.
+Three things fall out, and the third is the one with work attached.
+
+- **RevenueCat leaves the critical path entirely** rather than being deferred to
+  a later phase. It was already not a prerequisite, since the token carries a
+  tier that could have been gated on in the interim. Now there is no gate in
+  either place for it to replace.
+- **The tier is still parsed and is read by nothing.** The grammar belongs to
+  Untilt's `lib/access.js` and is not ours to trim, so the field stays in the
+  parse and is asserted to decide nothing: the token suite walks every value in
+  `TIERS` and expects the same answer from each.
+- **The sign-in is now the only paid door left in the way, and it is in another
+  repository.** Removing Log's gate does not by itself let a free player sync,
+  because they cannot get a token at all. That is [the open
+  question](#still-open) and it is the one thing between the front door's promise
+  and the shipped feature.
 
 ---
 
@@ -321,9 +345,9 @@ order is chosen so that the riskiest work is done before anything depends on it.
 | | Phase | Ships | Roughly |
 |---|---|---|---|
 | **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
-| **1** | Identity: promote Untilt's sign-in, token storage, gate on the tier it already carries | **Done**, behind `ALLOW_SIGN_IN` | 3 to 4 days, most of it in Untilt |
+| **1** | Identity: promote Untilt's sign-in, token storage. The tier gate it shipped with is since gone | **Done**, behind `ALLOW_SIGN_IN` | 3 to 4 days, most of it in Untilt |
 | **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | **Built.** Waiting on one env var | 5 to 8 days |
-| **3** | RevenueCat `log_plus`, the offering, the both-singles rule, store review | The purchase | 3 to 5 days |
+| **3** | Was RevenueCat, `log_plus`, the offering and store review. **Cut**: nothing here is sold | Nothing | none |
 
 ### What phase 0 actually landed
 
@@ -528,6 +552,67 @@ pushes that at Log. Two endpoints and no browser, which beats reading
 Nothing is ever erased in either of those modes: the token names a person, and
 their history is not a check's to tidy away.
 
+### What the free door landed
+
+Making sync free in this repository did not make it free. Removing the tier
+check let a free token sync; it did not let a free player get a token, because
+the family's only sign-in belongs to Untilt and that one asks Stripe first. So
+Log has its own now, and this is what came out of writing it.
+
+`netlify/functions/signin.mts` answers `/api/signin` and `/api/signin/code` on
+`log.poker`, the same two paths with the same bodies and the same statuses, so
+`src/auth/signin.ts` did not change shape and neither did the screen above it.
+One constant moved. **Untilt's endpoint is untouched**, which was the point of
+choosing this over the other two ways out: the abuse surface lands on the app
+that wanted it.
+
+**Minting lives in `src/sync/verify.ts`, next to the check it has to agree
+with.** That file was named for verifying and is now the one place that holds
+the key, which is the property worth keeping. Two files each knowing half of a
+signature format are two files that disagree in a year, and the failure is a
+token this family mints and then refuses.
+
+**There is still no user table.** The subject on a token is an HMAC of the
+normalized address, so the same person always gets the same log back without
+anything having remembered them, and the record for a pending code is keyed by
+another HMAC of the same address and holds an HMAC of the code. A store that
+leaked would say how many people have signed in and nothing about who or how to
+become them. Normalizing is not cosmetic: Untilt keeps the spelling somebody
+typed because Stripe's customer filter is case-sensitive, and nothing here
+looks anybody up, so `Player@Example.com` reaching a different history than
+`player@example.com` would be a second empty log with nothing on screen to
+explain it.
+
+**The disclosure argument survives, wearing a different hat.** Untilt answers
+202 whether or not it has heard of an address, because an endpoint that says
+*no customer* is a way to ask who has bought. Here anybody may sign in, so
+there is nothing to disclose, and the 202 stays anyway: the cooldown and the
+daily cap would otherwise answer differently for an address somebody had been
+mailing. The copy on the screen named a purchase and no longer does, which is
+the one place that property could have died quietly.
+
+**What the free door costs is mail somebody did not ask for**, and it is
+bounded rather than argued away. One mail a minute and five a day to any one
+address, twenty requests an hour from any one caller, both counted before
+anything is generated or sent. A code is six digits, single use, good for
+fifteen minutes, and dies rather than merely failing after five wrong guesses.
+A send that fails takes its record back, because leaving it would spend one of
+the day's five and start a cooldown for a mail nobody got, so the retry a
+person makes straight away would be silently ignored.
+
+**One thing the gate check no longer proves.** Log signs and verifies under the
+same key, so a wrong `GATE_SECRET` that is wrong consistently passes an
+end-to-end run against Log: everything agrees with itself. Pointing
+`--signin-origin` at `https://untilt.poker` is what still asks whether the key
+is *Untilt's*, and that is worth knowing even though nothing in Log depends on
+it any more, because subjects and bucket names are HMACs under this key and
+finding out later means orphaning every bucket.
+
+**What is left is two environment variables**, and neither is code.
+`GATE_SECRET` and `RESEND_API_KEY` on Log's Netlify site; without the first,
+both endpoints answer 503 to everything, which is the state to leave them in.
+Then `ALLOW_SIGN_IN` flips.
+
 ### Collecting tombstones
 
 Built, and it turned out to be the one piece where the obvious implementation is
@@ -671,8 +756,10 @@ On the endpoint:
   was gone with its device told it had succeeded. Now a strongly consistent read
   and a conditional write, retried against a fresh read on a lost race.
 - **DELETE was gated by exactly the check its own comment said it skipped**, so
-  a lapsed subscriber could not erase their history. The tier check now sits
-  below it; the rule about a subject of one's own still sits above.
+  a lapsed subscriber could not erase their history. Fixed by moving the tier
+  check below it, and then settled properly by deleting the tier check: sync is
+  free, so an erasure and a write are behind the same one rule, which is the rule
+  about a subject of one's own.
 - **The merge and the erase were the two unguarded calls.** A throw in either
   was a 500 or a 204 that promised something that had not happened.
 - **The file was not typechecked at all.** `tsconfig.json` matched `**/*.ts`,
@@ -840,8 +927,16 @@ These are the promises already in the product, and each one has a way of dying
 quietly during work like this.
 
 - **The free app never goes behind the sign-in.** Log stays completely usable by
-  somebody who never types an email address. RevenueCat makes an account feel
-  like the natural first screen, and it is not one here.
+  somebody who never types an email address. An account makes itself feel like
+  the natural first screen, and it is not one here.
+- **Sync does not quietly acquire a price later.** It had one on paper for two
+  phases and the conversion moment is still written down in enough places that
+  somebody drafting release copy will reach for it honestly. Three tests hold the
+  line rather than one, because a promise on a marketing page and a gate in a
+  verifier fail independently: `site.test.ts` refuses a price in any paragraph on
+  the front door that mentions sync, `token.test.ts` walks every tier and expects
+  the same answer, and `endpoint.test.ts` pushes a free-tier write and reads it
+  back out of the store.
 - **The app never blocks on the network.** Every write commits locally and
   returns; the push happens after. A card room has no wifi and that is the
   normal case, not the degraded one.
@@ -862,10 +957,15 @@ quietly during work like this.
 
 ## Still open
 
-1. **Does Untilt's Stripe stay the processor while RevenueCat takes native, or
-   does everything move?** FAMILY-PRICING.md argues for one RevenueCat project
-   holding all three with Stripe underneath for web. The answer changes phase 3
-   and nothing before it.
+1. ~~**Who is allowed to sign in?**~~ **Settled: anybody, at Log's own door.**
+   Untilt's sign-in will not mail a code to an address Stripe has no customer
+   for, in its own words: *only somebody who has bought can be reached*. That
+   was right while sync was sold and made *free like the rest of this* false
+   the moment it was not. Of the three ways out, the third was taken:
+   `netlify/functions/signin.mts` answers the same two paths on `log.poker`,
+   mints the free tier for anybody who can read their mail, and **Untilt is
+   untouched**. See [what the free door landed](#what-the-free-door-landed).
+
 2. **Does the first release sync Log only, or is the shared account across all
    three apps a launch requirement?** Log-only is smaller and can use the same
    token without the App User ID work landing anywhere else.

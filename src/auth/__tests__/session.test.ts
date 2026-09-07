@@ -48,9 +48,21 @@ describe('the session a device holds', () => {
     expect(await store.read()).toBe(live);
   });
 
-  it('does not sync on the free tier, though it is still a session', async () => {
+  it('syncs on the free tier, because cross-device history is free', async () => {
+    // The inverse of this was asserted while sync was sold. Left pointing the
+    // other way rather than deleted: the free tier is the only tier that can
+    // notice a paid line coming back.
     const manager = new SessionManager(memoryTokenStore(), () => NOW);
     const session = await manager.signIn(token(NOW + HOUR, 'free'));
+    expect(session).not.toBeNull();
+    expect(session?.syncs).toBe(true);
+  });
+
+  it('does not sync on a shared passcode, which is the one case left', async () => {
+    // Everybody who typed one carries the same subject, so their logs would
+    // merge into a single bucket. The only reason `syncs` is ever false now.
+    const manager = new SessionManager(memoryTokenStore(), () => NOW);
+    const session = await manager.signIn(token(NOW + HOUR, 'full', 'passcode'));
     expect(session).not.toBeNull();
     expect(session?.syncs).toBe(false);
   });

@@ -69,13 +69,19 @@ also charge rent for the answer. It is also the app that gets talked about,
 which is how anybody arrives at the other two.
 
 The paid side of the family is the longer material in TiltProof and Untilt, sold
-as one payment rather than a subscription. **What it adds here is cross-device
-history**, and that is the only thing in Log that will ever be paid for: it
-comes with owning the other two apps rather than carrying a price of its own.
-The line falls there because a second device needs an identity to sync to, and
-paying is what creates one, which makes it an honest conversion moment rather
-than a hostage situation. It is unbuilt today, and it is roadmap items 2 and 3;
-[SYNC.md](SYNC.md) scopes what building it takes.
+as one payment rather than a subscription. **Log adds nothing to it.**
+Cross-device history was going to: it was the one thing here with a price, it
+came with owning the other two, and the argument was that a second device needs
+an identity to sync to and paying is what creates one, which made it an honest
+conversion moment rather than a hostage situation.
+
+That argument lost to a simpler one. Every tracker worth using syncs for free,
+so the only paid thing in this app would also have been the one thing a player
+could get elsewhere for nothing, and *free in its entirety* would have carried a
+footnote forever. It is unbuilt today, it is roadmap item 2, and when it lands it
+lands free; [SYNC.md](SYNC.md) scopes what building it takes and names the one
+thing still in the way, which is that Untilt's sign-in only mails a code to an
+address that has bought something.
 
 The numbers themselves live in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
@@ -602,8 +608,10 @@ Three things about this are worth knowing before touching it.
 - **The expiry is in seconds** where every other timestamp in this app is
   milliseconds. Converted at the boundary, and tested there, because the
   difference is a factor of a thousand and therefore about fifty years.
-- **A tier is not enough to sync; the holder needs a subject of their own.**
-  Everybody who typed a passcode shares one subject, so syncing them together
+- **The tier decides nothing; the holder needs a subject of their own.** That is
+  the whole of the rule, on both sides. Sync is free, so `claim.tier` is parsed
+  and never read, and what is left is the refusal that was never about money:
+  everybody who typed a passcode shares one subject, so syncing them together
   would pour every preview visitor's history into a single bucket.
 
 `SessionManager` holds the token over a three-method `TokenStore`, the same
@@ -613,13 +621,40 @@ against an in-memory one. Both adapters answer as if nothing were stored when
 storage is unavailable, which is ordinary rather than exceptional -- a locked
 device, a private window, a prerender with no `window` at all.
 
-The server side is built too, in Untilt. Its sign-in answers a browser with a
-redirect carrying an `HttpOnly` cookie, which Log can neither read across
-domains nor receive on native, so it answers a caller sending
-`Accept: application/json` with the token in the body instead. That header is
-the whole of what separates the two shapes. `src/auth/signin.ts` speaks that
-contract and is tested against a fake `fetch`, which is as far as a client in a
-different repository can prove anything.
+**The server side is Log's own**, in `netlify/functions/signin.mts`, and that
+is the second thing making sync free took. The family's sign-in is Untilt's and
+will not mail a code to an address Stripe has no customer for -- *only somebody
+who has bought can be reached*, in its own words -- which was right while sync
+was sold and wrong the moment it was not. Removing the tier check let a free
+token sync; it did not let a free player get a token. So Log answers the same
+two paths on its own host, mints the free tier for anybody who can read their
+mail, and Untilt is untouched.
+
+The contract is still Untilt's, deliberately: the same paths, bodies and
+statuses, so `src/auth/signin.ts` did not change shape and neither did the
+screen. One constant moved. `Accept: application/json` is still sent and is no
+longer what makes the difference, because Log has no page and no cookie to
+answer with.
+
+**Minting lives beside verifying**, in `src/sync/verify.ts`, which is now the
+one file that holds the key. Two files each knowing half of a signature format
+are two files that disagree in a year, and the failure is a token this family
+mints and then refuses.
+
+There is still no user table. A subject is an HMAC of the normalized address, a
+pending code is stored under another HMAC of it as an HMAC of the code, and a
+store that leaked would say how many people have signed in and nothing about
+who. Normalizing matters: Untilt keeps the spelling somebody typed because
+Stripe's filter is case-sensitive, nothing here looks anybody up, and
+`Player@Example.com` reaching a different history would be a second empty log
+with nothing on screen to explain it.
+
+A door that mails anybody can be pointed at somebody who did not ask, so it is
+bounded: one mail a minute and five a day per address, twenty requests an hour
+per caller, counted before anything is generated. A code is six digits, single
+use, good for fifteen minutes, and dies after five wrong guesses. A send that
+fails takes its record back, or the retry a person makes straight away is
+silently ignored.
 
 The screen is in `src/features/account`: an address, then the code mailed to
 it, and never the link, because mail opens links in the browser and an installed
@@ -628,13 +663,17 @@ app keeps its own storage.
 **It is behind `ALLOW_SIGN_IN`, which is `__DEV__`**, the same treatment the
 demo seeder gets and for the same reason: signing in unlocks nothing until there
 is something to sync to, and a form that cannot succeed is worse than an
-absence. One constant flips when phase 2 lands.
+absence. What is left is not code: `GATE_SECRET` and `RESEND_API_KEY` on Log's
+Netlify site, without which both endpoints answer 503, and then the constant
+flips.
 
-The copy has tests, which most copy should not. `/api/signin` answers the same
-whether or not it has heard of an address, deliberately, so that nobody can use
-it to ask which addresses have bought. A screen that said *check your inbox*
-would throw that away on the client, where no review of the server would catch
-it. So the confirmation is conditional and the refusal never guesses why.
+The copy has tests, which most copy should not. `/api/signin` answers 202
+whether or not a mail went, so that nobody can use it to ask how much mail an
+address has had. A screen that said *check your inbox* would throw that away on
+the client, where no review of the server would catch it. So the confirmation is
+conditional and the refusal never guesses why. It also said *if that address has
+a purchase behind it*, which was true of Untilt's door and is not true of this
+one; there is a test now for the sentence that would put the price back.
 
 ### Cross-device history
 
@@ -712,42 +751,46 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 33 passed
-Tests:       916 passed
+Test Suites: 37 passed
+Tests:       1082 passed
 
-  dexieRepository   104   the IndexedDB path, against real IndexedDB
-  sqlRepository     104   the SQLite path, against real SQLite
+  dexieRepository   115   the IndexedDB path, against real IndexedDB
+  sqlRepository     115   the SQLite path, against real SQLite
+  bundle             63   what ships to each platform, against the real output
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   stats              45   P/L, rebuys, duration, win rate, groupings
-  bundle             39   what ships to each platform, against the real output
-  site               37   the marketing/app split, the PWA, the sitemap
+  site               38   the marketing/app split, the PWA, the sitemap
   values             36   money, dates, durations, stakes, formats, counts
+  signinEndpoint     35   the free door, and every bound on it
   variance           35   win rate, σ, confidence bands, verdicts
+  verify             35   checking a token, and every way past it that must not work
+  merge              30   two devices disagreeing, and who wins
+  syncingRepository  29   two devices and one server, no fakes in between
   blog               28   the post grammar, the share cards, and what it refuses
-  merge              28   two devices disagreeing, and who wins
   palette            27   the theme matches BRAND.md
+  endpoint           25   the sync endpoint, end to end
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
-  copy               19   what the sign-in and the sync are allowed to say
+  copy               20   what the sign-in and the sync are allowed to say
+  batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
+  token              17   the family token grammar, against signed fixtures
   handNotation       16   parse, round-trip, hand classes
-  syncingRepository  16   two devices and one server, no fakes in between
-  token              16   the family token grammar, against signed fixtures
-  verify             16   checking a token, and every way past it that must not work
   client             14   the sync client, against a fake fetch
   seed               14   the demo dataset stays coherent
-  session            12   holding a token, and stores that fail as real ones do
+  session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
-  endpoint           11   the sync endpoint, end to end
+  gateCheck           9   the key-on-the-site script, run rather than read
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
   tokenStore.web      8   the browser token store
   columns             7   header matching
   readme              6   the test table adds up and says what each suite is for
+  compose             5   which repository a device gets, and the unsafe sweep
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em
@@ -985,7 +1028,8 @@ Ordered roughly by how much each is worth against how much it costs.
    timestamped, money is integer cents, and hands are in a portable notation.
    Wants a share sheet on native and a download on web.
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
-   id and an `updatedAt`, and the one feature the family pass adds to this app.
+   id and an `updatedAt`. It was going to be the one feature the family pass
+   added to this app, and it is free instead.
    **Scoped in full in [SYNC.md](SYNC.md)**, which is worth reading before
    starting: three quarters of the server already exists in Untilt.
    **Phases 0, 1 and 2 have landed**; see
@@ -1003,25 +1047,13 @@ Ordered roughly by how much each is worth against how much it costs.
    id for the same person, and Untilt's existing magic-link endpoint is what
    that is promoted from. **The free tier never goes behind it** -- Log stays
    usable forever by somebody who never types an email address.
-3. **RevenueCat entitlements, which are not subscriptions** -- one
-   non-consumable, `log_plus`, checked at the store layer rather than inside
-   screens, so the free build and the paid build stay one codebase. Log's
-   offering sells the family pass alone, because Log has nothing to sell by
-   itself, and every app checks only its own entitlement: which SKU paid for it
-   is a fact about billing that no screen needs to know. Web entitlements via
-   Stripe through the same RevenueCat account. One mapping detail is load
-   bearing, because the front door promises it in words: the pass grants
-   `log_plus`, and so does holding both single-app entitlements at once. Nobody
-   will ever buy two singles when the pass costs less than that, but *own the
-   other two and your history follows you* has to be true however somebody got
-   there, or the page is lying in an edge case.
-4. **Online session support** -- [importing a session summary](#importing-an-online-history)
+3. **Online session support** -- [importing a session summary](#importing-an-online-history)
    and [tournaments](#tournaments) are the halves of this that already ship, and
    `sessions` has its `format` discriminator. What is left is multi-table
    sessions and hands per hour, which need the hourly-rate math to become
    per-table: wall-clock hours stop meaning one thing the moment four tables are
    open.
-5. **Deep Untilt and TiltProof integration** -- the seams already exist in
+4. **Deep Untilt and TiltProof integration** -- the seams already exist in
    `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
    real payload -- the flagged hand into a TiltProof drill, the rough stretch
    into the matching Untilt exercise -- and eventually share an account across
@@ -1029,7 +1061,7 @@ Ordered roughly by how much each is worth against how much it costs.
    written up in TiltProof's README; the seam from this side, and where the URL
    we emit today actually lands, is in
    [`design/tree-review.md`](design/tree-review.md).
-6. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
+5. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
 
 Also wanted, smaller: session photos of the chip stack,

@@ -756,8 +756,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 38 passed
-Tests:       1114 passed
+Test Suites: 39 passed
+Tests:       1128 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -771,8 +771,8 @@ Tests:       1114 passed
   signinEndpoint     35   the free door, and every bound on it
   variance           35   win rate, σ, confidence bands, verdicts
   verify             35   checking a token, and every way past it that must not work
+  mood               32   what tilt costs, and when to say nothing
   merge              30   two devices disagreeing, and who wins
-  mood               29   what tilt costs, and when to say nothing
   syncingRepository  29   two devices and one server, no fakes in between
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
@@ -790,6 +790,7 @@ Tests:       1114 passed
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
   gateCheck          11   the key-on-the-site script, run rather than read
+  handOffs           11   where a hand-off goes, and what the mid-session card says
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
@@ -899,6 +900,43 @@ Three of the card's four states show no hand-off, including the one where the
 comparison settles the *other* way and a player's rattled sessions are their
 better ones. That state is still reported. An analysis that only speaks when it
 supports the upsell is an advertisement wearing a lab coat.
+
+### The mid-session reset
+
+A player two hours into a session who taps **4** or **5** on the tilt check has
+just said, at a table, that they are rattled. That is the state Untilt exists
+for, so the card does not simply vanish on those two scores: it offers a
+sixty-second reset that is free, needs no account, and opens straight into the
+exercise via Untilt's own `play=<id>` form rather than dropping somebody on a
+home screen to go and find it.
+
+**The tap is recorded first and unconditionally, and that ordering is the whole
+safety of the feature.** `MoodPicker`'s header says mood data is only useful if
+logging it costs nothing, and the moment it feels like homework players stop --
+so a check-in that summons something *before* recording is one people answer
+with a 3 to be left alone, and the correlation in
+[What tilt costs](#what-tilt-costs) dies quietly. A test reads the handler and
+asserts `logMood` comes first with nothing conditional in front of it, because
+that property cannot be seen from the rendered output.
+
+**Nothing here is sold.** The resets reached for mid-session are free across the
+family by the front door's own promise, so the card names no price, asks for no
+address, and says *free* rather than leaving anyone to wonder. Tests assert the
+absence as well as the presence: no currency, no buy, no sign-up. The paid
+material is mentioned on the variance screen next to a number, away from the
+table, which is where that promise puts it.
+
+Which scores count as rattled is `wantsReset`, and it reuses `RATTLED_SCORES`
+from the comparison rather than restating `[4, 5]`. A player who would land in
+that group at the end of the month is the one worth offering something to
+tonight, and two definitions of rattled in one app is one too many.
+
+The URL builders moved to [`src/features/family/links.ts`](src/features/family/links.ts)
+to make any of this testable. `hooks.ts` imports `Linking` from React Native,
+which this repository's Node test runner cannot load, so the builders had no
+tests purely by accident of sharing a file with a two-line wrapper. Building a
+URL and following one are different jobs, and only the first has anything to get
+wrong.
 
 ### Hand notation
 

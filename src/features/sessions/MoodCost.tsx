@@ -29,7 +29,8 @@ import {
   type MoodComparison,
 } from '../../domain/mood';
 import { colors, spacing } from '../../theme';
-import { openHandOff, untiltHandOff } from '../family/hooks';
+import { openHandOff } from '../family/hooks';
+import { untiltHandOff } from '../family/links';
 
 const rate = (bbPerHour: number): string => `${Math.abs(bbPerHour).toFixed(1)} bb/hr`;
 

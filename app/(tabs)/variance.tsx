@@ -48,7 +48,8 @@ import {
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { MoodCost } from '../../src/features/sessions/MoodCost';
 import { startMoodComparison } from '../../src/domain/mood';
-import { openHandOff, untiltHandOff } from '../../src/features/family/hooks';
+import { openHandOff } from '../../src/features/family/hooks';
+import { untiltHandOff } from '../../src/features/family/links';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
 import type { StretchVerdict } from '../../src/domain/variance';

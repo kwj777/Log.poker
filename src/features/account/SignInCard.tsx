@@ -7,21 +7,24 @@
  * The code is the same credential in a shape that can be typed into whatever is
  * holding it. See `src/auth/signin.ts`.
  *
- * ## Why this is behind a flag
+ * ## Why this is still behind a flag
  *
- * Signing in currently unlocks nothing, because the thing it unlocks is not
- * built. A player who typed their address, waited for mail, read a code off a
- * phone and typed it in would arrive back at a screen that looks exactly as it
- * did before, having gained nothing. That is worse than an absence, so
- * `ALLOW_SIGN_IN` keeps it out of production builds entirely rather than
- * merely hiding it, the same way the demo seeder above it is kept out.
+ * It was behind one because signing in unlocked nothing: a player who typed
+ * their address, waited for mail, read a code off a phone and typed it in
+ * arrived back at a screen that looked exactly as it did before. That is worse
+ * than an absence.
  *
- * What it is for meanwhile is the one thing nothing else can do: prove the
- * whole chain end to end against the live endpoint. Both halves of it are
- * tested against fakes and held together by a written contract, which is
- * exactly the arrangement that produces a bug neither side can see.
+ * It is not that any more. `ALLOW_SIGN_IN` is `true`, and the flag stays for
+ * the other reason: `/api/signin` mails a code to anybody who types an
+ * address, and a door like that wants a switch. Turning it off strips this
+ * card from the build rather than hiding it, and the endpoint's own limits
+ * hold in the meantime.
  *
- * Turning it on is this one line in `src/config.ts`, when sync lands.
+ * What the flag bought while it was off was the one thing nothing else could
+ * do: proving the whole chain end to end against the live endpoint. Both
+ * halves are tested against fakes and held together by a written contract,
+ * which is exactly the arrangement that produces a bug neither side can see,
+ * and running it for real is what retired the argument for keeping this dark.
  */
 
 import { useCallback, useEffect, useState } from 'react';

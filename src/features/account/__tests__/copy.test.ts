@@ -143,17 +143,23 @@ describe('where the card is wired up', () => {
   const settings = read('app', '(tabs)', 'settings.tsx');
   const config = read('src', 'config.ts');
 
-  it('is behind a flag rather than shipped to somebody it does nothing for', () => {
-    // It unlocks nothing until sync exists, and a form that cannot succeed is
-    // worse than an absence. Same treatment as the demo seeder beside it.
+  it('is on, and still behind the flag that can turn it off', () => {
+    // The flag was `IS_DEV` while signing in unlocked nothing, on the argument
+    // that a form which cannot succeed is worse than an absence. It is on now,
+    // and the flag stays because `/api/signin` mails a code to anybody who
+    // types an address and a door like that wants a switch.
     expect(settings).toContain('{ALLOW_SIGN_IN ? (');
     expect(settings).toContain('<SignInCard />');
-    expect(config).toContain('export const ALLOW_SIGN_IN = IS_DEV;');
+    expect(config).toContain('export const ALLOW_SIGN_IN = true;');
+    expect(config).not.toMatch(/ALLOW_SIGN_IN = IS_DEV/);
   });
 
-  it('and the flag is a build-time constant, so it is stripped rather than hidden', () => {
+  it('and the flag is a build-time constant, so turning it off strips the card', () => {
+    // Which is the difference between a kill switch and a hidden feature: a
+    // `false` here removes the card from the bundle rather than rendering it
+    // and declining to show it.
     expect(config).toContain('export const IS_DEV: boolean');
-    expect(config).toMatch(/ALLOW_SIGN_IN = IS_DEV/);
+    expect(config).toMatch(/export const ALLOW_SIGN_IN = (true|false|IS_DEV);/);
   });
 
   it('signs out without touching the log', () => {

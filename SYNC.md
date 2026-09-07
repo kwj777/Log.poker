@@ -345,7 +345,7 @@ order is chosen so that the riskiest work is done before anything depends on it.
 | | Phase | Ships | Roughly |
 |---|---|---|---|
 | **0** | Tombstones, the three merge rules, contract tests. No network. | **Built.** See below | 3 to 5 days |
-| **1** | Identity: promote Untilt's sign-in, token storage. The tier gate it shipped with is since gone | **Done**, behind `ALLOW_SIGN_IN` | 3 to 4 days, most of it in Untilt |
+| **1** | Identity: promote Untilt's sign-in, token storage. The tier gate it shipped with is since gone | **Done and on** | 3 to 4 days, most of it in Untilt |
 | **2** | `SyncingRepository`, the endpoint, cursors, backoff, Settings state | **Built.** Waiting on one env var | 5 to 8 days |
 | **3** | Was RevenueCat, `log_plus`, the offering and store review. **Cut**: nothing here is sold | Nothing | none |
 
@@ -437,11 +437,11 @@ address, on purpose, and a screen saying *check your inbox* throws that away on
 the client where nobody reviewing the server would see it. So the confirmation
 is conditional, the code refusal never guesses why, and both are asserted.
 
-**It is behind `ALLOW_SIGN_IN`, which is `__DEV__`.** Signing in unlocks
-nothing until there is something to sync to, and somebody who typed an address,
-waited for mail and read a code off a phone would arrive back at a screen that
-looks exactly as it did before. That is worse than an absence. Flipping the one
-constant when phase 2 lands is the whole of shipping it.
+**It was behind `ALLOW_SIGN_IN`, which was `__DEV__`.** Signing in unlocked
+nothing until there was something to sync to, and somebody who typed an
+address, waited for mail and read a code off a phone would have arrived back at
+a screen that looked exactly as it did before. That is worse than an absence.
+The constant is `true` now; see [what turning it on took](#what-turning-it-on-took).
 
 What it buys meanwhile is the thing nothing else could do: the chain runs end to
 end in a browser. Ask, redeem, hold, reload, sign out; both requests carrying
@@ -509,10 +509,9 @@ second is taken from the records actually sent rather than from a clock. Both
 were silent, both lost data, and both were found by asking the question a player
 would ask rather than the question a unit test asks.
 
-**What is left is an environment variable.** `GATE_SECRET` has to be set on
-Log's Netlify site, the same value Untilt signs with, and then `ALLOW_SIGN_IN`
-flips. Until that is true the endpoint answers 503 to everything, which is the
-state to leave it in.
+**What was left was an environment variable**, and it is set. `GATE_SECRET` on
+Log's Netlify site, the same value Untilt signs with. Until it was, the endpoint
+answered 503 to everything.
 
 There is no code to write for the variable itself: `netlify/functions/sync.mts`
 reads it and hands it down, and nothing else in the repository looks for it.
@@ -608,10 +607,48 @@ is *Untilt's*, and that is worth knowing even though nothing in Log depends on
 it any more, because subjects and bucket names are HMACs under this key and
 finding out later means orphaning every bucket.
 
-**What is left is two environment variables**, and neither is code.
+**What was left was two environment variables**, and neither was code.
 `GATE_SECRET` and `RESEND_API_KEY` on Log's Netlify site; without the first,
-both endpoints answer 503 to everything, which is the state to leave them in.
-Then `ALLOW_SIGN_IN` flips.
+both endpoints answer 503 to everything. Both are set, and
+[the chain has been run](#what-turning-it-on-took).
+
+### What turning it on took
+
+The flag is `true`. What retired the argument for keeping it dark was running
+the chain against the live site rather than reasoning about it, and the run is
+worth recording because three of its four answers were the wrong ones first and
+each was informative.
+
+**A 400 on the first ask**, because the address was a placeholder with no dot
+after the `@`. Not a setback: the answer proved `netlify/functions/signin.mts`
+was deployed and answering, since the headers were the ones `json()` sets and
+the body was its literal `{"error":"rejected"}`, and it proved `GATE_SECRET`
+was set, because the secret check runs first and would have answered 503 with
+`off`.
+
+**A 202 on the second**, which is the answer that proves the most. It comes
+after the store write and after `mail()` returns true, so it says the blob
+store accepted the pending record and Resend accepted the message, which in
+turn says the API key is valid and `signin@log.poker` is on a verified domain,
+because Resend refuses an unverified From.
+
+**A 401 at the sync**, from a token that was still the placeholder text. Also
+useful: it proved `/api/sync` was deployed and refusing what it cannot verify.
+
+**Then a 200**, with a valid empty pull and a token reading
+`<expiry>.free.log_<32 hex>.<signature>`. The tier is `free` because
+`mintToken` hardcodes it, the subject carries `SUBJECT_PREFIX` because
+`subjectForEmail` derived it from an address that has bought nothing, and the
+signature verified under the same `GATE_SECRET` at the other endpoint. **A free
+player, holding no purchase anywhere in the family, synced.** That is the thing
+that was not possible while sync was sold.
+
+**The flag stays, and is now a kill switch rather than a curtain.**
+`/api/signin` mails a code to anybody who types an address, which is the point
+of the free door and also the whole risk in it. Setting the constant to `false`
+strips the card from the next build; the endpoint's own limits, one mail a
+minute and five a day per address, hold in the meantime. A test pins the
+current value either way, so it cannot move by accident.
 
 ### Collecting tombstones
 

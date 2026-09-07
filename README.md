@@ -621,13 +621,40 @@ against an in-memory one. Both adapters answer as if nothing were stored when
 storage is unavailable, which is ordinary rather than exceptional -- a locked
 device, a private window, a prerender with no `window` at all.
 
-The server side is built too, in Untilt. Its sign-in answers a browser with a
-redirect carrying an `HttpOnly` cookie, which Log can neither read across
-domains nor receive on native, so it answers a caller sending
-`Accept: application/json` with the token in the body instead. That header is
-the whole of what separates the two shapes. `src/auth/signin.ts` speaks that
-contract and is tested against a fake `fetch`, which is as far as a client in a
-different repository can prove anything.
+**The server side is Log's own**, in `netlify/functions/signin.mts`, and that
+is the second thing making sync free took. The family's sign-in is Untilt's and
+will not mail a code to an address Stripe has no customer for -- *only somebody
+who has bought can be reached*, in its own words -- which was right while sync
+was sold and wrong the moment it was not. Removing the tier check let a free
+token sync; it did not let a free player get a token. So Log answers the same
+two paths on its own host, mints the free tier for anybody who can read their
+mail, and Untilt is untouched.
+
+The contract is still Untilt's, deliberately: the same paths, bodies and
+statuses, so `src/auth/signin.ts` did not change shape and neither did the
+screen. One constant moved. `Accept: application/json` is still sent and is no
+longer what makes the difference, because Log has no page and no cookie to
+answer with.
+
+**Minting lives beside verifying**, in `src/sync/verify.ts`, which is now the
+one file that holds the key. Two files each knowing half of a signature format
+are two files that disagree in a year, and the failure is a token this family
+mints and then refuses.
+
+There is still no user table. A subject is an HMAC of the normalized address, a
+pending code is stored under another HMAC of it as an HMAC of the code, and a
+store that leaked would say how many people have signed in and nothing about
+who. Normalizing matters: Untilt keeps the spelling somebody typed because
+Stripe's filter is case-sensitive, nothing here looks anybody up, and
+`Player@Example.com` reaching a different history would be a second empty log
+with nothing on screen to explain it.
+
+A door that mails anybody can be pointed at somebody who did not ask, so it is
+bounded: one mail a minute and five a day per address, twenty requests an hour
+per caller, counted before anything is generated. A code is six digits, single
+use, good for fifteen minutes, and dies after five wrong guesses. A send that
+fails takes its record back, or the retry a person makes straight away is
+silently ignored.
 
 The screen is in `src/features/account`: an address, then the code mailed to
 it, and never the link, because mail opens links in the browser and an installed
@@ -636,13 +663,17 @@ app keeps its own storage.
 **It is behind `ALLOW_SIGN_IN`, which is `__DEV__`**, the same treatment the
 demo seeder gets and for the same reason: signing in unlocks nothing until there
 is something to sync to, and a form that cannot succeed is worse than an
-absence. One constant flips when phase 2 lands.
+absence. What is left is not code: `GATE_SECRET` and `RESEND_API_KEY` on Log's
+Netlify site, without which both endpoints answer 503, and then the constant
+flips.
 
-The copy has tests, which most copy should not. `/api/signin` answers the same
-whether or not it has heard of an address, deliberately, so that nobody can use
-it to ask which addresses have bought. A screen that said *check your inbox*
-would throw that away on the client, where no review of the server would catch
-it. So the confirmation is conditional and the refusal never guesses why.
+The copy has tests, which most copy should not. `/api/signin` answers 202
+whether or not a mail went, so that nobody can use it to ask how much mail an
+address has had. A screen that said *check your inbox* would throw that away on
+the client, where no review of the server would catch it. So the confirmation is
+conditional and the refusal never guesses why. It also said *if that address has
+a purchase behind it*, which was true of Untilt's door and is not true of this
+one; there is a test now for the sentence that would put the price back.
 
 ### Cross-device history
 
@@ -720,8 +751,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 36 passed
-Tests:       1035 passed
+Test Suites: 37 passed
+Tests:       1082 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -732,17 +763,18 @@ Tests:       1035 passed
   stats              45   P/L, rebuys, duration, win rate, groupings
   site               38   the marketing/app split, the PWA, the sitemap
   values             36   money, dates, durations, stakes, formats, counts
+  signinEndpoint     35   the free door, and every bound on it
   variance           35   win rate, σ, confidence bands, verdicts
+  verify             35   checking a token, and every way past it that must not work
   merge              30   two devices disagreeing, and who wins
   syncingRepository  29   two devices and one server, no fakes in between
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   endpoint           25   the sync endpoint, end to end
-  verify             24   checking a token, and every way past it that must not work
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
+  copy               20   what the sign-in and the sync are allowed to say
   batch              19   a backlog split into requests, without orphaning a child
-  copy               19   what the sign-in and the sync are allowed to say
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
   token              17   the family token grammar, against signed fixtures

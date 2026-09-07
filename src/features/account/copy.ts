@@ -4,14 +4,18 @@
  * Pure, and separate from the card that renders it, because the copy is the
  * part with rules in it. A screen can be looked at; a rule has to be asserted.
  *
- * ## It cannot say whether an address has bought
+ * ## It cannot say that a mail was sent
  *
- * `/api/signin` answers the same whether or not Stripe has ever heard of the
- * address, and it does that on purpose: an endpoint that says *no customer*
- * is a way to ask which addresses have bought. That property survives all the
- * way to the server and dies here if this screen says "check your inbox" as
- * though a mail were certainly sent. So the confirmation is conditional, in
- * plain words, and there is a test that it stays that way.
+ * `/api/signin` answers 202 whether or not one went. It used to be Untilt's,
+ * where the reason was that an endpoint saying *no customer* is a way to ask
+ * which addresses have bought. It is Log's now and nobody has to buy anything,
+ * so the reason is the other one it always also had: the rate limits stop a
+ * mail to an address that has just had one, and an endpoint that reported that
+ * would report how much mail any address has been sent.
+ *
+ * Either way the property dies here if this screen says "check your inbox" as
+ * though a mail were certainly on its way. So the confirmation is conditional,
+ * in plain words, and there is a test that it stays that way.
  *
  * ## It cannot say what went wrong with a code
  *
@@ -29,11 +33,16 @@ export type Stage = 'email' | 'code';
  * What to say after a code has been asked for.
  *
  * Conditional on purpose, and the condition is the whole point: nothing here
- * has been told whether that address exists, and saying otherwise would make
- * this screen the disclosure the endpoint refuses to be.
+ * has been told whether a mail went, and saying otherwise would make this
+ * screen the disclosure the endpoint refuses to be.
+ *
+ * **It used to name a purchase**, back when the only sign-in in the family was
+ * Untilt's and that one will not mail an address Stripe has never seen. Log
+ * mints its own tokens now and anybody may sign in, so a sentence about having
+ * bought would be turning people away from a door that is open to them.
  */
 export const CODE_SENT =
-  'If that address has a purchase behind it, a code is on its way. It is good for fifteen minutes.';
+  'A code is on its way, unless one has just gone to that address. Either way, a code is good for fifteen minutes.';
 
 /** Said under the fields, both halves. Signing in does not move anybody's log. */
 export const NOTHING_LEAVES =

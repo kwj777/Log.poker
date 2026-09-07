@@ -17,18 +17,29 @@
  *   npm run check:gate -- --token <t>    one you already have
  *   npm run check:gate -- --print-token
  *   npm run check:gate -- --origin https://deploy-preview-1--log.netlify.app
- *   npm run check:gate -- --signin-origin https://deploy-preview-1--untilt.netlify.app
+ *   npm run check:gate -- --signin-origin https://untilt.poker
  *
  * Two different questions, and it is worth being clear which one is being
- * asked. Minting proves the key stored on the site is byte for byte the key you
- * typed here, and nothing more: paste damage, and only paste damage. A token
- * Untilt signed is the one that proves the key is *Untilt's*, which is the
- * question that actually matters, because the two apps agreeing is the whole
- * feature.
+ * asked, because the answer changed when Log started minting its own tokens.
  *
- * `--signin` gets that second token the way the app will: it asks Untilt to
- * mail a code, takes the code, and trades it for a token. Two endpoints and no
- * browser, which beats reading `localStorage` out of a dev build.
+ * **Minting proves paste damage and nothing else.** The key stored on the site
+ * is byte for byte the key you typed here.
+ *
+ * **`--signin` walks the path the app walks**: ask `/api/signin` for a code,
+ * read it out of the mail, trade it at `/api/signin/code`, spend the token at
+ * `/api/sync`. Two endpoints and no browser, which beats reading
+ * `localStorage` out of a dev build. It is the end-to-end check, and it is now
+ * the one that has a hole in it: **Log signs and verifies under the same key,
+ * so a wrong key that is wrong consistently passes this.** Everything agrees
+ * with itself.
+ *
+ * The hole is closed by pointing `--signin-origin` at `https://untilt.poker`.
+ * A token Untilt signed is the only one that proves the key is *Untilt's*, and
+ * that is worth knowing even though nothing in Log depends on it any more:
+ * subjects and bucket names are HMACs under this key, so it is effectively
+ * write once, and finding out it was the wrong one later means orphaning every
+ * bucket. Untilt only mails an address that has bought, so that run needs an
+ * address that has.
  *
  * The token this mints names the subject `gatecheck`, so a successful run
  * writes a bucket, and the run erases it again on the way out. A token that
@@ -73,7 +84,7 @@ const printing = args.includes('--print-token');
  * testable end to end, which matters more than it sounds, because the sign-in
  * path is the half that cannot be checked by reading it.
  */
-const SIGNIN_ORIGIN = valueOf('--signin-origin') ?? 'https://untilt.poker';
+const SIGNIN_ORIGIN = valueOf('--signin-origin') ?? 'https://log.poker';
 
 /* ------------------------------------------------------------- the reading */
 
@@ -226,11 +237,12 @@ const readLine = async (question) => {
   }
 };
 
-const askUntilt = async (path, body) => {
+const askSignIn = async (path, body) => {
   try {
     return await fetch(`${SIGNIN_ORIGIN}${path}`, {
       method: 'POST',
-      // Accept is what the endpoint keys on. Without it it answers the way it
+      // Log's endpoint answers JSON to everybody, having no page to answer
+      // with. Untilt's keys on this header: without it, it answers the way it
       // answers a browser, with a page and a cookie that cannot cross a
       // registrable domain, and there would be no token in the body at all.
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -247,7 +259,11 @@ const stop = (...lines) => {
 };
 
 /**
- * A token, minted by Untilt, the way the app will ask for one.
+ * A token, the way the app asks for one.
+ *
+ * From `--signin-origin`, which is Log by default and is the door the app
+ * actually uses. Point it at Untilt to ask the other question; see the top of
+ * this file for which is which.
  *
  * The code and never the link. Mail opens a link in a browser, and a browser
  * is the one place this token is no use, which is the reason the code flow
@@ -256,24 +272,26 @@ const stop = (...lines) => {
 const signIn = async (address) => {
   say(`Asking ${SIGNIN_ORIGIN} to mail a code to ${address}.`, '');
 
-  const asked = await askUntilt('/api/signin', { email: address });
+  const asked = await askSignIn('/api/signin', { email: address });
   if (asked === null) stop(`Could not reach ${SIGNIN_ORIGIN}.`);
-  if (asked.status === 429) stop('Asked too often. Untilt rate limits this; wait and retry.');
+  if (asked.status === 429) stop('Asked too often. This is rate limited; wait and retry.');
   if (!asked.ok) stop(`Sign-in would not take that address (HTTP ${asked.status}).`);
 
   say(
-    'Sent, if there was anywhere to send it.',
+    'Sent, if anything was going to be sent.',
     '',
-    'The endpoint answers the same whether or not it has heard of an address, on',
-    'purpose, so that nobody can use it to ask who has bought. So a 202 is not a',
-    'promise that mail is coming: if none arrives, that address has not bought.',
+    'A 202 is not a promise that mail is coming. Log answers the same whether or',
+    'not one went, because the rate limits stop a mail to an address that has just',
+    'had one and saying so would report how much mail any address has had. Untilt',
+    'answers the same whether or not it has heard of the address at all, so that',
+    'nobody can use it to ask who has bought.',
     '',
   );
 
   const code = await readLine('Code from the email: ');
   if (!code) stop('No code, so there is nothing to trade.');
 
-  const traded = await askUntilt('/api/signin/code', { email: address, code });
+  const traded = await askSignIn('/api/signin/code', { email: address, code });
   if (traded === null) stop(`Could not reach ${SIGNIN_ORIGIN}.`);
   if (traded.status === 429) stop('Asked too often. Wait and retry.');
   if (!traded.ok) stop(`That code was refused (HTTP ${traded.status}). Codes expire; ask again.`);
@@ -290,7 +308,7 @@ const signIn = async (address) => {
     stop('Sign-in answered 200 without a token in it, which it should never do.');
   }
 
-  say('', 'Untilt signed a token. Now to see whether Log agrees.', '');
+  say('', `${SIGNIN_ORIGIN} signed a token. Now to see whether the sync agrees.`, '');
   return token;
 };
 

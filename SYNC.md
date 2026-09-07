@@ -173,8 +173,14 @@ is already built:
 
 What Log adds is storage for the token: `expo-secure-store` on native,
 `localStorage` on web, and a sign-out that clears it. Roughly a day, and the
-harder half of the phase is in Untilt's repo rather than this one, promoting one
-endpoint to answer for three apps.
+harder half of the phase was in Untilt's repo rather than this one, promoting
+one endpoint to answer for three apps.
+
+**That is no longer where the door is.** Untilt's sign-in still answers the
+three apps and still mints for paying customers; Log mints its own free-tier
+tokens on its own host, because sync stopped being sold and a door only buyers
+can open stopped being the right one. See
+[what the free door landed](#what-the-free-door-landed).
 
 **One thing to get right early.** Untilt's sync refuses the subject `passcode`
 by name, because every passcode holder shares it and syncing them would pour
@@ -546,6 +552,67 @@ pushes that at Log. Two endpoints and no browser, which beats reading
 Nothing is ever erased in either of those modes: the token names a person, and
 their history is not a check's to tidy away.
 
+### What the free door landed
+
+Making sync free in this repository did not make it free. Removing the tier
+check let a free token sync; it did not let a free player get a token, because
+the family's only sign-in belongs to Untilt and that one asks Stripe first. So
+Log has its own now, and this is what came out of writing it.
+
+`netlify/functions/signin.mts` answers `/api/signin` and `/api/signin/code` on
+`log.poker`, the same two paths with the same bodies and the same statuses, so
+`src/auth/signin.ts` did not change shape and neither did the screen above it.
+One constant moved. **Untilt's endpoint is untouched**, which was the point of
+choosing this over the other two ways out: the abuse surface lands on the app
+that wanted it.
+
+**Minting lives in `src/sync/verify.ts`, next to the check it has to agree
+with.** That file was named for verifying and is now the one place that holds
+the key, which is the property worth keeping. Two files each knowing half of a
+signature format are two files that disagree in a year, and the failure is a
+token this family mints and then refuses.
+
+**There is still no user table.** The subject on a token is an HMAC of the
+normalized address, so the same person always gets the same log back without
+anything having remembered them, and the record for a pending code is keyed by
+another HMAC of the same address and holds an HMAC of the code. A store that
+leaked would say how many people have signed in and nothing about who or how to
+become them. Normalizing is not cosmetic: Untilt keeps the spelling somebody
+typed because Stripe's customer filter is case-sensitive, and nothing here
+looks anybody up, so `Player@Example.com` reaching a different history than
+`player@example.com` would be a second empty log with nothing on screen to
+explain it.
+
+**The disclosure argument survives, wearing a different hat.** Untilt answers
+202 whether or not it has heard of an address, because an endpoint that says
+*no customer* is a way to ask who has bought. Here anybody may sign in, so
+there is nothing to disclose, and the 202 stays anyway: the cooldown and the
+daily cap would otherwise answer differently for an address somebody had been
+mailing. The copy on the screen named a purchase and no longer does, which is
+the one place that property could have died quietly.
+
+**What the free door costs is mail somebody did not ask for**, and it is
+bounded rather than argued away. One mail a minute and five a day to any one
+address, twenty requests an hour from any one caller, both counted before
+anything is generated or sent. A code is six digits, single use, good for
+fifteen minutes, and dies rather than merely failing after five wrong guesses.
+A send that fails takes its record back, because leaving it would spend one of
+the day's five and start a cooldown for a mail nobody got, so the retry a
+person makes straight away would be silently ignored.
+
+**One thing the gate check no longer proves.** Log signs and verifies under the
+same key, so a wrong `GATE_SECRET` that is wrong consistently passes an
+end-to-end run against Log: everything agrees with itself. Pointing
+`--signin-origin` at `https://untilt.poker` is what still asks whether the key
+is *Untilt's*, and that is worth knowing even though nothing in Log depends on
+it any more, because subjects and bucket names are HMACs under this key and
+finding out later means orphaning every bucket.
+
+**What is left is two environment variables**, and neither is code.
+`GATE_SECRET` and `RESEND_API_KEY` on Log's Netlify site; without the first,
+both endpoints answer 503 to everything, which is the state to leave them in.
+Then `ALLOW_SIGN_IN` flips.
+
 ### Collecting tombstones
 
 Built, and it turned out to be the one piece where the obvious implementation is
@@ -890,32 +957,15 @@ quietly during work like this.
 
 ## Still open
 
-1. **Who is allowed to sign in?** The one thing between the front door's promise
-   and a shipped feature, and it is in Untilt's repository rather than this one.
-   `netlify/edge-functions/signin.js` never mails a code to an address Stripe has
-   no customer for, in its own words: *only somebody who has bought can be
-   reached*. So sync being free in Log means free to anybody who has bought
-   something in the family, and a player who only ever uses the free tracker
-   cannot get a token to sync with. *Free like the rest of this* is on the front
-   door and is not yet true. Three ways out:
+1. ~~**Who is allowed to sign in?**~~ **Settled: anybody, at Log's own door.**
+   Untilt's sign-in will not mail a code to an address Stripe has no customer
+   for, in its own words: *only somebody who has bought can be reached*. That
+   was right while sync was sold and made *free like the rest of this* false
+   the moment it was not. Of the three ways out, the third was taken:
+   `netlify/functions/signin.mts` answers the same two paths on `log.poker`,
+   mints the free tier for anybody who can read their mail, and **Untilt is
+   untouched**. See [what the free door landed](#what-the-free-door-landed).
 
-   - **Leave it.** Cheapest, and it makes the front door lie. Not viable while
-     that paragraph reads the way it now reads.
-   - **Mail a code to anybody who asks.** One condition removed from a function
-     that is already rate limited per caller and per address. It costs the thing
-     that check is really doing, which is bounding who this endpoint can be made
-     to send mail to: without it a stranger can point it at an address that is
-     not theirs. The non-disclosure property survives and in fact gets simpler,
-     since answering identically is trivially true once there is nothing to
-     disclose.
-   - **Give Log its own sign-in that mints a free-tier token without asking
-     Stripe anything.** More code, in the repository that wants the feature,
-     and it leaves Untilt's paid door exactly as it is. Recommended: the abuse
-     surface lands on the app that chose it, and Log's token needs no tier, no
-     customer and no entitlement, which is most of what that endpoint does.
-
-   Nothing in this repository is blocked on the answer. The endpoint, the merge
-   and the client do not care which of the three mints the token they are handed.
 2. **Does the first release sync Log only, or is the shared account across all
    three apps a launch requirement?** Log-only is smaller and can use the same
    token without the App User ID work landing anywhere else.

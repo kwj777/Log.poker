@@ -1,14 +1,22 @@
 /**
- * Asking Untilt's sign-in for a token.
+ * Asking for a token.
  *
- * ## Why there is a second shape of the same endpoint
+ * ## Which sign-in this talks to, and why it moved
  *
- * Untilt's `/api/signin` answers a browser with a 303 carrying a `Set-Cookie`,
- * and that cookie is `__Host-` prefixed and `HttpOnly`: unreadable by script by
- * design, unreachable from another registrable domain by definition, and
- * meaningless to a native app with no browser cookie jar at all. So it answers
- * a caller that asks for JSON with the token in the body instead. Nothing about
- * how the token is minted, signed or checked differs between the two.
+ * Untilt's. Then Log's, on `log.poker`, and the switch is the whole of what
+ * made cross-device history actually free rather than free on paper.
+ *
+ * Untilt's `/api/signin` will not mail a code to an address Stripe has no
+ * customer for -- *only somebody who has bought can be reached* -- which was
+ * right while sync was sold and wrong the moment it was not. Removing Log's
+ * tier check let a free tier sync; it did not let a free player get a token to
+ * sync with. `netlify/functions/signin.mts` is the door that does, it mints the
+ * free tier for anybody who can read their mail, and Untilt's endpoint is
+ * untouched.
+ *
+ * **The contract is Untilt's, deliberately.** The same two paths, the same
+ * bodies, the same statuses, so this file did not change shape and neither did
+ * the screen above it. What changed is one constant.
  *
  * The contract:
  *
@@ -17,34 +25,42 @@
  *                                                       400 { error }
  *                                                       429 { error }
  *
- * Both take `Accept: application/json`, which is what makes the difference:
- * without it the same request is answered with a page and a cookie, exactly as
- * it always was. A refusal is 400 rather than 401 because that is the status
- * the page carries for the same condition, and one status per outcome across
- * both representations is worth more than matching a convention.
+ * `Accept: application/json` is sent on both and is no longer what makes the
+ * difference: Log's endpoint answers JSON to everybody, having no page and no
+ * cookie to answer with. It stays because the header is honest and because a
+ * deploy pointed back at Untilt would need it. A refusal is 400 rather than
+ * 401 for the same reason it always was: it is the status the family's other
+ * representation carries for the same condition.
  *
- * The first mails a link and a code, and answers 202 whether or not the
- * address is one it has heard of, because an endpoint that says *no customer*
- * is an endpoint that tells a stranger who bought. The second trades a code
- * for the token. Both are already rate limited and both already refuse to mail
- * an address Stripe has never seen; none of that moves.
+ * The first mails a code and answers 202 whether or not one was sent, because
+ * the rate limits would otherwise report how much mail an address has had. The
+ * second trades a code for the token, and cannot tell a wrong code from an
+ * address it never issued one for. See `signinEndpoint.ts` for both.
  *
  * **The code, and not the link.** A link cannot reach an installed app: mail
  * opens links in the browser, always, and an installed app keeps its own
  * storage, so a player who tapped one would be signed in to Safari and come
  * back to an app as signed out as they left it. Untilt learned that and built
- * the code flow for it. A native app has the same problem with no way around.
+ * the code flow for it. Log's mails no link at all.
  *
  * ## What this is still not
  *
- * Nothing in the app calls this. It is tested against a fake `fetch` rather
- * than a live server, which proves it handles the answers the contract
- * describes and proves nothing about whether the server gives them. See
- * SYNC.md.
+ * It is tested against a fake `fetch` rather than a live server, which proves
+ * it handles the answers the contract describes and proves nothing about
+ * whether the server gives them. `signinEndpoint.test.ts` is the other half and
+ * runs the server's rules; `scripts/check-gate.mjs` is the only thing that puts
+ * the two together against a deploy. See SYNC.md.
  */
 
-/** Where the family's sign-in lives. One host mints for all three apps. */
-export const SIGNIN_ORIGIN = 'https://untilt.poker';
+/**
+ * Where Log's sign-in lives.
+ *
+ * Absolute rather than relative, because this app also runs natively, where a
+ * path means nothing. On web the app is served from `log.poker/app` and this
+ * answers on `log.poker`, so it is same-origin there and there is no preflight
+ * to answer, exactly as with `/api/sync`.
+ */
+export const SIGNIN_ORIGIN = 'https://log.poker';
 
 /** Long enough for a cold serverless start, short enough to fail on a dead network. */
 export const REQUEST_TIMEOUT_MS = 15_000;

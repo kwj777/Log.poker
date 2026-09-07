@@ -1,11 +1,12 @@
 /**
- * Checking a token, which only the server can do.
+ * Making and checking a token, and everything else that needs the key.
  *
  * `src/auth/token.ts` parses one and says so loudly: it has no key and proves
  * nothing. This is the other half, and it lives apart because the difference
- * matters more than the duplication. Anything importing this file needs a
- * secret to call it, and a secret that reached the app bundle would be a secret
- * anybody could download.
+ * matters more than the duplication. **Anything importing this file needs a
+ * secret to call it**, and a secret that reached the app bundle would be a
+ * secret anybody could download. It is under `src/sync` for historical reasons
+ * and is not about syncing; `signinEndpoint.ts` is the other caller.
  *
  * The secret is a parameter rather than an environment read, so this stays a
  * pure function with a test suite and the one place that knows where the key
@@ -13,13 +14,18 @@
  *
  * The signature is Untilt's, re-derived rather than reimplemented: HMAC-SHA256
  * over the first three fields, base64url, no padding.
+ *
+ * **Minting lives here rather than beside the sign-in**, next to the check it
+ * has to agree with. Two files that each know half of a signature format are
+ * two files that disagree about it in a year, and the failure mode is a token
+ * this family mints and then refuses.
  */
 
-import { readClaim, SUBJECT_PASSCODE, type Claim } from '../auth/token';
+import { readClaim, SUBJECT_PASSCODE, type Claim, type Tier } from '../auth/token';
 import type { Timestamp } from '../domain/types';
 
 /** Length-independent, so a wrong guess leaks no timing signal. */
-const safeEqual = (a: string, b: string): boolean => {
+export const safeEqual = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
   let differing = 0;
   for (let index = 0; index < a.length; index += 1) {
@@ -35,7 +41,7 @@ const base64url = (bytes: ArrayBuffer): string => {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-const sign = async (secret: string, payload: string): Promise<string> => {
+const mac = async (secret: string, payload: string): Promise<ArrayBuffer> => {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -44,7 +50,23 @@ const sign = async (secret: string, payload: string): Promise<string> => {
     false,
     ['sign'],
   );
-  return base64url(await crypto.subtle.sign('HMAC', key, encoder.encode(payload)));
+  return crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+};
+
+const sign = async (secret: string, payload: string): Promise<string> =>
+  base64url(await mac(secret, payload));
+
+/**
+ * A name derived from the key rather than from what it names.
+ *
+ * Three things are keyed this way and the argument is the same for all of
+ * them: a store that holds an address, a customer id or a subject is a store
+ * that identifies people if it ever leaks, and none of these need to be
+ * reversible. The domain prefix keeps them from being each other.
+ */
+export const hmacHex = async (secret: string, payload: string): Promise<string> => {
+  const bytes = new Uint8Array(await mac(secret, payload));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
 /**
@@ -140,22 +162,83 @@ export const hasOwnBucket = (claim: Claim | null): claim is Claim =>
  * every bucket, which is exactly what it already does to every token, and the
  * two are meant to move together.
  */
-export const bucketFor = async (secret: string, subject: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode('log.sync.' + subject));
-  return [...new Uint8Array(mac)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-};
+export const bucketFor = (secret: string, subject: string): Promise<string> =>
+  hmacHex(secret, 'log.sync.' + subject);
 
 /** The bearer token on a request, or null. Case-insensitive, as the header is. */
 export const bearerFrom = (authorization: string | null | undefined): string | null => {
   if (typeof authorization !== 'string') return null;
   const found = /^Bearer\s+(\S+)$/i.exec(authorization.trim());
   return found ? found[1] : null;
+};
+
+/* --------------------------------------------------------------- minting */
+
+/**
+ * How long a token this app mints is good for.
+ *
+ * Thirty days, which is Untilt's number and is chosen to be the same one.
+ * A device that has been in a drawer for a month signs in again; a device in
+ * use never notices, because a sync is what discovers the expiry and there is
+ * one on every launch.
+ */
+export const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * The prefix on a subject this app minted.
+ *
+ * Untilt's subjects are Stripe customer ids, which begin `cus_`, and the
+ * shared passcode's is the literal `passcode`. This is neither, deliberately
+ * and checkably: a subject is the name of a bucket, so two schemes that could
+ * ever collide are two people who could ever share a poker history.
+ */
+export const SUBJECT_PREFIX = 'log_';
+
+/**
+ * One spelling of an address, so one person has one log.
+ *
+ * Untilt keeps the spelling somebody typed, because Stripe's customer filter
+ * is case-sensitive and it has to find them. Nothing here looks anybody up, so
+ * this can do the correct thing instead: the local part of an address is
+ * case-sensitive by RFC and case-insensitive at every mail provider anybody
+ * uses, and treating `Player@Example.com` as a second person would give them a
+ * second, empty history and no way to tell why.
+ */
+export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
+/**
+ * The subject for an address, which is all this app knows about anybody.
+ *
+ * Derived rather than stored, so there is no user table to keep, to migrate or
+ * to leak: the same address always answers with the same subject, and the
+ * subject cannot be turned back into the address without the key.
+ *
+ * Thirty-two hex characters of an HMAC. That is 128 bits, which is far past
+ * what a collision needs, and it leaves the whole thing at 36 characters
+ * against the grammar's limit of 64.
+ */
+export const subjectForEmail = async (secret: string, email: string): Promise<string> =>
+  SUBJECT_PREFIX + (await hmacHex(secret, 'log.subject.' + normalizeEmail(email))).slice(0, 32);
+
+/**
+ * A signed token, in the grammar Untilt defined.
+ *
+ * The counterpart of `checkToken` and the reason both live in this file. The
+ * expiry is written in seconds because that is what the grammar says, and the
+ * argument is in milliseconds because that is what everything in this app
+ * counts in; the conversion is here so that no caller has to remember it.
+ *
+ * **Nothing about this decides what a token is worth.** A token minted here
+ * carries the free tier, because this app has nothing to sell and no way to
+ * find out whether somebody has bought elsewhere. It is a valid family token
+ * by construction, since the signature is the whole of what makes one, so it
+ * is worth saying what that does and does not buy: the other two apps will
+ * read the tier and give it exactly what an unpaid visitor already has.
+ */
+export const mintToken = async (
+  secret: string,
+  { subject, tier, expiresAt }: { subject: string; tier: Tier; expiresAt: Timestamp },
+): Promise<string> => {
+  const payload = `${Math.floor(expiresAt / 1000)}.${tier}.${subject}`;
+  return `${payload}.${await sign(secret, payload)}`;
 };

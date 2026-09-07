@@ -28,9 +28,20 @@ const FAILURES: SignInFailure[] = ['rejected', 'throttled', 'unreachable'];
 describe('what it says after asking for a code', () => {
   it('does not promise that a mail was sent', () => {
     // The property the endpoint is built around, at the last place it can die.
-    expect(CODE_SENT).toMatch(/^If /);
+    // 202 does not mean a mail went: the cooldown and the daily cap stop one
+    // silently, and reporting that would report how much mail an address has
+    // had.
+    expect(CODE_SENT).toMatch(/\b(if|unless)\b/i);
     expect(CODE_SENT).not.toMatch(/check your (inbox|email)/i);
     expect(CODE_SENT).not.toMatch(/\bwe (have )?(sent|emailed)\b/i);
+  });
+
+  it('and does not send somebody away who has bought nothing', () => {
+    // It said "if that address has a purchase behind it" while the family's
+    // only sign-in was Untilt's, which will not mail a stranger. Log mints its
+    // own now, cross-device history is free, and there is nothing to have
+    // bought. This is the sentence that would quietly put the price back.
+    expect(CODE_SENT).not.toMatch(/\b(purchase|purchased|bought|paid|subscription)\b/i);
   });
 
   it('says how long the code lasts, because the mail is not on screen', () => {

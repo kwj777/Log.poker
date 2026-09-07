@@ -756,8 +756,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 39 passed
-Tests:       1131 passed
+Test Suites: 40 passed
+Tests:       1144 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -787,6 +787,7 @@ Tests:       1131 passed
   token              17   the family token grammar, against signed fixtures
   handNotation       16   parse, round-trip, hand classes
   client             14   the sync client, against a fake fetch
+  glossary           13   the shorthand on screen still matches its explanation
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
   gateCheck          11   the key-on-the-site script, run rather than read
@@ -908,6 +909,41 @@ Three of the card's four states show no hand-off, including the one where the
 comparison settles the *other* way and a player's rattled sessions are their
 better ones. That state is still reported. An analysis that only speaks when it
 supports the upsell is an advertisement wearing a lab coat.
+
+### What the shorthand means
+
+The app labels a chip `UTG` and a stat tile `Swing` and assumes the reader
+speaks poker. Most do. The ones who do not are exactly the players a tracker is
+most use to, and they are not going to ask.
+
+`src/domain/glossary.ts` holds the explanations, keyed as
+`Record<Position, ...>` and `Record<HandTag, ...>`, so **a new seat cannot be
+added without the compiler asking what it means.** It sits beside the types
+rather than beside a screen for that reason: a glossary kept next to the
+component that happened to use it falls behind the first rename.
+
+**A tap, not a hover.** The obvious build is tooltip text on hover, which would
+work in the web build and be invisible on a phone -- and a phone is where a
+player standing at a table is. So `Explain` is a question mark in
+`SectionHeader`'s existing `action` slot, opening the same `Sheet` the cash-out
+and rebuy flows use, which is already proven across iOS, Android and web and
+already handles the browser's Escape key.
+
+It explains a section rather than a word, which is also the better unit. Nobody
+wonders what `HJ` means on its own; they wonder what the row of abbreviations
+is, and reading the nine seats in order answers a question they had not finished
+forming. It keeps the chips as chips, too: tapping one picks a position, and
+overloading that gesture to sometimes mean *define this* would cost more than an
+extra tap on a question mark.
+
+The tests are mostly not about the prose. A glossary is the easiest thing in a
+codebase to let rot, because nothing breaks when a label is renamed and its
+entry is not -- the screen simply goes on defining a word it no longer uses. So
+every entry has to name a label the app actually prints, asserted against the
+screen's own source, and the entries are held to the exact strings the pickers
+show, question mark on `misplayed?` included. That anchoring rule is also why
+this is not a general poker glossary: an entry explaining a word the app never
+displays is one nobody would notice going stale.
 
 ### The mid-session reset
 

@@ -46,6 +46,15 @@
  * address, at most twenty requests an hour from any one caller, both counted
  * before anything is generated or sent. A code is six digits, single use, good
  * for fifteen minutes, and dies after five wrong guesses.
+ *
+ * ## What is exported for the sweep, and why
+ *
+ * `signinSweep.ts` collects records this file has stopped reading, and the
+ * only way it can know which those are is to share the predicates that decide.
+ * So `isPending`, `isCaller` and `windowRolled` are exported and used on both
+ * sides rather than restated over there: a sweep that disagreed with this file
+ * about when a window has rolled would hand back mail budget, which is the one
+ * bound that matters here. The key prefixes are exported for the same reason.
  */
 
 import {
@@ -103,6 +112,16 @@ export const CALLER_WINDOW_MS = 60 * 60 * 1000;
 const MAX_BODY = 4 * 1024;
 
 /**
+ * Where the two kinds of record live.
+ *
+ * Exported because the sweep lists by them. Neither prefix is a secret and
+ * neither carries anything about who: what follows is an HMAC.
+ */
+export const CODE_PREFIX = 'code/';
+
+export const CALLER_PREFIX = 'caller/';
+
+/**
  * Permissive on purpose.
  *
  * The only thing this has to rule out is a string that cannot be mailed, so
@@ -131,7 +150,7 @@ const randomCode = (): string => {
 };
 
 /** What is written down about an address, none of which identifies one. */
-interface Pending {
+export interface Pending {
   /** An HMAC of the code. Storing the code would make the store a way in. */
   hash: string;
   issuedAt: number;
@@ -142,16 +161,41 @@ interface Pending {
   windowStartedAt: number;
 }
 
-interface Caller {
+export interface Caller {
   count: number;
   resetAt: number;
 }
 
-const isPending = (value: unknown): value is Pending =>
+/**
+ * Whether a stored value is a record at all.
+ *
+ * Anything that is not is treated as absent, here and by the sweep, which is
+ * why both of these are exported rather than inlined: the sweep's license to
+ * collect a record is precisely that this file would ignore it.
+ */
+export const isPending = (value: unknown): value is Pending =>
   typeof value === 'object' &&
   value !== null &&
   typeof (value as Pending).hash === 'string' &&
-  typeof (value as Pending).expiresAt === 'number';
+  typeof (value as Pending).expiresAt === 'number' &&
+  typeof (value as Pending).windowStartedAt === 'number';
+
+export const isCaller = (value: unknown): value is Caller =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as Caller).count === 'number' &&
+  typeof (value as Caller).resetAt === 'number';
+
+/**
+ * Whether the day this record counts mail in has run out.
+ *
+ * The one predicate the sweep most needs to agree with, so it is written once.
+ * A rolled window is the same as never having asked: the count starts again
+ * below, and the sweep may take the record away entirely once the code on it
+ * has also expired.
+ */
+export const windowRolled = (record: Pending, now: number): boolean =>
+  now - record.windowStartedAt > DAY_MS;
 
 const json = (body: unknown, status: number): Response =>
   new Response(body === null ? null : JSON.stringify(body), {
@@ -242,21 +286,24 @@ const overCallerLimit = async (
   now: number,
 ): Promise<boolean> => {
   if (caller === null) return false;
-  const key = `caller/${await hmacHex(secret, 'log.signin.caller.' + caller)}`;
-  const held = (await store.get(key, { type: 'json' })) as Caller | null;
-  const live = held !== null && typeof held.resetAt === 'number' && held.resetAt > now;
-  const count = (live ? held.count : 0) + 1;
+  const key = `${CALLER_PREFIX}${await hmacHex(secret, 'log.signin.caller.' + caller)}`;
+  const found = await store.get(key, { type: 'json' });
+  // Anything that is not a live record is nothing: an hour that has run out
+  // and an unreadable value both start the count again. The sweep collects on
+  // the same reading, which is what makes collecting one safe.
+  const held = isCaller(found) && found.resetAt > now ? found : null;
+  const count = (held === null ? 0 : held.count) + 1;
   if (count > CALLER_LIMIT) return true;
   await store.setJSON(key, {
     count,
-    resetAt: live ? held.resetAt : now + CALLER_WINDOW_MS,
+    resetAt: held === null ? now + CALLER_WINDOW_MS : held.resetAt,
   } satisfies Caller);
   return false;
 };
 
 /** Where an address's record lives, which is not anywhere the address is. */
 const pendingKey = async (secret: string, email: string): Promise<string> =>
-  `code/${await hmacHex(secret, 'log.signin.address.' + normalizeEmail(email))}`;
+  `${CODE_PREFIX}${await hmacHex(secret, 'log.signin.address.' + normalizeEmail(email))}`;
 
 /** What is compared against, which is never the code itself. */
 const hashOf = (secret: string, email: string, code: string): Promise<string> =>
@@ -302,10 +349,11 @@ const askFor = async (
     return json({ error: 'unreachable' }, 503);
   }
 
-  // A window that has rolled is the same as never having asked. The record is
-  // overwritten rather than collected, so this cannot grow without bound: one
-  // small object per address ever seen, and it stops changing size.
-  const current = held !== null && now - held.windowStartedAt <= DAY_MS ? held : null;
+  // A window that has rolled is the same as never having asked, so the record
+  // is overwritten and the count starts again. `signinSweep.ts` takes such a
+  // record away once its code has also expired, which is the point at which
+  // neither path here would read anything from it.
+  const current = held !== null && !windowRolled(held, now) ? held : null;
   const sent = current === null ? 0 : current.sent;
   const windowStartedAt = current === null ? now : current.windowStartedAt;
 

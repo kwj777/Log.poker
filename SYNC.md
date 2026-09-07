@@ -650,6 +650,55 @@ strips the card from the next build; the endpoint's own limits, one mail a
 minute and five a day per address, hold in the meantime. A test pins the
 current value either way, so it cannot move by accident.
 
+### And the store behind the free door collects too
+
+`/api/signin` writes one small record per address it has ever mailed and one per
+caller it has ever counted, and for its first weeks it wrote them forever.
+Neither record grows, because a second mail to the same address overwrites the
+first, so the size of that store is the number of addresses ever typed into the
+form rather than the number of times they were. That is the benign reading, and
+it is the wrong one to plan around: the form mails anybody, which is the point
+of it, so a script pointed at the door for a week leaves a record for every
+address it invented and none of them is ever coming back.
+
+`netlify/functions/signin-sweep.mts` runs `@daily` around
+`src/auth/signinSweep.ts`. **The rule is that a record is collectable exactly
+when neither request path would read anything from it**, which is worth stating
+that way rather than as arithmetic, because it is the version that survives
+somebody changing the arithmetic. Every predicate the sweep decides on is
+imported from `signinEndpoint.ts` rather than restated, so the two cannot drift
+into disagreeing about what a live record is, and the suite proves the
+equivalence by running the real endpoint against a swept store and one that
+never held the record and asserting they cannot be told apart.
+
+**This is the tombstone lesson below in miniature, and it took two conditions
+rather than the obvious one.** Collecting an address record inside its window
+hands back mail budget: `sent` and `windowStartedAt` are the whole of what holds
+one address to five mails a day, so a sweep that took the record early would
+mean anybody who wanted a stranger mailed more than five times only had to wait
+for the nightly run. That much was clear from the start. What was not is that
+the window rolling is not enough on its own: a code asked for at twenty-three
+hours and fifty-nine minutes into a window is live for fifteen minutes *past*
+the roll, so collecting on the window alone would kill a code somebody was at
+that moment reading off their phone. Rare, silent, and indistinguishable from
+typing it wrong. The rule is the later of the two horizons.
+
+It needs less margin than the tombstone collection does, and for a reason worth
+being explicit about rather than assuming: there is no second party holding
+state that has to hear about the collection, so the horizon is exactly the last
+moment either path would look, with nothing added for a device in a drawer.
+
+Two smaller things. The sweep budgets twenty seconds against the platform's
+thirty and **says in its log when it ran out of them**, because a run that
+stopped halfway and a run with nothing left to do leave the same store behind. A
+truncated run always stops at the same end of the key order, so a store larger
+than one run could examine would sweep its head repeatedly and never reach its
+tail; that is a real defect and not yet a real problem, and the fix when it
+arrives is a stored cursor, which is why `finished` is reported rather than
+inferred. And the function holds no key at all: it cannot mint, cannot verify,
+and cannot tell whose record is whose, which is the least it can be trusted with
+and therefore the right amount.
+
 ### Collecting tombstones
 
 Built, and it turned out to be the one piece where the obvious implementation is

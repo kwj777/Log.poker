@@ -674,6 +674,15 @@ constant to `false` strips the card from the next build while the endpoint's
 own limits hold in the meantime. A test pins its current value either way, so
 it cannot move by accident.
 
+**The store behind it collects nightly.** `netlify/functions/signin-sweep.mts`
+runs `@daily` and takes away the records `/api/signin` has stopped reading: an
+address whose day of mail counting has rolled *and* whose code has expired, and
+a caller whose hour has run out. Both conditions for an address, because the
+record is what holds one to five mails a day and collecting it early would hand
+that budget back. The sweep holds no key, never writes, and shares its
+predicates with the endpoint so the two cannot disagree about what a live record
+is. See SYNC.md.
+
 The copy has tests, which most copy should not. `/api/signin` answers 202
 whether or not a mail went, so that nobody can use it to ask how much mail an
 address has had. A screen that said *check your inbox* would throw that away on
@@ -756,8 +765,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 40 passed
-Tests:       1151 passed
+Test Suites: 41 passed
+Tests:       1173 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -779,6 +788,7 @@ Tests:       1151 passed
   endpoint           25   the sync endpoint, end to end
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
+  signinSweep        22   what the sign-in store may collect, and what it must not
   copy               20   what the sign-in and the sync are allowed to say
   glossary           20   the shorthand on screen still matches its explanation
   batch              19   a backlog split into requests, without orphaning a child

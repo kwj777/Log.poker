@@ -755,7 +755,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 37 passed
-Tests:       1084 passed
+Tests:       1085 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -764,7 +764,7 @@ Tests:       1084 passed
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   stats              45   P/L, rebuys, duration, win rate, groupings
-  site               38   the marketing/app split, the PWA, the sitemap
+  site               39   the marketing/app split, the PWA, the sitemap
   values             36   money, dates, durations, stakes, formats, counts
   signinEndpoint     35   the free door, and every bound on it
   variance           35   win rate, σ, confidence bands, verdicts

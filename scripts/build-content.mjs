@@ -520,7 +520,7 @@ ${next({
   name: 'Log',
   href: '/app',
   what:
-    'Log estimates both numbers from your own completed sessions, draws the band around your real curve, and answers the question at the top of this page in a sentence. A session takes under ten seconds to record. All of it is free, it works offline, it keeps everything on your device, and it needs no account.',
+    'Log estimates both numbers from your own completed sessions, draws the band around your real curve, and answers the question at the top of this page in a sentence. A session takes under ten seconds to record. All of it is free, it works offline, and it needs no account: nothing leaves your device unless you sign in to carry it to another one.',
 })}
 `,
 };

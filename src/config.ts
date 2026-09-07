@@ -29,6 +29,21 @@ export const ALLOW_DEMO_SEED = IS_DEV;
 export const ALLOW_SIGN_IN = true;
 
 /**
+ * The id on the bottom tab bar, and the one thing two layers have to agree on.
+ *
+ * `app/+html.tsx` styles that element by hand, because clearing iOS Safari's
+ * toolbar needs `calc(100dvh - 100svh)` and a React Native style cannot say it.
+ * A selector and an element that drift apart do not fail: the rule stops
+ * matching and the bar quietly goes back under the toolbar. So the string lives
+ * here, where neither side owns it, rather than being written out twice.
+ *
+ * Here rather than beside the component because the web shell should not have
+ * to import a component to render its own stylesheet, and because a test can
+ * read this file without standing up React Native.
+ */
+export const BOTTOM_BAR_ID = 'log-tab-bar';
+
+/**
  * Where each app lives. `log.poker` is the family's front door and Log itself
  * is under /app, so a link meant to open the app has to say so.
  */

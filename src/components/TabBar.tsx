@@ -14,12 +14,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs } from 'expo-router';
 
+import { BOTTOM_BAR_ID } from '../config';
 import { colors, layout, spacing, typography } from '../theme';
 import { tapFeedback } from './haptics';
 import { Text } from './Text';
 
 /** Height of the bar itself, above the device's bottom safe-area inset. */
 export const TAB_BAR_HEIGHT = 58;
+
 
 /**
  * Whether a tab bar sits below the current screen.
@@ -39,7 +41,10 @@ export const TabBar = ({ state, descriptors, navigation }: TabBarProps) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: insets.bottom }]}>
+    // `nativeID` is an `id` on web and inert on native. The shell stylesheet
+    // needs to reach this one element to clear iOS Safari's toolbar, and this
+    // is the one prop that survives the trip. See `app/+html.tsx`.
+    <View nativeID={BOTTOM_BAR_ID} style={[styles.wrapper, { paddingBottom: insets.bottom }]}>
       <View style={styles.bar}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];

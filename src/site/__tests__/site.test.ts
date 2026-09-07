@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { FAMILY_LINKS, FAMILY_HOME, GUIDES } from '../../config';
+import { BOTTOM_BAR_ID, FAMILY_LINKS, FAMILY_HOME, GUIDES } from '../../config';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
@@ -330,11 +330,40 @@ describe('the app shell in a phone browser', () => {
     expect(style).toContain('height: 100dvh');
   });
 
-  it('and only inside `@supports`, or an older browser is left with no height', () => {
-    const guarded = /@supports \(height: 100dvh\) \{[^}]*\}[^}]*\}/.exec(style)?.[0] ?? '';
-    expect(guarded).toContain('html, body, #root { height: 100dvh; }');
-    // Nowhere else in the CSS, which is what makes the guard mean anything.
-    expect(style.match(/100dvh/g)).toHaveLength((guarded.match(/100dvh/g) ?? []).length);
+  it('and clears the toolbar sitting on top of that height, which dvh does not', () => {
+    // Safari's compact toolbar overlays the dynamic viewport rather than
+    // reducing it, so `dvh` alone still left the bottom of the bar underneath.
+    // `100dvh - 100svh` is exactly how much of the window it is sitting on.
+    expect(style).toContain(
+      'padding-bottom: max(env(safe-area-inset-bottom), calc(100dvh - 100svh)) !important;',
+    );
+  });
+
+  it('at the bar itself, by an id neither side writes out by hand', () => {
+    // Interpolated on both sides, which is the point: a selector and an element
+    // that drift apart do not fail. The rule stops matching, and the bar goes
+    // quietly back under the toolbar.
+    const bar = read('src', 'components', 'TabBar.tsx');
+    expect(style).toContain('#${BOTTOM_BAR_ID} {');
+    expect(bar).toContain('nativeID={BOTTOM_BAR_ID}');
+    expect(bar).not.toContain(BOTTOM_BAR_ID);
+    expect(shell.replace(/BOTTOM_BAR_ID/g, '')).not.toContain(BOTTOM_BAR_ID);
+  });
+
+  it('and `!important`, because the component writes the same property inline', () => {
+    // react-native-web puts a dynamic style on the element, and an inline style
+    // beats an id. Nothing is lost by winning: the inset it writes is the left
+    // half of the `max` above.
+    expect(style).toContain('!important');
+  });
+
+  it('with every one of those units inside `@supports`, or older browsers break', () => {
+    // Unguarded, a browser that does not know the unit throws the declaration
+    // away: the height rule leaves the app with no height at all, and the
+    // padding rule leaves the bar with none of the inset it did have.
+    const outside = style.replace(/@supports[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/g, '');
+    expect(style).toMatch(/dvh|svh/);
+    expect(outside).not.toMatch(/dvh|svh/);
   });
 
   it('and after the reset it is correcting, or the reset wins', () => {

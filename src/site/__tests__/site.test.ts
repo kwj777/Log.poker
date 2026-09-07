@@ -65,13 +65,40 @@ describe('the front door', () => {
     for (const card of cards) expect(card).toMatch(/\bfree\b/i);
   });
 
-  it('claims no server, which is true until sync ships', () => {
-    // A tripwire rather than a fact worth asserting for its own sake. Roadmap
-    // items 2 and 3 give this app a server, at which point the honest sentence
-    // becomes "nothing leaves your device unless you turn this on" and this
-    // test is what stops the old one going out beside the new feature.
-    // See SYNC.md, "What must not break".
-    expect(home).toContain('Log has no server to send anything to.');
+  it('does not claim there is no server, now that there is one', () => {
+    // This replaces a test named "claims no server, which is true until sync
+    // ships", whose comment called it the tripwire for exactly this day. It
+    // asserted the sentence was PRESENT, so it fired when somebody edited the
+    // copy and never when somebody shipped the server. Sync went live and it
+    // went on passing, with `Log has no server to send anything to` on the
+    // front page of a site whose whole argument is that it does not lie to you.
+    //
+    // A tripwire has to be anchored to the thing that makes the claim false,
+    // not to the claim. See SYNC.md, "What must not break".
+    expect(existsSync(join(ROOT, 'netlify', 'functions', 'sync.mts'))).toBe(true);
+    expect(home).not.toMatch(/no server to send anything to/i);
+    expect(home).not.toMatch(/never leaves your device/i);
+    expect(home).toMatch(/[Nn]othing leaves your device unless you sign in/);
+  });
+
+  it('and neither does any other page that carries the same line', () => {
+    // The claim was on four pages and in the app, because the call to action
+    // is copied rather than shared. Every one of them is a page somebody could
+    // arrive on, and `chip.html` is the one a physical object points at.
+    for (const page of ['home.html', 'chip.html', 'running-bad.html', '404.html']) {
+      const path = join(ROOT, 'public', page);
+      if (!existsSync(path)) continue;
+      const text = readFileSync(path, 'utf8');
+      expect(text).not.toMatch(/never leaves your device/i);
+      expect(text).not.toMatch(/no server to send anything to/i);
+      expect(text).not.toMatch(/keeps everything on your device/i);
+    }
+    // And the two generators that stamp it onto everything else.
+    for (const script of ['build-blog.mjs', 'build-content.mjs']) {
+      const text = readFileSync(join(ROOT, 'scripts', script), 'utf8');
+      expect(text).not.toMatch(/never leaves your device/i);
+      expect(text).not.toMatch(/keeps everything on your device/i);
+    }
   });
 
   it('and where the line falls, in words rather than in a number', () => {

@@ -3,8 +3,10 @@
  *
  * Short by design. The real controls are venue management, the session-summary
  * import and the dev-only demo seeder; everything else is information about
- * where your data lives -- which, with no account and no server, is a question
- * worth answering plainly.
+ * where your data lives, which is a question worth answering plainly and now
+ * has two answers: on this device, and on the server too if the card below
+ * this one has been used. The copy has to carry both, because the paragraph
+ * saying otherwise sat directly above that card for the length of one deploy.
  */
 
 import { useState } from 'react';
@@ -119,8 +121,9 @@ export default function SettingsScreen() {
       <SectionHeader title="Your data" />
       <Card>
         <Text color={colors.textSecondary} style={styles.body}>
-          Everything stays on this device. There is no account and no server: Log
-          stores your sessions in {STORAGE_ENGINE} and never sends them anywhere.
+          Log stores your sessions in {STORAGE_ENGINE} on this device, and that is
+          the whole of it unless you sign in below. Signing in carries your own
+          log to your own other devices and sends nothing else, ever.
         </Text>
         <View style={styles.dataStats}>
           <Text variant="caption" color={colors.textTertiary}>

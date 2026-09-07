@@ -25,6 +25,8 @@ import { Screen } from '../src/components/Screen';
 import { SectionHeader } from '../src/components/SectionHeader';
 import { Text } from '../src/components/Text';
 import { successFeedback } from '../src/components/haptics';
+import { Explain } from '../src/components/Explain';
+import { importGlossary } from '../src/domain/glossary';
 import { FIELD_LABELS, parseSessionCsv, type ImportField } from '../src/domain/import';
 import { formatMoney } from '../src/domain/money';
 import { CAN_PICK_FILE, pickCsvFile } from '../src/features/import/pickCsvFile';
@@ -164,7 +166,10 @@ export default function ImportScreen() {
 
       {reading && reading.error === null && totals ? (
         <>
-          <SectionHeader title="What it reads" />
+          <SectionHeader
+            title="What it reads"
+            action={<Explain title="What each column is" entries={importGlossary()} />}
+          />
           <Card>
             <View style={styles.headline}>
               <Text variant="heading">

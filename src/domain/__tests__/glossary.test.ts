@@ -18,11 +18,14 @@ import { join } from 'node:path';
 
 import {
   HAND_TAG_HELP,
+  IMPORT_HELP,
   POSITION_HELP,
   STAT_HELP,
   handTagGlossary,
+  importGlossary,
   positionGlossary,
 } from '../glossary';
+import { FIELD_LABELS, IMPORT_FIELDS } from '../import';
 import { HAND_TAGS, HAND_TAG_LABELS, POSITIONS } from '../types';
 
 const ROOT = join(__dirname, '..', '..', '..');
@@ -31,6 +34,7 @@ const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 
 const everyEntry = [
   ...Object.values(POSITION_HELP),
   ...Object.values(HAND_TAG_HELP),
+  ...Object.values(IMPORT_HELP),
   ...STAT_HELP,
 ];
 
@@ -111,8 +115,21 @@ describe('the numbers', () => {
     // The anchor rule, and the reason this file is not a general poker
     // glossary: an entry explaining a word the app never prints is an entry
     // nobody will notice going stale.
+    //
+    // Followed through `anchor` where it is set, because a player calls it the
+    // rake and the tile says "Fees paid". The entry is headed with the word
+    // somebody would look for and anchored to the one on screen.
     for (const entry of STAT_HELP) {
-      expect(variance).toContain(entry.term);
+      expect(variance).toContain(entry.anchor ?? entry.term);
+    }
+  });
+
+  it('and an anchor is only used where the term genuinely is not printed', () => {
+    // Otherwise it becomes the escape hatch that makes the rule above
+    // meaningless: anything unanchorable could simply claim to be anchored
+    // somewhere else.
+    for (const entry of STAT_HELP.filter((one) => one.anchor !== undefined)) {
+      expect(variance).not.toContain(entry.term);
     }
   });
 
@@ -136,6 +153,9 @@ describe('where the help is offered', () => {
     expect(hand).toMatch(/title="Position"[\s\S]{0,120}positionGlossary\(\)/);
     expect(hand).toMatch(/title="Tag it"[\s\S]{0,120}handTagGlossary\(\)/);
     expect(variance).toMatch(/title="Your numbers"[\s\S]{0,120}STAT_HELP/);
+    expect(read('app', 'import.tsx')).toMatch(
+      /title="What it reads"[\s\S]{0,160}importGlossary\(\)/,
+    );
   });
 
   it('and opens on a tap rather than a hover, which a phone does not have', () => {
@@ -157,5 +177,53 @@ describe('where the help is offered', () => {
     const explain = read('src', 'components', 'Explain.tsx');
     expect(explain).toContain('accessibilityRole="button"');
     expect(explain).toMatch(/accessibilityLabel=\{label \?\? `What these mean/);
+  });
+});
+
+describe('the import columns', () => {
+  it('are all there, named exactly as the mapping arrow names them', () => {
+    // The screen renders `→ {FIELD_LABELS[field]}`, so these have to be the
+    // same strings or the sheet explains columns the arrow never mentioned.
+    for (const field of IMPORT_FIELDS) {
+      expect(IMPORT_HELP[field].term).toBe(FIELD_LABELS[field]);
+    }
+  });
+
+  it('and read in the order the mapping lists them', () => {
+    expect(importGlossary().map((entry) => entry.term)).toEqual(
+      IMPORT_FIELDS.map((field) => FIELD_LABELS[field]),
+    );
+  });
+
+  it('and tell cash-out and result apart, which is the whole reason for them', () => {
+    // A file often carries both and they are not the same measurement. Cash-out
+    // is taken directly; a result is a number somebody else already derived, so
+    // it fills in only where there is no cash-out column. Getting that backwards
+    // is silent, and nobody mapping a spreadsheet could guess it.
+    expect(IMPORT_HELP.cashOut.says).toMatch(/direct/i);
+    expect(IMPORT_HELP.result.says).toMatch(/derived|only where/i);
+  });
+
+  it('and say what happens to a row that is missing something', () => {
+    // The import's own promise is that nothing is invented. These are the two
+    // columns where that shows, so the help has to say it rather than leave
+    // somebody wondering why a session has no win rate.
+    expect(IMPORT_HELP.stakes.says).toMatch(/without them|no stakes/i);
+    expect(IMPORT_HELP.endedAt.says).toMatch(/ending when it started|per hour/i);
+  });
+});
+
+describe('the rake', () => {
+  const rake = STAT_HELP.find((entry) => entry.term === 'Rake');
+
+  it('is explained where the total is shown, under the label that shows it', () => {
+    expect(rake?.anchor).toBe('Fees paid');
+  });
+
+  it('and says why the total is tournaments only, rather than leaving it puzzling', () => {
+    // Cash rake comes out of the pot, so this app never sees it. Without that
+    // sentence a cash player reads "Fees paid: $0" as a bug.
+    expect(rake?.says).toMatch(/cash[- ]game rake/i);
+    expect(rake?.says).toMatch(/tournament/i);
   });
 });

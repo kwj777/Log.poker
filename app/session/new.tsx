@@ -177,7 +177,7 @@ export default function NewSessionScreen() {
             accessibilityLabel="Tournament entry fee"
           />
           <Text variant="caption" color={colors.textTertiary} style={styles.moodHint}>
-            The rake, kept apart from the buy-in so a year of it can be totalled. Leave it at
+            The rake, kept apart from the buy-in so a year of it can be totaled. Leave it at
             zero for a freeroll. Where you finish is asked for at the end.
           </Text>
         </>

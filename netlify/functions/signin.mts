@@ -24,8 +24,15 @@
  *                    every request, which is the state to leave it in until
  *                    there is something to sync to.
  *   RESEND_API_KEY   required. Nothing else here sends mail.
- *   SIGNIN_FROM      optional. The From address, which has to be on a domain
- *                    verified with Resend. Defaults to the one below.
+ *   SIGNIN_FROM      optional, and currently wants leaving alone. The From
+ *                    address has to be on a domain verified with Resend, and
+ *                    `log.poker` is verified at the apex: DKIM is published at
+ *                    `resend._domainkey.log.poker`, and the `send.log.poker`
+ *                    MX and SPF records beside it are Resend's return path for
+ *                    bounces rather than a sending identity of their own. So
+ *                    the default below is right, and `From: signin@log.poker`
+ *                    aligns with `d=log.poker` for DMARC. Setting this to
+ *                    anything off that domain is what makes the mailer refuse.
  *
  * The value of `GATE_SECRET` has to be **byte for byte** what Untilt signs
  * with, because a token minted here is a family token and the other two apps

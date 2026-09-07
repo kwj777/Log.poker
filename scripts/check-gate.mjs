@@ -299,10 +299,10 @@ const diagnose = async (response, fallback) => {
       '  "the code was not mailed"             RESEND_API_KEY, or SIGNIN_FROM is',
       '                                        not on a domain verified with Resend',
       '',
-      'That last one is the usual answer straight after setting Resend up: the',
-      'From address has to be on the domain that was verified, so an apex',
-      'verification wants signin@log.poker and a subdomain one wants',
-      'signin@send.log.poker.',
+      'That last one is the usual answer straight after setting Resend up.',
+      'log.poker is verified at the apex, so the shipped default of',
+      'signin@log.poker is right and SIGNIN_FROM wants leaving unset. If it is',
+      'set to anything off that domain, that is the thing to undo.',
     );
   }
 

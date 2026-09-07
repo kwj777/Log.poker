@@ -46,6 +46,8 @@ import {
   type TournamentTotals,
 } from '../../src/domain/tournaments';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
+import { MoodCost } from '../../src/features/sessions/MoodCost';
+import { startMoodComparison } from '../../src/domain/mood';
 import { openHandOff, untiltHandOff } from '../../src/features/family/hooks';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
@@ -83,8 +85,13 @@ const VERDICT_COLORS: Record<StretchVerdict, string> = {
 
 export default function VarianceScreen() {
   const sessions = useLogStore((state) => state.sessions);
+  const moodEntries = useLogStore((state) => state.moodEntries);
 
   const observations = useMemo(() => toObservations(sessions), [sessions]);
+  const moodComparison = useMemo(
+    () => startMoodComparison(sessions, moodEntries),
+    [sessions, moodEntries],
+  );
   const tournaments = useMemo(() => tournamentTotals(sessions), [sessions]);
   const tournamentAssessment = useMemo(() => assessTournaments(tournaments), [tournaments]);
 
@@ -289,6 +296,8 @@ export default function VarianceScreen() {
           </Card>
         </>
       ) : null}
+
+      <MoodCost comparison={moodComparison} />
 
       <FamilyCrossPromo exclude={['log']} style={styles.family} />
     </Screen>

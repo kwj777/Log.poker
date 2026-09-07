@@ -13,7 +13,7 @@
 
 import { createHmac } from 'node:crypto';
 
-import { SUBJECT_PASSCODE, TIERS, holdsLogPlus, readClaim, type Tier } from '../token';
+import { SUBJECT_PASSCODE, TIERS, hasOwnSubject, readClaim, type Tier } from '../token';
 
 const NOW = 1_700_000_000_000;
 const SECRET = 'test-gate-secret';
@@ -116,23 +116,36 @@ describe('reading a token', () => {
 });
 
 describe('what a claim is worth', () => {
-  it('gives cross-device history to a paid subject of their own', () => {
-    expect(holdsLogPlus(readClaim(mint({ tier: 'full' }), NOW))).toBe(true);
+  it('gives cross-device history to a subject of their own', () => {
+    expect(hasOwnSubject(readClaim(mint({ tier: 'full' }), NOW))).toBe(true);
   });
 
-  it('withholds it from the free tier', () => {
-    expect(holdsLogPlus(readClaim(mint({ tier: 'free' }), NOW))).toBe(false);
+  it('gives it to the free tier too, because sync is free', () => {
+    // This is the assertion, not a variant of the one above. Cross-device
+    // history was gated on `tier === 'full'` and is not gated on anything a
+    // purchase decides any more, and the free tier is the only way to notice
+    // if that ever comes back.
+    expect(hasOwnSubject(readClaim(mint({ tier: 'free' }), NOW))).toBe(true);
+  });
+
+  it('reads the same for every tier the grammar allows', () => {
+    // Stronger than the two above and cheap: whatever Untilt puts in that
+    // field, it cannot be what decides this.
+    for (const tier of TIERS) {
+      expect(hasOwnSubject(readClaim(mint({ tier }), NOW))).toBe(true);
+    }
   });
 
   it('withholds it from a passcode, which is a door rather than a person', () => {
     // Every passcode holder shares this subject, so syncing them would pour
-    // every preview visitor's history into one bucket.
+    // every preview visitor's history into one bucket. The one refusal that
+    // survived making this free, because it was never about money.
     const claim = readClaim(mint({ tier: 'full', subject: SUBJECT_PASSCODE }), NOW);
     expect(claim).not.toBeNull();
-    expect(holdsLogPlus(claim)).toBe(false);
+    expect(hasOwnSubject(claim)).toBe(false);
   });
 
   it('withholds it from nobody at all', () => {
-    expect(holdsLogPlus(null)).toBe(false);
+    expect(hasOwnSubject(null)).toBe(false);
   });
 });

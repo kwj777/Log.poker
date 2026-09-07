@@ -122,20 +122,14 @@ export const verifyToken = async (
  * and this refuses it here, explicitly, rather than by never happening to meet
  * one.
  *
- * Separate from the tier below because the two answer different questions, and
- * one endpoint asks only this one: see the DELETE path in `sync.mts`.
+ * **This is the whole of who may sync.** There used to be a second question
+ * below it, asking whether the tier had paid, and it is gone: cross-device
+ * history is free, so a verified token with a subject of its own is the entire
+ * condition for reading, writing and erasing alike. Nothing here reads
+ * `claim.tier`.
  */
 export const hasOwnBucket = (claim: Claim | null): claim is Claim =>
   claim !== null && claim.subject !== SUBJECT_PASSCODE;
-
-/**
- * Whether this claim may sync, which is two questions rather than one.
- *
- * A subject of their own, and the paid tier. Erasing needs the first and not
- * the second, which is why they are written apart.
- */
-export const maySync = (claim: Claim | null): boolean =>
-  hasOwnBucket(claim) && claim.tier === 'full';
 
 /**
  * Which bucket this person's log lives in.

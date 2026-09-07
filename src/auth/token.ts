@@ -28,13 +28,20 @@
  * That is not a weakness as long as nothing on this side is load bearing. What
  * a parsed claim is good for is deciding what to show and what to bother
  * sending: an expired token means sign in again rather than a round trip that
- * will fail, and a free tier means do not offer to sync. Both are courtesies.
- * The gate is at the other end.
+ * will fail, and a passcode subject means there is no log of its own to carry.
+ * Both are courtesies. The gate is at the other end.
  */
 
 import type { Timestamp } from '../domain/types';
 
-/** What Untilt's tokens can say. Anything else is not a token we understand. */
+/**
+ * What Untilt's tokens can say. Anything else is not a token we understand.
+ *
+ * Parsed and then read by nothing. **Cross-device history is free**, so what a
+ * person has paid for decides nothing on this side of the family. The field
+ * stays in the grammar because the grammar is Untilt's and not ours to trim:
+ * dropping it here would make this accept a shape Untilt does not mint.
+ */
 export const TIERS = ['full', 'free'] as const;
 
 export type Tier = (typeof TIERS)[number];
@@ -89,17 +96,19 @@ export const readClaim = (token: string | null, now: Timestamp): Claim | null =>
 };
 
 /**
- * Whether this claim buys cross-device history.
+ * Whether this claim names somebody with a log of their own to carry.
  *
- * Two conditions, and the second is the one that is easy to forget. **A tier
- * of its own is not enough; the holder needs a subject of their own**, or two
- * strangers who typed the same passcode would sync into the same log.
+ * One condition, where there were two. The tier used to be the other one, and
+ * removing it is the whole of making sync free: what is valuable in a tracker
+ * is the player's own record, and an app that charges to read that back on a
+ * second device is charging rent on their work rather than selling them
+ * anything. There is no `log_plus`, there is no entitlement to check later,
+ * and this function is not a gate waiting for a better one.
  *
- * The name is the entitlement RevenueCat will eventually carry, and reading it
- * off the tier is the interim: the token already says enough to gate on, so
- * shipping the feature does not wait on a payments integration. When
- * `log_plus` exists this is where it replaces the tier check, and nothing
- * above this function has to know that happened.
+ * What is left was never about money. **A passcode holder has no subject of
+ * their own**: everybody who typed one shares the literal string, so carrying
+ * their histories together would pour every preview visitor's log into a
+ * single one.
  */
-export const holdsLogPlus = (claim: Claim | null): boolean =>
-  claim !== null && claim.tier === 'full' && claim.subject !== SUBJECT_PASSCODE;
+export const hasOwnSubject = (claim: Claim | null): boolean =>
+  claim !== null && claim.subject !== SUBJECT_PASSCODE;

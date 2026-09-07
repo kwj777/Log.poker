@@ -76,10 +76,26 @@ describe('the front door', () => {
 
   it('and where the line falls, in words rather than in a number', () => {
     expect(home).toContain('Free at the table, paid away from it.');
-    // Cross-device history is the one paid thing in this app, so the page says
-    // so before it exists rather than after somebody has years of log in it.
-    expect(home).toMatch(/own the other two/i);
+    // Cross-device history was the one paid thing in this app and is not one
+    // any more, which makes "free in its entirety" literally true rather than
+    // true with a footnote. Said before the feature exists rather than after
+    // somebody has years of log in it, which is the same order the old promise
+    // was made in and the reason this assertion is here at all.
+    expect(home).toMatch(/history follows you, and that is free/i);
     expect(home).toMatch(/One payment rather than\s+a subscription/);
+  });
+
+  it('and never puts a price back on the one thing that used to carry one', () => {
+    // The failure this guards is a sentence, not a feature: sync ships, and
+    // somebody writing the release copy reaches for the old conversion moment
+    // because it is still written down in three other places.
+    expect(home).not.toMatch(/own the other two/i);
+    const sync = /(sync|history follows you|phone to your laptop)/i;
+    for (const paragraph of home.split(/<\/p>/)) {
+      if (!sync.test(paragraph)) continue;
+      expect(paragraph).not.toMatch(/\$\s*\d/);
+      expect(paragraph).not.toMatch(/\b(paid for|costs|price|purchase|upgrade|subscription)\b/i);
+    }
   });
 
   it('has a 404 that is a page rather than a wall', () => {

@@ -219,14 +219,33 @@ describe('what has to be true before a byte is stored', () => {
     expect(store.writes).toHaveLength(0);
   });
 
-  it('refuses the free tier a write, and 403 rather than 401', async () => {
-    const answer = await post(await mint({ tier: 'free' }), push(), fakeStore());
-    expect(answer.status).toBe(403);
+  it('takes a write from the free tier, because sync is free', async () => {
+    // This asserted 403 until sync stopped being sold. Asserted on the store
+    // rather than on the status, because a 200 that stored nothing is exactly
+    // the failure this suite exists for: the write has to actually land.
+    const store = fakeStore();
+    const answer = await post(
+      await mint({ tier: 'free' }),
+      push({ venues: [venue('venue-free-tier')] }),
+      store,
+    );
+    expect(answer.status).toBe(200);
+    expect(store.writes).toHaveLength(1);
+    expect(JSON.stringify(store.held)).toContain('venue-free-tier');
   });
 
-  it('but lets the free tier erase, which is the opposite of consuming it', async () => {
-    // A purchase that was refunded does not make the history behind it less
-    // theirs to remove.
+  it('and reads back for it too, so the answer is not one-way', async () => {
+    const store = fakeStore();
+    await post(await mint(), push({ venues: [venue('venue-from-paid')] }), store);
+    const answer = await post(await mint({ tier: 'free' }), push(), store);
+    expect(answer.status).toBe(200);
+    expect(JSON.stringify(await answer.json())).toContain('venue-from-paid');
+  });
+
+  it('and lets the free tier erase, as it always did', async () => {
+    // This one was already true, on an argument that has since been retired
+    // rather than won: erasing used to sit one check below a paid write, and
+    // now there is no paid check anywhere for it to sit below.
     const store = fakeStore({ held: { version: BUNDLE_VERSION } });
     const answer = await handleSync(
       new Request('https://log.poker/api/sync', {

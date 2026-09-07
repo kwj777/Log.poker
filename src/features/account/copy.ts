@@ -93,8 +93,15 @@ export const describeSync = (state: {
   return 'Up to date on this device.';
 };
 
-/** What a held session is worth, said without a number or a SKU. */
+/**
+ * What a held session is worth, said without a number or a SKU.
+ *
+ * There is no number to say. Cross-device history is free, so the false branch
+ * is not somebody who has not paid: it is somebody holding a shared passcode,
+ * which names a door rather than a person, and the words have to say that
+ * rather than imply a price.
+ */
 export const describeSession = (syncs: boolean): string =>
   syncs
-    ? 'Signed in. Cross-device history comes with this.'
-    : 'Signed in, on the free tier. Cross-device history comes with the other two apps.';
+    ? 'Signed in. Your history follows you to your other devices, at no charge.'
+    : 'Signed in with a shared passcode, which is a door rather than a person. Carrying your history needs an address of your own.';

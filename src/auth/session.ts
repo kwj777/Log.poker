@@ -17,7 +17,7 @@
  */
 
 import type { Timestamp } from '../domain/types';
-import { holdsLogPlus, readClaim, type Claim } from './token';
+import { hasOwnSubject, readClaim, type Claim } from './token';
 
 /**
  * Somewhere to keep one string.
@@ -50,7 +50,12 @@ export const memoryTokenStore = (): TokenStore => {
 
 export interface Session {
   claim: Claim;
-  /** Whether this session buys cross-device history. */
+  /**
+   * Whether this session has a log of its own to carry.
+   *
+   * Not a purchase. Cross-device history is free; this is false only for a
+   * shared passcode, which names a door rather than a person.
+   */
   syncs: boolean;
 }
 
@@ -80,7 +85,7 @@ export class SessionManager {
       await this.store.clear();
       return null;
     }
-    return { claim, syncs: holdsLogPlus(claim) };
+    return { claim, syncs: hasOwnSubject(claim) };
   }
 
   /**
@@ -94,7 +99,7 @@ export class SessionManager {
     const claim = readClaim(token, this.clock());
     if (claim === null) return null;
     await this.store.write(token);
-    return { claim, syncs: holdsLogPlus(claim) };
+    return { claim, syncs: hasOwnSubject(claim) };
   }
 
   /**

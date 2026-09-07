@@ -10,7 +10,7 @@
 
 import { createHmac } from 'node:crypto';
 
-import { bearerFrom, bucketFor, checkToken, maySync, verifyToken } from '../verify';
+import { bearerFrom, bucketFor, checkToken, hasOwnBucket, verifyToken } from '../verify';
 import { readClaim } from '../../auth/token';
 
 const NOW = 1_700_000_000_000;
@@ -121,24 +121,28 @@ describe('why a token was refused', () => {
 });
 
 describe('who may sync', () => {
-  it('lets a paid subject through', async () => {
-    expect(maySync(await verifyToken(SECRET, mint(), NOW))).toBe(true);
+  it('lets a subject of their own through', async () => {
+    expect(hasOwnBucket(await verifyToken(SECRET, mint(), NOW))).toBe(true);
   });
 
-  it('refuses the free tier', async () => {
-    expect(maySync(await verifyToken(SECRET, mint({ tier: 'free' }), NOW))).toBe(false);
+  it('lets the free tier through too, because sync is free', async () => {
+    // The gate this replaces was `hasOwnBucket(claim) && claim.tier === 'full'`,
+    // and a free tier got 403 on every write. Nothing is sold here any more, so
+    // this is the assertion that would fail if a paid line came back.
+    expect(hasOwnBucket(await verifyToken(SECRET, mint({ tier: 'free' }), NOW))).toBe(true);
   });
 
   it('refuses a passcode, which is a door rather than a person', async () => {
     // Everybody who typed one shares this subject, so syncing them together
-    // would pour every preview visitor's log into a single bucket.
+    // would pour every preview visitor's log into a single bucket. The only
+    // refusal left, and it was never a price.
     const claim = await verifyToken(SECRET, mint({ subject: 'passcode' }), NOW);
     expect(claim).not.toBeNull();
-    expect(maySync(claim)).toBe(false);
+    expect(hasOwnBucket(claim)).toBe(false);
   });
 
   it('refuses nobody at all', () => {
-    expect(maySync(null)).toBe(false);
+    expect(hasOwnBucket(null)).toBe(false);
   });
 });
 

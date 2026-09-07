@@ -19,9 +19,12 @@
  *                           into one. Refused by name.
  *   Somewhere to put it.    No store configured, no sync, and it says so
  *                           rather than pretending.
- *   Full access.            The paid line. A free tier gets 403 and keeps
- *                           exactly the local-only app it had. Last, and only
- *                           for a write: erasing is not consuming the feature.
+ *
+ * **There is no fourth check, and there used to be.** A write sat behind the
+ * paid tier and a free one got 403. Cross-device history is free now, so a
+ * verified token with a subject of its own is the whole condition: the same
+ * three for a read, a write and an erasure, and nothing on this path reads
+ * `claim.tier`.
  *
  * The bucket is an HMAC of the subject, so the store never holds a customer id.
  * What is in there is somebody's whole poker history, which is the most
@@ -40,7 +43,7 @@
 
 import { mergeIntoBundle } from './bundle';
 import { BUNDLE_VERSION } from './protocol';
-import { bearerFrom, bucketFor, checkToken, hasOwnBucket, maySync } from './verify';
+import { bearerFrom, bucketFor, checkToken, hasOwnBucket } from './verify';
 
 /** What this needs from a blob store, and nothing more. */
 export interface BlobStore {
@@ -199,11 +202,11 @@ export const handleSync = async (
   const bucket = await bucketFor(secret, claim.subject);
 
   if (request.method === 'DELETE') {
-    // Erasure, behind one check fewer than a write and now actually so: what
-    // the tier buys is the syncing, and deleting is the opposite of consuming
-    // it. A purchase that was refunded does not make the history behind it less
-    // theirs to remove. The same argument Untilt's sync already makes, and it
-    // sat above a tier check that contradicted it until the check moved below.
+    // Erasure, behind exactly what a write is behind, which took two goes to
+    // arrive at. It was once one check fewer, on the argument that a refunded
+    // purchase does not make the history behind it less theirs to remove; that
+    // argument is retired rather than won, because there is no purchase in
+    // front of any of this any more.
     //
     // Guarded, because 204 on an erasure is a promise: this said it whether or
     // not the store had answered, and erasure is the one thing a person is
@@ -216,9 +219,6 @@ export const handleSync = async (
     }
     return json(null, 204);
   }
-
-  // The paid line, and only writes are behind it.
-  if (!maySync(claim)) return json({ error: 'forbidden' }, 403);
 
   if (request.method !== 'POST') return json({ error: 'method' }, 405);
 

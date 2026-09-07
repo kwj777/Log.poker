@@ -47,6 +47,8 @@ import {
 } from '../../src/domain/tournaments';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { MoodCost } from '../../src/features/sessions/MoodCost';
+import { Explain } from '../../src/components/Explain';
+import { STAT_HELP } from '../../src/domain/glossary';
 import { startMoodComparison } from '../../src/domain/mood';
 import { openHandOff } from '../../src/features/family/hooks';
 import { untiltHandOff } from '../../src/features/family/links';
@@ -248,7 +250,10 @@ export default function VarianceScreen() {
         </Text>
       </Card>
 
-      <SectionHeader title="Your numbers" />
+      <SectionHeader
+        title="Your numbers"
+        action={<Explain title="What these numbers are" entries={STAT_HELP} />}
+      />
       <View style={styles.tiles}>
         <StatTile
           label="Win rate"

@@ -17,9 +17,11 @@ import { Button } from '../../src/components/Button';
 import { ChipGroup, ChipMultiGroup } from '../../src/components/Chip';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
+import { Explain } from '../../src/components/Explain';
 import { Text } from '../../src/components/Text';
 import { successFeedback } from '../../src/components/haptics';
 import { parseAmount } from '../../src/domain/money';
+import { handTagGlossary, positionGlossary } from '../../src/domain/glossary';
 import {
   HAND_TAGS,
   HAND_TAG_LABELS,
@@ -116,10 +118,16 @@ export default function LogHandScreen() {
         cardCount={session.gameType === 'PLO' ? 4 : 2}
       />
 
-      <SectionHeader title="Position" />
+      <SectionHeader
+        title="Position"
+        action={<Explain title="Positions" entries={positionGlossary()} />}
+      />
       <ChipGroup options={POSITION_OPTIONS} value={position} onChange={setPosition} scroll />
 
-      <SectionHeader title="Tag it" />
+      <SectionHeader
+        title="Tag it"
+        action={<Explain title="What the tags mean" entries={handTagGlossary()} />}
+      />
       <ChipMultiGroup
         options={TAG_OPTIONS}
         values={tags}

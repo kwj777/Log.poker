@@ -5,6 +5,14 @@
  */
 
 import { estimatePlayer, toObservations } from '../../domain/variance';
+import {
+  MIN_HOURS_PER_GROUP,
+  MIN_SESSIONS_PER_GROUP,
+  startMoodComparison,
+  startMoodSpread,
+  toMoodObservations,
+  worthActingOn,
+} from '../../domain/mood';
 import { bankrollCurve, totals } from '../../domain/stats';
 import {
   MIN_ENTRIES_FOR_INTERVAL,
@@ -32,6 +40,56 @@ describe('demo dataset', () => {
 
   afterEach(async () => {
     await driver.close();
+  });
+
+  it('has a tilt cost the card can actually report', async () => {
+    // The demo is the fixture every screenshot is taken against, so a feature
+    // that can only ever render its own refusal here is a feature nobody can
+    // see. It shipped that way: one cash night started at 4 or 5 against a
+    // floor of five, so "What tilt costs you" could only say "not enough yet".
+    const [sessions, moodEntries] = await Promise.all([
+      repository.listSessions(),
+      repository.listMoodEntries(),
+    ]);
+    const comparison = startMoodComparison(sessions, moodEntries);
+
+    expect(comparison.blocker).toBeNull();
+    expect(comparison.settled).toBe(true);
+    expect(worthActingOn(comparison)).toBe(true);
+    expect(comparison.differenceBbPerHour).toBeLessThan(0);
+  });
+
+  it('and clears the floors on both sides with something to spare', async () => {
+    // Asserted apart from the finding above, because these are the two ways it
+    // can regress and they want telling apart: a plan edit that thins a group
+    // reads differently from one that shrinks the gap.
+    const [sessions, moodEntries] = await Promise.all([
+      repository.listSessions(),
+      repository.listMoodEntries(),
+    ]);
+    const { steady, rattled } = startMoodComparison(sessions, moodEntries);
+
+    for (const group of [steady, rattled]) {
+      expect(group.sessions).toBeGreaterThanOrEqual(MIN_SESSIONS_PER_GROUP);
+      expect(group.hours).toBeGreaterThanOrEqual(MIN_HOURS_PER_GROUP);
+    }
+  });
+
+  it('and is a player rather than a caricature, with one rattled night that went fine', async () => {
+    // Six for six losing would make the demo an argument rather than a data
+    // set. Real records are noisy and the card is more believable for it.
+    const [sessions, moodEntries] = await Promise.all([
+      repository.listSessions(),
+      repository.listMoodEntries(),
+    ]);
+    const observations = toMoodObservations(sessions, moodEntries);
+    const rattled = observations.filter((o) => o.startScore >= 4);
+
+    expect(rattled.some((o) => o.resultBb > 0)).toBe(true);
+    // And most nights are still ordinary: a demo where a third of sessions
+    // start tilted is one thing, half would be another.
+    const spread = startMoodSpread(observations);
+    expect(spread[4] + spread[5]).toBeLessThan(observations.length / 2);
   });
 
   it('seeds every planned session across four venues, all finished', async () => {

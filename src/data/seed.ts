@@ -73,14 +73,35 @@ interface SessionPlan {
  * It is a modest winner (positive overall) with realistic swings, one brutal
  * night, and a couple of heaters -- enough for the variance view to have
  * something honest to say.
+ *
+ * ## The mood shape, which is also deliberate
+ *
+ * Six of the twenty cash nights start at 4 or 5, and this player does worse on
+ * them: enough for `startMoodComparison` to settle rather than refuse, so the
+ * "What tilt costs you" card has something to show. It shipped without that and
+ * the card could only ever say *not enough to compare yet*, which demonstrates
+ * nothing.
+ *
+ * **Only the mood labels were chosen for it. Not one result moved**, so the
+ * bankroll curve, the totals and every variance verdict are exactly what they
+ * were. What changed is which nights this player is recorded as having *arrived*
+ * rattled on, and they are mostly nights that already went badly, which is the
+ * relationship the feature exists to look for rather than one invented for it.
+ *
+ * **It is still a constructed player, and nobody should read the demo as
+ * evidence.** One of the six went fine, a small win at mid stakes calming from a
+ * 4 to a 2, because six for six would be a caricature and the real thing is
+ * noisy. The gap it produces is around 37 bb/hour, which is large; a smaller one
+ * would not clear the significance bar at only six sessions, and that trade is
+ * the arithmetic rather than a choice.
  */
 const PLAN: readonly SessionPlan[] = [
   { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: 245, hours: 4.5, startMoodScore: 2, endMoodScore: 1 },
   { venue: 'commerce', gameType: 'NLHE', stakes: STAKES.mid, buyInDollars: 300, resultDollars: -300, hours: 3, rebuyDollars: [200], startMoodScore: 2, endMoodScore: 4 },
   { venue: 'home', gameType: 'PLO', stakes: STAKES.low, buyInDollars: 200, resultDollars: 410, hours: 5.5, startMoodScore: 1, endMoodScore: 1 },
-  { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -180, hours: 6, startMoodScore: 3, endMoodScore: 4 },
+  { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -180, hours: 6, startMoodScore: 4, endMoodScore: 4 },
   { venue: 'wynn', gameType: 'NLHE', stakes: STAKES.high, buyInDollars: 1000, resultDollars: 1_240, hours: 7, startMoodScore: 2, endMoodScore: 1 },
-  { venue: 'commerce', gameType: 'NLHE', stakes: STAKES.mid, buyInDollars: 300, resultDollars: 85, hours: 3.5, startMoodScore: 3, endMoodScore: 2 },
+  { venue: 'commerce', gameType: 'NLHE', stakes: STAKES.mid, buyInDollars: 300, resultDollars: 85, hours: 3.5, startMoodScore: 4, endMoodScore: 2 },
   { venue: 'home', gameType: 'PLO', stakes: STAKES.low, buyInDollars: 200, resultDollars: -200, hours: 4, startMoodScore: 2, endMoodScore: 3 },
   { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: 520, hours: 8, startMoodScore: 1, endMoodScore: 1 },
   { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -300, hours: 2.5, startMoodScore: 4, endMoodScore: 5 },
@@ -88,12 +109,12 @@ const PLAN: readonly SessionPlan[] = [
   { venue: 'wynn', gameType: 'NLHE', stakes: STAKES.high, buyInDollars: 1000, resultDollars: -1_000, hours: 5, rebuyDollars: [500, 500], startMoodScore: 2, endMoodScore: 5 },
   { venue: 'home', gameType: 'PLO', stakes: STAKES.low, buyInDollars: 200, resultDollars: 175, hours: 4.5, startMoodScore: 1, endMoodScore: 2 },
   { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: 310, hours: 5, startMoodScore: 2, endMoodScore: 1 },
-  { venue: 'commerce', gameType: 'NLHE', stakes: STAKES.mid, buyInDollars: 300, resultDollars: -145, hours: 4, startMoodScore: 3, endMoodScore: 3 },
-  { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -260, hours: 6.5, rebuyDollars: [300], startMoodScore: 2, endMoodScore: 4 },
+  { venue: 'commerce', gameType: 'NLHE', stakes: STAKES.mid, buyInDollars: 300, resultDollars: -145, hours: 4, startMoodScore: 4, endMoodScore: 3 },
+  { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -260, hours: 6.5, rebuyDollars: [300], startMoodScore: 4, endMoodScore: 4 },
   { venue: 'wynn', gameType: 'NLHE', stakes: STAKES.high, buyInDollars: 1000, resultDollars: 680, hours: 6, startMoodScore: 2, endMoodScore: 1 },
   { venue: 'home', gameType: 'PLO', stakes: STAKES.low, buyInDollars: 200, resultDollars: -95, hours: 3.5, startMoodScore: 2, endMoodScore: 3 },
   { venue: 'commerce', gameType: 'NLHE', stakes: STAKES.mid, buyInDollars: 300, resultDollars: 220, hours: 4, startMoodScore: 1, endMoodScore: 1 },
-  { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -420, hours: 5, rebuyDollars: [300], startMoodScore: 3, endMoodScore: 5 },
+  { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: -420, hours: 5, rebuyDollars: [300], startMoodScore: 5, endMoodScore: 5 },
   { venue: 'aria', gameType: 'NLHE', stakes: STAKES.low, buyInDollars: 300, resultDollars: 390, hours: 4.5, startMoodScore: 2, endMoodScore: 1 },
 ];
 

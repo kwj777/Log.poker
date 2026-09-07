@@ -757,7 +757,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 39 passed
-Tests:       1128 passed
+Tests:       1131 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -783,10 +783,10 @@ Tests:       1128 passed
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
+  seed               17   the demo dataset stays coherent
   token              17   the family token grammar, against signed fixtures
   handNotation       16   parse, round-trip, hand classes
   client             14   the sync client, against a fake fetch
-  seed               14   the demo dataset stays coherent
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
   gateCheck          11   the key-on-the-site script, run rather than read
@@ -891,6 +891,14 @@ Two tests carry that claim rather than a comment: three hundred simulated player
 whose mood affects nothing produce a settled finding 9.7% of the time against a
 nominal 10%, and the same players with a real 40bb/hour penalty produce one well
 over half the time. Calibration without power is a function that returns `false`.
+
+**The demo dataset is built to show it.** Six of the twenty seeded cash nights
+start at 4 or 5 and go worse, which is enough for the comparison to settle
+rather than refuse. It shipped without that and the card could only ever render
+its own *not enough yet*, which demonstrates nothing. Only the mood labels were
+chosen for it: not one result moved, so the bankroll curve and every variance
+verdict are untouched, and a test asserts the demo still produces a finding so a
+later plan edit cannot quietly take it away.
 
 **The Untilt hand-off is behind one gate, and the gate is in the domain.**
 `worthActingOn` is exported and tested rather than living as a boolean inside the

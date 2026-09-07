@@ -54,8 +54,10 @@ for this repo: **Log is free in its entirety and has no standalone price.** See
   contextual hand-offs: a rough stretch on the variance view offers Untilt, and
   a hand tagged *misplayed?* offers to drill the spot in TiltProof.
 
-Offline throughout. There is no account, no server, and no network call -- your
-log never leaves your device.
+Offline throughout, and that is the default rather than the limit: no account,
+no network call, nothing leaving the device. Signing in is optional and is the
+only thing that changes it, carrying your own log to your own other devices.
+See [Signing in](#signing-in-and-what-it-is-for).
 
 ---
 

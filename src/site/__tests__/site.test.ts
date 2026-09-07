@@ -99,6 +99,14 @@ describe('the front door', () => {
       expect(text).not.toMatch(/never leaves your device/i);
       expect(text).not.toMatch(/keeps everything on your device/i);
     }
+    // And the README, which had it too and was missed by the first sweep,
+    // because the first sweep looked at the places a visitor lands rather than
+    // at every place the sentence was written. The list is what makes this a
+    // sweep; leaving one out is how the claim survived in five places to begin
+    // with.
+    const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+    expect(readme).not.toMatch(/never leaves your device/i);
+    expect(readme).not.toMatch(/no account, no server, and no network call/i);
   });
 
   it('and where the line falls, in words rather than in a number', () => {

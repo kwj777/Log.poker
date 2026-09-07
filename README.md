@@ -756,8 +756,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 37 passed
-Tests:       1085 passed
+Test Suites: 38 passed
+Tests:       1114 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -772,6 +772,7 @@ Tests:       1085 passed
   variance           35   win rate, σ, confidence bands, verdicts
   verify             35   checking a token, and every way past it that must not work
   merge              30   two devices disagreeing, and who wins
+  mood               29   what tilt costs, and when to say nothing
   syncingRepository  29   two devices and one server, no fakes in between
   blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
@@ -856,6 +857,48 @@ calming: a rough stretch inside the band is named as ordinary, an outlier is
 named as an outlier, and a heater is called a heater so nobody banks on it. A
 test asserts that no verdict branch ever implies the player is broken or that
 they are "due".
+
+### What tilt costs
+
+`MoodPicker` has taken a 1-to-5 score at the start, middle and end of every
+session since the app shipped, and its own header calls the correlation between
+mood and results the reason it exists. Nothing computed it until
+[`src/domain/mood.ts`](src/domain/mood.ts).
+
+**Sessions are grouped by the score logged before the cards.** That is the whole
+design and it is not the obvious choice. The instinct is to group by the worst
+score, or the one at the end, because that is where tilt shows -- but both are
+downstream of the result. A player who loses four buy-ins reports feeling
+terrible afterwards, so a split on end mood mostly measures *losing feels bad*:
+true, circular, and no use to somebody deciding whether to sit down tonight. The
+start score cannot have been caused by the result, which makes the comparison
+real and the advice actionable.
+
+Everything is in big blinds, for the same reason the variance model is: sessions
+across stakes have to pool.
+
+**It refuses far more often than it speaks.** Poker variance is large enough that
+a difference of means over a handful of sessions looks like a finding almost
+every time, and an app whose flagship screen exists to talk players out of
+reading noise as signal cannot ship a feature that manufactures one. So the gap
+is measured against its own standard error, using the player's own sigma, and
+reported only when it clears the bar. When it does not, the card says so and says
+how many more hours would settle it -- and says nothing at all when no amount
+would, because the other group is the binding constraint.
+
+Two tests carry that claim rather than a comment: three hundred simulated players
+whose mood affects nothing produce a settled finding 9.7% of the time against a
+nominal 10%, and the same players with a real 40bb/hour penalty produce one well
+over half the time. Calibration without power is a function that returns `false`.
+
+**The Untilt hand-off is behind one gate, and the gate is in the domain.**
+`worthActingOn` is exported and tested rather than living as a boolean inside the
+card, because it is the one place a conflict of interest could hide: there is a
+standing pull toward finding tilt expensive when a cross-promo sits underneath.
+Three of the card's four states show no hand-off, including the one where the
+comparison settles the *other* way and a player's rattled sessions are their
+better ones. That state is still reported. An analysis that only speaks when it
+supports the upsell is an advertisement wearing a lab coat.
 
 ### Hand notation
 

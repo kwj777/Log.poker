@@ -660,12 +660,17 @@ The screen is in `src/features/account`: an address, then the code mailed to
 it, and never the link, because mail opens links in the browser and an installed
 app keeps its own storage.
 
-**It is behind `ALLOW_SIGN_IN`, which is `__DEV__`**, the same treatment the
-demo seeder gets and for the same reason: signing in unlocks nothing until there
-is something to sync to, and a form that cannot succeed is worse than an
-absence. What is left is not code: `GATE_SECRET` and `RESEND_API_KEY` on Log's
-Netlify site, without which both endpoints answer 503, and then the constant
-flips.
+**It is on.** `ALLOW_SIGN_IN` was `__DEV__` for two phases, the same treatment
+the demo seeder gets and for the same reason: signing in unlocked nothing until
+there was something to sync to, and a form that cannot succeed is worse than an
+absence. `GATE_SECRET` and `RESEND_API_KEY` are set, the chain has been run
+end to end against the live site, and the constant is `true`.
+
+The flag stays rather than being deleted, because it is now a kill switch:
+`/api/signin` mails a code to anybody who types an address, and setting the
+constant to `false` strips the card from the next build while the endpoint's
+own limits hold in the meantime. A test pins its current value either way, so
+it cannot move by accident.
 
 The copy has tests, which most copy should not. `/api/signin` answers 202
 whether or not a mail went, so that nobody can use it to ask how much mail an
@@ -677,10 +682,8 @@ one; there is a test now for the sentence that would put the price back.
 
 ### Cross-device history
 
-Off unless somebody signs in, and unbuilt in the sense that matters until
-`GATE_SECRET` is set on this site: the endpoint answers 503 to everything
-without it, and `ALLOW_SIGN_IN` stays `__DEV__` until it is set. Setting it
-takes no code; flipping the flag afterwards is one line. The value has to be
+Off unless somebody signs in, and live for anybody who does. `GATE_SECRET` is
+set on this site, without which every endpoint answers 503. The value has to be
 byte for byte what Untilt signs with, and it cannot be changed later without
 orphaning every bucket, because a bucket name is an HMAC of the subject under
 that same key. `npm run check:gate` asks the deployed endpoint whether the key
@@ -752,7 +755,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 37 passed
-Tests:       1082 passed
+Tests:       1084 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -783,7 +786,7 @@ Tests:       1082 passed
   seed               14   the demo dataset stays coherent
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
-  gateCheck           9   the key-on-the-site script, run rather than read
+  gateCheck          11   the key-on-the-site script, run rather than read
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it

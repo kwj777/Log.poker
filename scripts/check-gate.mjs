@@ -259,6 +259,57 @@ const stop = (...lines) => {
 };
 
 /**
+ * Why a sign-in refused, said as the thing to go and fix.
+ *
+ * Worth more than the status alone, because the statuses overlap with the
+ * reason somebody is running this in the first place. **A 503 is the site, not
+ * the address**, and reporting it as "would not take that address" sends
+ * whoever just finished setting the site up to look at their own email.
+ *
+ * The two 503s are told apart by the body, which is the endpoint's own word
+ * for what happened: `off` is a key that is not there, and anything else is a
+ * store or a mailer that would not answer. Which of those two is in the deploy
+ * log rather than on the wire, because a public endpoint saying *the mailer is
+ * down* is a public endpoint reporting infrastructure.
+ */
+const diagnose = async (response, fallback) => {
+  let error = null;
+  try {
+    error = (await response.json())?.error ?? null;
+  } catch {
+    error = null;
+  }
+
+  if (response.status === 503 && error === 'off') {
+    stop(
+      `${SIGNIN_ORIGIN} answered 503, and says the key is missing.`,
+      '',
+      'GATE_SECRET is not set on that site. Netlify -> Site configuration ->',
+      'Environment, then redeploy, then run this again.',
+    );
+  }
+
+  if (response.status === 503) {
+    stop(
+      `${SIGNIN_ORIGIN} answered 503, which is the site rather than the address.`,
+      '',
+      'Something it needs would not answer. The deploy log says which:',
+      '',
+      '  "could not write the pending record"  the blob store',
+      '  "the code was not mailed"             RESEND_API_KEY, or SIGNIN_FROM is',
+      '                                        not on a domain verified with Resend',
+      '',
+      'That last one is the usual answer straight after setting Resend up.',
+      'log.poker is verified at the apex, so the shipped default of',
+      'signin@log.poker is right and SIGNIN_FROM wants leaving unset. If it is',
+      'set to anything off that domain, that is the thing to undo.',
+    );
+  }
+
+  stop(`${fallback} (HTTP ${response.status}).`);
+};
+
+/**
  * A token, the way the app asks for one.
  *
  * From `--signin-origin`, which is Log by default and is the door the app
@@ -275,7 +326,7 @@ const signIn = async (address) => {
   const asked = await askSignIn('/api/signin', { email: address });
   if (asked === null) stop(`Could not reach ${SIGNIN_ORIGIN}.`);
   if (asked.status === 429) stop('Asked too often. This is rate limited; wait and retry.');
-  if (!asked.ok) stop(`Sign-in would not take that address (HTTP ${asked.status}).`);
+  if (!asked.ok) await diagnose(asked, 'Sign-in would not take that address');
 
   say(
     'Sent, if anything was going to be sent.',
@@ -294,7 +345,7 @@ const signIn = async (address) => {
   const traded = await askSignIn('/api/signin/code', { email: address, code });
   if (traded === null) stop(`Could not reach ${SIGNIN_ORIGIN}.`);
   if (traded.status === 429) stop('Asked too often. Wait and retry.');
-  if (!traded.ok) stop(`That code was refused (HTTP ${traded.status}). Codes expire; ask again.`);
+  if (!traded.ok) await diagnose(traded, 'That code was refused. Codes expire, so ask again');
 
   let token = null;
   try {

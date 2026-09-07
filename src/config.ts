@@ -14,20 +14,19 @@ export const ALLOW_DEMO_SEED = IS_DEV;
 /**
  * Gates the sign-in card in Settings.
  *
- * Signing in currently unlocks nothing, because cross-device history is not
- * built yet: somebody who typed their address, waited for mail and read a code
- * off a phone would arrive back at a screen that looks exactly as it did
- * before. A dead end is worse than an absence, so it stays out of production
- * builds until there is something on the other side of it.
+ * On, because the thing it unlocks exists now. It was `IS_DEV` for two phases
+ * on the argument that a form which cannot succeed is worse than an absence,
+ * and that argument expired the day the chain worked end to end against the
+ * live site: ask, mail, redeem, and a free-tier token accepted by `/api/sync`.
  *
- * **Flip this to `true` when sync lands.** Every piece is built: the card, the
- * client, Log's own sign-in in `netlify/functions/signin.mts`, and the sync
- * endpoint behind it. What is left is not code. `GATE_SECRET` and
- * `RESEND_API_KEY` have to be set on Log's Netlify site, and until they are,
- * both endpoints answer 503 to everything. `npm run check:gate` asks a deploy
- * whether the first one landed. See SYNC.md.
+ * **Left as a constant rather than deleted, because it is the kill switch.**
+ * `/api/signin` mails a code to anybody who types an address, which is the
+ * point of it and also the whole risk in it. If that is ever being abused, or
+ * the mail costs something worth caring about, setting this to `false` takes
+ * the card out of the next build and the endpoint keeps refusing on its own
+ * limits meanwhile. One line, and it strips rather than hides.
  */
-export const ALLOW_SIGN_IN = IS_DEV;
+export const ALLOW_SIGN_IN = true;
 
 /**
  * Where each app lives. `log.poker` is the family's front door and Log itself

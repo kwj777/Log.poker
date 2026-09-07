@@ -379,6 +379,25 @@ describe('the app shell in a phone browser', () => {
     expect(reset).toContain('#root,body,html{height:100%}');
   });
 
+  it('and gives the tab labels a line box rather than whatever the font says', () => {
+    // The other half of the same screenshot, and a separate bug underneath it.
+    // `Text` is `overflow: hidden` on web, so a label with no line height gets
+    // one `normal` line and anything the font puts below it is sliced off in a
+    // straight line. `normal` is 12px for an 11px font in a desktop browser,
+    // whose fonts fit inside that; iOS Safari's system font does not, so every
+    // label was cut level with every other, descenders and all.
+    //
+    // Which is why this is a number rather than a default: `normal` means "ask
+    // the font", and the font is the thing that differs.
+    const bar = read('src', 'components', 'TabBar.tsx');
+    const size = Number(/label: \{\s*fontSize: (\d+)/.exec(bar)?.[1]);
+    const line = Number(/lineHeight: (\d+)/.exec(bar)?.[1]);
+
+    expect(size).toBeGreaterThan(0);
+    // The system font wants about 1.25em between its ascender and descender.
+    expect(line / size).toBeGreaterThanOrEqual(1.3);
+  });
+
   it('with `viewport-fit=cover`, or no inset ever reaches the layout', () => {
     // The other half, and the one that keeps the bar off the home indicator
     // once the app is installed to the home screen and there is no toolbar.

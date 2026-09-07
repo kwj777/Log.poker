@@ -103,11 +103,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    // Small, because the content is centered anyway and these only ever act as
+    // a floor. At `sm` the floor was tight enough that the label below had no
+    // room to be given a line box that fits it.
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
   },
   label: {
     fontSize: 11,
     fontWeight: '600',
+    /**
+     * Stated, because the default is whatever the platform's font says.
+     *
+     * `Text` is `overflow: hidden` on web, and with no line height the box is
+     * one `normal` line: 12px for an 11px font in a desktop browser, which the
+     * fonts there happen to fit inside. iOS Safari's system font does not, so
+     * the bottom of every label was sliced off in a straight line, descenders
+     * and all, on the one platform most people meet Log on first.
+     *
+     * The system font wants about 1.25em between ascender and descender, so 16
+     * against 11 leaves room under the baseline for the `g` in Settings with
+     * margin on top of that. It costs nothing: the line is centered in its own
+     * box, and the bar still has 7pt of slack at 4 + 24 + 3 + 16 + 4 of 58.
+     */
+    lineHeight: 16,
   },
 });

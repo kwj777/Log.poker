@@ -344,3 +344,21 @@ export const worthActingOn = (comparison: MoodComparison): boolean =>
   comparison.settled &&
   comparison.differenceBbPerHour !== null &&
   comparison.differenceBbPerHour < 0;
+
+/**
+ * Whether a score logged mid-session is worth offering a reset for.
+ *
+ * The same two scores the comparison calls rattled, and reusing `RATTLED_SCORES`
+ * rather than restating `[4, 5]` is the point: a player who would land in that
+ * group at the end of the month is the player worth offering something to
+ * tonight, and two different definitions of rattled in one app is one too many.
+ *
+ * **Not gated on anything a purchase decides**, unlike `worthActingOn`, and for
+ * a reason that is in the family's creed rather than in this file: the resets
+ * you reach for mid-session are free. What this offers costs nothing and needs
+ * no account, so there is nothing here to be careful about selling. The care
+ * needed is the other kind, and it lives at the call site: the tap has to be
+ * recorded before this is ever consulted, or the check-in starts costing the
+ * player something and they stop answering it honestly.
+ */
+export const wantsReset = (score: MoodScore): boolean => RATTLED_SCORES.includes(score);

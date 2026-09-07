@@ -13,7 +13,8 @@ import { Text } from '../../components/Text';
 import { formatMoney } from '../../domain/money';
 import { formatNotation } from '../../domain/handNotation';
 import { HAND_TAG_LABELS, type Hand } from '../../domain/types';
-import { drillHandOff, openHandOff } from '../family/hooks';
+import { openHandOff } from '../family/hooks';
+import { drillHandOff } from '../family/links';
 import { colors, radius, resultColor, spacing, typography } from '../../theme';
 
 interface HandRowProps {

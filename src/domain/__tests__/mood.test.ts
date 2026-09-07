@@ -18,14 +18,17 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { makeRandom } from '../random';
-import type { MoodEntry, MoodPhase, MoodScore, SessionWithChildren } from '../types';
+import { MOOD_SCALE, type MoodEntry, type MoodPhase, type MoodScore, type SessionWithChildren } from '../types';
 import {
   MIN_HOURS_PER_GROUP,
   MIN_SESSIONS_PER_GROUP,
+  RATTLED_SCORES,
+  STEADY_SCORES,
   startMoodComparison,
   startMoodSpread,
   startScoreOf,
   toMoodObservations,
+  wantsReset,
   worthActingOn,
 } from '../mood';
 import { HOUR, STAKES_1_2, T0, completed, session } from './support';
@@ -506,5 +509,26 @@ describe('the card that shows it', () => {
     // line is not optional per branch.
     const branches = source.split('return (').length - 1;
     expect(source.match(/<Basis \/>/g) ?? []).toHaveLength(branches - 1);
+  });
+});
+
+describe('whether a mid-session tap is worth offering a reset for', () => {
+  it('is the two scores the comparison also calls rattled', () => {
+    // One definition, reused rather than restated. A player who would land in
+    // that group at the end of the month is the one worth offering something to
+    // tonight, and two definitions of rattled in one app is one too many.
+    expect(RATTLED_SCORES.map(wantsReset)).toEqual([true, true]);
+    expect(STEADY_SCORES.map(wantsReset)).toEqual([false, false]);
+  });
+
+  it('and never the middle of the scale, which is most sessions', () => {
+    // 3 is Edgy, the honest answer for a normal night. Offering something there
+    // would make the check-in cost the player an interruption most times they
+    // answered it honestly, which is how a check-in stops being answered.
+    expect(wantsReset(3)).toBe(false);
+  });
+
+  it('covers the whole scale between them, so no score falls through', () => {
+    expect(MOOD_SCALE.filter(wantsReset)).toEqual([...RATTLED_SCORES]);
   });
 });

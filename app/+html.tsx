@@ -33,11 +33,40 @@ if ('serviceWorker' in navigator) {
 /**
  * Paint the page background before the bundle loads, so a cold start on a slow
  * connection shows Log's charcoal rather than a white flash.
+ *
+ * ## And why the height is `dvh` rather than the `100%` it looks like
+ *
+ * `ScrollViewStyleReset` below sets `html, body, #root` to `height: 100%`, and
+ * on iOS Safari 100% of the layout viewport is **taller than the window you can
+ * see**: it runs on behind the browser's own bottom toolbar. So the tab bar,
+ * which sits at the bottom of the app in normal flow, was drawn underneath that
+ * toolbar with its labels cut in half. Not on a phone, where the app is a real
+ * app, and not on desktop, where the chrome is at the top. Only on the one
+ * platform most people will meet Log on first.
+ *
+ * The page itself never scrolls, which is what makes it permanent rather than
+ * intermittent: `overflow: hidden` on the body means Safari never gets the
+ * scroll it collapses that toolbar for, so the toolbar is always there.
+ *
+ * `100dvh` is the height of what is actually visible, browser chrome excluded,
+ * and it is the whole fix. Behind `@supports`, so a browser that does not know
+ * the unit keeps exactly the behavior it has today rather than losing its
+ * height entirely.
+ *
+ * The safe-area padding on the tab bar stays and does not double up with this.
+ * The two never both apply: with a toolbar covering the bottom of the window
+ * Safari reports no inset, because the toolbar already sits between the content
+ * and the home indicator, and installed to the home screen there is no toolbar
+ * and the inset is the whole of what lifts the bar clear.
  */
 const BASE_STYLE = `
 html, body, #root { background-color: #1c211f; }
 body { overscroll-behavior-y: none; }
 #root { display: flex; flex: 1 1 auto; min-height: 100%; }
+
+@supports (height: 100dvh) {
+  html, body, #root { height: 100dvh; }
+}
 `;
 
 export default function Root({ children }: { children: ReactNode }) {

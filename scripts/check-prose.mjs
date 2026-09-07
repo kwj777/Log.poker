@@ -51,6 +51,7 @@ const BRITISH = [
   'minimise', 'minimised', 'maximise', 'maximised', 'utilise', 'utilised', 'capitalise',
   'standardise', 'standardised', 'itemise', 'itemised',
   'levelled', 'levelling', 'modelling', 'labelled', 'travelling', 'cancelled',
+  'totalled', 'totalling',
   'centre', 'centred', 'centring', 'grey', 'practise', 'licence', 'defence', 'offence',
   'whilst', 'amongst', 'learnt', 'programme', 'metre', 'judgement', 'ageing', 'sceptical',
   'burnt', 'spelt', 'dreamt', 'cheque', 'catalogue', 'storey', 'fibre', 'litre',

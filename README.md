@@ -757,7 +757,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 40 passed
-Tests:       1144 passed
+Tests:       1151 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -780,6 +780,7 @@ Tests:       1144 passed
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
   copy               20   what the sign-in and the sync are allowed to say
+  glossary           20   the shorthand on screen still matches its explanation
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
@@ -787,7 +788,6 @@ Tests:       1144 passed
   token              17   the family token grammar, against signed fixtures
   handNotation       16   parse, round-trip, hand classes
   client             14   the sync client, against a fake fetch
-  glossary           13   the shorthand on screen still matches its explanation
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
   gateCheck          11   the key-on-the-site script, run rather than read
@@ -935,6 +935,18 @@ is, and reading the nine seats in order answers a question they had not finished
 forming. It keeps the chips as chips, too: tapping one picks a position, and
 overloading that gesture to sometimes mean *define this* would cost more than an
 extra tap on a question mark.
+
+The CSV import gets the same treatment, keyed by `ImportField` so a new column
+cannot ship unexplained. Two of those entries are the reason the group exists:
+**cash-out and result are not the same measurement**, a file often carries both,
+and the import takes the cash-out because it is measured while a result is a
+number somebody already derived. Getting that backwards is silent, and nobody
+mapping a spreadsheet could guess it.
+
+`Rake` is the one entry headed with a word the app does not print, since the tile
+says *Fees paid*. It carries an `anchor` for that, and a second test refuses an
+anchor on any entry whose term the screen *does* print, so the escape hatch
+cannot quietly swallow the rule.
 
 The tests are mostly not about the prose. A glossary is the easiest thing in a
 codebase to let rot, because nothing breaks when a label is renamed and its

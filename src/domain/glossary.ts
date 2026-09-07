@@ -26,6 +26,7 @@
  * than knowing it is called that because it cuts off the button's steal.
  */
 
+import { FIELD_LABELS, IMPORT_FIELDS, type ImportField } from './import';
 import { HAND_TAGS, HAND_TAG_LABELS, POSITIONS, type HandTag, type Position } from './types';
 
 export interface GlossaryEntry {
@@ -33,6 +34,14 @@ export interface GlossaryEntry {
   term: string;
   /** One or two sentences. No jargon that is not itself in here. */
   says: string;
+  /**
+   * The label on screen this explains, when the app does not print the term.
+   *
+   * `Rake` is what a player calls it and `Fees paid` is what the tile says, so
+   * an entry headed `Rake` would fail the anchoring rule for the wrong reason.
+   * The rule follows this where it is set.
+   */
+  anchor?: string;
 }
 
 /**
@@ -126,7 +135,90 @@ export const STAT_HELP: readonly GlossaryEntry[] = [
     term: 'ROI',
     says: 'Return on investment. Profit as a percentage of everything put in, which is how tournament results are normally quoted.',
   },
+  {
+    term: 'Rake',
+    anchor: 'Fees paid',
+    says: 'What the house takes. In a tournament it is the entry fee, the +10 in $100+$10, kept apart from the buy-in here so a year of it can be totaled. Cash-game rake comes out of the pots rather than off your buy-in, so nothing here can see it and this total covers tournaments only.',
+  },
 ];
+
+/**
+ * The columns an import can read, named as the mapping names them.
+ *
+ * Keyed by `ImportField` for the same reason the seats are keyed by `Position`:
+ * a new column cannot be added without the compiler asking what it is. The
+ * terms are asserted equal to `FIELD_LABELS`, so the sheet reads exactly as the
+ * arrow on screen does.
+ *
+ * Two of these are the reason the group exists at all. **Cash-out and Result
+ * are not the same measurement**, and a file often has both: cash-out is what
+ * you left the table with and is taken directly, while a result is a number
+ * somebody already derived, so it is used only where there is no cash-out
+ * column. Somebody mapping a spreadsheet has no way to know that, and getting
+ * it backwards is silent.
+ */
+export const IMPORT_HELP: Record<ImportField, GlossaryEntry> = {
+  startedAt: {
+    term: FIELD_LABELS.startedAt,
+    says: 'When the session began, from a date or a date and time. This is the one column an import cannot do without.',
+  },
+  endedAt: {
+    term: FIELD_LABELS.endedAt,
+    says: 'When it finished. With neither this nor a duration, the session is recorded as ending when it started, which keeps it out of anything measured per hour rather than inventing a length for it.',
+  },
+  duration: {
+    term: FIELD_LABELS.duration,
+    says: 'How long you played, for a file that says that instead of an end time. Either one answers the same question.',
+  },
+  format: {
+    term: FIELD_LABELS.format,
+    says: 'Which kind of session. Worked out from the row when the file does not say: anything carrying an entry fee, a field size or a finishing position is read as a tournament.',
+  },
+  gameType: {
+    term: FIELD_LABELS.gameType,
+    says: 'Hold’em, Omaha or something else. Used for grouping and nothing more, so an unfamiliar name is kept rather than refused.',
+  },
+  stakes: {
+    term: FIELD_LABELS.stakes,
+    says: 'The blinds, like 1/2. A row without them still imports and simply stays out of the win-rate estimate, because a plausible-looking guess would poison it.',
+  },
+  venue: {
+    term: FIELD_LABELS.venue,
+    says: 'Where you played. Venues are created from the names in the file as it is read, so the spelling in your spreadsheet is the spelling you get.',
+  },
+  buyIn: {
+    term: FIELD_LABELS.buyIn,
+    says: 'What you put on the table to start, before any rebuys.',
+  },
+  fee: {
+    term: FIELD_LABELS.fee,
+    says: 'A tournament’s rake, kept apart from the buy-in. Its presence is also one of the signals that a row is a tournament at all.',
+  },
+  cashOut: {
+    term: FIELD_LABELS.cashOut,
+    says: 'What you left the table with. This is the direct measurement, so it wins over a result column when a file carries both.',
+  },
+  result: {
+    term: FIELD_LABELS.result,
+    says: 'Profit or loss for the session. Derived by whoever made the file rather than measured, so it is used only where there is no cash-out column.',
+  },
+  entrants: {
+    term: FIELD_LABELS.entrants,
+    says: 'How many played, for a tournament. It is what makes a finishing position mean anything: 40th of 50 and 40th of 2,000 are not the same night.',
+  },
+  finishPosition: {
+    term: FIELD_LABELS.finishPosition,
+    says: 'Where you placed, 1 being the win. On its own it says little: 40th means one thing in a fifty-runner and quite another in a two-thousand, which is what the field size beside it is for.',
+  },
+  notes: {
+    term: FIELD_LABELS.notes,
+    says: 'Whatever the file kept alongside the row. Carried across as written rather than parsed, so nothing in it changes a number.',
+  },
+  currency: {
+    term: FIELD_LABELS.currency,
+    says: 'Which money the numbers are in. Read from a column or from the money cells themselves, and falling back to this app’s own setting when neither says.',
+  },
+};
 
 /** The positions in seat order, which is the order they are worth reading in. */
 export const positionGlossary = (): GlossaryEntry[] =>
@@ -134,3 +226,7 @@ export const positionGlossary = (): GlossaryEntry[] =>
 
 /** The tags in the order the picker offers them. */
 export const handTagGlossary = (): GlossaryEntry[] => HAND_TAGS.map((tag) => HAND_TAG_HELP[tag]);
+
+/** The columns in the order the mapping lists them. */
+export const importGlossary = (): GlossaryEntry[] =>
+  IMPORT_FIELDS.map((field) => IMPORT_HELP[field]);

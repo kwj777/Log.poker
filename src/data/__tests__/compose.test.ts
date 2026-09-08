@@ -46,6 +46,23 @@ describe('composing the repository', () => {
     expect(tokenless).not.toContain('collectTombstones');
   });
 
+  it('renews a token that is nearly out, on the one path that runs every launch', () => {
+    // Thirty days was the whole life of a session until this line. On the
+    // thirty-first `current()` cleared the token, the tokenless branch above
+    // returned the local repository, and nothing anywhere said why: no 401, no
+    // `problem`, and the sign-in form back where it started.
+    const renew = at('void renewIfDue();');
+    expect(at('const token = await getToken();')).toBeLessThan(renew);
+    expect(renew).toBeLessThan(at('void syncing.push()'));
+  });
+
+  it('and never waits on it, because nothing in Log waits on the network', () => {
+    // `void`, not `await`. A renewal that hung would hang the launch, and the
+    // app opens on the local database whatever the network is doing.
+    expect(source).toContain('void renewIfDue();');
+    expect(source).not.toContain('await renewIfDue(');
+  });
+
   it('sweeps in exactly one place, so there is only one branch to get right', () => {
     expect([...source.matchAll(/collectTombstones\(/g)]).toHaveLength(1);
   });

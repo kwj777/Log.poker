@@ -7,7 +7,7 @@
  * written contract rather than by anything either side can check alone.
  */
 
-import { redeemCode, requestCode, SIGNIN_ORIGIN, type Fetch } from '../signin';
+import { redeemCode, renewToken, requestCode, SIGNIN_ORIGIN, type Fetch } from '../signin';
 
 const answering = (status: number, body?: unknown): { fetch: Fetch; calls: Request[] } => {
   const calls: Request[] = [];
@@ -138,5 +138,62 @@ describe('trading a code for a token', () => {
     await redeemCode('a@b.com', '1', { fetch, origin: 'https://deploy-preview.untilt.poker' });
     const [call] = calls as unknown as { url: string }[];
     expect(call.url).toBe('https://deploy-preview.untilt.poker/api/signin/code');
+  });
+});
+
+/**
+ * Trading a token that still works for one that lasts another thirty days.
+ *
+ * The property worth proving is the one about failure: none of these may leave
+ * the caller thinking the token it passed in is gone. It answers with a reason
+ * and nothing else, and the caller keeps what it had.
+ */
+describe('renewing a token', () => {
+  const HELD = '1800000000.free.cus_1.signature';
+
+  it('sends the token it is renewing, as a bearer, and asks for JSON', async () => {
+    const { fetch, calls } = answering(200, { token: 'fresher' });
+    expect(await renewToken(HELD, { fetch })).toEqual({ ok: true, token: 'fresher' });
+
+    const [call] = calls as unknown as { url: string; init: RequestInit }[];
+    expect(call.url).toBe(`${SIGNIN_ORIGIN}/api/signin/renew`);
+    expect(call.init.method).toBe('POST');
+    const headers = call.init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe(`Bearer ${HELD}`);
+    // Without this the endpoint answers the way it answers a browser.
+    expect(headers.Accept).toBe('application/json');
+  });
+
+  it('reads a refusal as a refusal rather than as a dead network', async () => {
+    // 401 is a token the server will not renew; 403 is one it will not renew
+    // for this subject. Neither is worth retrying and both leave the token.
+    expect(await renewToken(HELD, { fetch: answering(401).fetch })).toEqual({
+      ok: false,
+      reason: 'rejected',
+    });
+    expect(await renewToken(HELD, { fetch: answering(403).fetch })).toEqual({
+      ok: false,
+      reason: 'rejected',
+    });
+  });
+
+  it('and a dead network as unreachable', async () => {
+    expect(await renewToken(HELD, { fetch: dead() })).toEqual({
+      ok: false,
+      reason: 'unreachable',
+    });
+  });
+
+  it('and a 200 with no token in it as unreachable, rather than passing it on', async () => {
+    // A server that changed under us. Handing a non-token onward as a token
+    // would replace a working credential with something that is not one.
+    expect(await renewToken(HELD, { fetch: answering(200, {}).fetch })).toEqual({
+      ok: false,
+      reason: 'unreachable',
+    });
+    expect(await renewToken(HELD, { fetch: answering(200).fetch })).toEqual({
+      ok: false,
+      reason: 'unreachable',
+    });
   });
 });

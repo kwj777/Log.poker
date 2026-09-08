@@ -187,7 +187,7 @@ by name, because every passcode holder shares it and syncing them would pour
 every preview visitor's history into one bucket. Log inherits that refusal and
 must inherit it explicitly rather than by luck.
 
-#### The token lasts thirty days, and nothing here renews it
+#### The token lasts thirty days, and now something renews it
 
 Checked against Untilt's `lib/access.js` as deployed. The two implementations of
 the format agree field for field -- four parts, the same expiry pattern, the
@@ -222,16 +222,36 @@ stops, and the app gives no account of itself. The device also resumes sweeping
 its own tombstones on the local window, because that branch is the one it now
 takes.
 
-The fix is the treatment `signin.js` already got: an endpoint that will take
-`Authorization: Bearer <token>`, verify it, run the renewal Stripe check that
-`library.js` runs, and answer a family origin -- or a caller with no `Origin` at
-all, which is the native case -- with `{ token }` as JSON. Log then asks for a
-fresh one on launch whenever the one it holds is inside the renew window, which
-is the ten days of thirty `library.js` already uses. Most of that work is in
-Untilt's repository rather than this one, exactly as the sign-in half was.
+That was the state until Log started minting its own tokens, at which point the
+fix stopped being in somebody else's repository. `POST /api/signin/renew` takes
+`Authorization: Bearer <token>`, verifies it, and answers `{ token }` with a
+fresh thirty days on the same subject. `compose()` asks for one at launch, not
+awaited, whenever the token it holds is inside its last ten days, which is the
+window `library.js` already uses.
 
-Until it exists, sync is a thirty-day feature, and that is worth knowing before
-`GATE_SECRET` is set rather than a month afterwards.
+**It will not renew a paid claim.** Log mints the free tier and has no way to
+find out whether anybody has bought, so a `full` token is refused with a 403 and
+goes on working until its own expiry. Renewing one here would be a way to hold a
+paid claim alive forever without the Stripe check that grants it, and
+downgrading one to free would quietly take away access the holder still has in
+Untilt. Neither is Log's to do.
+
+**It will not renew an expired one**, which is what stops the thirty days from
+being decorative, and the client will not even ask: a renewal that resurrected a
+dead credential would mean the expiry never meant anything.
+
+**And it needs no store.** A signature check and a mint, both pure, so a renewal
+still lands on a day Netlify Blobs does not. It also does not spend the caller
+limit, which exists to bound mail: charging launches against it would let a few
+devices behind one office network refuse a colleague's sign-in.
+
+The one property the client half is written around is that **every way of
+failing leaves the token alone**. A refusal, a dead network, an answer that is
+not a token, a store that will not write: in all of them what was there is still
+there, still valid, and still renewable on the next launch. There are ten days
+of window and every launch is another try. Clearing a working credential because
+a request failed is the shape of every "signed me out for no reason" bug there
+is, and `renewIfDue` is the one place that could do it.
 
 ### 4. The entitlement, which there is not one of
 

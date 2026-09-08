@@ -201,12 +201,71 @@ describe('signing in for a token Untilt actually minted', () => {
     expect(seen.map((request) => request.path)).not.toContain('/api/sync');
   });
 
-  it('and names GATE_SECRET when that is the one the endpoint says is missing', async () => {
+  it('and offers both things `off` can mean, rather than guessing at one', async () => {
+    // `off` is the endpoint's word for *not configured*, and it covers two
+    // causes: no key to sign with, and nowhere to put what it signs. This used
+    // to report it as the key alone, which was safe only while a missing store
+    // could not happen: `getStore` threw rather than returning null, so that
+    // branch was unreachable. Wrapping the thunk made it reachable, and made
+    // this message wrong for the case it had just enabled.
     await stand({ status: 503, body: '{"error":"off"}' });
     const said = await run(CODE);
     expect(said).toContain('GATE_SECRET is not set');
-    // Not the mailer. The endpoint said which, so the check should not guess.
+    expect(said).toContain('Blobs is not provisioned');
+    // And it says how to tell them apart, which the wire cannot.
+    expect(said).toContain('no blob store configured');
+    // Still not the mailer: a mailer that is down does not answer `off`.
     expect(said).not.toContain('RESEND_API_KEY');
+  });
+});
+
+/* ------------------------------------------- the guide to reading the log */
+
+describe('the deploy-log lines it tells somebody to search for', () => {
+  const script = readFileSync(SCRIPT, 'utf8');
+  const endpoint = readFileSync(
+    join(__dirname, '..', '..', 'auth', 'signinEndpoint.ts'),
+    'utf8',
+  );
+
+  const table = script.slice(
+    script.indexOf('const SIGNIN_LOG_LINES = ['),
+    script.indexOf('];', script.indexOf('const SIGNIN_LOG_LINES = [')),
+  );
+  const named = [...table.matchAll(/\['([^']+)',/g)].map((match) => match[1]);
+
+  it('are lines the endpoint actually writes', () => {
+    // The anchoring rule, and the reason the list is a table rather than prose
+    // inside a message. Somebody who searches a deploy log for a string that is
+    // not there concludes the log is empty and goes looking somewhere else, so
+    // a stale guide is worse than none.
+    //
+    // This is not hypothetical. A rewrite of the endpoint added six ways to
+    // answer 503 while this still named two of them, and nothing noticed,
+    // because the guide and the code had no relationship a test could see.
+    expect(named.length).toBeGreaterThan(2);
+    for (const line of named) {
+      expect(endpoint).toContain(`console.error('signin: ${line}'`);
+    }
+  });
+
+  it('and cover every way that endpoint answers 503', () => {
+    // The other direction, which is the one that goes stale: a new failure path
+    // with a log line nobody was told to look for.
+    const written = [...endpoint.matchAll(/console\.error\('signin: ([^']+)'/g)].map(
+      (match) => match[1],
+    );
+    const unlisted = [...new Set(written)].filter((line) => !named.includes(line));
+    // The ones that are not a 503: a caller refused with 429, and the races,
+    // which answer 202 or 429 and are about load rather than configuration.
+    expect(unlisted.sort()).toEqual([
+      'could not read the caller record',
+      'could not undo the pending record',
+      'could not write the caller record',
+      'gave up after losing every attempt race',
+      'gave up after losing every write race',
+      'refusing a caller whose own counter it kept losing',
+    ]);
   });
 });
 

@@ -155,6 +155,38 @@ const say = (...lines) => {
   for (const line of lines) console.log(line);
 };
 
+/**
+ * The lines the sign-in endpoint writes to the deploy log, and what each means.
+ *
+ * A 503 from `/api/signin` says nothing about which of half a dozen things
+ * would not answer, deliberately: a public endpoint that reports *the mailer is
+ * down* is a public endpoint reporting infrastructure. The deploy log says
+ * which, so this is a guide to reading it.
+ *
+ * **Every string here is asserted to exist in `src/auth/signinEndpoint.ts`** by
+ * `gateCheck.test.ts`. A guide that names lines the code no longer writes is
+ * worse than no guide: somebody searching a log for a string that is not there
+ * concludes the log is empty and goes looking somewhere else. That test caught
+ * this list going stale once already, when a rewrite of the endpoint added six
+ * ways to answer 503 and this still named two of them.
+ */
+const SIGNIN_LOG_LINES = [
+  ['no blob store configured', 'Blobs is not provisioned for the site'],
+  ['refusing every request; unset: GATE_SECRET', 'the key, and not the store'],
+  ['could not read the pending record', 'the blob store, before anything was written'],
+  ['could not write the pending record', 'the blob store'],
+  ['pending record read carried no tag to write against', 'the store answered with no etag'],
+  ['the code was not mailed', 'RESEND_API_KEY, or SIGNIN_FROM is off a verified domain'],
+  ['could not count the guess', 'the blob store, on the redemption path'],
+  ['could not spend the code', 'the blob store, after the code was accepted'],
+];
+
+/** The table above, as aligned columns somebody can scan. */
+const logGuide = () => {
+  const width = Math.max(...SIGNIN_LOG_LINES.map(([line]) => line.length));
+  return SIGNIN_LOG_LINES.map(([line, means]) => `  "${line}"${' '.repeat(width - line.length)}  ${means}`);
+};
+
 const explain = (status, body, minted) => {
   if (status === 200) {
     return minted
@@ -207,11 +239,18 @@ const explain = (status, body, minted) => {
 
   if (status === 503 && body?.error === 'off') {
     return [
-      'GATE_SECRET is not set on the site at all, or is set to an empty string.',
+      'The site says this is not configured, which is one of two things and the',
+      'answer does not say which:',
       '',
-      'Netlify UI, Site configuration, Environment variables. A variable added',
-      'after the last deploy does not reach a running function until the site is',
-      'deployed again.',
+      '  GATE_SECRET is unset, or set to an empty string',
+      '  the blob store is not provisioned for the site',
+      '',
+      'The deploy log says which: "no blob store configured" is the store, and',
+      '"refusing every request; unset: GATE_SECRET" is the key.',
+      '',
+      'For the key: Netlify UI, Site configuration, Environment variables. A',
+      'variable added after the last deploy does not reach a running function',
+      'until the site is deployed again.',
     ];
   }
 
@@ -282,10 +321,21 @@ const diagnose = async (response, fallback) => {
 
   if (response.status === 503 && error === 'off') {
     stop(
-      `${SIGNIN_ORIGIN} answered 503, and says the key is missing.`,
+      `${SIGNIN_ORIGIN} answered 503, and says it is not configured.`,
       '',
-      'GATE_SECRET is not set on that site. Netlify -> Site configuration ->',
-      'Environment, then redeploy, then run this again.',
+      'That is one of two things and the answer does not say which, because both',
+      'are the same fact from outside: nothing there to sign with, or nowhere to',
+      'put what it signs.',
+      '',
+      '  GATE_SECRET is not set on that site, or is empty',
+      '  Blobs is not provisioned for it',
+      '',
+      'The deploy log tells them apart: "refusing every request; unset:',
+      'GATE_SECRET" is the key, and "no blob store configured" is the store.',
+      '',
+      'For the key: Netlify -> Site configuration -> Environment, then redeploy,',
+      'then run this again. A variable added after the last deploy does not reach',
+      'a running function until the site is deployed again.',
     );
   }
 
@@ -293,16 +343,16 @@ const diagnose = async (response, fallback) => {
     stop(
       `${SIGNIN_ORIGIN} answered 503, which is the site rather than the address.`,
       '',
-      'Something it needs would not answer. The deploy log says which:',
+      'Something it needs would not answer, and the answer does not say what,',
+      'deliberately. The deploy log does:',
       '',
-      '  "could not write the pending record"  the blob store',
-      '  "the code was not mailed"             RESEND_API_KEY, or SIGNIN_FROM is',
-      '                                        not on a domain verified with Resend',
+      ...logGuide(),
       '',
-      'That last one is the usual answer straight after setting Resend up.',
-      'log.poker is verified at the apex, so the shipped default of',
-      'signin@log.poker is right and SIGNIN_FROM wants leaving unset. If it is',
-      'set to anything off that domain, that is the thing to undo.',
+      'The mailer is the usual one straight after setting Resend up. log.poker is',
+      'verified at the apex, so the shipped default of signin@log.poker is right',
+      'and SIGNIN_FROM wants leaving unset. If it is set to anything off that',
+      'domain, that is the thing to undo. Everything else on that list is the',
+      'blob store, and Blobs being unprovisioned is what all of them look like.',
     );
   }
 

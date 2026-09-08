@@ -781,7 +781,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 41 passed
-Tests:       1191 passed
+Tests:       1202 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -789,9 +789,9 @@ Tests:       1191 passed
   content            55   every figure in the guides, re-derived and read back
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
+  site               48   the marketing/app split, the PWA, the sitemap
   stats              45   P/L, rebuys, duration, win rate, groupings
   signinEndpoint     44   the free door, and every bound on it
-  site               39   the marketing/app split, the PWA, the sitemap
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
   verify             35   checking a token, and every way past it that must not work
@@ -813,9 +813,9 @@ Tests:       1191 passed
   token              17   the family token grammar, against signed fixtures
   handNotation       16   parse, round-trip, hand classes
   client             14   the sync client, against a fake fetch
+  gateCheck          13   the key-on-the-site script, run rather than read
   session            13   holding a token, and stores that fail as real ones do
   signin             12   the sign-in client, against a fake fetch
-  gateCheck          11   the key-on-the-site script, run rather than read
   handOffs           11   where a hand-off goes, and what the mid-session card says
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters

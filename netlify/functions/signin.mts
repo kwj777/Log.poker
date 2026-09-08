@@ -91,10 +91,26 @@ const send = async (to: string, code: string): Promise<boolean> => {
   }
 };
 
+/**
+ * The store, or nothing, which is what the endpoint's 503 branch expects.
+ *
+ * `getStore` throws when the Blobs context is not injected rather than
+ * returning null, so without this the "no blob store configured" answer that
+ * path is written to give could never happen and a missing store would be an
+ * unhandled exception instead.
+ */
+const store = (): CodeStore | null => {
+  try {
+    return getStore('log-signin') as unknown as CodeStore;
+  } catch {
+    return null;
+  }
+};
+
 export default async (request: Request): Promise<Response> =>
   handleSignIn(request, {
     secret: process.env.GATE_SECRET || '',
-    store: () => getStore('log-signin') as unknown as CodeStore,
+    store,
     mail: send,
     now: Date.now,
   });

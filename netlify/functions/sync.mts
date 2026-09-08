@@ -41,10 +41,25 @@ import { getStore } from '@netlify/blobs';
 
 import { handleSync, type BlobStore } from '../../src/sync/endpoint';
 
+/**
+ * The store, or nothing, which is what the endpoint's 503 branch expects.
+ *
+ * `getStore` throws when the Blobs context is not injected rather than
+ * returning null, so without this the answer that path is written to give
+ * could never happen and a missing store would be an unhandled exception.
+ */
+const store = (): BlobStore | null => {
+  try {
+    return getStore('log-sync') as unknown as BlobStore;
+  } catch {
+    return null;
+  }
+};
+
 export default async (request: Request): Promise<Response> =>
   handleSync(request, {
     secret: process.env.GATE_SECRET || '',
-    store: () => getStore('log-sync') as unknown as BlobStore,
+    store,
     now: Date.now,
   });
 

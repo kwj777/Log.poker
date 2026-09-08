@@ -19,6 +19,7 @@ import { join } from 'node:path';
 
 import { readClaim, SUBJECT_PASSCODE } from '../token';
 import { SUBJECT_PREFIX, subjectForEmail, verifyToken } from '../../sync/verify';
+import { fakeStore as blobStore, snapshot, type Fake } from './fakeStore';
 import {
   CALLER_LIMIT,
   CODE_TTL_MS,
@@ -43,39 +44,11 @@ const CODE = '424242';
 
 /* ------------------------------------------------------------------- a store */
 
-interface Fake extends CodeStore {
-  held: Map<string, unknown>;
-  reads: number;
-  readThrows: boolean;
-  writeThrows: boolean;
-  deleteThrows: boolean;
-}
-
-const fakeStore = (over: Partial<Fake> = {}): Fake => {
-  const store: Fake = {
-    held: new Map(),
-    reads: 0,
-    readThrows: false,
-    writeThrows: false,
-    deleteThrows: false,
-    async get(key) {
-      store.reads += 1;
-      if (store.readThrows) throw new Error('unreachable');
-      return store.held.get(key) ?? null;
-    },
-    async setJSON(key, value) {
-      if (store.writeThrows) throw new Error('unreachable');
-      store.held.set(key, JSON.parse(JSON.stringify(value)));
-      return null;
-    },
-    async delete(key) {
-      if (store.deleteThrows) throw new Error('unreachable');
-      store.held.delete(key);
-    },
-    ...over,
-  };
-  return store;
-};
+// Shared with `signinSweep.test.ts`. The fake this file used to carry was a
+// plain `Map`: linearizable, always answering with the latest value, and with
+// no notion of a conditional write. Every race below was invisible under it,
+// which is how three of them shipped. See the header of `fakeStore.ts`.
+const fakeStore = (over: Partial<Fake> = {}): Fake => Object.assign(blobStore(NOW).store, over);
 
 /* ------------------------------------------------------------------- a world */
 
@@ -235,7 +208,7 @@ describe('asking for a code', () => {
     // nothing whatever about who or how to become them.
     const store = fakeStore();
     await ask({ email: EMAIL }, world(store), { 'x-nf-client-connection-ip': '203.0.113.7' });
-    const written = JSON.stringify([...store.held.entries()]);
+    const written = JSON.stringify(snapshot(store));
     // Both records: the address's pending code and the caller's counter.
     expect(store.held.size).toBe(2);
     expect(written).not.toContain(EMAIL);
@@ -317,10 +290,18 @@ describe('when the mail does not go', () => {
     // thing to do next is silently ignored.
     const store = fakeStore();
     await ask({ email: EMAIL }, world(store, { failMail: true }));
-    // Nothing at all: no caller was identifiable, so the pending record is the
-    // only thing that could have been written and it was taken back.
-    expect(store.held.size).toBe(0);
 
+    // What is left behind is a record that counts nothing and opens nothing,
+    // rather than no record at all. The rollback used to delete the key, which
+    // deletes whatever is there *now*: a second request that had written its
+    // own record in between lost the live code it had just mailed. So it
+    // writes, conditionally on still owning the key, and what it writes is
+    // expired and has spent none of the day's five.
+    const [[, left]] = snapshot(store);
+    expect((left as { sent: number }).sent).toBe(0);
+    expect((left as { expiresAt: number }).expiresAt).toBeLessThanOrEqual(NOW);
+
+    // Which is the whole point: the obvious thing to do next still works.
     const surroundings = world(store);
     expect((await ask({ email: EMAIL }, surroundings)).status).toBe(202);
     expect(surroundings.sent).toHaveLength(1);
@@ -330,11 +311,11 @@ describe('when the mail does not go', () => {
     const store = fakeStore();
     const { surroundings, tick } = clocked(store);
     await ask({ email: EMAIL }, surroundings);
-    const before = JSON.stringify([...store.held.entries()]);
+    const before = JSON.stringify(snapshot(store));
 
     tick(COOLDOWN_MS + 1);
     await ask({ email: EMAIL }, world(store, { failMail: true, now: surroundings.now }));
-    expect(JSON.stringify([...store.held.entries()])).toBe(before);
+    expect(JSON.stringify(snapshot(store))).toBe(before);
   });
 });
 
@@ -439,6 +420,180 @@ describe('trading a code for a token', () => {
     const answer = await trade({ email: EMAIL, code: CODE }, surroundings);
     expect(answer.status).toBe(503);
     expect(await answer.text()).not.toContain('token');
+  });
+});
+
+/* ------------------------------------------------------- all at once */
+
+describe('what happens when requests arrive together', () => {
+  /**
+   * Every one of these fails on a bare read-modify-write, which is what all
+   * three counters here were until an audit put twelve simultaneous requests
+   * through them. A lost update does not cost one request past the limit; it
+   * costs the whole limit, because everybody who read the same number also
+   * passes the same check. Five a day meant five per round trip.
+   *
+   * The gate is what makes that reproducible rather than a matter of luck:
+   * every reader stops until it opens, so the reads genuinely all precede the
+   * writes.
+   */
+  const together = async <T>(count: number, store: Fake, run: () => Promise<T>): Promise<T[]> => {
+    let open = () => {};
+    store.gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const all = Array.from({ length: count }, run);
+    // Let each one get as far as its read before any of them is let through.
+    await Promise.resolve();
+    store.gate = null;
+    open();
+    return Promise.all(all);
+  };
+
+  it('mails once for one address, not once per request', async () => {
+    // Twelve at once used to be twelve mails, against a cap of five, and the
+    // record left behind said `sent: 1`.
+    const store = fakeStore();
+    const surroundings = world(store);
+    const answers = await together(12, store, () => ask({ email: EMAIL }, surroundings));
+
+    expect(answers.every((one) => one.status === 202)).toBe(true);
+    expect(surroundings.sent).toHaveLength(1);
+  });
+
+  it('and a burst never gets more than the day allows, however many bursts', async () => {
+    // The bound the sweep next door exists to protect, stated as the thing it
+    // actually promises: an address cannot be mailed more than five times in a
+    // day by anybody, at any concurrency.
+    const store = fakeStore();
+    let at = NOW;
+    const surroundings = world(store, { now: () => at });
+    for (let burst = 0; burst < 8; burst += 1) {
+      await together(6, store, () => ask({ email: EMAIL }, surroundings));
+      at += COOLDOWN_MS + 1;
+    }
+    expect(surroundings.sent.length).toBeLessThanOrEqual(DAILY_LIMIT);
+  });
+
+  it('counts a caller once per request, so twenty an hour is not twenty a round trip', async () => {
+    const store = fakeStore();
+    const surroundings = world(store);
+    const from = { 'x-nf-client-connection-ip': '198.51.100.4' };
+    // Well past the limit, all at once. Every one of them has to be counted or
+    // refused; what must not happen is all of them passing on the same count.
+    const answers = await together(CALLER_LIMIT * 2, store, () =>
+      ask({ email: EMAIL }, surroundings, from),
+    );
+    expect(answers.filter((one) => one.status === 429).length).toBeGreaterThan(0);
+  });
+
+  it('and a burst of guesses kills the code, rather than counting as one guess', async () => {
+    // Twenty simultaneous wrong guesses used to leave `attempts` at one,
+    // because each of them read zero and each of them wrote one. The code then
+    // had thirteen minutes of life left and no working counter in front of it,
+    // which against six digits and a rotated pool of callers is a way in.
+    //
+    // Counting the guess before comparing it is what fixes that, and the
+    // property to hold is the one somebody attacking this cares about: a burst
+    // cannot leave the code alive. Not the number of 400s, which counts
+    // refusals after the code is already dead and there is nothing left to
+    // guess at.
+    const store = fakeStore();
+    const surroundings = world(store);
+    await ask({ email: EMAIL }, surroundings);
+
+    const answers = await together(20, store, () =>
+      trade({ email: EMAIL, code: '000000' }, surroundings),
+    );
+    expect(answers.some((one) => one.status === 200)).toBe(false);
+    expect([...store.held.keys()].some((key) => key.startsWith('code/'))).toBe(false);
+    // And it stays dead: the right code cannot rescue it either.
+    expect((await trade({ email: EMAIL, code: CODE }, surroundings)).status).not.toBe(200);
+  });
+
+  it('and the right code still works after a burst of wrong ones has been refused', async () => {
+    // The other side of that: refusing to compare must not lock out the person
+    // whose code it is, so long as the counter has not really run out.
+    const store = fakeStore();
+    const surroundings = world(store);
+    await ask({ email: EMAIL }, surroundings);
+    await together(3, store, () => trade({ email: EMAIL, code: '000000' }, surroundings));
+    expect((await trade({ email: EMAIL, code: CODE }, surroundings)).status).toBe(200);
+  });
+
+  it('and a failed send never takes away a code another request just mailed', async () => {
+    // The rollback used to delete the key outright. Two requests arrive, the
+    // first mails and answers 202, the second's mailer fails, and the second
+    // deletes the record holding the first one's live code: the person reads
+    // the code off their phone and is told it is wrong.
+    const store = fakeStore();
+    const good = world(store);
+    const bad = world(store, { failMail: true });
+
+    let open = () => {};
+    store.gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const both = [ask({ email: EMAIL }, good), ask({ email: EMAIL }, bad)];
+    await Promise.resolve();
+    store.gate = null;
+    open();
+    await Promise.all(both);
+
+    expect(good.sent).toHaveLength(1);
+    expect((await trade({ email: EMAIL, code: CODE }, world(store))).status).toBe(200);
+  });
+
+  it('and refuses a caller whose own counter it can never write, rather than waving them through', async () => {
+    // Losing every round on your own rate-limit record means you are
+    // generating that contention yourself, which is the burst the limit is
+    // for. Answering 429 is the conservative direction; the alternative is
+    // that hammering hard enough is the way past the limit.
+    const store = fakeStore();
+    store.loses.add('caller/');
+    const surroundings = world(store);
+    const from = { 'x-nf-client-connection-ip': '198.51.100.7' };
+    expect((await ask({ email: EMAIL }, surroundings, from)).status).toBe(429);
+    expect(surroundings.sent).toEqual([]);
+    // And the same on the other path, which shares the counter.
+    expect((await trade({ email: EMAIL, code: CODE }, surroundings, from)).status).toBe(429);
+  });
+
+  it('and every read it makes is a strongly consistent one', async () => {
+    // The default read is served from a cache that can lag by up to a minute,
+    // which on this path means deciding a cap against a count from before the
+    // last mail, and on the redemption path means telling somebody their code
+    // is wrong because the record holding it has not arrived yet.
+    const store = fakeStore();
+    const surroundings = world(store);
+    await ask({ email: EMAIL }, surroundings, { 'x-nf-client-connection-ip': '198.51.100.9' });
+    await trade({ email: EMAIL, code: CODE }, surroundings);
+
+    expect(store.reads.length).toBeGreaterThan(2);
+    for (const read of store.reads) {
+      expect(read.options).toEqual({ type: 'json', consistency: 'strong' });
+    }
+  });
+
+  it('and does not believe a write that came back without a tag', async () => {
+    // The client reports `modified: true` for every status except a 412, so a
+    // 429 after its own retries is indistinguishable from a write that landed.
+    // Mailing on one of those hands somebody a code the store never kept.
+    const store = fakeStore();
+    const surroundings = world(store);
+    const key = [...store.held.keys()];
+    expect(key).toHaveLength(0);
+
+    // Every write to the pending record comes back tagless, so no round can
+    // confirm itself and nothing may be mailed.
+    const original = store.setJSON.bind(store);
+    store.setJSON = async (k, v, o) => {
+      const written = await original(k, v, o);
+      return k.startsWith('code/') ? { modified: written.modified } : written;
+    };
+
+    expect((await ask({ email: EMAIL }, surroundings)).status).toBe(202);
+    expect(surroundings.sent).toEqual([]);
   });
 });
 

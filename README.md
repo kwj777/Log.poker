@@ -681,7 +681,22 @@ a caller whose hour has run out. Both conditions for an address, because the
 record is what holds one to five mails a day and collecting it early would hand
 that budget back. The sweep holds no key, never writes, and shares its
 predicates with the endpoint so the two cannot disagree about what a live record
-is. See SYNC.md.
+is.
+
+Deciding correctly about a record you are not looking at is not deciding
+correctly, and the first version of it did that: blobs read eventually by
+default, so a run could judge a copy of a record from a minute earlier and
+delete what had replaced it. It reads strongly now and collects only a record
+whose etag still matches the one the listing gave. See SYNC.md.
+
+**Its counters are conditional writes**, which they were not at first. Reading a
+count, deciding on it and writing it back is a lost update, and a lost update in
+a rate limit costs the whole limit rather than one request: a dozen requests for
+one address arriving together read the same count, passed the same cap and sent
+a dozen mails. Every read here is strongly consistent now and every write
+conditional, nothing is mailed until the write that counted it has landed, and a
+guess is counted before it is compared, which is what makes five wrong guesses
+mean five. See SYNC.md.
 
 The copy has tests, which most copy should not. `/api/signin` answers 202
 whether or not a mail went, so that nobody can use it to ask how much mail an
@@ -766,7 +781,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 41 passed
-Tests:       1173 passed
+Tests:       1191 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -775,12 +790,13 @@ Tests:       1173 passed
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   stats              45   P/L, rebuys, duration, win rate, groupings
+  signinEndpoint     44   the free door, and every bound on it
   site               39   the marketing/app split, the PWA, the sitemap
   values             36   money, dates, durations, stakes, formats, counts
-  signinEndpoint     35   the free door, and every bound on it
   variance           35   win rate, σ, confidence bands, verdicts
   verify             35   checking a token, and every way past it that must not work
   mood               32   what tilt costs, and when to say nothing
+  signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
   syncingRepository  29   two devices and one server, no fakes in between
   blog               28   the post grammar, the share cards, and what it refuses
@@ -788,7 +804,6 @@ Tests:       1173 passed
   endpoint           25   the sync endpoint, end to end
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
-  signinSweep        22   what the sign-in store may collect, and what it must not
   copy               20   what the sign-in and the sync are allowed to say
   glossary           20   the shorthand on screen still matches its explanation
   batch              19   a backlog split into requests, without orphaning a child

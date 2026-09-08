@@ -114,3 +114,48 @@ export const describeSession = (syncs: boolean): string =>
   syncs
     ? 'Signed in. Your history follows you to your other devices, at no charge.'
     : 'Signed in with a shared passcode, which is a door rather than a person. Carrying your history needs an address of your own.';
+
+/* --------------------------------------------------------------- erasing */
+
+/**
+ * The three sentences the erase has to say, and the one it must not leave out.
+ *
+ * ## Why it signs out, and why that is not a detail
+ *
+ * `eraseRemote` deletes the bucket and nothing else. Erasing it while still
+ * signed in is a control that undoes itself: the next session logged on this
+ * device pushes the whole local history straight back up, and the person is
+ * left believing something was deleted that is sitting there again. So the
+ * sign-out is part of what erasing *is* here, not a courtesy afterwards, and
+ * the copy says so before it happens rather than surprising somebody with it.
+ *
+ * ## And why it names the other devices
+ *
+ * Nothing here can reach into somebody's other phone. A device still signed in
+ * has its own copy and will upload it, which puts the bucket back within a
+ * session or two, and there is no honest way to promise otherwise from this
+ * screen. Saying it plainly is the whole of what can be done about it, and
+ * leaving it out would make the button a promise the app cannot keep.
+ */
+export const ERASE_EXPLAINS =
+  'You can also erase the copy on the server. That signs this device out, and leaves your log here.';
+
+/** The step between the button and the deletion. Says what it reaches. */
+export const ERASE_CONFIRM =
+  'This deletes the copy Log is holding for you and signs this device out. The log on this device is untouched. Any other device still signed in has its own copy and will upload it again, so sign out there too if you want it gone for good.';
+
+/**
+ * What to say when it did not happen.
+ *
+ * The important half is the second sentence. A failed erase that left somebody
+ * signed out would be the worst outcome available: told their data was gone,
+ * signed out, and no longer able to ask again without signing back in. So the
+ * sign-out only happens once the deletion has, and this says which side of that
+ * line the failure fell on.
+ */
+export const ERASE_FAILED =
+  'Could not reach the server, so nothing was erased and you are still signed in. Try again in a moment.';
+
+/** And when it did. Read on the signed-out card, which is where it lands. */
+export const ERASE_DONE =
+  'Erased, and this device is signed out. Your log is still here.';

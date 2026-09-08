@@ -110,5 +110,26 @@ export const readClaim = (token: string | null, now: Timestamp): Claim | null =>
  * their histories together would pour every preview visitor's log into a
  * single one.
  */
+/**
+ * How close to the end a token has to be before the app asks for a new one.
+ *
+ * Ten days of thirty, which is the number Untilt's own renewal uses. Wide
+ * enough that a device opened once a week renews long before it runs out, and
+ * narrow enough that a renewal is not something every launch does.
+ *
+ * Here rather than beside the minting, because deciding *when* to ask is the
+ * app's half and this file is the half the app is allowed to import.
+ */
+export const RENEW_WITHIN_MS = 10 * 24 * 60 * 60 * 1000;
+
+/**
+ * Whether the token behind this claim is close enough to expiry to replace.
+ *
+ * False for a claim that has already expired: a renewal cannot resurrect one,
+ * the server refuses it, and asking would only be a request that fails.
+ */
+export const dueForRenewal = (claim: Claim | null, now: Timestamp): boolean =>
+  claim !== null && claim.expiresAt > now && claim.expiresAt - now <= RENEW_WITHIN_MS;
+
 export const hasOwnSubject = (claim: Claim | null): boolean =>
   claim !== null && claim.subject !== SUBJECT_PASSCODE;

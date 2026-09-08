@@ -13,7 +13,7 @@
  * screen, it is the absence of one.
  */
 
-import { getSession, getToken } from '../auth';
+import { getSession, getToken, renewIfDue } from '../auth';
 import { cursorStore } from '../sync/cursorStore';
 import { SyncingRepository } from './SyncingRepository';
 import { createRepository, STORAGE_ENGINE } from './repositoryFactory';
@@ -56,6 +56,15 @@ const compose = async (): Promise<Repository> => {
       // person deleted come back down and land on every device they own.
       return local;
     }
+
+    // And a token that is nearly out is replaced, here, because this is the
+    // one thing that runs on every launch and holds a token while it does.
+    // Thirty days was the whole life of a session until this line: on the
+    // thirty-first, `current()` cleared the token, the branch above returned
+    // the local repository, and nothing anywhere said why. Not awaited, for
+    // the same reason as the push below, and it cannot take the launch with it
+    // whatever it does.
+    void renewIfDue();
 
     // A syncing device does not decide this for itself: the server draws the
     // line from every device it has heard from, and this one only knows about

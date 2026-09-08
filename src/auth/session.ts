@@ -17,7 +17,7 @@
  */
 
 import type { Timestamp } from '../domain/types';
-import { hasOwnSubject, readClaim, type Claim } from './token';
+import { dueForRenewal, hasOwnSubject, readClaim, type Claim } from './token';
 
 /**
  * Somewhere to keep one string.
@@ -111,6 +111,45 @@ export class SessionManager {
    */
   async token(): Promise<string | null> {
     return (await this.current()) === null ? null : this.store.read();
+  }
+
+  /**
+   * Replace the token with a fresh one, if the one held is nearly out.
+   *
+   * The whole of what stops a session from ending on a timer. Called at launch
+   * and never awaited: this is a network request, and nothing in Log waits on
+   * one.
+   *
+   * **Every way of failing leaves the token alone**, which is the property
+   * worth stating rather than inferring. A refusal, a dead network, an answer
+   * that is not a token, a store that will not write: in all of them what was
+   * there is still there, still valid, and still renewable on the next launch.
+   * There are ten days of window and a launch is another try. The one thing
+   * this must never do is clear a working credential because a request failed,
+   * which is the shape of every "signed me out for no reason" bug there is.
+   *
+   * Answers whether it wrote one, for a test and for nobody else.
+   */
+  async renewIfDue(fresh: (token: string) => Promise<string | null>): Promise<boolean> {
+    const now = this.clock();
+    const token = await this.store.read();
+    if (token === null) return false;
+
+    const claim = readClaim(token, now);
+    // Expired, or unreadable. `current()` is the one place that clears, and it
+    // is not this one: a renewal is not a session check.
+    if (claim === null || !dueForRenewal(claim, now)) return false;
+
+    const next = await fresh(token);
+    if (next === null) return false;
+
+    // Refused rather than stored, exactly as `signIn` refuses one: a token this
+    // side cannot read is one the next launch would clear, and replacing a good
+    // token with that is worse than not renewing at all.
+    if (readClaim(next, now) === null) return false;
+
+    await this.store.write(next);
+    return true;
   }
 
   /**

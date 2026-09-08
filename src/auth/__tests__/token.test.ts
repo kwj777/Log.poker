@@ -13,7 +13,7 @@
 
 import { createHmac } from 'node:crypto';
 
-import { SUBJECT_PASSCODE, TIERS, hasOwnSubject, readClaim, type Tier } from '../token';
+import { RENEW_WITHIN_MS, dueForRenewal, SUBJECT_PASSCODE, TIERS, hasOwnSubject, readClaim, type Tier } from '../token';
 
 const NOW = 1_700_000_000_000;
 const SECRET = 'test-gate-secret';
@@ -147,5 +147,37 @@ describe('what a claim is worth', () => {
 
   it('withholds it from nobody at all', () => {
     expect(hasOwnSubject(null)).toBe(false);
+  });
+});
+
+/**
+ * When to ask for a new token, which is the app's half of the renewal.
+ *
+ * Ten days of thirty. Wide enough that a device opened once a week renews long
+ * before it runs out, narrow enough that this is not something every launch
+ * does.
+ */
+describe('whether a token is due to be replaced', () => {
+  const NOW = 1_700_000_000_000;
+  const claimAt = (expiresAt: number) => ({ expiresAt, tier: 'free' as const, subject: 'cus_1' });
+
+  it('is not, with most of the month still on it', () => {
+    expect(dueForRenewal(claimAt(NOW + RENEW_WITHIN_MS + 60_000), NOW)).toBe(false);
+  });
+
+  it('is, once inside the window', () => {
+    expect(dueForRenewal(claimAt(NOW + RENEW_WITHIN_MS), NOW)).toBe(true);
+    expect(dueForRenewal(claimAt(NOW + 60_000), NOW)).toBe(true);
+  });
+
+  it('is not, once it has already run out', () => {
+    // A renewal cannot resurrect one and the server refuses it, so asking
+    // would only be a request that fails.
+    expect(dueForRenewal(claimAt(NOW), NOW)).toBe(false);
+    expect(dueForRenewal(claimAt(NOW - 1), NOW)).toBe(false);
+  });
+
+  it('and is not, for no claim at all', () => {
+    expect(dueForRenewal(null, NOW)).toBe(false);
   });
 });

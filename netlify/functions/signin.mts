@@ -115,4 +115,4 @@ export default async (request: Request): Promise<Response> =>
     now: Date.now,
   });
 
-export const config = { path: ['/api/signin', '/api/signin/code'] };
+export const config = { path: ['/api/signin', '/api/signin/code', '/api/signin/renew'] };

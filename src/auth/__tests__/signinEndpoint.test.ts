@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { readClaim, SUBJECT_PASSCODE } from '../token';
-import { SUBJECT_PREFIX, subjectForEmail, verifyToken } from '../../sync/verify';
+import { SUBJECT_PREFIX, mintToken, subjectForEmail, verifyToken } from '../../sync/verify';
 import { fakeStore as blobStore, snapshot, type Fake } from './fakeStore';
 import {
   CALLER_LIMIT,
@@ -159,7 +159,9 @@ describe('what it answers at all', () => {
     // anywhere a test can reach it. Still small enough that a rule arriving
     // would show.
     expect(code.length).toBeLessThan(50);
-    expect(source).toContain("export const config = { path: ['/api/signin', '/api/signin/code'] };");
+    expect(source).toContain(
+      "export const config = { path: ['/api/signin', '/api/signin/code', '/api/signin/renew'] };",
+    );
     expect(source).toContain('handleSignIn(request, {');
     // Named individually rather than by counting braces: these are the things
     // that would be untested if they moved, and the list is the point.
@@ -686,5 +688,140 @@ describe('when the store cannot be read or written', () => {
     await ask({ email: EMAIL }, world(store));
     store.readThrows = true;
     expect((await trade({ email: EMAIL, code: CODE }, world(store))).status).toBe(503);
+  });
+});
+
+/* ------------------------------------------------------------------ renewing */
+
+/**
+ * The half nobody asks for.
+ *
+ * A token is good for thirty days, and until this existed it was good for
+ * exactly thirty days: on the thirty-first the app cleared it, went back to the
+ * local database, and said nothing. Most of what is asserted here is what it
+ * refuses, because a renewal that is too willing is worse than none at all.
+ */
+describe('renewing a token', () => {
+  const CALLER = { 'x-nf-client-connection-ip': '203.0.113.42' };
+
+  const tokenFor = async (email = EMAIL): Promise<string> => {
+    const surroundings = world(fakeStore());
+    await ask({ email }, surroundings);
+    const answer = await trade({ email, code: CODE }, surroundings);
+    return ((await answer.json()) as { token: string }).token;
+  };
+
+  const renewWith = (
+    token: string | null,
+    surroundings: Surroundings = world(fakeStore()),
+    headers: Record<string, string> = {},
+  ): Promise<Response> =>
+    handleSignIn(
+      new Request('https://log.poker/api/signin/renew', {
+        method: 'POST',
+        headers: { ...(token === null ? {} : { Authorization: `Bearer ${token}` }), ...headers },
+        body: '{}',
+      }),
+      surroundings,
+    );
+
+  it('hands back a token the server accepts, for the same person, lasting longer', async () => {
+    const held = await tokenFor();
+    const before = readClaim(held, NOW);
+
+    // A fortnight on, which is inside nothing in particular: the server does
+    // not care how close to the end this is, only that it is not past it.
+    const later = NOW + 14 * DAY_MS;
+    const answer = await renewWith(held, world(fakeStore(), { now: () => later }));
+    expect(answer.status).toBe(200);
+
+    const { token } = (await answer.json()) as { token: string };
+    const claim = await verifyToken(SECRET, token, later);
+    expect(claim).not.toBeNull();
+    expect(claim?.subject).toBe(before?.subject);
+    expect(claim?.tier).toBe('free');
+    expect(claim?.expiresAt).toBeGreaterThan(before?.expiresAt ?? 0);
+  });
+
+  it('refuses one signed with another key, and says which half in the log only', async () => {
+    const said: unknown[] = [];
+    const logged = jest.spyOn(console, 'error').mockImplementation((...args) => said.push(args));
+    try {
+      const answer = await renewWith(
+        await tokenFor(),
+        world(fakeStore(), { secret: 'a-different-key' }),
+      );
+      expect(answer.status).toBe(401);
+      expect(JSON.stringify(said)).toContain('signature');
+      expect(await answer.text()).not.toContain('signature');
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('refuses an expired one, or the thirty days never meant anything', async () => {
+    const held = await tokenFor();
+    const after = (readClaim(held, NOW)?.expiresAt ?? NOW) + 1000;
+    expect((await renewWith(held, world(fakeStore(), { now: () => after }))).status).toBe(401);
+  });
+
+  it('refuses a request carrying no token, and writes nothing down for it', async () => {
+    // A public URL. A line per unauthenticated poke is a log nobody can read
+    // on the day they need to.
+    const said: unknown[] = [];
+    const logged = jest.spyOn(console, 'error').mockImplementation((...args) => said.push(args));
+    try {
+      expect((await renewWith(null)).status).toBe(401);
+      expect(said).toEqual([]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('refuses a passcode, which names a door rather than a person', async () => {
+    // Properly signed, so that what is being refused is the subject and not
+    // the token: everybody who typed one shares it, and a bucket for it would
+    // be one bucket for every preview visitor.
+    const passcode = await mintToken(SECRET, {
+      subject: SUBJECT_PASSCODE,
+      tier: 'free',
+      expiresAt: NOW + DAY_MS,
+    });
+    // 403 rather than 401: the token is fine and the subject is not, which is
+    // the difference between "sign in again" and "not you".
+    expect((await renewWith(passcode)).status).toBe(403);
+  });
+
+  it('will not extend a paid claim, because it cannot ask whether it is still true', async () => {
+    // Log mints the free tier and has no way to find out who has bought. A paid
+    // claim is Untilt's to renew, and renewing it here would be a way to hold
+    // one alive forever without the check that grants it. Downgrading it to
+    // free would be worse: access taken away somewhere this cannot see.
+    const paid = await mintToken(SECRET, {
+      subject: await subjectForEmail(SECRET, EMAIL),
+      tier: 'full',
+      expiresAt: NOW + DAY_MS,
+    });
+    expect((await renewWith(paid)).status).toBe(403);
+  });
+
+  it('and works on a day the blob store does not', async () => {
+    // A signature check and a mint, both pure. Worth having on the one request
+    // every launch makes.
+    expect((await renewWith(await tokenFor(), world(null))).status).toBe(200);
+  });
+
+  it('and never spends the mail budget a real sign-in needs', async () => {
+    // That limit exists to bound mail. Spending it on launches would let a few
+    // devices behind one office network refuse a colleague's sign-in, so the
+    // renewals below carry the same caller as the ask that follows them.
+    const surroundings = world(fakeStore());
+    const held = await tokenFor();
+
+    for (let round = 0; round < CALLER_LIMIT + 5; round += 1) {
+      expect((await renewWith(held, surroundings, CALLER)).status).toBe(200);
+    }
+
+    expect((await ask({ email: 'someone@example.com' }, surroundings, CALLER)).status).toBe(202);
   });
 });

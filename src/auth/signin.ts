@@ -97,6 +97,7 @@ const post = async (
   path: string,
   body: unknown,
   { fetch = globalThis.fetch, origin = SIGNIN_ORIGIN, timeoutMs = REQUEST_TIMEOUT_MS }: Options,
+  bearer?: string,
 ): Promise<Response | null> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -106,7 +107,11 @@ const post = async (
       // Accept is what the endpoint keys on. Without it the server answers the
       // way it answers a browser, with a page and a cookie that cannot cross a
       // registrable domain, and every call here would fail on a 200.
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(bearer === undefined ? {} : { Authorization: `Bearer ${bearer}` }),
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -163,6 +168,35 @@ export const redeemCode = async (
     const token = (body as { token?: unknown } | null)?.token;
     if (typeof token !== 'string' || token === '') return { ok: false, reason: 'unreachable' };
     return { ok: true, token };
+  } catch {
+    return { ok: false, reason: 'unreachable' };
+  }
+};
+
+/**
+ * Trade a token that still works for one that works for another thirty days.
+ *
+ * The half of the sign-in nobody asks for. A token lasts thirty days, and
+ * before this the thirty-first day cleared it: the app went back to the local
+ * database, said nothing, and put the sign-in form back where it had been. So
+ * this is asked on launch, by whatever holds the token, when the one it holds
+ * is inside its last ten days.
+ *
+ * **A refusal is not a sign-out.** Every failure here leaves the token that
+ * was passed in exactly where it was, because it is still good: that is what
+ * makes it renewable. There are days of window left to try again in, and every
+ * launch is another try.
+ */
+export const renewToken = async (token: string, options: Options = {}): Promise<Redemption> => {
+  const response = await post('/api/signin/renew', {}, options, token);
+  if (response === null) return { ok: false, reason: 'unreachable' };
+  if (!response.ok) return { ok: false, reason: failureFor(response.status) };
+
+  try {
+    const body: unknown = await response.json();
+    const fresh = (body as { token?: unknown } | null)?.token;
+    if (typeof fresh !== 'string' || fresh === '') return { ok: false, reason: 'unreachable' };
+    return { ok: true, token: fresh };
   } catch {
     return { ok: false, reason: 'unreachable' };
   }

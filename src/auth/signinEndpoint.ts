@@ -70,6 +70,9 @@
 
 import {
   TOKEN_TTL_MS,
+  bearerFrom,
+  checkToken,
+  hasOwnBucket,
   hmacHex,
   mintToken,
   normalizeEmail,
@@ -667,11 +670,84 @@ const redeem = async (
 };
 
 /**
- * Both halves, routed on the path.
+ * A fresh token for somebody already holding a good one.
  *
- * One function rather than two because they share every rule above the split:
- * the same key, the same store, the same caller limit and the same refusal to
- * say why.
+ * A token is good for thirty days and, until this existed, for exactly thirty
+ * days. On day thirty-one `SessionManager.current()` cleared it, `compose()`
+ * handed back the plain local repository, and there was no 401, no `problem`
+ * and nothing in Settings but the sign-in form back where it started. Everyone
+ * who signed in was signed out again a month later, silently, and the app gave
+ * no account of itself. A feature that stops working on a timer and says
+ * nothing is worse than one that was never built.
+ *
+ * ## What it will not do
+ *
+ * **It will not renew a paid token.** Log mints the free tier and cannot find
+ * out whether anybody has bought; a paid claim is Untilt's to extend, because
+ * Untilt is the one that can ask Stripe whether it is still true. Renewing one
+ * here would turn this endpoint into a way to hold a paid claim alive forever
+ * without the check that grants it, and downgrading one to free would quietly
+ * take away access the holder still has elsewhere. So it refuses, and the token
+ * keeps working until its own expiry exactly as it does today.
+ *
+ * **It will not renew an expired one.** `checkToken` refuses those, which is
+ * the whole point: a renewal that resurrected a dead credential would mean the
+ * thirty days never meant anything.
+ *
+ * ## What it does not need
+ *
+ * The store. This is a signature check and a mint, both pure, so a renewal
+ * still lands on a day the blob store is unreachable. That is worth having on
+ * the one request every launch makes.
+ *
+ * And the caller limit, deliberately. That limit exists to bound *mail*, and
+ * spending it on launches would let a few devices behind one office network
+ * refuse a real sign-in from a colleague. There is nothing to bound here that
+ * a valid signature has not already bounded: anybody who can get past it can
+ * already sync, and renewing is strictly less than that.
+ */
+const renew = async (
+  request: Request,
+  { secret, now: clock }: Surroundings,
+): Promise<Response> => {
+  const now = clock();
+  const checked = await checkToken(
+    secret,
+    bearerFrom(request.headers.get('authorization')),
+    now,
+  );
+
+  if ('refused' in checked) {
+    // The reason to the deploy log and never into the answer, the same way the
+    // sync endpoint does it: which half of a token is wrong is as useful to
+    // somebody guessing as it is to us. `absent` is a scanner, not a diagnosis.
+    if (checked.refused !== 'absent') {
+      console.error(`signin: refusing to renew a token: ${checked.refused}`);
+    }
+    return json({ error: 'rejected' }, 401);
+  }
+
+  const { claim } = checked;
+  // A passcode names a door rather than a person, and 403 rather than 401 for
+  // the same reason the sync endpoint says it: the token is fine, the subject
+  // is not, and telling those apart is "sign in again" versus "not you".
+  if (!hasOwnBucket(claim)) return json({ error: 'forbidden' }, 403);
+  if (claim.tier !== 'free') return json({ error: 'forbidden' }, 403);
+
+  const token = await mintToken(secret, {
+    subject: claim.subject,
+    tier: 'free',
+    expiresAt: now + TOKEN_TTL_MS,
+  });
+  return json({ token }, 200);
+};
+
+/**
+ * All three, routed on the path.
+ *
+ * One function rather than three because they share every rule above the split:
+ * the same key, the same store, and the same refusal to say why. The caller
+ * limit is the one thing that is not shared; see `renew`.
  */
 export const handleSignIn = async (
   request: Request,
@@ -687,5 +763,6 @@ export const handleSignIn = async (
   const { pathname } = new URL(request.url);
   if (pathname === '/api/signin') return askFor(request, surroundings);
   if (pathname === '/api/signin/code') return redeem(request, surroundings);
+  if (pathname === '/api/signin/renew') return renew(request, surroundings);
   return json({ error: 'rejected' }, 404);
 };

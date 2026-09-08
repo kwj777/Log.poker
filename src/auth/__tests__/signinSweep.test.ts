@@ -54,6 +54,7 @@ import {
   type Surroundings as EndpointSurroundings,
 } from '../signinEndpoint';
 import { SWEEP_BATCH, SWEEP_BUDGET_MS, sweepSignIn, type SweepStore } from '../signinSweep';
+import { fakeStore, snapshot, type Fake, type Held } from './fakeStore';
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -70,104 +71,10 @@ const CODE = '424242';
 
 /* --------------------------------------------------------- a store and a clock */
 
-/** What the fake keeps, which is a value and the tag that says which value. */
-interface Held {
-  value: unknown;
-  etag: string;
-}
-
-interface Fake extends CodeStore, SweepStore {
-  held: Map<string, Held>;
-  /** Milliseconds each read costs, for the runs that are about the budget. */
-  slow: number;
-  /** Keys whose read never answers, for the runs that are about one bad key. */
-  hangs: Set<string>;
-  /** Keys the read makes vanish, as a redemption between listing and read does. */
-  vanishes: Set<string>;
-  /** Keys the read rewrites underneath itself, which is the race the etag is for. */
-  rewrites: Set<string>;
-  /** Keys whose read answers with no etag at all. */
-  tagless: Set<string>;
-  /** Extra rows the listing invents, for guards the prefix filter hides. */
-  invents: { key: string; etag: string }[];
-  getThrows: Set<string>;
-  deleteThrows: Set<string>;
-  listThrows: boolean;
-  /** Every options object the sweep read with, so the consistency can be checked. */
-  reads: { key: string; options: unknown }[];
-}
-
-const build = () => {
-  let at = NOW;
-  const clock = { now: () => at, to: (when: number) => (at = when), by: (ms: number) => (at += ms) };
-  let written = 0;
-
-  const put = (key: string, value: unknown) => {
-    written += 1;
-    store.held.set(key, { value: JSON.parse(JSON.stringify(value)), etag: `v${written}` });
-  };
-
-  const store: Fake = {
-    held: new Map(),
-    slow: 0,
-    hangs: new Set(),
-    vanishes: new Set(),
-    rewrites: new Set(),
-    tagless: new Set(),
-    invents: [],
-    getThrows: new Set(),
-    deleteThrows: new Set(),
-    listThrows: false,
-    reads: [],
-
-    // The endpoint's half of the interface.
-    async get(key) {
-      if (store.getThrows.has(key)) throw new Error('unreachable');
-      return store.held.get(key)?.value ?? null;
-    },
-    async setJSON(key, value) {
-      put(key, value);
-      return null;
-    },
-    async delete(key) {
-      if (store.deleteThrows.has(key)) throw new Error('unreachable');
-      store.held.delete(key);
-    },
-
-    // The sweep's half.
-    async getWithMetadata(key, options) {
-      at += store.slow;
-      store.reads.push({ key, options });
-      if (store.hangs.has(key)) return new Promise(() => {});
-      if (store.getThrows.has(key)) throw new Error('unreachable');
-      if (store.vanishes.has(key)) {
-        store.held.delete(key);
-        return null;
-      }
-      const found = store.held.get(key);
-      if (found === undefined) return null;
-      // A write landing between the listing and this read. The record handed
-      // back is the new one, and its tag is what gives that away.
-      if (store.rewrites.has(key)) put(key, found.value);
-      const now = store.held.get(key) as Held;
-      return { data: now.value, etag: store.tagless.has(key) ? undefined : now.etag };
-    },
-    async list({ prefix }) {
-      if (store.listThrows) throw new Error('unreachable');
-      return {
-        blobs: [
-          ...[...store.held.entries()]
-            .filter(([key]) => key.startsWith(prefix))
-            .sort(([a], [b]) => (a < b ? -1 : 1))
-            .map(([key, one]) => ({ key, etag: one.etag })),
-          ...store.invents,
-        ],
-      };
-    },
-  };
-
-  return { store, clock, put };
-};
+// Shared with `signinEndpoint.test.ts`, because both files need the same
+// etags, the same conditional writes and the same ways to fail, and two
+// hand-rolled copies of that is how the two sides come to disagree about what
+// the store does. See the header of `fakeStore.ts`.
 
 const sweep = (store: SweepStore | null, now: () => number) =>
   sweepSignIn({ store: () => store, now });
@@ -218,13 +125,9 @@ const only = (store: Fake): Pending => {
 };
 
 const rewrite = (store: Fake, over: Partial<Pending>): void => {
-  const held = { ...only(store), ...over };
-  void store.setJSON(codeKeys(store)[0], held);
+  store.put(codeKeys(store)[0], { ...only(store), ...over });
 };
 
-/** The store as two comparable snapshots: what is under each key, tags aside. */
-const snapshot = (store: Fake) =>
-  [...store.held.entries()].map(([key, one]) => [key, one.value] as const).sort();
 
 /* ------------------------------------------------------------------ quiet logs */
 
@@ -245,7 +148,7 @@ afterEach(() => {
 describe('a record it collects is a record nothing was reading', () => {
   /** Ask for a code, then let the clock run past everything. */
   const spent = async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     clock.to(NOW + DAY_MS + CODE_TTL_MS + 1);
     return { store, clock };
@@ -269,7 +172,7 @@ describe('a record it collects is a record nothing was reading', () => {
     await sweep(store, clock.now);
     expect(store.held.size).toBe(0);
 
-    const fresh = build();
+    const fresh = fakeStore(NOW);
     fresh.clock.to(clock.now());
 
     const swept = endpoint(store, clock.now);
@@ -283,7 +186,7 @@ describe('a record it collects is a record nothing was reading', () => {
     const { store, clock } = await spent();
     await sweep(store, clock.now);
     expect(store.held.size).toBe(0);
-    const fresh = build();
+    const fresh = fakeStore(NOW);
     fresh.clock.to(clock.now());
     expect((await trade(endpoint(store, clock.now))).status).toBe(
       (await trade(endpoint(fresh.store, fresh.clock.now))).status,
@@ -295,13 +198,13 @@ describe('a record it collects is a record nothing was reading', () => {
     // out. Swept-equals-virgin holds trivially for a sweep that collects
     // everything; what pins the rule is that a live record survives and the
     // two stores are then NOT the same.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     clock.by(CODE_TTL_MS + 1); // code dead, window very much alive
 
     expect((await sweep(store, clock.now)).collected).toBe(0);
 
-    const fresh = build();
+    const fresh = fakeStore(NOW);
     fresh.clock.to(clock.now());
     expect(snapshot(store)).not.toEqual(snapshot(fresh.store));
 
@@ -323,7 +226,7 @@ describe('what it must not collect, because the mail budget lives there', () => 
     // The failure this suite exists for. Collect this and the next request
     // starts a fresh count, so five mails a day becomes five mails a day plus
     // five more whenever the sweep happens to run.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     const surroundings = endpoint(store, clock.now);
     for (let i = 0; i < DAILY_LIMIT; i += 1) {
       await ask(surroundings);
@@ -341,7 +244,7 @@ describe('what it must not collect, because the mail budget lives there', () => 
   });
 
   it('and does not free the budget a moment before the window is up', async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     rewrite(store, { sent: DAILY_LIMIT, expiresAt: NOW });
 
@@ -356,7 +259,7 @@ describe('what it must not collect, because the mail budget lives there', () => 
     // `expiresAt <= now`. Without this the suite tolerated collecting a code
     // twelve minutes into its fifteen-minute life: long enough to delete one
     // out from under somebody reading it, and green.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     const dies = NOW + CODE_TTL_MS;
     rewrite(store, { windowStartedAt: NOW - DAY_MS - 1, expiresAt: dies });
@@ -372,7 +275,7 @@ describe('what it must not collect, because the mail budget lives there', () => 
     // to fifteen minutes. Collecting on `windowRolled` alone would kill it
     // while somebody was reading it off their phone: rare, silent, and a
     // sign-in that simply says the code is wrong.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     const surroundings = endpoint(store, clock.now);
     await ask(surroundings);
     rewrite(store, { windowStartedAt: NOW - DAY_MS + 60 * 1000 });
@@ -386,7 +289,7 @@ describe('what it must not collect, because the mail budget lives there', () => 
     // Five wrong guesses arms a refusal that lasts the rest of the code's
     // life. Collecting it would answer 400 instead, which is a quieter answer
     // to somebody who is guessing.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     rewrite(store, { windowStartedAt: NOW - DAY_MS - 1, attempts: MAX_ATTEMPTS });
 
@@ -399,7 +302,7 @@ describe('what it must not collect, because the mail budget lives there', () => 
 
 describe('whether it is looking at the record it deletes', () => {
   const stale = async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     rewrite(store, { windowStartedAt: NOW - DAY_MS - 1, expiresAt: NOW - 1 });
     return { store, clock };
@@ -459,7 +362,7 @@ describe('the caller records', () => {
   const from = { 'x-nf-client-connection-ip': '203.0.113.7' };
 
   const counted = async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await handleSignIn(
       new Request('https://log.poker/api/signin', {
         method: 'POST',
@@ -496,9 +399,9 @@ describe('what it will not touch', () => {
     // where the fake's own prefix filter removed it before the sweep saw it:
     // inverting the guard left the suite green. The listing invents the row
     // instead, which is the shape a cursor-based rewrite would produce.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     store.invents.push({ key: 'something/else', etag: 'v1' });
-    void store.setJSON('something/else', { whatever: true });
+    store.put('something/else', { whatever: true });
 
     const report = await sweep(store, clock.now);
     expect(report.found).toBeGreaterThan(0);
@@ -511,7 +414,7 @@ describe('what it will not touch', () => {
     // rather than the test's. What the run adds is that a record it decided to
     // keep comes out of the pass byte for byte as it went in: a sweep that
     // rewrote what it kept would be a second author of the mail budget.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     const before = JSON.stringify(snapshot(store));
     expect((await sweep(store, clock.now)).collected).toBe(0);
@@ -522,9 +425,9 @@ describe('what it will not touch', () => {
     // `isPending` is the same predicate on both sides. A value it says no to
     // is one `askFor` overwrites and `redeem` refuses, so there is nothing
     // left to protect.
-    const { store, clock } = build();
-    void store.setJSON('code/deadbeef', { nonsense: true });
-    void store.setJSON('caller/deadbeef', 'not an object');
+    const { store, clock } = fakeStore(NOW);
+    store.put('code/deadbeef', { nonsense: true });
+    store.put('caller/deadbeef', 'not an object');
     expect((await sweep(store, clock.now)).collected).toBe(2);
     expect(store.held.size).toBe(0);
   });
@@ -535,7 +438,7 @@ describe('what it will not touch', () => {
 describe('when there is more store than time', () => {
   const fill = (store: Fake, count: number, prefix = 'code/') => {
     for (let i = 0; i < count; i += 1) {
-      void store.setJSON(
+      store.put(
         `${prefix}${String(i).padStart(4, '0')}`,
         prefix === 'code/'
           ? ({
@@ -552,7 +455,7 @@ describe('when there is more store than time', () => {
   };
 
   it('stops on the budget rather than being cut off by the platform', async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     fill(store, SWEEP_BATCH * 4);
     // Each read costs a twentieth of the budget, so one batch spends all of it.
     store.slow = SWEEP_BUDGET_MS / SWEEP_BATCH;
@@ -570,7 +473,7 @@ describe('when there is more store than time', () => {
   it('and says how much it did not get to, rather than looking finished', async () => {
     // A sweep that stopped halfway and a sweep with nothing left to do produce
     // the same store. The log is the only thing that tells them apart.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     fill(store, SWEEP_BATCH * 4);
     store.slow = SWEEP_BUDGET_MS / SWEEP_BATCH;
     await sweep(store, clock.now);
@@ -585,7 +488,7 @@ describe('when there is more store than time', () => {
     // platform's thirty and the run was killed with nothing logged, which is
     // the exact outcome the budget exists to prevent. Every operation is now
     // raced against the time left.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     fill(store, 1);
     store.hangs.add(codeKeys(store)[0]);
     store.slow = SWEEP_BUDGET_MS - 5;
@@ -601,7 +504,7 @@ describe('when there is more store than time', () => {
     // behind every address record, so the first store big enough to truncate
     // would have stopped collecting caller records altogether. Round-robin
     // costs nothing and makes a short run bite proportionally.
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     fill(store, SWEEP_BATCH * 4, 'code/');
     fill(store, SWEEP_BATCH * 4, 'caller/');
     store.slow = SWEEP_BUDGET_MS / SWEEP_BATCH;
@@ -615,7 +518,7 @@ describe('when there is more store than time', () => {
   });
 
   it('and finishes, saying so, when there is time', async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     fill(store, SWEEP_BATCH * 4);
     const report = await sweep(store, clock.now);
     expect(report).toEqual({
@@ -638,7 +541,7 @@ describe('when the store will not answer', () => {
   });
 
   it('gives up on a listing it cannot read, and does not claim to have finished', async () => {
-    const { store, clock } = build();
+    const { store, clock } = fakeStore(NOW);
     store.listThrows = true;
     const report = await sweep(store, clock.now);
     expect(report.finished).toBe(false);
@@ -646,8 +549,8 @@ describe('when the store will not answer', () => {
   });
 
   it('counts a record it could not read and carries on with the rest', async () => {
-    const { store, clock } = build();
-    for (const key of ['code/a', 'code/b']) void store.setJSON(key, { nonsense: true });
+    const { store, clock } = fakeStore(NOW);
+    for (const key of ['code/a', 'code/b']) store.put(key, { nonsense: true });
     store.getThrows.add('code/a');
 
     const report = await sweep(store, clock.now);
@@ -656,9 +559,9 @@ describe('when the store will not answer', () => {
   });
 
   it('and a delete that fails leaves the record for tomorrow rather than losing count', async () => {
-    const { store, clock } = build();
-    void store.setJSON('code/a', { nonsense: true });
-    store.deleteThrows.add('code/a');
+    const { store, clock } = fakeStore(NOW);
+    store.put('code/a', { nonsense: true });
+    store.deleteKeyThrows.add('code/a');
     expect(await sweep(store, clock.now)).toMatchObject({ collected: 0, failed: 1 });
     expect(store.held.has('code/a')).toBe(true);
   });

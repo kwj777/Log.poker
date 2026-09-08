@@ -47,6 +47,17 @@
  * before anything is generated or sent. A code is six digits, single use, good
  * for fifteen minutes, and dies after five wrong guesses.
  *
+ * **Every one of those was a per-round-trip bound rather than a per-day one
+ * until an audit said so.** All three counters were read, decided on and
+ * written back without a condition, which is a lost update: a dozen requests
+ * for one address arriving together read the same `sent`, pass the same cap
+ * and send a dozen mails; twenty guesses fired at once all read `attempts` at
+ * zero and all get compared. The paragraph above was a description of what the
+ * code meant rather than of what it did. Every read here is now strongly
+ * consistent and every write conditional on the record not having moved, in
+ * the shape `src/sync/endpoint.ts` already had, and nothing is mailed or
+ * compared until its own write has landed.
+ *
  * ## What is exported for the sweep, and why
  *
  * `signinSweep.ts` collects records this file has stopped reading, and the
@@ -66,10 +77,24 @@ import {
   subjectForEmail,
 } from '../sync/verify';
 
-/** What this needs from a blob store, and nothing more. */
+/**
+ * What this needs from a blob store, and nothing more.
+ *
+ * Every read is strongly consistent and every write is conditional, which is
+ * the shape `src/sync/endpoint.ts` already has and for the same reason: each
+ * of the three paths below is a read, a decision and a write, and two requests
+ * running one at once is not a hypothetical here. It is the abuse case.
+ */
 export interface CodeStore {
-  get(key: string, options: { type: 'json' }): Promise<unknown>;
-  setJSON(key: string, value: unknown): Promise<unknown>;
+  getWithMetadata(
+    key: string,
+    options: { type: 'json'; consistency: 'strong' },
+  ): Promise<{ data: unknown; etag?: string } | null>;
+  setJSON(
+    key: string,
+    value: unknown,
+    options: { onlyIfNew: true } | { onlyIfMatch: string },
+  ): Promise<{ modified: boolean; etag?: string }>;
   delete(key: string): Promise<void>;
 }
 
@@ -110,6 +135,44 @@ export const CALLER_WINDOW_MS = 60 * 60 * 1000;
 
 /** Two short strings. Anything larger is not this endpoint's request. */
 const MAX_BODY = 4 * 1024;
+
+/**
+ * How many times to lose a record to another request before giving up.
+ *
+ * The same number the sync endpoint uses, for the same reason: enough to get
+ * past an ordinary collision, few enough that an address somebody is hammering
+ * fails rather than holds a function open.
+ */
+const ROUNDS = 4;
+
+/**
+ * What makes a write conditional on the record not having moved.
+ *
+ * A key that was empty must still be empty; one that was there must still
+ * carry the same tag. Lifted wholesale from `guardFor` in the sync endpoint,
+ * including the case that matters: a read that came back with no tag cannot be
+ * written against, and passing an empty `onlyIfMatch` would be read by the
+ * client as no condition at all, turning the guard into the blind overwrite it
+ * exists to prevent. Refusing is the loud version of the same answer.
+ */
+const guardFor = (
+  stored: { etag?: string } | null,
+): { onlyIfNew: true } | { onlyIfMatch: string } | null => {
+  if (stored === null) return { onlyIfNew: true };
+  return stored.etag ? { onlyIfMatch: stored.etag } : null;
+};
+
+/**
+ * Whether a write really happened.
+ *
+ * `modified` alone is not enough, which the sync endpoint learned the harder
+ * way: the client reports `modified: true` for every status except a 412, so a
+ * 429 or a 500 after its own retries is indistinguishable from a write that
+ * landed. A write that really happened carries the new tag, and one that did
+ * not has nothing to carry.
+ */
+const landed = (written: { modified: boolean; etag?: string }): boolean =>
+  written.modified && Boolean(written.etag);
 
 /**
  * Where the two kinds of record live.
@@ -274,10 +337,20 @@ const callerOf = (request: Request): string | null =>
 /**
  * Whether this caller has asked too often, counting this ask.
  *
- * Deliberately not a read-modify-write with a compare-and-swap. Two requests
- * racing can each read the same count and one of them goes uncounted, which
- * costs one request past the limit and is not worth a retry loop in front of a
- * mailer: the number that matters is twenty an hour, not exactly twenty.
+ * This used to be a bare read-modify-write, on the argument that a lost update
+ * costs one request past the limit and the number that matters is twenty an
+ * hour rather than exactly twenty. The argument was wrong about its own
+ * arithmetic. A lost update does not cost *one*: twenty requests arriving
+ * together all read the same count, all write the same count, and all pass, so
+ * the limit is not twenty an hour but twenty per round trip. The whole point
+ * of a rate limit is the burst.
+ *
+ * So it is conditional now, like everything else here.
+ *
+ * **Losing every round refuses.** A caller generating that much contention on
+ * their own counter is the burst this exists to stop, and answering 429 to it
+ * is the conservative direction; the alternative is that hammering hard enough
+ * is the way through.
  */
 const overCallerLimit = async (
   store: CodeStore,
@@ -287,18 +360,45 @@ const overCallerLimit = async (
 ): Promise<boolean> => {
   if (caller === null) return false;
   const key = `${CALLER_PREFIX}${await hmacHex(secret, 'log.signin.caller.' + caller)}`;
-  const found = await store.get(key, { type: 'json' });
-  // Anything that is not a live record is nothing: an hour that has run out
-  // and an unreadable value both start the count again. The sweep collects on
-  // the same reading, which is what makes collecting one safe.
-  const held = isCaller(found) && found.resetAt > now ? found : null;
-  const count = (held === null ? 0 : held.count) + 1;
-  if (count > CALLER_LIMIT) return true;
-  await store.setJSON(key, {
-    count,
-    resetAt: held === null ? now + CALLER_WINDOW_MS : held.resetAt,
-  } satisfies Caller);
-  return false;
+
+  for (let round = 0; round < ROUNDS; round += 1) {
+    let stored: { data: unknown; etag?: string } | null;
+    try {
+      stored = await store.getWithMetadata(key, { type: 'json', consistency: 'strong' });
+    } catch {
+      // A store that cannot be read is not a caller who has asked too often.
+      // The per-address caps are the load-bearing ones and they refuse for
+      // themselves; failing open here rather than there is the right side.
+      console.error('signin: could not read the caller record');
+      return false;
+    }
+
+    // Anything that is not a live record is nothing: an hour that has run out
+    // and an unreadable value both start the count again. The sweep collects
+    // on the same reading, which is what makes collecting one safe.
+    const found = stored === null ? null : stored.data;
+    const held = isCaller(found) && found.resetAt > now ? found : null;
+    const count = (held === null ? 0 : held.count) + 1;
+    if (count > CALLER_LIMIT) return true;
+
+    const guard = guardFor(stored);
+    if (guard === null) return false;
+
+    try {
+      const written = await store.setJSON(
+        key,
+        { count, resetAt: held === null ? now + CALLER_WINDOW_MS : held.resetAt } satisfies Caller,
+        guard,
+      );
+      if (landed(written)) return false;
+    } catch {
+      console.error('signin: could not write the caller record');
+      return false;
+    }
+  }
+
+  console.error('signin: refusing a caller whose own counter it kept losing');
+  return true;
 };
 
 /** Where an address's record lives, which is not anywhere the address is. */
@@ -310,6 +410,25 @@ const hashOf = (secret: string, email: string, code: string): Promise<string> =>
   hmacHex(secret, `log.signin.code.${normalizeEmail(email)}.${code}`);
 
 /**
+ * What to write to undo a code that was never mailed.
+ *
+ * The rollback used to be `delete the key if there was nothing there before`,
+ * which deletes whatever is there *now*: a second request that wrote its own
+ * record in between has its live code destroyed by this one's failure, and the
+ * person reading that code off their phone is told it is wrong.
+ *
+ * So nothing is deleted. Where there was a record it goes back; where there
+ * was none, this stands in for none. It is a record every path reads as
+ * nothing to act on: expired, so `redeem` refuses it before looking at
+ * anything else, and no mail counted against it, so the next request is free
+ * to send one. It costs a window that starts a few seconds early and one small
+ * record the sweep collects tomorrow, and it is written conditionally, so a
+ * request that has since taken the key over keeps it.
+ */
+const undone = (held: Pending | null, now: number): Pending =>
+  held ?? { hash: '', issuedAt: 0, expiresAt: 0, attempts: 0, sent: 0, windowStartedAt: now };
+
+/**
  * Ask for a code.
  *
  * Answers 202 to everything it did not refuse outright, whether a mail was
@@ -317,6 +436,14 @@ const hashOf = (secret: string, email: string, code: string): Promise<string> =>
  * that is the point: the alternative is an endpoint that reports whether an
  * address has been active, which is most of what hiding the customer list was
  * for.
+ *
+ * **The count and the mail are one operation, and used to be two.** Reading
+ * `sent`, deciding, and then writing is a lost update: a dozen requests for
+ * one address arriving together all read the same count, all pass the cap, and
+ * all mail, so five a day was five per round trip and the bound this endpoint
+ * advertises did not hold. The write is conditional now and the mail goes only
+ * after it lands, so a request that lost the record to somebody else looks
+ * again rather than mailing on a count that has moved.
  */
 const askFor = async (
   request: Request,
@@ -340,64 +467,89 @@ const askFor = async (
   }
 
   const key = await pendingKey(secret, email);
-  let held: Pending | null = null;
-  try {
-    const found = await store.get(key, { type: 'json' });
-    held = isPending(found) ? found : null;
-  } catch {
-    console.error('signin: could not read the pending record');
-    return json({ error: 'unreachable' }, 503);
-  }
 
-  // A window that has rolled is the same as never having asked, so the record
-  // is overwritten and the count starts again. `signinSweep.ts` takes such a
-  // record away once its code has also expired, which is the point at which
-  // neither path here would read anything from it.
-  const current = held !== null && !windowRolled(held, now) ? held : null;
-  const sent = current === null ? 0 : current.sent;
-  const windowStartedAt = current === null ? now : current.windowStartedAt;
-
-  // Both caps answer 202 without mailing. Telling somebody which one they hit
-  // would say how much mail that address has had, which is not their business
-  // unless it is their address, and this cannot tell.
-  if (current !== null && now - current.issuedAt < COOLDOWN_MS) return json(null, 202);
-  if (sent >= DAILY_LIMIT) return json(null, 202);
-
-  const code = draw();
-  const record: Pending = {
-    hash: await hashOf(secret, email, code),
-    issuedAt: now,
-    expiresAt: now + CODE_TTL_MS,
-    attempts: 0,
-    sent: sent + 1,
-    windowStartedAt,
-  };
-
-  // Written before the mail goes, so a code that reaches somebody is always
-  // one this will accept. The other order loses the race in the direction that
-  // matters: a person reading a code that was never stored.
-  try {
-    await store.setJSON(key, record);
-  } catch {
-    console.error('signin: could not write the pending record');
-    return json({ error: 'unreachable' }, 503);
-  }
-
-  if (!(await mail(email, code))) {
-    // Put back what was there, or take away what was not. Leaving the record
-    // would spend one of the day's five and start a cooldown for a mail that
-    // was never sent, so the retry a person makes straight away would be
-    // silently ignored.
-    console.error('signin: the code was not mailed');
+  for (let round = 0; round < ROUNDS; round += 1) {
+    let stored: { data: unknown; etag?: string } | null;
     try {
-      if (held === null) await store.delete(key);
-      else await store.setJSON(key, held);
+      // Strongly, because this is a read-modify-write. The eventual read is
+      // served from a cache that can lag by up to a minute, which here would
+      // mean reading a count from before the last mail and sending another.
+      stored = await store.getWithMetadata(key, { type: 'json', consistency: 'strong' });
     } catch {
-      console.error('signin: could not undo the pending record');
+      console.error('signin: could not read the pending record');
+      return json({ error: 'unreachable' }, 503);
     }
-    return json({ error: 'unreachable' }, 503);
+
+    const found = stored === null ? null : stored.data;
+    const held = isPending(found) ? found : null;
+
+    // A window that has rolled is the same as never having asked, so the
+    // record is overwritten and the count starts again. `signinSweep.ts` takes
+    // such a record away once its code has also expired, which is the point at
+    // which neither path here would read anything from it.
+    const current = held !== null && !windowRolled(held, now) ? held : null;
+    const sent = current === null ? 0 : current.sent;
+    const windowStartedAt = current === null ? now : current.windowStartedAt;
+
+    // Both caps answer 202 without mailing. Telling somebody which one they
+    // hit would say how much mail that address has had, which is not their
+    // business unless it is their address, and this cannot tell.
+    if (current !== null && now - current.issuedAt < COOLDOWN_MS) return json(null, 202);
+    if (sent >= DAILY_LIMIT) return json(null, 202);
+
+    const code = draw();
+    const record: Pending = {
+      hash: await hashOf(secret, email, code),
+      issuedAt: now,
+      expiresAt: now + CODE_TTL_MS,
+      attempts: 0,
+      sent: sent + 1,
+      windowStartedAt,
+    };
+
+    const guard = guardFor(stored);
+    if (guard === null) {
+      console.error('signin: pending record read carried no tag to write against');
+      return json({ error: 'unreachable' }, 503);
+    }
+
+    // Written before the mail goes, so a code that reaches somebody is always
+    // one this will accept. The other order loses the race in the direction
+    // that matters: a person reading a code that was never stored.
+    let written: { modified: boolean; etag?: string };
+    try {
+      written = await store.setJSON(key, record, guard);
+    } catch {
+      console.error('signin: could not write the pending record');
+      return json({ error: 'unreachable' }, 503);
+    }
+
+    // Somebody else wrote between this read and this write. Their mail spent
+    // the budget this request was about to spend, so go around and decide
+    // again against what is there now rather than mailing on a stale count.
+    if (!landed(written)) continue;
+
+    if (!(await mail(email, code))) {
+      // Put back what was there, conditionally, so a request that has taken
+      // the key over since keeps it. Leaving this record would spend one of
+      // the day's five and start a cooldown for a mail that never went, so the
+      // retry a person makes straight away would be silently ignored.
+      console.error('signin: the code was not mailed');
+      try {
+        await store.setJSON(key, undone(held, now), { onlyIfMatch: written.etag as string });
+      } catch {
+        console.error('signin: could not undo the pending record');
+      }
+      return json({ error: 'unreachable' }, 503);
+    }
+
+    return json(null, 202);
   }
 
+  // Lost every round, which means this address is being asked for from several
+  // places at once: the burst the caps exist for. 202 without mailing, which
+  // is what every other refusal here looks like.
+  console.error('signin: gave up after losing every write race');
   return json(null, 202);
 };
 
@@ -407,6 +559,16 @@ const askFor = async (
  * Every refusal that is not a rate limit is the same 400: a code that is
  * wrong, expired, already spent, or was never issued for that address are one
  * answer, because telling them apart tells somebody which addresses have asked.
+ *
+ * **A guess is counted before it is compared**, and that ordering is the whole
+ * of what makes `MAX_ATTEMPTS` mean anything. Comparing first and incrementing
+ * after is a lost update, so twenty guesses fired together all read `attempts`
+ * at zero, all get compared, and all leave it at one: five wrong guesses
+ * became five per round trip, and a six-digit code with an unbounded number of
+ * tries is a six-digit code somebody will eventually get. Now the increment is
+ * conditional and nothing is compared until it lands, so a guess that cannot
+ * be paid for is not taken. Losing every round answers 429 rather than
+ * comparing for free.
  */
 const redeem = async (
   request: Request,
@@ -429,50 +591,79 @@ const redeem = async (
   }
 
   const key = await pendingKey(secret, email);
-  let held: Pending | null = null;
-  try {
-    const found = await store.get(key, { type: 'json' });
-    held = isPending(found) ? found : null;
-  } catch {
-    console.error('signin: could not read the pending record');
-    return json({ error: 'unreachable' }, 503);
+
+  for (let round = 0; round < ROUNDS; round += 1) {
+    let stored: { data: unknown; etag?: string } | null;
+    try {
+      stored = await store.getWithMetadata(key, { type: 'json', consistency: 'strong' });
+    } catch {
+      console.error('signin: could not read the pending record');
+      return json({ error: 'unreachable' }, 503);
+    }
+
+    const found = stored === null ? null : stored.data;
+    const held = isPending(found) ? found : null;
+    if (held === null || held.expiresAt <= now) return json({ error: 'rejected' }, 400);
+
+    if (held.attempts >= MAX_ATTEMPTS) {
+      // Dead rather than merely refused: a code that has been guessed at five
+      // times is a code somebody is working on, and leaving it alive for the
+      // rest of its fifteen minutes is leaving them to it.
+      await store.delete(key).catch(() => {});
+      return json({ error: 'throttled' }, 429);
+    }
+
+    const guard = guardFor(stored);
+    if (guard === null) {
+      console.error('signin: pending record read carried no tag to write against');
+      return json({ error: 'unreachable' }, 503);
+    }
+
+    // The guess is paid for first. Nothing below looks at the code until this
+    // has landed, so every comparison this endpoint performs is one that has
+    // been counted.
+    let counted: { modified: boolean; etag?: string };
+    try {
+      counted = await store.setJSON(key, { ...held, attempts: held.attempts + 1 }, guard);
+    } catch {
+      console.error('signin: could not count the guess');
+      return json({ error: 'unreachable' }, 503);
+    }
+    if (!landed(counted)) continue;
+
+    if (!safeEqual(held.hash, await hashOf(secret, email, code))) {
+      return json({ error: 'rejected' }, 400);
+    }
+
+    // Spent before it is answered. A delete that fails is a code that stays
+    // live for its fifteen minutes, which is worth a 503 rather than a token:
+    // the alternative hands out a credential and leaves the way to it open.
+    //
+    // Two correct redemptions racing can both get through, because the store
+    // has no conditional delete and the second one's read predates the first
+    // one's delete. Both mint the same subject from the same address, so what
+    // that costs is one duplicate token to the person who already had one.
+    try {
+      await store.delete(key);
+    } catch {
+      console.error('signin: could not spend the code');
+      return json({ error: 'unreachable' }, 503);
+    }
+
+    const token = await mintToken(secret, {
+      subject: await subjectForEmail(secret, email),
+      // Nothing here can find out whether somebody has bought, and nothing in
+      // this app asks any more. See `mintToken`.
+      tier: 'free',
+      expiresAt: now + TOKEN_TTL_MS,
+    });
+    return json({ token }, 200);
   }
 
-  if (held === null || held.expiresAt <= now) return json({ error: 'rejected' }, 400);
-  if (held.attempts >= MAX_ATTEMPTS) {
-    // Dead rather than merely refused: a code that has been guessed at five
-    // times is a code somebody is working on, and leaving it alive for the
-    // rest of its fifteen minutes is leaving them to it.
-    await store.delete(key).catch(() => {});
-    return json({ error: 'throttled' }, 429);
-  }
-
-  if (!safeEqual(held.hash, await hashOf(secret, email, code))) {
-    await store
-      .setJSON(key, { ...held, attempts: held.attempts + 1 } satisfies Pending)
-      .catch(() => {});
-    return json({ error: 'rejected' }, 400);
-  }
-
-  // Spent before it is answered, so a code that raced itself cannot be
-  // redeemed twice. A delete that fails is a code that stays live for its
-  // fifteen minutes, which is worth a 503 rather than a token: the alternative
-  // hands out a credential and leaves the way to it open.
-  try {
-    await store.delete(key);
-  } catch {
-    console.error('signin: could not spend the code');
-    return json({ error: 'unreachable' }, 503);
-  }
-
-  const token = await mintToken(secret, {
-    subject: await subjectForEmail(secret, email),
-    // Nothing here can find out whether somebody has bought, and nothing in
-    // this app asks any more. See `mintToken`.
-    tier: 'free',
-    expiresAt: now + TOKEN_TTL_MS,
-  });
-  return json({ token }, 200);
+  // Lost every round trying to count the guess. Refusing to compare is the
+  // point: a guess that cannot be counted is a free guess.
+  console.error('signin: gave up after losing every attempt race');
+  return json({ error: 'throttled' }, 429);
 };
 
 /**

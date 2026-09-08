@@ -2,13 +2,13 @@
  * Collecting what the sign-in store has stopped reading.
  *
  * `/api/signin` writes one small record per address it has ever mailed and one
- * per caller it has ever counted, and until now it wrote them forever. Neither
- * grows: a second mail to the same address overwrites the first record, so the
- * store's size is the number of addresses ever typed into the form rather than
- * the number of times they were. That is the good case. The bad one is the
- * reason this exists at all, because the form mails anybody: a script pointed
- * at the free door for a week leaves a record for every address it invented,
- * and none of them is ever coming back.
+ * per caller it has ever counted, and until this existed it wrote them
+ * forever. Neither grows: a second mail to the same address overwrites the
+ * first record, so the store's size is the number of addresses ever typed into
+ * the form rather than the number of times they were. That is the good case.
+ * The bad one is the reason this exists at all, because the form mails anybody:
+ * a script pointed at the free door for a week leaves a record for every
+ * address it invented, and none of them is ever coming back.
  *
  * ## The rule, in one sentence
  *
@@ -39,13 +39,36 @@
  * For a caller it means the hour has run out, which is the same rule with only
  * one clock in it.
  *
- * This is the tombstone lesson from `SYNC.md` in miniature, and it needs less
- * margin than that one did: there is no second party holding state that has to
- * hear about the collection, so the horizon is exactly the last moment either
- * path here would look, with nothing added for a device that has been in a
- * drawer. What it shares is the shape of the failure. Collecting too early
- * does not break anything today; it quietly loosens a bound, months later, in
- * a place nobody is watching.
+ * ## The rule is not enough on its own, and the first version thought it was
+ *
+ * Deciding correctly about a record you are not actually looking at is not
+ * deciding correctly. Two things nearly made that happen, both found by an
+ * audit of this file after it had already shipped, and both the same shape as
+ * defects `SYNC.md` records next door.
+ *
+ * **The read is strongly consistent.** Netlify Blobs reads eventually by
+ * default, from a cache that can lag by up to a minute. So a sweep firing at
+ * midnight could be handed a copy of a record from a minute earlier, judge
+ * *that* collectable, and delete the record that had replaced it in the
+ * meantime: a live code, and a mail budget reset to zero, from one stale read.
+ * `src/sync/endpoint.ts` already learned this and says so in its header; this
+ * had to learn it too.
+ *
+ * **And a record is collected only if it has not changed since the listing.**
+ * The listing hands back an etag with every key, so the read can check that
+ * what it is about to delete is what it was told about. Anything rewritten in
+ * between is left for tomorrow. This matters because the platform has no
+ * conditional delete: `Store.delete` takes a key and nothing else, so the last
+ * hop cannot be guarded and the honest thing is to shrink what reaches it. A
+ * read with no etag at all is refused for the same reason `guardFor` refuses
+ * one in the sync endpoint: an unverifiable write is the blind overwrite the
+ * check exists to avoid, wearing a check's clothes.
+ *
+ * What is left after those two is a race between this read and this delete,
+ * measured in the milliseconds of one round trip, which the platform gives no
+ * way to close. Losing it costs one person one retry of a sign-in they were
+ * already making. That is the residue, and it is named here rather than
+ * implied.
  *
  * ## Why this is a scheduled function and not part of a request
  *
@@ -64,11 +87,20 @@ import {
   windowRolled,
 } from './signinEndpoint';
 
-/** What this needs from a blob store, and nothing more. It never writes. */
+/**
+ * What this needs from a blob store, and nothing more. It never writes.
+ *
+ * The read is `getWithMetadata` rather than `get` for the etag, which is half
+ * of what makes the delete safe, and it is asked for strongly because the
+ * other half is looking at the record that is actually there. See the header.
+ */
 export interface SweepStore {
-  get(key: string, options: { type: 'json' }): Promise<unknown>;
+  getWithMetadata(
+    key: string,
+    options: { type: 'json'; consistency: 'strong' },
+  ): Promise<{ data: unknown; etag?: string } | null>;
   delete(key: string): Promise<void>;
-  list(options: { prefix: string }): Promise<{ blobs: { key: string }[] }>;
+  list(options: { prefix: string }): Promise<{ blobs: { key: string; etag: string }[] }>;
 }
 
 export interface Surroundings {
@@ -79,18 +111,22 @@ export interface Surroundings {
 /**
  * How long a run gives itself, against a platform limit of thirty seconds.
  *
- * The ten seconds left over are for the listing, which happens inside the
- * budget, and for the last batch to finish after the clock is checked. A run
- * that is cut off by the platform instead reports nothing at all, and a sweep
- * nobody can read the results of is most of the way to no sweep.
+ * The ten seconds left over are for the last operation to finish after the
+ * clock has been checked. That slack used to be a hope rather than a bound:
+ * the blobs client retries a 429 or a 5xx five times with five seconds between
+ * attempts, so one unlucky key could sleep for twenty-five seconds inside a
+ * batch nothing was watching, and the run was killed at thirty with the
+ * truncation line it exists to print still unwritten. Every operation is now
+ * raced against the time actually left, so no single record can outlive the
+ * budget and the report always gets written.
  */
 export const SWEEP_BUDGET_MS = 20 * 1000;
 
 /**
  * Records looked at together.
  *
- * Every decision needs a `get`, because a listing carries keys and etags and
- * no values, so a serial sweep is one round trip per record and gets through a
+ * Every decision needs a read, because a listing carries keys and etags and no
+ * values, so a serial sweep is one round trip per record and gets through a
  * few hundred before the budget is gone. Twenty at a time is not a tuned
  * number; it is the difference between a sweep that finishes and one that
  * never reaches the end of the store.
@@ -100,7 +136,7 @@ export const SWEEP_BATCH = 20;
 export interface SweepReport {
   /** Keys the listing returned, across both prefixes. */
   found: number;
-  /** Of those, the ones this run got to before the budget ran out. */
+  /** Of those, the ones this run reached a decision about. */
   examined: number;
   collected: number;
   /** Reads or deletes that threw. A record left behind is next run's. */
@@ -133,6 +169,26 @@ const collectable = (key: string, value: unknown, now: number): boolean => {
   return false;
 };
 
+type Verdict = 'collected' | 'kept' | 'failed' | 'expired';
+
+/**
+ * The work, or a giving-up, whichever comes first.
+ *
+ * `work` never rejects, so the only thing the timer has to beat is a request
+ * the platform is still retrying underneath us. Abandoning it does not cancel
+ * it, which is fine: nothing has been decided, so nothing is half done.
+ */
+const within = (work: Promise<Verdict>, ms: number): Promise<Verdict> => {
+  if (ms <= 0) return Promise.resolve('expired');
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    work.finally(() => clearTimeout(timer)),
+    new Promise<Verdict>((resolve) => {
+      timer = setTimeout(() => resolve('expired'), ms);
+    }),
+  ]);
+};
+
 /**
  * One pass over the store.
  *
@@ -143,13 +199,19 @@ const collectable = (key: string, value: unknown, now: number): boolean => {
  *
  * ## What truncation costs, and when it starts to matter
  *
- * The listing is in key order and a truncated run always stops at the same
- * end of it, so a store larger than one run can examine would sweep its head
- * repeatedly and never reach its tail. That is a real defect and not yet a
- * real problem: the head shrinks as it is collected, and getting there needs
- * more addresses than this app has had visitors. The fix when it arrives is a
- * stored cursor to start the next run from, which is why `finished` is
- * reported rather than inferred.
+ * A truncated run always stops at the same end of the key order, so a store
+ * larger than one run can examine would sweep its head repeatedly and never
+ * reach its tail. That is a real defect and not yet a real problem: the head
+ * shrinks as it is collected, and getting there needs more addresses than this
+ * app has had visitors. The fix when it arrives is a stored cursor to start
+ * the next run from, which is why `finished` is reported rather than inferred.
+ *
+ * **The two prefixes are interleaved rather than concatenated**, which is the
+ * one part of that not worth deferring. Listing the addresses and then the
+ * callers put every caller record behind every address record, so the first
+ * store big enough to truncate would have stopped collecting caller records
+ * entirely rather than proportionally. Round-robin costs nothing and makes
+ * truncation hit both kinds alike.
  */
 export const sweepSignIn = async ({ store: open, now }: Surroundings): Promise<SweepReport> => {
   const report: SweepReport = { found: 0, examined: 0, collected: 0, failed: 0, finished: true };
@@ -161,49 +223,69 @@ export const sweepSignIn = async ({ store: open, now }: Surroundings): Promise<S
   }
 
   const deadline = now() + SWEEP_BUDGET_MS;
-  const keys: string[] = [];
+  const listings: { key: string; etag: string }[][] = [];
   try {
     for (const prefix of [CODE_PREFIX, CALLER_PREFIX]) {
-      const listing = await store.list({ prefix });
-      for (const blob of listing.blobs) keys.push(blob.key);
+      listings.push((await store.list({ prefix })).blobs);
     }
   } catch {
     console.error('signin-sweep: could not list the store');
     report.finished = false;
     return report;
   }
+
+  const keys: { key: string; etag: string }[] = [];
+  for (let i = 0; i < Math.max(...listings.map((one) => one.length), 0); i += 1) {
+    for (const listing of listings) if (i < listing.length) keys.push(listing[i]);
+  }
   report.found = keys.length;
+
+  /** One record, from the listing's word for it to gone or left alone. */
+  const examine = async (blob: { key: string; etag: string }): Promise<Verdict> => {
+    try {
+      const held = await store.getWithMetadata(blob.key, { type: 'json', consistency: 'strong' });
+      // Gone between the listing and now. Nothing to do and nothing wrong: the
+      // other way a record leaves is being redeemed.
+      if (held === null) return 'kept';
+      // Rewritten since the listing, or a read with no etag to check. Either
+      // way this is not the record the listing described, and the delete below
+      // cannot be made conditional, so the only safe answer is tomorrow.
+      if (held.etag === undefined || held.etag !== blob.etag) return 'kept';
+      if (!collectable(blob.key, held.data, now())) return 'kept';
+      await store.delete(blob.key);
+      return 'collected';
+    } catch {
+      return 'failed';
+    }
+  };
+
+  const ranOut = () => {
+    report.finished = false;
+    console.error(
+      `signin-sweep: out of time with ${keys.length - report.examined} records unexamined`,
+    );
+  };
 
   for (let at = 0; at < keys.length; at += SWEEP_BATCH) {
     if (now() >= deadline) {
-      report.finished = false;
-      console.error(
-        `signin-sweep: out of time with ${keys.length - report.examined} records unexamined`,
-      );
+      ranOut();
       break;
     }
 
-    const batch = keys.slice(at, at + SWEEP_BATCH);
     const verdicts = await Promise.all(
-      batch.map(async (key): Promise<'collected' | 'kept' | 'failed'> => {
-        try {
-          const value = await store.get(key, { type: 'json' });
-          // Gone between the listing and now. Nothing to do and nothing wrong:
-          // the other way a record leaves is being redeemed.
-          if (value === null || value === undefined) return 'kept';
-          if (!collectable(key, value, now())) return 'kept';
-          await store.delete(key);
-          return 'collected';
-        } catch {
-          return 'failed';
-        }
-      }),
+      keys.slice(at, at + SWEEP_BATCH).map((blob) => within(examine(blob), deadline - now())),
     );
 
-    report.examined += batch.length;
     for (const verdict of verdicts) {
+      if (verdict === 'expired') continue;
+      report.examined += 1;
       if (verdict === 'collected') report.collected += 1;
       if (verdict === 'failed') report.failed += 1;
+    }
+
+    if (verdicts.includes('expired')) {
+      ranOut();
+      break;
     }
   }
 

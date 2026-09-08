@@ -37,11 +37,24 @@ import { getStore } from '@netlify/blobs';
 
 import { sweepSignIn, type SweepStore } from '../../src/auth/signinSweep';
 
+/**
+ * The store, or nothing, rather than the store or an exception.
+ *
+ * `getStore` throws when the Blobs context is not injected, so a bare call
+ * here would take out the whole run with a stack trace and leave the sweep's
+ * own "no blob store configured" line, and the empty report beside it, as
+ * unreachable code. The same guard is on the two request functions.
+ */
+const store = (): SweepStore | null => {
+  try {
+    return getStore('log-signin') as unknown as SweepStore;
+  } catch {
+    return null;
+  }
+};
+
 export default async (): Promise<void> => {
-  await sweepSignIn({
-    store: () => getStore('log-signin') as unknown as SweepStore,
-    now: Date.now,
-  });
+  await sweepSignIn({ store, now: Date.now });
 };
 
 export const config = { schedule: '@daily' };

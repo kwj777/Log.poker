@@ -699,6 +699,54 @@ inferred. And the function holds no key at all: it cannot mint, cannot verify,
 and cannot tell whose record is whose, which is the least it can be trusted with
 and therefore the right amount.
 
+### Four ways the sweep was still wrong
+
+The rule above was right and the implementation was not, which is exactly what
+happened to the tombstone collection below and is why that section is worth
+reading before writing anything that deletes. An adversarial audit ran nine
+lenses over the merged file and mutated it a line at a time against its own
+suite. All four of these were confirmed and are fixed.
+
+**It decided on a record it was not looking at.** Netlify Blobs reads eventually
+by default, from a cache that can lag by up to a minute. So a run firing at
+midnight could be handed a record as it stood at 23:59, find it collectable, and
+delete whatever had replaced it in the meantime: a live code, and a mail budget
+reset to zero, from one stale read. The sync endpoint had already learned this
+and says so in its own header; this had not. The read is now
+`getWithMetadata` with `consistency: 'strong'`.
+
+**And it deleted without checking that was still the record.** The listing hands
+back an etag with every key, which the first version dropped on the floor. A
+record is now collected only if the read's tag still matches the listing's, so
+anything rewritten in between is left for tomorrow. The platform has **no
+conditional delete**, so the last hop cannot be guarded at all; what is left is
+a race measured in one round trip, whose cost is one person retrying a sign-in
+they were already making. That residue is named in the file rather than implied.
+
+**One slow key could eat the whole run.** The clock was checked only between
+batches, and the blobs client retries a 429 or a 5xx five times with five
+seconds between attempts, so a single unlucky key could sleep for twenty-five
+seconds inside a batch nothing was watching. The run was then killed at thirty
+with the truncation line it exists to print still unwritten, which is precisely
+what the budget was there to prevent. Every operation is now raced against the
+time actually left.
+
+**And truncation fell entirely on the caller records.** Listing the addresses
+and then the callers put every caller record behind every address record, so the
+first store big enough to truncate would have stopped collecting caller records
+altogether rather than proportionally. The two prefixes are interleaved now,
+which costs nothing.
+
+Two more things came out of the same audit. `getStore` **throws** when the Blobs
+context is not injected rather than returning null, so the "no store configured"
+branch that all three functions are written to answer with was unreachable in
+production and a missing store would have been an unhandled exception; the thunk
+is wrapped in all three now, `sync.mts` included. And **four of the sweep's own
+tests were passing for the wrong reason** -- among them the pair the file called
+its proof of the whole rule, which held whether the sweep collected everything
+or nothing. Each mutation that went green now has a test written to fail on it,
+and twelve mutations were re-run against the repaired suite.
+
 ### Collecting tombstones
 
 Built, and it turned out to be the one piece where the obvious implementation is

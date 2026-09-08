@@ -1155,7 +1155,16 @@ quietly during work like this.
 - **Erasure has to exist and has to be its own control.** Untilt's sync endpoint
   already implements DELETE behind one check fewer than a write, on the argument
   that a refunded purchase does not make the history behind it less yours to
-  remove. Log inherits that argument.
+  remove. Log inherits that argument. **Built**, in `SignInCard`, and the shape
+  of it is the interesting part: **erasing signs the device out**, because
+  `eraseRemote` deletes the bucket and nothing else, and erasing it while still
+  signed in is a control that undoes itself the next time somebody logs a
+  session. It erases first and signs out second, so the worst failure available
+  is a session still there and a button that can be pressed again rather than
+  somebody signed out of a deletion that never happened. And the copy names the
+  other devices, because nothing here can reach into them: one still signed in
+  has its own copy and will upload it, and saying so is the whole of what can
+  honestly be done about it.
 
 ---
 

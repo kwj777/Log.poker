@@ -18,7 +18,17 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { SignInFailure } from '../../../auth/signin';
-import { CODE_SENT, NOTHING_LEAVES, describeSession, describeSync, messageFor } from '../copy';
+import {
+  CODE_SENT,
+  ERASE_CONFIRM,
+  ERASE_DONE,
+  ERASE_EXPLAINS,
+  ERASE_FAILED,
+  NOTHING_LEAVES,
+  describeSession,
+  describeSync,
+  messageFor,
+} from '../copy';
 
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
@@ -169,11 +179,66 @@ describe('where the card is wired up', () => {
     expect(card).not.toMatch(/clearAll|deleteSession|deleteAll/);
   });
 
-  it('tells the data layer to compose again on both sides of a session', () => {
+  it('tells the data layer to compose again on every side of a session', () => {
     // The repository was built before there was a token, so it is holding the
     // plain local one. Without this, signing in appears to work and syncs
     // nothing, which is the worst of the three possible outcomes.
+    //
+    // Three, not two: in and out, and the erase, which is also a way out.
     const card = read('src', 'features', 'account', 'SignInCard.tsx');
-    expect([...card.matchAll(/recomposeRepository\(\)/g)]).toHaveLength(2);
+    expect([...card.matchAll(/recomposeRepository\(\)/g)]).toHaveLength(3);
+  });
+});
+
+/**
+ * Erasing, which is the one control on this card that deletes anything.
+ *
+ * All of it is copy and ordering, and both are the kind that fails quietly:
+ * copy that promises more than the endpoint delivers, and an order that leaves
+ * somebody signed out of a deletion that did not happen.
+ */
+describe('erasing the copy on the server', () => {
+  const card = read('src', 'features', 'account', 'SignInCard.tsx');
+
+  it('says it signs you out, before it does', () => {
+    // The sign-out is part of what erasing is here, not a courtesy afterwards:
+    // erasing while still signed in is a control that undoes itself on the
+    // next write. Somebody should not discover that by being signed out.
+    expect(ERASE_EXPLAINS).toMatch(/signs this device out/);
+    expect(ERASE_CONFIRM).toMatch(/signs this device out/);
+  });
+
+  it('and says the log on this device is not what is being deleted', () => {
+    expect(ERASE_CONFIRM).toMatch(/untouched/);
+    expect(ERASE_DONE).toMatch(/still here/);
+  });
+
+  it('and names the other devices, because it cannot reach them', () => {
+    // A device still signed in has its own copy and will upload it again.
+    // There is no honest way to promise otherwise from this screen, and
+    // leaving it out would make the button a promise the app cannot keep.
+    expect(ERASE_CONFIRM).toMatch(/other device/);
+    expect(ERASE_CONFIRM).toMatch(/sign out there too/);
+  });
+
+  it('erases before it signs out, so a failure leaves a session to retry from', () => {
+    // The other order leaves the worst outcome available: told the data is
+    // gone, signed out, and unable to ask again without signing back in.
+    const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
+    expect(body.indexOf('eraseRemote(token)')).toBeGreaterThan(-1);
+    expect(body.indexOf('eraseRemote(token)')).toBeLessThan(body.indexOf('await signOut()'));
+  });
+
+  it('and does not sign out at all when nothing was erased', () => {
+    const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
+    const bail = body.slice(body.indexOf('if (!gone)'), body.indexOf('await signOut()'));
+    expect(bail).toContain('ERASE_FAILED');
+    expect(bail).toContain('return;');
+    expect(ERASE_FAILED).toMatch(/still signed in/);
+  });
+
+  it('asks first, rather than deleting on one tap', () => {
+    expect(card).toContain('confirmingErase');
+    expect(card).toContain("variant=\"danger\"");
   });
 });

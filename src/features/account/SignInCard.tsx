@@ -30,15 +30,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 
-import { getSession, signIn, signOut, type Session } from '../../auth';
+import { getSession, getToken, signIn, signOut, type Session } from '../../auth';
 import { getSyncingRepository, recomposeRepository, type SyncState } from '../../data';
 import { redeemCode, requestCode } from '../../auth/signin';
+import { eraseRemote } from '../../sync/client';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Text } from '../../components/Text';
 import { colors, radius, spacing } from '../../theme';
 import {
   CODE_SENT,
+  ERASE_CONFIRM,
+  ERASE_DONE,
+  ERASE_EXPLAINS,
+  ERASE_FAILED,
   NOTHING_LEAVES,
   describeSession,
   describeSync,
@@ -56,6 +61,7 @@ export const SignInCard = () => {
   const [problem, setProblem] = useState<string | null>(null);
 
   const [syncState, setSyncState] = useState<SyncState | null>(null);
+  const [confirmingErase, setConfirmingErase] = useState(false);
 
   useEffect(() => {
     // A held token is read once on mount. There is nothing to subscribe to:
@@ -134,6 +140,41 @@ export const SignInCard = () => {
     setBusy(false);
   };
 
+  /**
+   * Delete the server's copy, then sign out.
+   *
+   * **In that order, and only in that order.** Signing out first would mean a
+   * failed deletion left somebody signed out, told nothing was erased, and
+   * unable to ask again without signing back in. Erasing first means the worst
+   * outcome is a session that is still there and a button that can be pressed
+   * again, which is the failure worth having.
+   *
+   * The cost of that order is a window between the two where a write could push
+   * the log back up and rebuild the bucket. It needs a write landing inside a
+   * few hundred milliseconds of this tap, on a screen with nothing to write
+   * from, and the alternative is the broken promise above.
+   */
+  const erase = async () => {
+    setBusy(true);
+    setProblem(null);
+    const token = await getToken();
+    const gone = token === null ? false : await eraseRemote(token);
+    if (!gone) {
+      setProblem(ERASE_FAILED);
+      setConfirmingErase(false);
+      setBusy(false);
+      return;
+    }
+    await signOut();
+    recomposeRepository();
+    setSession(null);
+    setEmail('');
+    setConfirmingErase(false);
+    reset();
+    setNote(ERASE_DONE);
+    setBusy(false);
+  };
+
   if (session) {
     return (
       <Card>
@@ -156,6 +197,48 @@ export const SignInCard = () => {
           it is already here.
         </Text>
         <Button label="Sign out" variant="secondary" size="medium" onPress={() => void leave()} loading={busy} />
+
+        {confirmingErase ? (
+          <>
+            <Text variant="caption" color={colors.textSecondary} style={styles.note}>
+              {ERASE_CONFIRM}
+            </Text>
+            <View style={styles.actions}>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                size="small"
+                onPress={() => setConfirmingErase(false)}
+              />
+              <Button
+                label="Erase and sign out"
+                variant="danger"
+                size="small"
+                onPress={() => void erase()}
+                loading={busy}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <Text variant="caption" color={colors.textTertiary} style={styles.note}>
+              {ERASE_EXPLAINS}
+            </Text>
+            <Button
+              label="Erase the copy on the server"
+              variant="ghost"
+              size="small"
+              onPress={() => setConfirmingErase(true)}
+              style={styles.action}
+            />
+          </>
+        )}
+
+        {problem ? (
+          <Text variant="caption" color={colors.danger} style={styles.note}>
+            {problem}
+          </Text>
+        ) : null}
       </Card>
     );
   }

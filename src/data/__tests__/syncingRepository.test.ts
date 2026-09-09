@@ -14,7 +14,7 @@
  */
 
 import { SqlRepository } from '../sql/SqlRepository';
-import { SyncingRepository, memoryCursorStore, type CursorStore } from '../SyncingRepository';
+import { SyncingRepository, memoryCursorStore, type CursorStore, type Cursors } from '../SyncingRepository';
 import { mergeIntoBundle } from '../../sync/bundle';
 import { countChanges } from '../../sync/protocol';
 import type { Fetch } from '../../sync/client';
@@ -101,7 +101,7 @@ const device = async (fetch: Fetch, name: string, id = `device-${name}0001`) => 
   return new SyncingRepository(
     local,
     'a.b.c.d',
-    memoryCursorStore({ pulled: 0, pushed: 0, device: id }),
+    memoryCursorStore({ pulled: 0, pushed: 0, device: id, settled: 0 }),
     { fetch },
     () => now,
   );
@@ -584,7 +584,7 @@ describe('what the loop does with a bad day', () => {
     const phone = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-loaded01' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-loaded01', settled: 0 }),
       { fetch: refusing, budget: 1_200 },
       () => now,
     );
@@ -644,7 +644,7 @@ describe('what the loop does with a bad day', () => {
     const laptop = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-slow0001' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-slow0001', settled: 0 }),
       { fetch },
       () => now - SKEW,
     );
@@ -705,7 +705,7 @@ describe('what the loop does with a bad day', () => {
     const laptop = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-late00001' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-late00001', settled: 0 }),
       { fetch },
       () => now,
     );
@@ -744,7 +744,7 @@ describe('what the loop does with a bad day', () => {
     const phone = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-heavy001' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-heavy001', settled: 0 }),
       { fetch, budget: 400 },
       () => now,
     );
@@ -803,7 +803,7 @@ describe('what the loop does with a bad day', () => {
     const reader = new SyncingRepository(
       brittle,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reader001' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reader001', settled: 0 }),
       { fetch },
       () => now,
     );
@@ -1075,7 +1075,7 @@ describe('resetting a device', () => {
     const reading = new SyncingRepository(
       gated,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reading01' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reading01', settled: 0 }),
       { fetch },
       () => now,
     );
@@ -1136,7 +1136,7 @@ describe('forgetting where the conversation had got to', () => {
       ids: { next: () => `${name}-${String(++counter).padStart(3, '0')}` },
     });
     await local.init();
-    const cursors = memoryCursorStore({ pulled: 0, pushed: 0, device: id });
+    const cursors = memoryCursorStore({ pulled: 0, pushed: 0, device: id, settled: 0 });
     return {
       cursors,
       wrap: () => new SyncingRepository(local, 'a.b.c.d', cursors, { fetch }, () => now),
@@ -1220,7 +1220,7 @@ describe('forgetting where the conversation had got to', () => {
   it('keeps the device id, or the server counts one phone as two', async () => {
     // Forgetting it would make this device look new and hold up collection for
     // a whole retention window under a name nobody will use again.
-    const cursors = memoryCursorStore({ pulled: 40, pushed: 30, device: 'device-keepme001' });
+    const cursors = memoryCursorStore({ pulled: 40, pushed: 30, device: 'device-keepme001', settled: 0 });
     const { fetch } = server();
     const driver = new NodeSqliteDriver(':memory:');
     drivers.push(driver);
@@ -1232,7 +1232,80 @@ describe('forgetting where the conversation had got to', () => {
 
     await new SyncingRepository(local, 'a.b.c.d', cursors, { fetch }, () => now).forget();
 
-    expect(await cursors.read()).toEqual({ pulled: 0, pushed: 0, device: 'device-keepme001' });
+    // And carries what the server has heard across, which is the other thing
+    // that must not be forgotten here. `pushed` is thrown away because it is
+    // this account's place in a conversation; `settled` is kept because it is
+    // how far back this database is safe to collect, which is a fact about the
+    // device and not about who was signed in.
+    expect(await cursors.read()).toEqual({
+      pulled: 0,
+      pushed: 0,
+      device: 'device-keepme001',
+      settled: 30,
+    });
+  });
+
+  /** A wrapper over an empty database, which is all these two need. */
+  const forgetting = async (start: Cursors) => {
+    const cursors = memoryCursorStore(start);
+    const { fetch } = server();
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'x-001' },
+    });
+    await local.init();
+    return {
+      cursors,
+      wrapper: new SyncingRepository(local, 'a.b.c.d', cursors, { fetch }, () => now),
+    };
+  };
+
+  it('carries the high-water mark forward rather than the higher of the two', async () => {
+    // `settled` only ever moves forward. A sign-out after a sync that pushed
+    // less than a previous one -- a batch held back, so `pushed` came back
+    // lower -- must not walk the mark backwards, or a tombstone that was
+    // already safe to collect stops being collectable and stays forever.
+    const { cursors, wrapper } = await forgetting({
+      pulled: 40,
+      pushed: 10,
+      device: 'device-keepme001',
+      settled: 99,
+    });
+    await wrapper.forget();
+    expect((await cursors.read()).settled).toBe(99);
+  });
+
+  it('and a local reset keeps it, because the bucket is still there', async () => {
+    // `clearAll` comes through the same rewind. It empties this device and
+    // asks for the log back, and the server keeps everything it had, so
+    // nothing about what it has heard has changed. Zeroing the mark here would
+    // leave the gap between the reset and the next successful sync sweeping on
+    // the window, with the bucket still holding every live row.
+    const { cursors, wrapper } = await forgetting({
+      pulled: 40,
+      pushed: 30,
+      device: 'device-keepme001',
+      settled: 99,
+    });
+    await wrapper.clearAll();
+    expect((await cursors.read()).settled).toBe(99);
+  });
+
+  it('and drops it entirely when the bucket behind it is gone', async () => {
+    // The erase door. Nothing is left in the bucket to send a deleted row
+    // back, so this device is as free to collect as one that never signed in.
+    // Keeping the mark here would leave somebody who erases and stays signed
+    // out holding every tombstone they write from then on, forever.
+    const { cursors, wrapper } = await forgetting({
+      pulled: 40,
+      pushed: 30,
+      device: 'device-keepme001',
+      settled: 99,
+    });
+    await wrapper.forget({ erased: true });
+    expect((await cursors.read()).settled).toBe(0);
   });
 });
 
@@ -1320,7 +1393,7 @@ describe('the token it sends', () => {
     const wrapper = new SyncingRepository(
       local,
       async () => current,
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-renew0001' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-renew0001', settled: 0 }),
       { fetch },
       () => now,
     );
@@ -1351,7 +1424,7 @@ describe('the token it sends', () => {
     const wrapper = new SyncingRepository(
       local,
       async () => current,
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-gone00001' }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-gone00001', settled: 0 }),
       { fetch },
       () => now,
     );

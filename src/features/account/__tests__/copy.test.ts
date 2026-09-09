@@ -276,14 +276,32 @@ describe('erasing the copy on the server', () => {
     // cannot write the old numbers back afterwards.
     const card = read('src', 'features', 'account', 'SignInCard.tsx');
     const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
-    expect(body).toContain('forget()');
-    expect(body.indexOf('forget()')).toBeLessThan(body.indexOf('await signOut()'));
+    expect(body).toContain('forget(');
+    expect(body.indexOf('forget(')).toBeLessThan(body.indexOf('await signOut()'));
+  });
+
+  it('and tells it the bucket is gone, which is what a sign-out cannot say', () => {
+    // The two doors leave the server in different states, and only one of them
+    // can be swept from freely afterwards. An erase leaves nothing in the
+    // bucket, so this device is as free to collect its own tombstones as one
+    // that never signed in. A sign-out leaves the bucket sitting there, so a
+    // delete this device never managed to push is still a row the server will
+    // hand back. Saying `erased` on both would sweep away those deletes; on
+    // neither, a person who erases and stays signed out keeps every tombstone
+    // they write from then on.
+    const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
+    expect(body).toContain('forget({ erased: true })');
   });
 
   it('and signing out forgets them too, or the next person inherits them', () => {
     const card = read('src', 'features', 'account', 'SignInCard.tsx');
     const body = card.slice(card.indexOf('const leave = async'), card.indexOf('const erase = async'));
     expect(body).toContain('forget()');
+    // And does not claim the bucket is gone, because it is not. Comments only,
+    // since the slice runs up to the doc block above `erase`, which says the
+    // word for its own reasons.
+    const code = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toContain('erased');
   });
 
   it('erases before it signs out, so a failure leaves a session to retry from', () => {

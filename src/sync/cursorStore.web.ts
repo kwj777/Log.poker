@@ -50,15 +50,23 @@ export const freshCursors = (): Cursors => ({
   pulled: 0,
   pushed: 0,
   device: (invented ??= mint()),
+  settled: 0,
 });
 
 const parse = (held: string | null): Cursors => {
   const fresh = freshCursors();
   try {
-    const { pulled, pushed, device } = JSON.parse(held ?? '') as Partial<Cursors>;
+    const { pulled, pushed, device, settled } = JSON.parse(held ?? '') as Partial<Cursors>;
     return {
       pulled: typeof pulled === 'number' && pulled > 0 ? pulled : 0,
       pushed: typeof pushed === 'number' && pushed > 0 ? pushed : 0,
+      // Zero when it is missing or nonsense, which reads as "the server has
+      // heard nothing from here". That is the answer that sweeps on the window
+      // alone, and it is the right way to be wrong: a record written before
+      // this field existed was either pushed, in which case the server holds
+      // the delete too, or never sent, in which case there is no bucket
+      // waiting to send it back.
+      settled: typeof settled === 'number' && settled > 0 ? settled : 0,
       // A stored id survives whatever else was wrong with the record. Minting
       // a new one makes this device look new to the server, which holds
       // collection up for a whole window under a name nobody will use again.

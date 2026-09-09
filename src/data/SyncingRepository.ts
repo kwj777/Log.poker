@@ -71,6 +71,23 @@ export interface Cursors {
    * already obvious from them carrying the same token.
    */
   device: string;
+  /**
+   * The newest local moment before which the server has heard everything.
+   *
+   * `pushed` says that while a session lasts, and signing out throws it away
+   * on purpose: the next person on this device must not inherit a place in
+   * somebody else's conversation. This is what is kept instead, and it is a
+   * different kind of fact. Not where this device had got to, which is
+   * account-shaped and dangerous to hand on, but how far back it is safe to
+   * collect a tombstone, which is a property of the local database that every
+   * account on this device shares anyway.
+   *
+   * Zero means the server has never heard anything from here, which is both
+   * the state of a device that has never synced and the state of one whose
+   * bucket has just been erased. Both are free to collect on the window alone,
+   * because there is nothing anywhere to send a deleted row back.
+   */
+  settled: Timestamp;
 }
 
 /** Where the cursors live. Small enough that anything durable will do. */
@@ -80,7 +97,7 @@ export interface CursorStore {
 }
 
 export const memoryCursorStore = (
-  start: Cursors = { pulled: 0, pushed: 0, device: 'test-device-0001' },
+  start: Cursors = { pulled: 0, pushed: 0, device: 'test-device-0001', settled: 0 },
 ): CursorStore => {
   let held = start;
   return {
@@ -585,10 +602,19 @@ export class SyncingRepository implements Repository {
    * The id survives, because forgetting it would make this device look like a
    * new one to the server and hold up collection for a whole retention window
    * under a name nobody will ever use again.
+   *
+   * So does `settled`, for the opposite reason: it is not part of the
+   * conversation at all. `clearAll` comes through here too, and an emptied
+   * local database has no tombstones to be wrong about.
    */
-  private async rewind(): Promise<void> {
-    const { device } = await this.cursors.read();
-    await this.cursors.write({ pulled: 0, pushed: 0, device });
+  private async rewind(settled?: Timestamp): Promise<void> {
+    const held = await this.cursors.read();
+    await this.cursors.write({
+      pulled: 0,
+      pushed: 0,
+      device: held.device,
+      settled: settled ?? held.settled,
+    });
   }
 
   /**
@@ -619,11 +645,17 @@ export class SyncingRepository implements Repository {
    * this cannot land afterwards and restore the numbers it was carrying.
    * `halted` is the other half: nothing new starts either.
    */
-  async forget(): Promise<void> {
+  async forget({ erased = false }: { erased?: boolean } = {}): Promise<void> {
     this.epoch += 1;
     this.halted = true;
     this.dirty = false;
-    await this.rewind();
+    const { pushed, settled } = await this.cursors.read();
+    // What the server has heard outlives the conversation about it, unless the
+    // bucket itself is gone. After an erase there is nothing left anywhere to
+    // send a deleted row back, so this device is as free to collect as one that
+    // never signed in -- and has to be, or a person who erases and stays signed
+    // out keeps every tombstone they write from then on.
+    await this.rewind(erased ? 0 : Math.max(settled, pushed));
   }
 
   /**

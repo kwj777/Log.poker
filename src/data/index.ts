@@ -17,7 +17,7 @@ import { getSession, getToken, renewIfDue } from '../auth';
 import { cursorStore } from '../sync/cursorStore';
 import { SyncingRepository } from './SyncingRepository';
 import { createRepository, STORAGE_ENGINE } from './repositoryFactory';
-import { TOMBSTONE_RETENTION_MS, type Repository } from './repository';
+import { safeToCollect, type Repository } from './repository';
 
 let pending: Promise<Repository> | null = null;
 
@@ -71,8 +71,24 @@ const compose = async (): Promise<Repository> => {
       // alone. Without it, an app that never signs in keeps every tombstone
       // forever and grows where it used to shrink. Failing is not worth a
       // launch.
-      void local
-        .collectTombstones(Date.now() - TOMBSTONE_RETENTION_MS)
+      //
+      // **On the window alone only if the server is holding nothing of ours.**
+      // This branch is two devices, not one. A device that has never signed in
+      // is safe to sweep on the window, because nothing anywhere can send a
+      // deleted row back to it. A device that has signed out is not: it may be
+      // holding deletes it never managed to push while the bucket still has
+      // the live rows, and that is the same hazard the tokenless branch below
+      // refuses to sweep for. Signing out landed here and swept anyway.
+      //
+      // What separates them is `settled`, the newest moment before which the
+      // server has heard everything this device wrote. Zero on a device that
+      // never synced and on one whose bucket has been erased, which is what
+      // makes both of those the ordinary case.
+      void cursorStore
+        .read()
+        .then(({ settled }) =>
+          local.collectTombstones(safeToCollect(settled, Date.now())),
+        )
         .catch(() => undefined);
       return local;
     }

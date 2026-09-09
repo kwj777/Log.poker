@@ -20,6 +20,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { TOMBSTONE_RETENTION_MS, safeToCollect } from '../repository';
+
 const source = readFileSync(join(__dirname, '..', 'index.ts'), 'utf8');
 
 /** Where a call is, so the branches can be compared rather than the imports. */
@@ -29,12 +31,64 @@ const at = (needle: string): number => {
   return index;
 };
 
+describe('how far back a device with no session may collect', () => {
+  const NOW = 1_700_000_000_000;
+  const WINDOW = NOW - TOMBSTONE_RETENTION_MS;
+
+  it('is the window, for a device the server has never heard from', () => {
+    // The ordinary free app, and the reason the sweep exists at all: without
+    // it a device that never signs in keeps every tombstone forever and the
+    // database grows where it used to shrink. Nothing anywhere holds a live
+    // row to send back, so there is nothing to be careful about.
+    expect(safeToCollect(0, NOW)).toBe(WINDOW);
+  });
+
+  it('and no further back than the last thing the server heard', () => {
+    // The case that made this a function. A device that synced, then deleted
+    // something it never managed to push, then signed out, was sweeping on the
+    // window like any other device with no session -- and the bucket still had
+    // the live row. Ninety days later the tombstone went, and the next sign-in
+    // pulled the row straight back onto every device.
+    const settled = WINDOW - 60_000;
+    expect(safeToCollect(settled, NOW)).toBe(settled);
+  });
+
+  it('but still the window when the server is further ahead than it is', () => {
+    // A device syncing normally is settled to a few moments ago, which is far
+    // past the window. Taking the smaller of the two is what keeps this from
+    // sweeping ninety days of tombstones off a device that is up to date.
+    expect(safeToCollect(NOW - 1_000, NOW)).toBe(WINDOW);
+  });
+
+  it('and zero is the answer at any distance, not just at this one', () => {
+    // Zero is the value `forget({ erased: true })` writes and the value a
+    // device that never synced has. It has to read as "no floor" rather than
+    // as a floor of zero, or the min would clamp every sweep to the beginning
+    // of time and nothing would ever be collected again.
+    for (const now of [NOW, NOW + TOMBSTONE_RETENTION_MS, TOMBSTONE_RETENTION_MS + 1]) {
+      expect(safeToCollect(0, now)).toBe(now - TOMBSTONE_RETENTION_MS);
+    }
+  });
+});
+
 describe('composing the repository', () => {
-  it('sweeps on the window only for a session that does not sync', () => {
+  it('sweeps only for a session that does not sync', () => {
     const branch = at('if (session === null || !session.syncs)');
-    const sweep = at('collectTombstones(Date.now() - TOMBSTONE_RETENTION_MS)');
+    const sweep = at('local.collectTombstones(safeToCollect(');
     expect(branch).toBeLessThan(sweep);
     expect(sweep).toBeLessThan(at('await getToken()'));
+  });
+
+  it('and not on the window alone, because that branch is two devices', () => {
+    // It swept at `now - TOMBSTONE_RETENTION_MS` for anything with no session,
+    // which is right for a device that has never signed in and wrong for one
+    // that has signed out. A signed-out device can be holding deletes it never
+    // managed to push while the bucket still has the live rows -- the same
+    // hazard the tokenless branch below refuses to sweep for, reached by the
+    // other door. `safeToCollect` is what tells the two apart.
+    const branch = source.slice(at('if (session === null || !session.syncs)'), at('await getToken()'));
+    expect(branch).not.toContain('collectTombstones(Date.now() - TOMBSTONE_RETENTION_MS)');
+    expect(branch).toContain('cursorStore');
   });
 
   it('does not sweep when the token is the thing that is missing', () => {

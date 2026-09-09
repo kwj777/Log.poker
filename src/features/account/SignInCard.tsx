@@ -174,7 +174,12 @@ export const SignInCard = () => {
     // The bucket is gone; now so is this device's memory of having filled it.
     // `pushed` said the whole log had been sent, so signing in again pushed
     // nothing and the emptied bucket stayed empty for good.
-    await (await getSyncingRepository())?.forget();
+    //
+    // `erased`, because this is the one of the two doors where the server is
+    // left holding nothing. A sign-out leaves the bucket there and this device
+    // has to keep collecting carefully; an erase leaves it as free as a device
+    // that never signed in. See `forget`.
+    await (await getSyncingRepository())?.forget({ erased: true });
     await signOut();
     recomposeRepository();
     setSession(null);

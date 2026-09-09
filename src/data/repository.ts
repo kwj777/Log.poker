@@ -224,6 +224,30 @@ export interface Repository {
 export const TOMBSTONE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 /**
+ * How far back a signed-out device may collect its own tombstones.
+ *
+ * The window is the answer whenever the server is holding nothing this device
+ * wrote: there is no bucket anywhere to send a deleted row back, so a
+ * tombstone past the window has no job left to do.
+ *
+ * Otherwise the window, or the moment the server last heard everything,
+ * whichever is further back. A tombstone older than `settled` was pushed, by
+ * definition, so the server holds the delete too and dropping the local copy
+ * loses nothing. One newer than it may never have been sent, and sweeping that
+ * one does not lose the delete quietly: it loses it loudly, on the next sync,
+ * when the row comes back down onto every device this person owns.
+ *
+ * The cost is tombstones kept past the window on a device that signed out and
+ * never came back. They are a few hundred bytes each, and a session a week for
+ * five years is under a hundred kilobytes, against a resurrected session on
+ * every device for the other choice.
+ */
+export const safeToCollect = (settled: Timestamp, now: Timestamp): Timestamp => {
+  const window = now - TOMBSTONE_RETENTION_MS;
+  return settled > 0 ? Math.min(window, settled) : window;
+};
+
+/**
  * How long a device is remembered as one that might still be waiting.
  *
  * Twice the retention window, and it has to be longer than it or the rule it

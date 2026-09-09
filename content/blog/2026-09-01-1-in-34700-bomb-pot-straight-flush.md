@@ -85,6 +85,6 @@ The hands worth telling are always the ones you are too wired to record, and the
 
 That is the entire reason Log exists. A session in under ten seconds, a hand in fifteen, and then it is there in a year when you want to know what actually happened, or whether the last three months were bad luck or bad play, which is the same question in a different mood.
 
-[It is free, it works with no signal, and it never sends your log anywhere](/app), which matters in a card room where the only reliable thing about the wifi is that there is none.
+[It is free, all of it, and it works with no signal at all](/app), which matters in a card room where the only reliable thing about the wifi is that there is none.
 
 Log the hand. Even this one. *Especially* this one.

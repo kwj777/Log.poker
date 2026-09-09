@@ -8,7 +8,7 @@
  * root caches nothing and loses offline without erroring. Neither shows up in a
  * type check or a render, so they are asserted here.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { BOTTOM_BAR_ID, FAMILY_LINKS, FAMILY_HOME, GUIDES } from '../../config';
@@ -21,6 +21,22 @@ const home = read('public', 'home.html');
 const worker = read('public', 'sw.js');
 const manifest = JSON.parse(read('public', 'manifest.webmanifest'));
 const buildScript = read('scripts', 'build-web.mjs');
+
+/**
+ * Ways of promising that nothing is sent anywhere, which sync made false.
+ *
+ * Named as a list because the first sweep was written as three literal
+ * sentences, and the claim had been made in more than three: a post saying
+ * "it never sends your log anywhere" was making it in words no pattern was
+ * looking for. What the sweep has to match is the promise, not its wording.
+ */
+const BROKEN_PROMISES = [
+  /never leaves your device/i,
+  /no server to send anything to/i,
+  /keeps everything on your device/i,
+  /never sends? (?:your log |anything |it )?anywhere/i,
+  /no account, no server,? and no network call/i,
+];
 
 /** Where a `from = "..."` rule sits in netlify.toml, or -1. */
 const ruleAt = (from: string): number => netlify.indexOf(`from = "${from}"`);
@@ -88,16 +104,22 @@ describe('the front door', () => {
     for (const page of ['home.html', 'chip.html', 'running-bad.html', '404.html']) {
       const path = join(ROOT, 'public', page);
       if (!existsSync(path)) continue;
-      const text = readFileSync(path, 'utf8');
-      expect(text).not.toMatch(/never leaves your device/i);
-      expect(text).not.toMatch(/no server to send anything to/i);
-      expect(text).not.toMatch(/keeps everything on your device/i);
+      for (const promise of BROKEN_PROMISES) expect(readFileSync(path, 'utf8')).not.toMatch(promise);
     }
     // And the two generators that stamp it onto everything else.
     for (const script of ['build-blog.mjs', 'build-content.mjs']) {
       const text = readFileSync(join(ROOT, 'scripts', script), 'utf8');
       expect(text).not.toMatch(/never leaves your device/i);
       expect(text).not.toMatch(/keeps everything on your device/i);
+    }
+    // And the posts, which the sweep missed twice over. They were not on the
+    // list, and they had phrased the promise in words the list did not hold:
+    // "it never sends your log anywhere" says the same thing as "no server to
+    // send anything to" and matched none of the patterns looking for it. A
+    // sweep anchored to three sentences finds three sentences.
+    for (const post of readdirSync(join(ROOT, 'content', 'blog')).filter((name) => name.endsWith('.md'))) {
+      const text = readFileSync(join(ROOT, 'content', 'blog', post), 'utf8');
+      for (const promise of BROKEN_PROMISES) expect(text).not.toMatch(promise);
     }
     // And the README, which had it too and was missed by the first sweep,
     // because the first sweep looked at the places a visitor lands rather than

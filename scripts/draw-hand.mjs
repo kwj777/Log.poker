@@ -22,8 +22,13 @@
  * the hand on a share card is drawn by the same code as the hand in the post.
  *
  * A card is `<rank><suit>`: `As`, `Td`, `2c`. A trailing `!` gives it the gold
- * edge that marks it as part of the hand being told. `?` as the rank is a card
- * whose rank is genuinely not remembered, and `??` is one nobody ever saw.
+ * edge that marks it as part of the hand being told.
+ *
+ * Either half can be `?`, because a hand somebody is telling you months later
+ * is remembered in pieces. `?s` is a spade whose rank is gone, `7?` is the
+ * seven that paired and never mind which one, and `??` is a card nobody ever
+ * saw. All three are drawn dashed, so what a post is sure of is visible at a
+ * glance rather than asserted in the caption.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -51,6 +56,8 @@ const DIM = '#828e89';
 const MUTED = '#b7c0ba';
 const RED = '#b7343f';
 const BLACK = '#242b28';
+/** A rank or a suit nobody wrote down, in an ink that is neither red nor black. */
+const UNSURE = '#8f8a80';
 
 /** The family's ink, for anything else drawing on the same table. */
 export const PALETTE = { CREAM, RIM, GOLD, FOREST, DIM, MUTED, RED, BLACK, GROUND: '#1c211f' };
@@ -90,22 +97,32 @@ const back = (x, y) => `  <g>
     </g>
   </g>`;
 
+/** What a card is called, including the half of it that may be missing. */
+const describe = (rank, suit) => {
+  const named = SPOKEN[rank] ?? rank;
+  if (rank === '?' && suit === '?') return 'A card nobody saw';
+  if (rank === '?') return `A ${NAMES[suit].slice(0, -1)}, and I could not tell you which`;
+  if (suit === '?') return `The ${named}, and I could not tell you the suit`;
+  return `${named} of ${NAMES[suit]}`;
+};
+
 /** One card face, at the size every hand on this site is drawn at. */
 export const card = (x, y, spec) => {
   if (spec.startsWith('??')) return back(x, y);
 
   const played = spec.endsWith('!');
-  const [rank, suit] = (played ? spec.slice(0, -1) : spec).split(/(?=[dhsc]$)/);
-  const color = suit === 'd' || suit === 'h' ? RED : BLACK;
-  const unknown = rank === '?';
+  const [rank, suit] = (played ? spec.slice(0, -1) : spec).split(/(?=[dhsc?]$)/);
+  const anySuit = suit === '?';
+  const color = anySuit ? UNSURE : suit === 'd' || suit === 'h' ? RED : BLACK;
+  const unknown = rank === '?' || anySuit;
   return `  <g>
-    <title>${unknown ? `A ${NAMES[suit].slice(0, -1)}, and I could not tell you which` : `${SPOKEN[rank] ?? rank} of ${NAMES[suit]}`}</title>
+    <title>${describe(rank, suit)}</title>
     <rect x="${x}" y="${y}" width="${CARD.w}" height="${CARD.h}" rx="${CARD.r}"
       fill="${CREAM}" stroke="${played ? GOLD : RIM}" stroke-width="${played ? 2 : 1}"${unknown ? ' stroke-dasharray="4 3"' : ''} />
     <text x="${x + 7}" y="${y + 22}" font-family="${SERIF}" font-size="19"
-      fill="${unknown ? '#8f8a80' : color}">${rank}</text>
-    <text x="${x + CARD.w / 2}" y="${y + 58}" font-family="${PIP_FONT}" font-size="27"
-      text-anchor="middle" fill="${color}">${SUITS[suit]}</text>
+      fill="${rank === '?' ? UNSURE : color}">${rank}</text>
+    <text x="${x + CARD.w / 2}" y="${y + 58}" font-family="${anySuit ? SERIF : PIP_FONT}" font-size="27"
+      text-anchor="middle" fill="${color}">${anySuit ? '?' : SUITS[suit]}</text>
   </g>`;
 };
 
@@ -199,6 +216,30 @@ export const FIGURES = {
         cards: ['Jh', '3s!', '5c!', '6h!', '??'],
         streets: true,
         outcomes: [['ME', 'Straight, six high', 'gold'], ['HIM', 'Jacks and sixes', 'muted']],
+      },
+    ],
+  },
+
+  /** The limp: two cards I am sure of, and a board I am not. */
+  'limped-two-pair': {
+    title: 'The hand a two-dollar limp bought',
+    desc: `My hand: the seven and eight of spades. The flop paired both of them and gave
+    me two pair, eights and sevens. Its third card, the turn and the river are drawn face
+    down, because I never wrote them down and cannot tell you what they were. Somebody
+    made a bigger two pair by the river. Gold-edged cards are the ones that made my hand,
+    and a dashed card is one I am not sure of.`,
+    rows: [
+      { type: 'hands', groups: [{ label: 'MY HAND', cards: ['7s!', '8s!'] }] },
+      { type: 'note', text: 'LIMPED FOR $2 ON THE BUTTON' },
+      {
+        label: 'THE FLOP',
+        cards: ['7?!', '8?!', '??'],
+        outcomes: [['ME', 'Two pair, eights and sevens', 'gold']],
+      },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['??', '??'],
+        outcomes: [['HIM', 'A bigger two pair', 'muted']],
       },
     ],
   },

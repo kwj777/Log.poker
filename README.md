@@ -246,10 +246,14 @@ The line under the number, which is also optional.
 
 A figure inlines `content/blog/figures/<name>.svg` into the page, so an
 illustration costs no request either. Hand diagrams are drawn by
-`scripts/draw-hand.mjs` from a short spec (`2d!` is the two of diamonds with
-the gold edge that marks a card as part of the hand, `?s` is a spade whose rank
-nobody remembers, `??` is face down), so every hand on the blog is drawn the
-same way. The SVG is the artefact and is committed with the post; run
+`scripts/draw-hand.mjs` from a short spec: `2d!` is the two of diamonds with
+the gold edge that marks a card as part of the hand, and either half of a card
+can be `?`, because a hand somebody tells you months later is remembered in
+pieces. `?s` is a spade whose rank is gone, `7?` is the seven that paired and
+never mind which one, `??` is a card nobody ever saw. All three draw dashed, so
+what a post is sure of is visible rather than asserted in the caption, and every
+hand on the blog is drawn the same way. The SVG is the artifact and is committed
+with the post; run
 `node scripts/draw-hand.mjs` after changing a spec, which a test then checks. Everything outside the subset throws at
 build time rather than reaching a live page, and raw HTML in a post is escaped
 rather than passed through, so a stray `<` in prose can never eat a paragraph.
@@ -781,49 +785,49 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 41 passed
-Tests:       1202 passed
+Tests:       1241 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
   bundle             63   what ships to each platform, against the real output
   content            55   every figure in the guides, re-derived and read back
+  signinEndpoint     55   the free door, and every bound on it
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   site               48   the marketing/app split, the PWA, the sitemap
   stats              45   P/L, rebuys, duration, win rate, groupings
-  signinEndpoint     44   the free door, and every bound on it
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
   verify             35   checking a token, and every way past it that must not work
   mood               32   what tilt costs, and when to say nothing
+  syncingRepository  32   two devices and one server, no fakes in between
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
-  syncingRepository  29   two devices and one server, no fakes in between
   blog               28   the post grammar, the share cards, and what it refuses
+  copy               28   what the sign-in and the sync are allowed to say
   palette            27   the theme matches BRAND.md
   endpoint           25   the sync endpoint, end to end
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
-  copy               20   what the sign-in and the sync are allowed to say
+  token              21   the family token grammar, against signed fixtures
   glossary           20   the shorthand on screen still matches its explanation
+  session            20   holding a token, and stores that fail as real ones do
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   money              18   cents arithmetic, parsing, formatting
   seed               17   the demo dataset stays coherent
-  token              17   the family token grammar, against signed fixtures
   handNotation       16   parse, round-trip, hand classes
+  signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
   gateCheck          13   the key-on-the-site script, run rather than read
-  session            13   holding a token, and stores that fail as real ones do
-  signin             12   the sign-in client, against a fake fetch
   handOffs           11   where a hand-off goes, and what the mid-session card says
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
   tokenStore.web      8   the browser token store
   columns             7   header matching
+  compose             7   which repository a device gets, and the unsafe sweep
   readme              6   the test table adds up and says what each suite is for
-  compose             5   which repository a device gets, and the unsafe sweep
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

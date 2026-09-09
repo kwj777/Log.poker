@@ -21,7 +21,14 @@
  * this family mints and then refuses.
  */
 
-import { readClaim, SUBJECT_PASSCODE, type Claim, type Tier } from '../auth/token';
+import {
+  OWN_SUBJECT,
+  readClaim,
+  SUBJECT_PASSCODE,
+  SUBJECT_PREFIX,
+  type Claim,
+  type Tier,
+} from '../auth/token';
 import type { Timestamp } from '../domain/types';
 
 /** Length-independent, so a wrong guess leaks no timing signal. */
@@ -144,6 +151,23 @@ export const verifyToken = async (
  * and this refuses it here, explicitly, rather than by never happening to meet
  * one.
  *
+ * **And a subject of one's own means one this app's own door minted**, which
+ * is `OWN_SUBJECT`: the prefix and thirty-two lowercase hex characters that
+ * `subjectForEmail` produces and nothing else in the family does. The rule
+ * used to be the passcode line alone, which took anything Untilt signed, and
+ * see `OWN_SUBJECT` for what that cost. One predicate at one call site, so
+ * reading, writing and erasing tighten together and there is no method that is
+ * the exception.
+ *
+ * Nothing is exempted, and erasing was the tempting one: refusing it leaves a
+ * bucket somebody can no longer read or delete. It is exempted anyway, because
+ * the exemption would be dead the moment it was needed. A foreign token cannot
+ * be renewed here, so it expires; `SessionManager.current` clears an expired
+ * token, which destroys the only string in the world naming that subject; and
+ * the erase control lives inside the signed-in branch of the card. So the
+ * exemption is reachable only by somebody who is not yet stranded and has no
+ * reason to use it, and unreachable by everybody it was written for.
+ *
  * **This is the whole of who may sync.** There used to be a second question
  * below it, asking whether the tier had paid, and it is gone: cross-device
  * history is free, so a verified token with a subject of its own is the entire
@@ -151,7 +175,7 @@ export const verifyToken = async (
  * `claim.tier`.
  */
 export const hasOwnBucket = (claim: Claim | null): claim is Claim =>
-  claim !== null && claim.subject !== SUBJECT_PASSCODE;
+  claim !== null && claim.subject !== SUBJECT_PASSCODE && OWN_SUBJECT.test(claim.subject);
 
 /**
  * Which bucket this person's log lives in.
@@ -192,7 +216,7 @@ export const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
  * and checkably: a subject is the name of a bucket, so two schemes that could
  * ever collide are two people who could ever share a poker history.
  */
-export const SUBJECT_PREFIX = 'log_';
+export { SUBJECT_PREFIX } from '../auth/token';
 
 /**
  * One spelling of an address, so one person has one log.
@@ -219,6 +243,25 @@ export const normalizeEmail = (email: string): string => email.trim().toLowerCas
  */
 export const subjectForEmail = async (secret: string, email: string): Promise<string> =>
   SUBJECT_PREFIX + (await hmacHex(secret, 'log.subject.' + normalizeEmail(email))).slice(0, 32);
+
+/**
+ * The subject a gate check names, which is nobody.
+ *
+ * `scripts/check-gate.mjs` mints itself a token to see whether the endpoint
+ * takes it, so it writes a real bucket and erases it again on the way out. It
+ * used to name the subject `gatecheck`, which the gate refuses now that a
+ * subject has to be one this door minted, so the check would have started
+ * reporting a broken key on a working one.
+ *
+ * Derived the same way and from a different preimage, so it satisfies the
+ * shape without being reachable from any address: `subjectForEmail` HMACs
+ * `'log.subject.' + address` and this HMACs `'log.gatecheck'`, and no address
+ * makes the first equal the second. That is the same domain-separation
+ * argument the bucket names already rest on, and it means the gate keeps zero
+ * named exceptions where it would otherwise need one.
+ */
+export const subjectForGateCheck = async (secret: string): Promise<string> =>
+  SUBJECT_PREFIX + (await hmacHex(secret, 'log.gatecheck')).slice(0, 32);
 
 /**
  * A signed token, in the grammar Untilt defined.

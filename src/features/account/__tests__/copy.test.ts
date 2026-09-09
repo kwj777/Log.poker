@@ -59,6 +59,51 @@ describe('what it says after asking for a code', () => {
   });
 });
 
+describe('and what nothing on this screen is allowed to say', () => {
+  /**
+   * The rule above, applied to the screen rather than to one constant.
+   *
+   * It was written against `CODE_SENT` because that is where the price had
+   * been. It survived somewhere the check could not see and nor could anybody
+   * else: the email field's `accessibilityLabel` read "the email address you
+   * paid with", so the only person told that Log had been bought was somebody
+   * using a screen reader. A label is not in `copy.ts`, is not on screen to be
+   * read back during review, and is exactly the kind of string a rule scoped
+   * to one file leaves behind.
+   *
+   * The account feature is the scope, and deliberately not the whole app. Log
+   * is a poker app: "buy-in", "entry cost" and "fees paid" are the vocabulary
+   * of the thing it records, and a word list swept across every screen would
+   * match those on every run until somebody turned it off. Nothing on this
+   * surface has a reason to use them, which is what makes the rule meaningful
+   * exactly here.
+   */
+  const BOUGHT = /\b(purchase|purchased|bought|buy|paid|pay|subscription|subscriber|price|pricing|refund|billed|billing)\b/i;
+
+  /** Comments discuss the price rule at length; only what ships is bound. */
+  const shipped = (source: string): string =>
+    source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  const files = ['copy.ts', 'SignInCard.tsx'];
+
+  it.each(files)('%s says nothing about having bought Log', (file) => {
+    const source = shipped(read('src', 'features', 'account', file));
+
+    const said = [
+      // Every string literal, which covers labels, hints and placeholders --
+      // the ones a reviewer looking at the rendered card never sees.
+      ...[...source.matchAll(/(['"`])((?:\\.|(?!\1)[^\\])*?)\1/g)].map((match) => match[2]),
+      // And text sitting directly in the markup.
+      ...[...source.matchAll(/>([^<>{}]{4,})</g)].map((match) => match[1]),
+    ];
+
+    // The sweep has to be finding something, or a change to how these files
+    // are written turns it into a test that passes by reading nothing.
+    expect(said.length).toBeGreaterThan(10);
+    expect(said.filter((line) => BOUGHT.test(line))).toEqual([]);
+  });
+});
+
 describe('what it says when something fails', () => {
   it('has one sentence for every failure the client can return', () => {
     for (const failure of FAILURES) {
@@ -101,16 +146,28 @@ describe('what it says once somebody is signed in', () => {
     expect(said).not.toMatch(/\$\s*\d/);
   });
 
-  it('tells the one session that cannot sync why, without inventing a price', () => {
-    // The false branch used to mean "has not bought" and now means "typed a
-    // shared passcode". Copy that still pointed at the other two apps would be
-    // selling something that is not for sale, to somebody whose problem is
-    // that their subject is not theirs.
+  it('tells a session that cannot sync what to do, without inventing a price', () => {
+    // The false branch used to mean "has not bought". Copy that still pointed
+    // at the other two apps would be selling something that is not for sale,
+    // to somebody whose problem is that their subject is not theirs.
     const said = describeSession(false);
-    expect(said).toMatch(/passcode/i);
     expect(said).toMatch(/address of your own/i);
     expect(said).not.toMatch(/\$\s*\d/);
     expect(said).not.toMatch(/buy|purchase|pay|upgrade|other two/i);
+  });
+
+  it('and does not name a cause, because there are two and it cannot tell', () => {
+    // A shared passcode is one. The other arrives once the family shares a
+    // token store: a sign-in made at one of the other apps, naming a subject
+    // this one will not sync with, on a device that never visited this door.
+    // `describeSession` is handed a boolean and could not tell them apart if
+    // it wanted to, so naming either one is a coin flip that reads as a
+    // statement of fact. It used to name the passcode, which was right while
+    // that was the only way in.
+    const said = describeSession(false);
+    expect(said).not.toMatch(/passcode/i);
+    // And still says the one thing both have in common, which is what to do.
+    expect(said).toMatch(/signing in/i);
   });
 
   it('promises nothing leaves the device either way', () => {
@@ -231,14 +288,32 @@ describe('erasing the copy on the server', () => {
     // cannot write the old numbers back afterwards.
     const card = read('src', 'features', 'account', 'SignInCard.tsx');
     const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
-    expect(body).toContain('forget()');
-    expect(body.indexOf('forget()')).toBeLessThan(body.indexOf('await signOut()'));
+    expect(body).toContain('forget(');
+    expect(body.indexOf('forget(')).toBeLessThan(body.indexOf('await signOut()'));
+  });
+
+  it('and tells it the bucket is gone, which is what a sign-out cannot say', () => {
+    // The two doors leave the server in different states, and only one of them
+    // can be swept from freely afterwards. An erase leaves nothing in the
+    // bucket, so this device is as free to collect its own tombstones as one
+    // that never signed in. A sign-out leaves the bucket sitting there, so a
+    // delete this device never managed to push is still a row the server will
+    // hand back. Saying `erased` on both would sweep away those deletes; on
+    // neither, a person who erases and stays signed out keeps every tombstone
+    // they write from then on.
+    const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
+    expect(body).toContain('forget({ erased: true })');
   });
 
   it('and signing out forgets them too, or the next person inherits them', () => {
     const card = read('src', 'features', 'account', 'SignInCard.tsx');
     const body = card.slice(card.indexOf('const leave = async'), card.indexOf('const erase = async'));
     expect(body).toContain('forget()');
+    // And does not claim the bucket is gone, because it is not. Comments only,
+    // since the slice runs up to the doc block above `erase`, which says the
+    // word for its own reasons.
+    const code = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toContain('erased');
   });
 
   it('erases before it signs out, so a failure leaves a session to retry from', () => {

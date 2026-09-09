@@ -22,7 +22,7 @@ import {
   subjectForEmail,
   verifyToken,
 } from '../verify';
-import { readClaim, SUBJECT_PASSCODE } from '../../auth/token';
+import { OWN_SUBJECT, hasOwnSubject, readClaim, SUBJECT_PASSCODE } from '../../auth/token';
 
 const NOW = 1_700_000_000_000;
 const SECRET = 'a-gate-secret';
@@ -32,7 +32,7 @@ const sign = (secret: string, payload: string): string =>
   createHmac('sha256', secret).update(payload).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-const mint = ({ secret = SECRET, tier = 'full', subject = 'cus_QRS123', ttl = 2_592_000 } = {}) => {
+const mint = ({ secret = SECRET, tier = 'full', subject = 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', ttl = 2_592_000 } = {}) => {
   const payload = `${Math.floor(NOW / 1000) + ttl}.${tier}.${subject}`;
   return `${payload}.${sign(secret, payload)}`;
 };
@@ -40,7 +40,7 @@ const mint = ({ secret = SECRET, tier = 'full', subject = 'cus_QRS123', ttl = 2_
 describe('verifying a token', () => {
   it('accepts one signed with the key', async () => {
     const claim = await verifyToken(SECRET, mint(), NOW);
-    expect(claim).toMatchObject({ tier: 'full', subject: 'cus_QRS123' });
+    expect(claim).toMatchObject({ tier: 'full', subject: 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2' });
   });
 
   it('refuses one signed with another key', async () => {
@@ -119,7 +119,7 @@ describe('why a token was refused', () => {
 
   it('hands back the claim when there is nothing wrong with it', async () => {
     expect(await checkToken(SECRET, mint(), NOW)).toEqual({
-      claim: { expiresAt: expect.any(Number), tier: 'full', subject: 'cus_QRS123' },
+      claim: { expiresAt: expect.any(Number), tier: 'full', subject: 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2' },
     });
   });
 
@@ -128,6 +128,60 @@ describe('why a token was refused', () => {
     // never come to different conclusions about the same request.
     expect(await verifyToken(SECRET, mint({ ttl: -1 }), NOW)).toBeNull();
     expect(await verifyToken(SECRET, mint(), NOW)).not.toBeNull();
+  });
+});
+
+describe('the subject, which three apps have to derive identically', () => {
+  /**
+   * A fixed vector, because this is a contract across repositories.
+   *
+   * The account is shared across the family and the subject is the identity:
+   * one string that is the sync subject in each app and the RevenueCat App
+   * User ID. It cannot be the purchase record, because Log is free and a Log
+   * user has bought nothing for a billing system to have heard of, so it runs
+   * the other way -- the address makes the subject, and the subject is what a
+   * vendor is handed.
+   *
+   * Which makes the preimage frozen. `'log.subject.' + normalizeEmail(address)`
+   * copied byte for byte, including the `log.` that will read wrong in another
+   * repository: it is the input to a hash rather than a name, and changing it
+   * gives the same person a different subject and orphans every bucket, the
+   * same way changing the key would. A vector is the only form of that rule
+   * another codebase can check itself against, so here it is, with the answer
+   * written out rather than recomputed by the test's own copy of the algorithm.
+   */
+  const VECTOR = { secret: 'family-gate-secret', address: 'Player@Example.COM' };
+  const EXPECTED = 'log_dd63349789b05bdc192591f2e6ac664d';
+
+  it('is this exact string for this exact address', async () => {
+    expect(await subjectForEmail(VECTOR.secret, VECTOR.address)).toBe(EXPECTED);
+  });
+
+  it('and the same one however the address was capitalized', async () => {
+    // The other half of the contract, and a way the family can split without
+    // anybody noticing: one app lowercasing and one not gives `Player@` and
+    // `player@` two identities and two histories.
+    for (const written of ['player@example.com', 'PLAYER@EXAMPLE.COM', '  Player@Example.COM  ']) {
+      expect(await subjectForEmail(VECTOR.secret, written)).toBe(EXPECTED);
+    }
+  });
+
+  it('and it is the shape the gate takes, or the family cannot sign in at all', async () => {
+    expect(OWN_SUBJECT.test(EXPECTED)).toBe(true);
+  });
+
+  it('and carries no address, which is what makes it safe to hand a vendor', async () => {
+    // Handed to RevenueCat as the App User ID, so it must not be the mailbox.
+    // An HMAC is stable, opaque and cannot be turned back into a person by
+    // anybody without the key.
+    const subject = await subjectForEmail(VECTOR.secret, VECTOR.address);
+    expect(subject).not.toContain('Player');
+    expect(subject.toLowerCase()).not.toContain('example');
+    expect(subject).not.toContain('@');
+  });
+
+  it('and a different key gives a different one, so the key is part of it too', async () => {
+    expect(await subjectForEmail('another-gate-secret', VECTOR.address)).not.toBe(EXPECTED);
   });
 });
 
@@ -152,6 +206,62 @@ describe('who may sync', () => {
     expect(hasOwnBucket(claim)).toBe(false);
   });
 
+  it('refuses a subject the other door in the family mints', async () => {
+    // The one that changed, and the reason it did. Untilt mints for a Stripe
+    // customer, so its subject is `cus_...`; this door derives one from an
+    // address. Taking both meant keying a bucket off whichever arrived, with no
+    // way to tell that they are the same person -- a customer id does not carry
+    // the address. Somebody who arrived on Untilt's token synced into one
+    // bucket, and when it expired (this app will not renew a paid claim, and
+    // rightly, because the store is shared with the family) they signed in at
+    // this door under the other subject and found an empty log, with the full
+    // one somewhere nothing would ever ask for again.
+    const claim = await verifyToken(SECRET, mint({ subject: 'cus_QRS123' }), NOW);
+    // It still verifies. The signature was never the problem.
+    expect(claim).not.toBeNull();
+    expect(hasOwnBucket(claim)).toBe(false);
+  });
+
+  it('and anything else that is not the shape this door writes', async () => {
+    // The grammar above is Untilt's and is much wider on purpose. This is the
+    // whole of what the shape excludes, spelled out rather than implied.
+    const wrong = [
+      'log_' + 'a'.repeat(31), // a character short
+      'log_' + 'a'.repeat(33), // one too many
+      'log_' + 'A'.repeat(32), // hex, and `hmacHex` writes it lowercase
+      'log_' + 'g'.repeat(32), // not hex at all
+      'log' + 'a'.repeat(32), // no separator
+      'xlog_' + 'a'.repeat(32), // prefixed
+      'passcode',
+    ];
+    for (const subject of wrong) {
+      const claim = await verifyToken(SECRET, mint({ subject }), NOW);
+      expect(claim).not.toBeNull();
+      expect(hasOwnBucket(claim)).toBe(false);
+    }
+  });
+
+  it('and takes exactly what this door mints, for any address', async () => {
+    // The other direction, and the one that locks the app out of itself if it
+    // is wrong: the shape test and the thing that produces the shape have to
+    // agree, or every sign-in is refused at once.
+    for (const address of ['a@b.co', 'PLAYER@Example.COM', 'x'.repeat(60) + '@e.io', '']) {
+      expect(OWN_SUBJECT.test(await subjectForEmail(SECRET, address))).toBe(true);
+      const claim = await verifyToken(SECRET, mint({ subject: await subjectForEmail(SECRET, address) }), NOW);
+      expect(hasOwnBucket(claim)).toBe(true);
+    }
+  });
+
+  it('and the client says the same thing, or a device syncs into a wall', async () => {
+    // `hasOwnSubject` decides whether the data layer builds a syncing wrapper
+    // at all. A device that answered yes here and no at the endpoint would
+    // send, take a 403, and halt, with a card reporting a session that syncs.
+    for (const subject of ['cus_QRS123', 'passcode', 'log_' + 'a'.repeat(31), await subjectForEmail(SECRET, 'a@b.co')]) {
+      const claim = await verifyToken(SECRET, mint({ subject }), NOW);
+      expect(hasOwnSubject(claim)).toBe(hasOwnBucket(claim));
+    }
+  });
+
   it('refuses nobody at all', () => {
     expect(hasOwnBucket(null)).toBe(false);
   });
@@ -159,18 +269,18 @@ describe('who may sync', () => {
 
 describe('which bucket a log lives in', () => {
   it('is an HMAC, so the store never holds a customer id', async () => {
-    const bucket = await bucketFor(SECRET, 'cus_QRS123');
+    const bucket = await bucketFor(SECRET, 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2');
     expect(bucket).toMatch(/^[0-9a-f]{64}$/);
     expect(bucket).not.toContain('cus_');
   });
 
   it('is stable for one person and different for another', async () => {
-    expect(await bucketFor(SECRET, 'cus_A')).toBe(await bucketFor(SECRET, 'cus_A'));
-    expect(await bucketFor(SECRET, 'cus_A')).not.toBe(await bucketFor(SECRET, 'cus_B'));
+    expect(await bucketFor(SECRET, 'log_f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6')).toBe(await bucketFor(SECRET, 'log_f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6'));
+    expect(await bucketFor(SECRET, 'log_f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6')).not.toBe(await bucketFor(SECRET, 'log_07070707070707070707070707070707'));
   });
 
   it('moves when the key does, which is what rotating one is for', async () => {
-    expect(await bucketFor(SECRET, 'cus_A')).not.toBe(await bucketFor(OTHER, 'cus_A'));
+    expect(await bucketFor(SECRET, 'log_f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6')).not.toBe(await bucketFor(OTHER, 'log_f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6'));
   });
 });
 

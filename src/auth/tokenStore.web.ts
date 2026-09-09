@@ -16,6 +16,12 @@
 
 import type { TokenStore } from './session';
 
+/**
+ * The same key as the native store, and on the web it is a name and nothing
+ * more: `localStorage` is per origin, and the family is on separate
+ * registrable domains, so there is nothing here to share even once the native
+ * halves do. See SYNC.md, "What none of this solves: the web".
+ */
 const KEY = 'family_access_token';
 
 /** Null rather than a throw when there is no storage, which is a real state. */

@@ -796,6 +796,11 @@ const renew = async (
   // the same reason the sync endpoint says it: the token is fine, the subject
   // is not, and telling those apart is "sign in again" versus "not you".
   if (!hasOwnBucket(claim)) return json({ error: 'forbidden' }, 403);
+  // And only the tier this door mints. Renewing a paid claim would hand back a
+  // free token in place of it, and the token lives in a store the family is
+  // meant to share, so that is access taken away somewhere this cannot see.
+  // The store is not shared yet, which made this true for a reason that was
+  // not the case; it becomes the reason once it is. See SYNC.md.
   if (claim.tier !== 'free') return json({ error: 'forbidden' }, 403);
 
   const token = await mintToken(secret, {

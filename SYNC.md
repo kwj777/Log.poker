@@ -245,6 +245,17 @@ still lands on a day Netlify Blobs does not. It also does not spend the caller
 limit, which exists to bound mail: charging launches against it would let a few
 devices behind one office network refuse a colleague's sign-in.
 
+**And it must not put a token back that somebody has just put down.** Renewal
+is the one operation on `SessionManager` with a network round trip in the
+middle, and it runs at launch without being awaited, so the seconds it spends
+out there are seconds somebody can spend signing out or erasing. Writing
+afterwards signed the device silently back in, with a fresh thirty days, and
+after an erase into a bucket that had just been deleted. A generation counter
+fences it, bumped at the *start* of a sign-out rather than the end: a
+comparison against the stored token would still see the old one sitting there
+while the clear was in the keychain's hands, and write over the top of somebody
+leaving.
+
 The one property the client half is written around is that **every way of
 failing leaves the token alone**. A refusal, a dead network, an answer that is
 not a token, a store that will not write: in all of them what was there is still
@@ -1123,6 +1134,327 @@ id, its fields and its children all stay, and its stamp is untouched, because
 this is reconciling with a decision the server is already in the middle of
 making rather than an edit worth pushing back.
 
+### And the one nobody could see
+
+**A pull landed rows and nothing told the screens.** The wrapper writes what
+comes back straight into the local database; `useLogStore` holds the arrays
+every screen renders and reloads them only when the app asks. The two never
+spoke. So the history somebody had just signed in for arrived, sat there, and
+did not appear until they quit and reopened the app, which on the one device
+most likely to be pulling a whole log down looks exactly like sync not working.
+
+`SyncState` carries a count of answers that changed the log, `compose` wires
+that to a signal that survives a recompose, and the store subscribes once and
+refreshes. Stable across a recompose because signing in builds a *new* wrapper:
+a subscription made once and for all would be listening to an object nothing
+writes to any more, on precisely the sync that matters most.
+
+It counts an answer that carried records rather than one that carried anything
+new, and the difference is worth naming: both comparisons read one millisecond
+back, so a device that has pulled everything is served its own boundary records
+again and counts that. The cost is one redundant reload per sync on a device
+that is syncing anyway, and every write in the app already reloads the log.
+Telling the two apart would mean asking `applyChanges` what it actually wrote,
+on both engines, for less than that costs.
+
+### And which token it carries
+
+**The wrapper captured the token once, when it was built.** That is fine for as
+long as a token does not change, and it changes: `renewIfDue` writes a fresh one
+to the store beside it at launch, and nothing re-read it. On a process that
+outlives thirty days -- a browser tab left open, which is the ordinary way to
+use the web build -- the captured token expires, the endpoint answers 401,
+`halted` latches, and sync stops for good while a perfectly valid token sits in
+the store. Nothing on screen would say why, because from the app's side there
+is no problem: `getSession` is happy, the card says signed in.
+
+`compose` hands it `getToken` instead of a string, so every request reads the
+token as it is now. A renewal is picked up by the next sync, and so is a
+sign-out: `getToken` answers null once the token is gone, and the run stops
+rather than sending an empty bearer and taking a 401 and a backoff on behalf of
+somebody who is no longer there.
+
+### One identity for three apps
+
+The account is shared across the family, and entitlements go through
+RevenueCat. That decides a question the sync has been carrying since the free
+door landed: **what is a person, to this family?**
+
+**One string, and it is the address-derived subject.** `log_` and thirty-two
+characters of `hmacHex(secret, 'log.subject.' + normalizeEmail(address))`, which
+is what `subjectForEmail` already writes. It is the sync subject in all three
+apps and it is the RevenueCat App User ID, and those are the same string rather
+than two that have to be kept in step.
+
+**It cannot be the purchase record, and that is not a preference.** Log is free
+in its entirety, so a Log user has bought nothing: no Stripe customer, no
+RevenueCat purchase, nothing a billing system has ever heard of. An identity
+that only exists once somebody pays cannot be the identity of an app that never
+charges. So the derivation runs the other way round -- the address makes the
+subject, and the subject is handed to RevenueCat as the App User ID -- rather
+than a customer id being borrowed as a name for somebody who is not a customer.
+That is also why the split two sections down happened at all, and closing it
+was the first half of this.
+
+It is a good App User ID for a second reason. It is an HMAC, so it is stable,
+opaque, and does not contain the address: the family can hand it to a vendor
+without handing over anybody's mailbox, and nothing that leaks it can turn it
+back into a person without the key.
+
+**Each app still gets its own bucket.** `bucketFor` is
+`hmacHex(secret, 'log.sync.' + subject)`, so an app that keys on a different
+domain string under the same subject lands somewhere else. One identity, three
+buckets, no collision, and nothing has to agree about anything except the
+subject.
+
+#### The preimage is frozen
+
+`'log.subject.' + normalizeEmail(address)`, copied byte for byte, including the
+`log.` that will read wrong in another repository. It is not a name, it is the
+input to a hash, and changing it gives the same person a different subject,
+which orphans every bucket exactly the way changing `GATE_SECRET` would.
+`normalizeEmail` goes with it: it lowercases, and a family where one app does
+and one does not gives `Player@example.com` two identities and two histories.
+
+#### The order these land in, which is the part that is silent
+
+1. **Untilt mints the family subject**, in place of the Stripe customer id.
+2. **Then** the token store is genuinely shared.
+3. Not before. A shared store with Untilt still minting `cus_...` puts a token
+   in Log's keychain that Log refuses, and sync stops on a device whose owner
+   did nothing wrong.
+
+The gate that refuses a foreign subject is not in tension with a shared
+account: it is what makes one safe. A shared account built by accepting
+whatever the family signs is the two-subject split with more doors into it. A
+shared account built on one identity is a gate that already accepts exactly
+that identity and nothing else.
+
+Two things that were true only by accident become load bearing here, and both
+are already written the right way. `renew` refuses to extend anything but the
+free tier, and its reason -- that handing back a free token in place of a paid
+one takes away access somewhere Log cannot see -- describes a shared store,
+which today there is not. After step 2 there is. And `hasOwnSubject` on the
+client has to keep saying what `hasOwnBucket` says on the server, because after
+step 2 a token Log will not sync with can arrive on a device that never visited
+Log's door.
+
+#### What none of this solves: the web
+
+`log.poker` and `untilt.poker` are different registrable domains.
+`localStorage` is per origin and a `__Host-` cookie is scoped to one host, so
+there is no shared store to share: on the web the family cannot hand a token
+sideways at all. RevenueCat does not close this either, being an entitlement
+SDK rather than a browser sign-in.
+
+So a shared account on the web needs something that does not exist yet: one
+sign-in origin for the family, or a hand-off where one app redirects to another
+carrying a one-time code that is traded for a token. Both are real designs with
+their own theft surface, and neither is written. **The native half can ship
+without it**, on a keychain access group, and the web stays one sign-in per app
+until somebody designs the hand-off. That is worth deciding deliberately rather
+than discovering.
+
+### One person, two subjects, and the door that is closed now
+
+Untilt mints for a Stripe customer, so its subject is `cus_...`; Log's own door
+derives `log_` and thirty-two characters of an HMAC of the address. Log took
+both and keyed a bucket off whichever arrived, and it cannot tell that they are
+the same person: a customer id does not carry the address, so nothing on this
+side can link them.
+
+Somebody who arrived on Untilt's token synced into one bucket. Thirty days
+later it expired, `renew` refused to extend a paid claim (rightly: the store is
+shared with the family, so handing back a free token would take away access
+somewhere Log cannot see), and the next sign-in was at Log's own door under the
+other subject. New bucket empty, old one full and never asked for again, and an
+erase from the new session does not reach it either.
+
+**The way out is not to merge them.** Every merge is also a way to reach
+somebody else's history, and the whole of what a token proves is that its
+bearer holds a signed string: a mechanism that takes two of them and folds one
+bucket into another is a history-theft primitive the day it is slightly wrong.
+Five approaches were designed and attacked, and the four that moved data were
+all broken, in every case through the thing that was supposed to prove
+possession.
+
+**The population is empty, which is what settles it.** Log has never shipped a
+way to receive an Untilt-minted token. The token store is `localStorage` on
+Log's own origin on web, and `expo-secure-store` with no keychain access group
+on native, so the `family_access_token` key is shared in name and not in fact.
+`signIn` has exactly one caller, the card, holding what Log's door has just
+minted. There is no deep link that reads a token and nothing pastes one. So the
+split could not happen to anybody through the app, and the only thing keeping
+it that way was a configuration that the comment above that key says is meant
+to change.
+
+So the door is closed rather than a bridge built across it. `hasOwnBucket` asks
+for a subject this app's own door minted, `OWN_SUBJECT` being the exact shape
+`subjectForEmail` writes, and `hasOwnSubject` on the client says the same thing
+so a device cannot decide it syncs and then meet a wall of 403s. One predicate
+at one call site, so reading, writing and erasing tighten together.
+
+**Nothing is exempted, and erasing was the tempting one**, because refusing it
+leaves a bucket somebody can no longer read or delete. It is refused anyway: a
+foreign token cannot be renewed here, so it expires; `SessionManager.current`
+clears an expired token, which destroys the only string in the world naming
+that subject; and the erase control lives inside the signed-in branch of the
+card. The exemption would be reachable only by somebody not yet stranded, and
+gone for everybody it was written for.
+
+The gate check needed a subject of its own, since `gatecheck` is not a shape
+this door writes. `subjectForGateCheck` derives one from `'log.gatecheck'`
+where `subjectForEmail` derives from `'log.subject.' + address`, so no address
+can reach it -- the same domain separation the bucket names already rest on --
+and the gate keeps zero named exceptions. In `--signin-origin` mode against
+Untilt **the pass is now a 403 rather than a 200**: a token of Untilt's gets as
+far as the gate and is turned away by who it names, and getting that far is the
+proof, because a wrong key answers 401 without ever reaching the question.
+
+### A cursor did not know which bucket it was a conversation with
+
+Closing the door left the other half, and that half was never about Untilt.
+
+A cursor is a place in one conversation and nothing recorded which one.
+`pushed` says everything up to it has been sent; point the same device at a
+different bucket and it goes on saying so, so the new bucket is never sent
+anything and the card reports it up to date over an empty log.
+
+Signing out is not the way in, because `forget` rewinds. The way in is an
+expiry. `SessionManager.current` clears a token that has run out, on its own,
+with no card on screen and nothing calling `forget`, so the cursors outlive the
+session and the next sign-in inherits them. Same address, same bucket, and they
+are right. A different address -- a second person on a shared phone, or the
+same person after the other door stopped being taken -- and they are a
+conversation with somewhere else. The pull half of this was already covered:
+a bundle refuses a cursor from a device it has never answered. The push half
+was not.
+
+So a cursor records the subject it is speaking to, and `settle` reads it before
+anything else uses it. A different subject rewinds both cursors and carries
+`settled` at the high-water mark, so a tombstone that was safe to collect stays
+safe -- zeroing it there is the one move in this file that resurrects a delete
+on every device somebody owns. No subject at all, which is every install on the
+day this ships, rewinds the push cursor only: it cannot be known whether those
+cursors are about this bucket, one re-push per install is a no-op the merge
+absorbs, and not rewinding would freeze anybody already in the broken state
+there for good.
+
+An unreadable token is not a change of bucket. `readClaim` answers null for one
+that has expired, and treating that as a switch would rewind on every launch
+past the thirtieth day; refusing a dead token is the server's job.
+
+### A sign-out was sweeping what a lapsed token was not
+
+`compose` sweeps tombstones on the ninety-day window when the session is null,
+and deliberately does not when the session is there and the token is missing.
+That second branch carries the reasoning: the device may be holding deletes it
+never managed to push while the server still has the live rows, so dropping them
+locally does not lose the delete quietly, it loses it loudly on the next sync
+when those rows come back down onto every device the person owns.
+
+**A sign-out landed in the first branch and swept anyway.** Delete something
+offline, sign out before reconnecting, leave it ninety days, sign back in: the
+cursors were forgotten at sign-out so the re-sign-in is a full pull, and the row
+comes back with nothing left locally to refuse it. Had the tombstone survived,
+that same pull would have pushed it and the delete would have won.
+
+The branch is two devices rather than one, and only the sweep could not tell
+them apart. A device that has **never** signed in is safe to sweep on the window
+and has to be, or it keeps every tombstone forever and the database grows where
+it used to shrink. A device that has **signed out** is in the state the branch
+below refuses to sweep for, reached by the other door.
+
+What separates them is `settled`: the newest local moment before which the
+server has heard everything this device wrote. `pushed` says that while a
+session lasts, and `forget` throws it away on purpose, because the next person
+on this device must not inherit a place in somebody else's conversation.
+`settled` is a different kind of fact and safe to keep: not where this device
+had got to, which is account-shaped, but how far back this database is safe to
+collect, which every account on the device shares anyway. So a signed-out device
+collects to the window or to `settled`, whichever is further back. A tombstone
+older than `settled` was pushed by definition, so the server holds the delete
+too.
+
+**Zero means no floor, and an erase sets it there.** A device that never synced
+and a device whose bucket has just been deleted are the same case: nothing
+anywhere can send a deleted row back, so both collect on the window alone. That
+is why `forget` takes `erased` -- the two doors leave the server in different
+states, and saying nothing would leave somebody who erases and stays signed out
+keeping every tombstone they write from then on.
+
+The cost, where the rule bites, is tombstones kept past the window on a device
+that signed out and never came back. A few hundred bytes each; a session a week
+for five years is under a hundred kilobytes, against a resurrected session on
+every device for the other choice.
+
+One thing this turned up: `cursorStore` had no tests, on either engine. That
+mattered more than it looked, because the store is the only thing carrying these
+numbers across a launch, so a field it quietly dropped would be inert on a real
+device and perfectly fine in every other suite. Neutralizing the new field's
+parse changed nothing anywhere. It is the one of the three whose loss is not
+self-correcting: a lost `pulled` or `pushed` costs one full re-sync, and a lost
+`settled` costs a delete.
+
+### Two the audit raised that were not there
+
+**The `folded` map is not unbounded.** It was read as the one map with no
+`MAX_DEVICES` equivalent, which is true and does not matter: `collect` runs on
+every merge and drops a fold whose session record is gone. A fold is remembered
+for exactly as long as the tombstone it names, and the entries are written by
+the server on an import collision rather than accepted from a push, so there is
+nothing a device can do to grow it.
+
+**Contending on the etag is real at six devices and safe at any number.** Every
+request is a write, including a pull with nothing in it, because a device mark
+carries `seen: now`; `ROUNDS` is 4. The existing tests script contention with a
+counter, which pins the loop's mechanics and cannot show what happens when real
+requests interleave, so a store that enforces the condition it is handed was
+written and six devices were pushed at it at once. Four land and two exhaust the
+rounds. The two are answered 503 `unreachable`, their records are not in the
+bundle, and they have moved no cursor, so they still hold what they were
+sending: contention costs a round trip and never a record. Six of one person's
+devices pushing in the same instant is not a case anybody has.
+
+The first attempt at that test measured nothing. The store yielded on a
+microtask, which is not enough to interleave a read-modify-write, so all six
+ran to completion in turn and all six landed first time. A timer puts every
+pending read ahead of every write, which is what two devices syncing at once
+actually looks like.
+
+### The unplaceable cursor was only half checked
+
+**Being ahead of `heardThrough` is one of the two ways a cursor can be from
+somewhere else, and it was the only one the clamp looked at.** A cursor from
+another bucket is just a number, and it is at least as likely to land below this
+bundle's stamps as above them. Below, it reads as a perfectly ordinary place in
+a conversation that never happened, and the device is answered with everything
+after it and nothing before: the tail of its own history handed over as the
+whole of it. That is quieter than the silence the clamp was written for, because
+records do come back and the sync reports success.
+
+The case that produces it is the one already written down two sections above --
+a second person signing in on a device the first had synced a lot on. The clamp
+was named there as the reason that is no longer silent data loss, and for the
+half of the number line it never covered, that was not true.
+
+The other half of the check is the device map, which is the only record of who
+this bundle has answered. **A device that has never been answered here cannot be
+holding a number this bundle issued**, so a named device with no mark starts
+from nothing whatever its cursor claims. Named only: a device that sends no id
+is served without being counted, deliberately, and clamping it would mean a full
+answer on every sync forever rather than once. Where the rule does apply it
+costs one full pull, and only to a device this bundle has forgotten -- six
+months of not syncing -- or to the sixty-fifth device somebody owns.
+
+The test that was supposed to hold the original half up turned out to prove
+nothing: it built both bundles at the same instant, so the stale cursor sat
+below the fresh bundle's records and they came back whether the clamp fired or
+not. It passes now by way of the mechanism that makes the erased case real --
+a stamp is `max(now, heardThrough + 1)`, so a bundle taking more rounds than the
+clock takes milliseconds runs its own stamps past the wall clock, and the
+replacement bucket starts below every number the device holds.
+
 ---
 
 ## What must not break
@@ -1193,9 +1525,11 @@ quietly during work like this.
    mints the free tier for anybody who can read their mail, and **Untilt is
    untouched**. See [what the free door landed](#what-the-free-door-landed).
 
-2. **Does the first release sync Log only, or is the shared account across all
-   three apps a launch requirement?** Log-only is smaller and can use the same
-   token without the App User ID work landing anywhere else.
+2. ~~**Does the first release sync Log only, or is the shared account across
+   all three apps a launch requirement?**~~ **Settled: shared, and the App User
+   ID is RevenueCat's.** See [one identity for three
+   apps](#one-identity-for-three-apps) for what that requires and in which
+   order, because two of the steps are silent if they land the wrong way round.
 3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
    bundle-at-rest shape fits them and keeps the family on one piece of
    infrastructure. A player with ten years of history and a device that has been

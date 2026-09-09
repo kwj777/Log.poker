@@ -19,6 +19,10 @@ const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 
 const netlify = read('netlify.toml');
 const home = read('public', 'home.html');
 const worker = read('public', 'sw.js');
+/** Every function that claims a path of its own, read as one string. */
+const functions = ['signin.mts', 'sync.mts', 'signin-sweep.mts', 'chip-scan.mjs']
+  .map((name) => read('netlify', 'functions', name))
+  .join('\n');
 const manifest = JSON.parse(read('public', 'manifest.webmanifest'));
 const buildScript = read('scripts', 'build-web.mjs');
 
@@ -221,6 +225,46 @@ describe('the worker caches the app and not the marketing site', () => {
 
   it('was bumped, so an existing install discards the caches it filled at /', () => {
     expect(worker).not.toContain("CACHE_VERSION = 'v1'");
+  });
+
+  it('and answers for none of the backend, which is same-origin too', () => {
+    // The worker's header used to say Log had no backend, and on that reading
+    // caching every same-origin GET is obviously safe. It is not: a bundle is
+    // a conversation, and a previous answer to a sync applied as a fresh one
+    // would put somebody's history in at the wrong point and write a cursor
+    // saying so. Nothing is cached today only because every one of these is a
+    // POST, which is a fact about the callers rather than a rule.
+    expect(worker).toContain("url.pathname.startsWith('/api/')");
+  });
+
+  it('and does not say in its own header that there is no backend', () => {
+    // The same claim in the same house, missed twice over: the sweep two
+    // describes up is a list of pages and generators, and this is neither, and
+    // it words it as "backend" rather than "server" so widening that list alone
+    // would still not have found it. It mattered more here than on a page,
+    // because it was not a promise to a visitor -- it was the premise the
+    // caching rule below it was reasoned from.
+    expect(worker).not.toMatch(/has no (backend|server)/i);
+    expect(worker).not.toMatch(/there is no (backend|server)/i);
+  });
+
+  it('and every endpoint there is under the prefix it skips', () => {
+    // The half that goes stale. A function declares its own path, so one added
+    // outside `/api/` would sit on this origin with nothing excluding it, and
+    // the exclusion above would still look complete.
+    const declared = [
+      ...functions.matchAll(/path:\s*(?:'([^']+)'|\[([^\]]+)\])/g),
+    ].flatMap((match) =>
+      match[1] !== undefined
+        ? [match[1]]
+        : [...match[2].matchAll(/'([^']+)'/g)].map((one) => one[1]),
+    );
+    // Plus the one routed by netlify.toml rather than by a config export.
+    const routed = [...netlify.matchAll(/from = "(\/api[^"]*)"/g)].map((match) => match[1]);
+
+    const paths = [...declared, ...routed];
+    expect(paths.length).toBeGreaterThan(3);
+    for (const path of paths) expect(path.startsWith('/api/')).toBe(true);
   });
 });
 

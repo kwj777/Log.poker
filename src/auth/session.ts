@@ -63,6 +63,16 @@ export class SessionManager {
   private readonly store: TokenStore;
   private readonly clock: () => Timestamp;
 
+  /**
+   * Bumped every time the token this device holds is deliberately changed.
+   *
+   * The fence for `renewIfDue`, which is the one operation here that takes a
+   * network round trip and then writes. Everything else is a read and a write
+   * with nothing in between; that one has seconds in the middle, and somebody
+   * can sign out or erase inside them. See the note there.
+   */
+  private generation = 0;
+
   constructor(store: TokenStore, clock: () => Timestamp = Date.now) {
     this.store = store;
     this.clock = clock;
@@ -82,6 +92,7 @@ export class SessionManager {
 
     const claim = readClaim(token, this.clock());
     if (claim === null) {
+      this.generation += 1;
       await this.store.clear();
       return null;
     }
@@ -98,6 +109,7 @@ export class SessionManager {
   async signIn(token: string): Promise<Session | null> {
     const claim = readClaim(token, this.clock());
     if (claim === null) return null;
+    this.generation += 1;
     await this.store.write(token);
     return { claim, syncs: hasOwnSubject(claim) };
   }
@@ -131,6 +143,14 @@ export class SessionManager {
    * Answers whether it wrote one, for a test and for nobody else.
    */
   async renewIfDue(fresh: (token: string) => Promise<string | null>): Promise<boolean> {
+    // Captured before anything is read, and checked again before anything is
+    // written. Renewal is the one operation on this class with a network round
+    // trip in the middle of it, and it runs at launch without being awaited,
+    // so the seconds it takes are seconds somebody can spend signing out or
+    // erasing. Writing afterwards put the token back and signed the device
+    // silently in again -- with a fresh thirty days, and after an erase into a
+    // bucket that had just been deleted.
+    const generation = this.generation;
     const now = this.clock();
     const token = await this.store.read();
     if (token === null) return false;
@@ -148,6 +168,13 @@ export class SessionManager {
     // token with that is worse than not renewing at all.
     if (readClaim(next, now) === null) return false;
 
+    // Nothing put the token down while this was in flight. The counter rather
+    // than a re-read and a comparison, because it moves at the *start* of a
+    // sign-out, before the clear it is waiting on has finished: a comparison
+    // would still see the old token there and write over the top of somebody
+    // signing out.
+    if (generation !== this.generation) return false;
+
     await this.store.write(next);
     return true;
   }
@@ -160,6 +187,11 @@ export class SessionManager {
    * exact thing SYNC.md refuses to build.
    */
   async signOut(): Promise<void> {
+    // Before the clear rather than after it. A renewal in flight checks this
+    // counter before it writes, and the point of moving it first is that the
+    // renewal is fenced from the moment somebody asks to sign out, not from
+    // the moment the keychain finishes obliging.
+    this.generation += 1;
     await this.store.clear();
   }
 }

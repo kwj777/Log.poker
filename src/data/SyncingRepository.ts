@@ -29,6 +29,7 @@
  * decisions it makes the fewer ways two devices have of never converging.
  */
 
+import { readClaim } from '../auth/token';
 import type { Timestamp } from '../domain/types';
 import { batchFor } from '../sync/batch';
 import { backoffMs, sync, type SyncOptions } from '../sync/client';
@@ -71,6 +72,31 @@ export interface Cursors {
    * already obvious from them carrying the same token.
    */
   device: string;
+  /**
+   * The newest local moment before which the server has heard everything.
+   *
+   * `pushed` says that while a session lasts, and signing out throws it away
+   * on purpose: the next person on this device must not inherit a place in
+   * somebody else's conversation. This is what is kept instead, and it is a
+   * different kind of fact. Not where this device had got to, which is
+   * account-shaped and dangerous to hand on, but how far back it is safe to
+   * collect a tombstone, which is a property of the local database that every
+   * account on this device shares anyway.
+   *
+   * Zero means the server has never heard anything from here, which is both
+   * the state of a device that has never synced and the state of one whose
+   * bucket has just been erased. Both are free to collect on the window alone,
+   * because there is nothing anywhere to send a deleted row back.
+   */
+  settled: Timestamp;
+  /**
+   * Which bucket these cursors are a conversation with, or null if unknown.
+   *
+   * Null means a record written before this field existed, not a device that
+   * has never synced: a fresh one has zeroes in the numbers above and nothing
+   * to be wrong about. See `settle`.
+   */
+  subject: string | null;
 }
 
 /** Where the cursors live. Small enough that anything durable will do. */
@@ -80,7 +106,13 @@ export interface CursorStore {
 }
 
 export const memoryCursorStore = (
-  start: Cursors = { pulled: 0, pushed: 0, device: 'test-device-0001' },
+  start: Cursors = {
+    pulled: 0,
+    pushed: 0,
+    device: 'test-device-0001',
+    settled: 0,
+    subject: null,
+  },
 ): CursorStore => {
   let held = start;
   return {
@@ -110,11 +142,27 @@ export interface SyncState {
   problem: SyncFailure | null;
   /** True while a request is in flight. */
   running: boolean;
+  /**
+   * How many answers have changed the local database.
+   *
+   * Not for showing. It is a number that goes up so that anything reading the
+   * log can tell that it has moved underneath them, and it is here rather than
+   * on a signal of its own because there is already one subscription and two
+   * would be two to keep wired.
+   *
+   * Nothing was told before this existed. A pull writes rows straight into the
+   * local database, the store above holds the arrays the screens render, and
+   * the two never spoke: the history somebody signed in for arrived, sat
+   * there, and did not appear until the app was restarted. On the one screen
+   * where that is most likely to be noticed, the dashboard of a device that
+   * has just been signed in on, it looks exactly like sync not working.
+   */
+  applied: number;
 }
 
 export class SyncingRepository implements Repository {
   private readonly local: Repository;
-  private readonly token: string;
+  private readonly token: () => Promise<string | null>;
   private readonly cursors: CursorStore;
   private readonly options: SyncingOptions;
   private readonly clock: () => Timestamp;
@@ -147,18 +195,36 @@ export class SyncingRepository implements Repository {
     pending: 0,
     problem: null,
     running: false,
+    applied: 0,
   };
   private listeners = new Set<(state: SyncState) => void>();
+  private applied = 0;
 
+  /**
+   * A string, or somewhere to ask for one.
+   *
+   * A string was all this took, and it was captured once when the wrapper was
+   * built. That is fine for as long as the token does not change, and it
+   * changes: `renewIfDue` writes a fresh one to the store beside this at
+   * launch, and this went on sending the one it was handed. On a process that
+   * outlives thirty days -- a browser tab left open, which is the ordinary way
+   * to use the web build -- the captured token expires, the endpoint answers
+   * 401, `halted` latches, and sync stops for good while the token sitting in
+   * the store is perfectly valid. Nothing on screen would say why.
+   *
+   * Asked per request instead, so a renewal is picked up by the next sync and
+   * a sign-out is too. Still accepts a plain string, because a test that means
+   * "this token, always" should be able to say that.
+   */
   constructor(
     local: Repository,
-    token: string,
+    token: string | (() => Promise<string | null>),
     cursors: CursorStore = memoryCursorStore(),
     options: SyncingOptions = {},
     clock: () => Timestamp = Date.now,
   ) {
     this.local = local;
-    this.token = token;
+    this.token = typeof token === 'string' ? async () => token : token;
     this.cursors = cursors;
     this.options = options;
     this.clock = clock;
@@ -266,6 +332,58 @@ export class SyncingRepository implements Repository {
     }
   }
 
+  /**
+   * Cursors that are about the bucket this token names, and not another one.
+   *
+   * A cursor is a place in one conversation, and nothing recorded which
+   * conversation. `pushed` says everything up to it has been sent; point the
+   * same device at a different bucket and it goes on saying so, so the new
+   * bucket is never sent anything and the app reports it as up to date.
+   *
+   * Signing out is not how that happens, because `forget` rewinds. The way in
+   * is an expiry: `SessionManager.current` clears a token that has run out, on
+   * its own, with no card on screen and nothing calling `forget`. So the
+   * cursors outlive the session, and the next sign-in on that device inherits
+   * them. If it is the same address it is the same bucket and they are right.
+   * If it is a different one -- a second person on a shared device, or the same
+   * person after the family's other door stopped being accepted -- they are a
+   * conversation with somewhere else.
+   *
+   * Two cases, and neither is a failure worth stopping for:
+   *
+   * **A different subject.** Back to the start of the conversation, keeping
+   * `settled` at the high-water mark so a tombstone that was safe to collect
+   * stays safe. The pull cursor goes too, though the server would clamp it
+   * anyway: a bundle refuses a cursor from a device it has never answered.
+   *
+   * **No subject at all**, which is every install on the day this ships. It
+   * cannot be known whether those cursors are about this bucket, so the push
+   * cursor is rewound and the pull cursor is not. That costs one re-push per
+   * install, once, which the merge absorbs as a no-op because it is idempotent
+   * and commutative, and it is the direction that cannot lose anything. Not
+   * rewinding would freeze anybody already in the broken state there for good.
+   */
+  private async settle(cursors: Cursors, token: string): Promise<Cursors> {
+    const speaking = readClaim(token, this.clock())?.subject ?? null;
+    // Nothing to compare against: an expired or unreadable token is the
+    // server's to refuse, and guessing from it would rewind on every launch
+    // past the thirtieth day.
+    if (speaking === null || cursors.subject === speaking) return cursors;
+
+    const settled =
+      cursors.subject === null
+        ? { ...cursors, pushed: 0, subject: speaking }
+        : {
+            ...cursors,
+            pulled: 0,
+            pushed: 0,
+            settled: Math.max(cursors.settled, cursors.pushed),
+            subject: speaking,
+          };
+    await this.cursors.write(settled);
+    return settled;
+  }
+
   private async run(): Promise<void> {
     this.announce({ running: true });
 
@@ -276,7 +394,23 @@ export class SyncingRepository implements Repository {
     const epoch = this.epoch;
     const startedAt = this.clock();
 
-    const cursors = await this.cursors.read();
+    // Read before the cursors rather than after them, because which bucket this
+    // token names decides whether those cursors mean anything. Read now rather
+    // than when this wrapper was built; see the constructor.
+    //
+    // It also means a run with nobody to sync for touches the database not at
+    // all, where it used to read every change since the mark and announce a
+    // backlog first.
+    const token = await this.token();
+    if (token === null) {
+      // Signed out from under this run. Not a failure to back off from and not
+      // a thing to retry: there is nobody to sync for any more.
+      this.halted = true;
+      this.announce({ running: false, problem: null });
+      return;
+    }
+
+    const cursors = await this.settle(await this.cursors.read(), token);
     // The floor is the mark and nothing else. It was briefly
     // `Math.min(pushed, startedAt)`, which is the clock, and a floor at the
     // clock excludes everything written before the clock: a device whose mark
@@ -305,7 +439,7 @@ export class SyncingRepository implements Repository {
 
     const outcome = await sync(
       { since: cursors.pulled, changes: batch.changes, device: cursors.device },
-      this.token,
+      token,
       this.options,
     );
 
@@ -360,10 +494,14 @@ export class SyncingRepository implements Repository {
 
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
+      // Counted here rather than after the fence below, because the rows are
+      // in the local database either way and what reads them has to know. A
+      // run that is fenced still applied what it applied.
+      this.applied += 1;
     }
 
     if (epoch !== this.epoch) {
-      this.announce({ running: false, problem: null });
+      this.announce({ running: false, problem: null, applied: this.applied });
       return;
     }
 
@@ -419,6 +557,7 @@ export class SyncingRepository implements Repository {
       // with nothing left to send, and thousands of records still here.
       pending: batch.more ? countChanges(pending) - countChanges(batch.changes) : 0,
       lastSyncedAt: this.clock(),
+      applied: this.applied,
     });
   }
 
@@ -536,10 +675,23 @@ export class SyncingRepository implements Repository {
    * The id survives, because forgetting it would make this device look like a
    * new one to the server and hold up collection for a whole retention window
    * under a name nobody will ever use again.
+   *
+   * So does `settled`, for the opposite reason: it is not part of the
+   * conversation at all. `clearAll` comes through here too, and an emptied
+   * local database has no tombstones to be wrong about.
    */
-  private async rewind(): Promise<void> {
-    const { device } = await this.cursors.read();
-    await this.cursors.write({ pulled: 0, pushed: 0, device });
+  private async rewind(settled?: Timestamp): Promise<void> {
+    const held = await this.cursors.read();
+    await this.cursors.write({
+      pulled: 0,
+      pushed: 0,
+      device: held.device,
+      settled: settled ?? held.settled,
+      // Kept, so a rewind is not mistaken for a change of bucket. `forget` is
+      // already the honest way to start a conversation over; `settle` is for
+      // the one nobody announced.
+      subject: held.subject,
+    });
   }
 
   /**
@@ -570,11 +722,17 @@ export class SyncingRepository implements Repository {
    * this cannot land afterwards and restore the numbers it was carrying.
    * `halted` is the other half: nothing new starts either.
    */
-  async forget(): Promise<void> {
+  async forget({ erased = false }: { erased?: boolean } = {}): Promise<void> {
     this.epoch += 1;
     this.halted = true;
     this.dirty = false;
-    await this.rewind();
+    const { pushed, settled } = await this.cursors.read();
+    // What the server has heard outlives the conversation about it, unless the
+    // bucket itself is gone. After an erase there is nothing left anywhere to
+    // send a deleted row back, so this device is as free to collect as one that
+    // never signed in -- and has to be, or a person who erases and stays signed
+    // out keeps every tombstone they write from then on.
+    await this.rewind(erased ? 0 : Math.max(settled, pushed));
   }
 
   /**

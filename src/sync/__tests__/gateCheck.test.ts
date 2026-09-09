@@ -21,7 +21,7 @@ import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 
-import { verifyToken } from '../verify';
+import { hasOwnBucket, subjectForEmail, subjectForGateCheck, verifyToken } from '../verify';
 
 const SCRIPT = join(__dirname, '..', '..', '..', 'scripts', 'check-gate.mjs');
 const SECRET = 'a-gate-secret';
@@ -35,7 +35,12 @@ const printToken = (secret: string): string =>
 describe('the token the gate check mints', () => {
   it('is one the endpoint accepts, which is the whole of what the check means', async () => {
     const claim = await verifyToken(SECRET, printToken(SECRET), Date.now());
-    expect(claim).toMatchObject({ tier: 'full', subject: 'gatecheck' });
+    expect(claim).toMatchObject({ tier: 'full' });
+    // Not just that it verifies. The gate asks a second question now -- is
+    // this a subject Log's own door minted -- and a check whose token cleared
+    // the signature and failed the gate would report a broken key on a working
+    // one, which is the one lie this script must never tell.
+    expect(hasOwnBucket(claim)).toBe(true);
   });
 
   it('and is refused under any other key, or the check would pass on a wrong one', async () => {
@@ -44,15 +49,36 @@ describe('the token the gate check mints', () => {
 
   it('names a subject of its own, so a check never writes into somebody real', async () => {
     const claim = await verifyToken(SECRET, printToken(SECRET), Date.now());
-    expect(claim?.subject).toBe('gatecheck');
+    expect(claim?.subject).toBe(await subjectForGateCheck(SECRET));
     expect(claim?.subject).not.toBe('passcode');
+  });
+
+  it('and one no address can reach, so it is nobody rather than somebody unlikely', async () => {
+    // The bucket this writes and erases has to be one no person could be
+    // sitting in. Both derivations have the same shape now, so the only thing
+    // keeping them apart is the preimage.
+    const mine = await subjectForGateCheck(SECRET);
+    for (const address of ['gatecheck', 'gatecheck@example.com', '', 'log.gatecheck']) {
+      expect(await subjectForEmail(SECRET, address)).not.toBe(mine);
+    }
+  });
+
+  it('and the script derives the same subject the app would', async () => {
+    // Mirrored rather than imported, because the script runs on node with
+    // nothing installed -- which is exactly the arrangement that drifts.
+    const claim = await verifyToken(SECRET, printToken(SECRET), Date.now());
+    expect(claim?.subject).toBe(await subjectForGateCheck(SECRET));
   });
 });
 
 /* ------------------------------------------------------------- signing in */
 
 /** One server standing in for both halves: Untilt's sign-in and Log's sync. */
-const stubs = (code: string, refuseSignIn: { status: number; body: string } | null = null) => {
+const stubs = (
+  code: string,
+  refuseSignIn: { status: number; body: string } | null = null,
+  sync: { status: number; body: string } = { status: 200, body: '{"cursor":0}' },
+) => {
   const seen: { method: string; path: string; accept?: string; body: string }[] = [];
   const server = createServer((request, response) => {
     let raw = '';
@@ -83,7 +109,7 @@ const stubs = (code: string, refuseSignIn: { status: number; body: string } | nu
             .writeHead(400, { 'content-type': 'application/json' })
             .end('{"error":"rejected"}');
         }
-        const payload = `${Math.floor(Date.now() / 1000) + 3600}.full.cus_somebody`;
+        const payload = `${Math.floor(Date.now() / 1000) + 3600}.full.log_c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3`;
         const signature = createHmac('sha256', SECRET)
           .update(payload)
           .digest('base64')
@@ -96,7 +122,9 @@ const stubs = (code: string, refuseSignIn: { status: number; body: string } | nu
       }
 
       if (request.method === 'DELETE') return void response.writeHead(204).end();
-      response.writeHead(200, { 'content-type': 'application/json' }).end('{"cursor":0}');
+      response
+        .writeHead(sync.status, { 'content-type': 'application/json' })
+        .end(sync.body);
     });
   });
   return { server, seen };
@@ -109,15 +137,18 @@ const listening = (server: Server): Promise<string> =>
     );
   });
 
-describe('signing in for a token Untilt actually minted', () => {
+describe('signing in for a token the door actually minted', () => {
   const CODE = '123456';
   let server: Server;
   let seen: { method: string; path: string; accept?: string; body: string }[];
   let origin: string;
 
-  const stand = async (refuse: { status: number; body: string } | null = null) => {
+  const stand = async (
+    refuse: { status: number; body: string } | null = null,
+    sync?: { status: number; body: string },
+  ) => {
     server.close();
-    ({ server, seen } = stubs(CODE, refuse));
+    ({ server, seen } = stubs(CODE, refuse, sync));
     origin = await listening(server);
   };
 
@@ -163,7 +194,24 @@ describe('signing in for a token Untilt actually minted', () => {
       'POST /api/signin/code',
       'POST /api/sync',
     ]);
-    expect(said).toContain('The key on the site is the key Untilt signs with');
+    // The default door is Log's own, and its subject is one Log's sync takes.
+    expect(said).toContain('named a subject this site mints');
+  });
+
+  it('and reads a 403 as the pass when the token came from the other door', async () => {
+    // The one that changed. Log's sync now takes only subjects its own door
+    // minted, so a token of Untilt's reaches the gate and is turned away there
+    // -- and reaching the gate at all is the whole proof, because a wrong key
+    // answers 401 without ever getting to the question of who the token names.
+    // Reporting that as a failure would send somebody to replace a key that is
+    // correct, which is the one lie this script must never tell.
+    await stand(null, { status: 403, body: '{"error":"forbidden"}' });
+    const said = await run(CODE);
+    expect(said).toContain('The key on the site is the key that signed this');
+    expect(said).toContain('a 403 is the pass');
+    expect(said).toContain('another door in the family');
+    // And it does not erase anything: the token is not one this run minted.
+    expect(seen.filter((request) => request.method === 'DELETE')).toEqual([]);
   });
 
   it('and asks for JSON, or the answer is a page and a cookie with no token in it', async () => {
@@ -266,6 +314,33 @@ describe('the deploy-log lines it tells somebody to search for', () => {
       'gave up after losing every write race',
       'refusing a caller whose own counter it kept losing',
     ]);
+  });
+});
+
+/* ------------------------------------------- and the rest of what it explains */
+
+describe('what it says a 403 means', () => {
+  const script = readFileSync(SCRIPT, 'utf8');
+  const endpoint = readFileSync(join(__dirname, '..', 'endpoint.ts'), 'utf8');
+
+  const advice = script.slice(script.indexOf('if (status === 403) {'), script.indexOf('if (status === 503'));
+
+  it('names the one thing that endpoint actually refuses', () => {
+    // The same drift the deploy-log table above exists to stop, in prose
+    // instead of a table. This used to say "a free tier cannot write", which
+    // was true while a write sat behind the paid tier. That check is gone --
+    // cross-device history is free -- so the advice sent whoever ran it to
+    // look at a tier nothing reads, past the one subject that is refused.
+    expect(advice).toContain('passcode');
+    expect(advice).not.toMatch(/free tier cannot/i);
+  });
+
+  it('because there is still only the one', () => {
+    // If a second 403 ever appears in that endpoint, the advice above is
+    // incomplete and this is what says so.
+    const refusals = [...endpoint.matchAll(/return json\(\{ error: '[^']+' \}, 403\)/g)];
+    expect(refusals).toHaveLength(1);
+    expect(endpoint).toContain("if (!hasOwnBucket(claim)) return json({ error: 'forbidden' }, 403);");
   });
 });
 

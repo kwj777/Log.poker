@@ -5,10 +5,20 @@
  * which are famously windowless basements with no reception. A player mid-session
  * has to be able to add a rebuy and log a hand with the network completely gone.
  *
- * That is achievable because Log has no backend -- every read and write goes to
+ * That is achievable because every read and write the app makes goes to
  * IndexedDB in the browser. The only thing the network is needed for is the app
  * shell itself, so this worker's whole job is to make sure the shell is always
  * available from cache.
+ *
+ * **Log does now have a backend**, and this used to say it did not. Sync and
+ * sign-in are same-origin under `/api/`, which is the one part of this origin
+ * a cache must never answer for: a bundle is a conversation, and handing the
+ * app a previous answer to a sync would have it apply somebody's history at the
+ * wrong point and write a cursor for it. Nothing was actually being cached --
+ * every one of those calls is a POST, and `sendBeacon` is a POST too -- but
+ * that is a property of today's callers rather than a rule, and the sentence
+ * that made caching every same-origin GET look safe was the reasoning somebody
+ * would have followed when adding the first one. The rule is below now.
  *
  * Strategy
  * --------
@@ -157,6 +167,13 @@ self.addEventListener('fetch', (event) => {
   // Never touch cross-origin requests: nothing in Log needs them, and caching a
   // third party's response is a good way to serve something stale forever.
   if (url.origin !== self.location.origin) return;
+
+  // Nor the backend, which is same-origin and is not a document. These answers
+  // are per-request and some of them say `no-store`, which the Cache API does
+  // not read: it stores whatever it is handed. Everything under here is a POST
+  // today and would be filtered above anyway; this is what makes that a rule
+  // rather than a coincidence that holds until the first GET endpoint.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(networkFirstShell(request));

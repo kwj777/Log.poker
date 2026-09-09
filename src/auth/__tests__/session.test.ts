@@ -14,7 +14,7 @@ import { SessionManager, memoryTokenStore, type TokenStore } from '../session';
 const NOW = 1_700_000_000_000;
 const HOUR = 3_600_000;
 
-const token = (expiresAt: number, tier = 'full', subject = 'cus_1'): string =>
+const token = (expiresAt: number, tier = 'full', subject = 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4'): string =>
   `${Math.floor(expiresAt / 1000)}.${tier}.${subject}.signature`;
 
 const live = token(NOW + 30 * 24 * HOUR);
@@ -36,7 +36,7 @@ describe('the session a device holds', () => {
     const store = memoryTokenStore();
     await store.write(live);
     const session = await new SessionManager(store, () => NOW).current();
-    expect(session?.claim.subject).toBe('cus_1');
+    expect(session?.claim.subject).toBe('log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
     expect(session?.syncs).toBe(true);
   });
 
@@ -142,8 +142,8 @@ describe('a store with nowhere to write', () => {
  */
 describe('renewing before it runs out', () => {
   const DAY = 24 * HOUR;
-  const nearlyOut = token(NOW + 3 * DAY, 'free', 'cus_1');
-  const fresh = token(NOW + 30 * DAY, 'free', 'cus_1');
+  const nearlyOut = token(NOW + 3 * DAY, 'free', 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
+  const fresh = token(NOW + 30 * DAY, 'free', 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
 
   const held = async (store: TokenStore) => store.read();
 
@@ -205,7 +205,7 @@ describe('renewing before it runs out', () => {
     // session check, and one that quietly signed somebody out would be a
     // renewal that did the exact thing it exists to prevent.
     const store = memoryTokenStore();
-    const dead = token(NOW - HOUR, 'free', 'cus_1');
+    const dead = token(NOW - HOUR, 'free', 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
     await store.write(dead);
     let asked = 0;
     const wrote = await new SessionManager(store, () => NOW).renewIfDue(async () => {
@@ -227,6 +227,127 @@ describe('renewing before it runs out', () => {
 
     expect(wrote).toBe(false);
     expect(asked).toBe(0);
+  });
+
+  it('does not sign the device back in when a sign-out lands mid-renewal', async () => {
+    // The renewal fires at launch and is not awaited, so the seconds it spends
+    // on the network are seconds somebody can spend tapping Sign out. Writing
+    // afterwards put the token back, with a fresh thirty days on it, and
+    // nothing on screen said why the device was signed in again.
+    const store = memoryTokenStore();
+    await store.write(nearlyOut);
+    const manager = new SessionManager(store, () => NOW);
+
+    let arrive: (() => void) | null = null;
+    const renewal = manager.renewIfDue(
+      async () =>
+        new Promise<string>((resolve) => {
+          arrive = () => resolve(fresh);
+        }),
+    );
+    for (let spin = 0; spin < 50 && arrive === null; spin += 1) await Promise.resolve();
+
+    await manager.signOut();
+    (arrive as unknown as () => void)();
+
+    expect(await renewal).toBe(false);
+    expect(await held(store)).toBeNull();
+    expect(await manager.current()).toBeNull();
+  });
+
+  it('and not when the erase signs out mid-renewal either, which is the same path', async () => {
+    // Worse there: the bucket has just been deleted, so putting the token back
+    // signs the device in to something that is not there any more.
+    const store = memoryTokenStore();
+    await store.write(nearlyOut);
+    const manager = new SessionManager(store, () => NOW);
+
+    let arrive: (() => void) | null = null;
+    const renewal = manager.renewIfDue(
+      async () =>
+        new Promise<string>((resolve) => {
+          arrive = () => resolve(fresh);
+        }),
+    );
+    for (let spin = 0; spin < 50 && arrive === null; spin += 1) await Promise.resolve();
+
+    // What `erase` does: the server copy goes, then the token.
+    await manager.signOut();
+    (arrive as unknown as () => void)();
+    await renewal;
+
+    expect(await held(store)).toBeNull();
+  });
+
+  it('and does not overwrite a token somebody signed in with while it was out', async () => {
+    // Two people, one device. The renewal read the first one's token; by the
+    // time it answered, the second had signed in. Writing would hand the
+    // device back to the person who had left it.
+    const store = memoryTokenStore();
+    await store.write(nearlyOut);
+    const manager = new SessionManager(store, () => NOW);
+
+    let arrive: (() => void) | null = null;
+    const renewal = manager.renewIfDue(
+      async () =>
+        new Promise<string>((resolve) => {
+          arrive = () => resolve(fresh);
+        }),
+    );
+    for (let spin = 0; spin < 50 && arrive === null; spin += 1) await Promise.resolve();
+
+    const theirs = token(NOW + 30 * DAY, 'free', 'log_e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5');
+    await manager.signOut();
+    await manager.signIn(theirs);
+    (arrive as unknown as () => void)();
+
+    expect(await renewal).toBe(false);
+    expect(await held(store)).toBe(theirs);
+  });
+
+  it('and is fenced from the moment sign-out is asked for, not when it finishes', async () => {
+    // The counter moves before the clear it is waiting on. A keychain write is
+    // not instant, and a renewal answering inside a sign-out that has started
+    // but not landed would look at a store that still held the old token,
+    // compare it happily, and write over the top of somebody leaving.
+    //
+    // This is the test that tells the two orderings apart: the sign-out is
+    // held open at the clear while the renewal answers.
+    let letClearFinish: (() => void) | null = null;
+    const slow: TokenStore = {
+      ...memoryTokenStore(),
+      read: async () => held(store),
+      write: async (value) => void (await store.write(value)),
+      clear: async () => {
+        await new Promise<void>((resolve) => {
+          letClearFinish = resolve;
+        });
+        await store.clear();
+      },
+    };
+    const store = memoryTokenStore();
+    await store.write(nearlyOut);
+    const manager = new SessionManager(slow, () => NOW);
+
+    let arrive: (() => void) | null = null;
+    const renewal = manager.renewIfDue(
+      async () =>
+        new Promise<string>((resolve) => {
+          arrive = () => resolve(fresh);
+        }),
+    );
+    for (let spin = 0; spin < 50 && arrive === null; spin += 1) await Promise.resolve();
+
+    const leaving = manager.signOut();
+    for (let spin = 0; spin < 50 && letClearFinish === null; spin += 1) await Promise.resolve();
+
+    // The renewal answers while the sign-out is still in the store's hands.
+    (arrive as unknown as () => void)();
+    expect(await renewal).toBe(false);
+
+    (letClearFinish as unknown as () => void)();
+    await leaving;
+    expect(await held(store)).toBeNull();
   });
 
   it('and survives a store with nowhere to read from', async () => {

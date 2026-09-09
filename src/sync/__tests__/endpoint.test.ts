@@ -309,6 +309,96 @@ describe('taking a push', () => {
     expect(store.writes.length).toBeLessThanOrEqual(4);
   });
 
+  /**
+   * A store that actually enforces the condition it is handed.
+   *
+   * `fakeStore` scripts contention with a counter, which pins the loop's
+   * mechanics and cannot show what happens when real requests interleave: it
+   * ignores `onlyIfMatch` and writes whatever it is given, so every device
+   * would win. This holds one tag and refuses any write that does not name it,
+   * which is the whole of what Blobs promises and the only thing the loop is
+   * built on.
+   */
+  const racingStore = () => {
+    const store = {
+      held: null as unknown,
+      etag: 'tag-0',
+      version: 0,
+      async getWithMetadata() {
+        // A real tick, not a microtask. With `Promise.resolve()` each request
+        // runs its whole read-modify-write to completion before the next is
+        // scheduled, so all six landed first time and this measured nothing.
+        // A timer puts every pending read ahead of every write, which is what
+        // two devices syncing at once actually looks like.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return store.held === null ? null : { data: store.held, etag: store.etag };
+      },
+      async setJSON(_key: string, value: unknown, options: Record<string, unknown>) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (options.onlyIfNew === true && store.held !== null) return { modified: false };
+        if (typeof options.onlyIfMatch === 'string' && options.onlyIfMatch !== store.etag) {
+          return { modified: false };
+        }
+        store.held = value;
+        store.version += 1;
+        store.etag = `tag-${store.version}`;
+        return { modified: true, etag: store.etag };
+      },
+      async delete() {
+        store.held = null;
+      },
+    };
+    return store;
+  };
+
+  it('loses nothing when several devices push at the same time', async () => {
+    // The property the whole compare-and-swap loop exists for, under real
+    // interleaving rather than a scripted counter. Every request is a write --
+    // a device mark carries `seen: now`, so even a pull with nothing in it
+    // changes the bundle -- which means devices contend on reads as well as on
+    // pushes, and `ROUNDS` is only 4.
+    //
+    // What must hold is not that everybody wins. Measured here, six at once
+    // leaves four landing and two exhausting the rounds -- so the concern is
+    // real at six, and six of one person's own devices pushing in the same
+    // instant is not a thing that happens. What must hold is that a device is
+    // told the truth: a 200 means the record is in the bundle, and anything
+    // else means it is not and the device still has it to send again.
+    const store = racingStore();
+    const token = await mint();
+
+    const answers = await Promise.all(
+      ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+        post(
+          token,
+          { since: 0, device: `device-000000${id}`, changes: { ...emptyChangeSet(), venues: [venue(id)] } },
+          store as never,
+        ),
+      ),
+    );
+
+    const landed = new Set<string>();
+    for (const [index, answer] of answers.entries()) {
+      const id = ['a', 'b', 'c', 'd', 'e', 'f'][index];
+      if (answer.status === 200) landed.add(id);
+      // Anything else is a retry, never a refusal: the device must not
+      // conclude its push was bad and drop it.
+      else expect(answer.status).toBe(503);
+    }
+
+    // Somebody got through, or the test is measuring nothing.
+    expect(landed.size).toBeGreaterThan(0);
+
+    const held = store.held as { records: { venues: Record<string, unknown> } };
+    for (const id of landed) expect(held.records.venues[id]).toBeDefined();
+    // And nothing arrived that nobody was told about, which would be the other
+    // half of a lie: a device that got a 503 and re-pushes is harmless, but one
+    // whose record landed under a 503 has moved no cursor past it.
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      if (!landed.has(id)) expect(held.records.venues[id]).toBeUndefined();
+    }
+  });
+
   it('does not call a write a success on the word of the client alone', async () => {
     // The finding this file exists for. On a conditional write the blobs client
     // reports `modified: true` for every status except 412, so a 429 or a 500

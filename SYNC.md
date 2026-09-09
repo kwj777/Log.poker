@@ -1174,6 +1174,32 @@ sign-out: `getToken` answers null once the token is gone, and the run stops
 rather than sending an empty bearer and taking a 401 and a backoff on behalf of
 somebody who is no longer there.
 
+### Two the audit raised that were not there
+
+**The `folded` map is not unbounded.** It was read as the one map with no
+`MAX_DEVICES` equivalent, which is true and does not matter: `collect` runs on
+every merge and drops a fold whose session record is gone. A fold is remembered
+for exactly as long as the tombstone it names, and the entries are written by
+the server on an import collision rather than accepted from a push, so there is
+nothing a device can do to grow it.
+
+**Contending on the etag is real at six devices and safe at any number.** Every
+request is a write, including a pull with nothing in it, because a device mark
+carries `seen: now`; `ROUNDS` is 4. The existing tests script contention with a
+counter, which pins the loop's mechanics and cannot show what happens when real
+requests interleave, so a store that enforces the condition it is handed was
+written and six devices were pushed at it at once. Four land and two exhaust the
+rounds. The two are answered 503 `unreachable`, their records are not in the
+bundle, and they have moved no cursor, so they still hold what they were
+sending: contention costs a round trip and never a record. Six of one person's
+devices pushing in the same instant is not a case anybody has.
+
+The first attempt at that test measured nothing. The store yielded on a
+microtask, which is not enough to interleave a read-modify-write, so all six
+ran to completion in turn and all six landed first time. A timer puts every
+pending read ahead of every write, which is what two devices syncing at once
+actually looks like.
+
 ### The unplaceable cursor was only half checked
 
 **Being ahead of `heardThrough` is one of the two ways a cursor can be from

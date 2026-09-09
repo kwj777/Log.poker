@@ -213,12 +213,32 @@ describe('erasing the copy on the server', () => {
     expect(ERASE_DONE).toMatch(/still here/);
   });
 
-  it('and names the other devices, because it cannot reach them', () => {
-    // A device still signed in has its own copy and will upload it again.
-    // There is no honest way to promise otherwise from this screen, and
-    // leaving it out would make the button a promise the app cannot keep.
-    expect(ERASE_CONFIRM).toMatch(/other device/);
-    expect(ERASE_CONFIRM).toMatch(/sign out there too/);
+  it('says it cannot be undone, and that nothing anywhere will put it back', () => {
+    // This asserted the opposite for a day: that another signed-in device
+    // would upload its copy again, so sign out there too. It will not. A
+    // device pushes what changed since its own cursor, and that cursor says
+    // the whole log was sent. The warning pointed at the one risk that was not
+    // real, and the real one went unsaid.
+    expect(ERASE_CONFIRM).toMatch(/cannot be undone/);
+    expect(ERASE_CONFIRM).toMatch(/no device will put it back/);
+    expect(ERASE_CONFIRM).not.toMatch(/upload it again|sign out there too/);
+  });
+
+  it('and forgets this device\u2019s cursors, or the erase is one it can undo by accident', () => {
+    // `pushed` says the whole log was sent. Left alone, signing in again
+    // pushes nothing and the emptied bucket stays empty while the app reports
+    // that it is up to date. Fenced through the wrapper, so a sync in flight
+    // cannot write the old numbers back afterwards.
+    const card = read('src', 'features', 'account', 'SignInCard.tsx');
+    const body = card.slice(card.indexOf('const erase = async'), card.indexOf('if (session)'));
+    expect(body).toContain('forget()');
+    expect(body.indexOf('forget()')).toBeLessThan(body.indexOf('await signOut()'));
+  });
+
+  it('and signing out forgets them too, or the next person inherits them', () => {
+    const card = read('src', 'features', 'account', 'SignInCard.tsx');
+    const body = card.slice(card.indexOf('const leave = async'), card.indexOf('const erase = async'));
+    expect(body).toContain('forget()');
   });
 
   it('erases before it signs out, so a failure leaves a session to retry from', () => {

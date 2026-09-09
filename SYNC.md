@@ -1161,10 +1161,24 @@ quietly during work like this.
   signed in is a control that undoes itself the next time somebody logs a
   session. It erases first and signs out second, so the worst failure available
   is a session still there and a button that can be pressed again rather than
-  somebody signed out of a deletion that never happened. And the copy names the
-  other devices, because nothing here can reach into them: one still signed in
-  has its own copy and will upload it, and saying so is the whole of what can
-  honestly be done about it.
+  somebody signed out of a deletion that never happened.
+
+  **And an audit found it did not erase.** `eraseRemote` deletes the bucket, and
+  nothing forgot this device's cursors, though `cursorStore`'s own header has
+  always said they are *"forgotten at the same moment the token is"*. So
+  `pushed` still claimed the whole log had been sent: signing in again pushed
+  only the last millisecond of it, the emptied bucket stayed empty, and the app
+  reported that it was up to date. The copy was wrong in the same breath, and
+  wrong in the direction that matters: it warned that another signed-in device
+  would put the copy back, which cursor-bounded pushes mean it will not, while
+  the real fact -- that nothing anywhere undoes this -- went unsaid.
+
+  `SyncingRepository.forget` is what makes the header true. It rewinds the
+  cursors, keeps the device id, and bumps the epoch so a push already in flight
+  cannot write the old numbers back afterwards. The card calls it wherever it
+  puts a token down, which is signing out as well as erasing: the next person
+  to sign in on a device used to inherit the last one's place in a conversation
+  with a different bucket, and be served the tail of their own history.
 
 ---
 

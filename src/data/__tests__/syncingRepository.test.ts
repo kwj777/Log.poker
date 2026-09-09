@@ -1035,3 +1035,129 @@ describe('resetting a device', () => {
     expect(await phone.getSession(session.id)).not.toBeNull();
   });
 });
+
+/* ------------------------------------------------------- forgetting a bucket */
+
+/**
+ * What a device forgets when it puts a token down.
+ *
+ * The cursors are this device's place in a conversation with one bucket, and
+ * for a while nothing ever forgot them. That is not untidiness: it is silent
+ * data loss twice over, and both halves are here.
+ */
+describe('forgetting where the conversation had got to', () => {
+  /**
+   * One local database and one cursor store, wrapped as many times as asked.
+   *
+   * Which is what the app does: `forget` halts the wrapper, and signing in
+   * again builds a new one over the same two things. A test that made a second
+   * *device* instead would be pushing an empty log and proving nothing.
+   */
+  const reWrappable = async (fetch: Fetch, name: string, id = `device-${name}0001`) => {
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    let counter = 0;
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `${name}-${String(++counter).padStart(3, '0')}` },
+    });
+    await local.init();
+    const cursors = memoryCursorStore({ pulled: 0, pushed: 0, device: id });
+    return {
+      cursors,
+      wrap: () => new SyncingRepository(local, 'a.b.c.d', cursors, { fetch }, () => now),
+    };
+  };
+
+  /**
+   * Two sessions an hour apart, pushed.
+   *
+   * The gap is the whole point. Both comparisons read one millisecond back, so
+   * the newest records are re-sent on every sync whatever the cursor says: a
+   * log written in one millisecond goes back up with or without this fix, and
+   * a test built on one passes either way. Only the older session is genuinely
+   * behind the mark, so only the older session proves anything.
+   */
+  const twoSessions = async (fetch: Fetch, held: { bundle: unknown }) => {
+    const phone = await reWrappable(fetch, 'phone');
+    const signedIn = phone.wrap();
+    const older = await startSession(signedIn, 'Aria');
+    tick(HOUR);
+    await startSession(signedIn, 'Bellagio');
+    await signedIn.push();
+    expect(held.bundle).not.toBeNull();
+    return { phone, signedIn, older };
+  };
+
+  it('lets an erased log go back up, which it could not before', async () => {
+    // The erase deletes the bucket. Without this the device still believes it
+    // has pushed everything, so signing in again pushes only the last
+    // millisecond of it, the rest never goes back, and the app reports that it
+    // is up to date.
+    const { fetch, held } = server();
+    const { phone, signedIn, older } = await twoSessions(fetch, held);
+
+    // The server copy is erased out from under it, the way the DELETE does,
+    // and then this device puts its token down.
+    held.bundle = null;
+    await signedIn.forget();
+
+    // Signing in again: a new wrapper over the same local database and the
+    // same cursor store, which is what `recomposeRepository` builds.
+    await phone.wrap().push(true);
+
+    const laptop = await device(fetch, 'laptop');
+    await laptop.push(true);
+    expect((await laptop.getSession(older.id))?.id).toBe(older.id);
+  });
+
+  it('and a push already in flight cannot put the old place back', async () => {
+    // The erase is a tap and a push is in flight after every write, so the two
+    // overlap by construction. A run that started first must not write the
+    // cursors it read before the forget, or the log is stranded again and
+    // nothing says so. The epoch fence is what stops it.
+    const { fetch, held } = server();
+    const { phone, signedIn, older } = await twoSessions(fetch, held);
+
+    let release: (() => void) | null = null;
+    held.hold = () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+    const inFlight = signedIn.push(true);
+    for (let spin = 0; spin < 50 && release === null; spin += 1) await Promise.resolve();
+
+    held.bundle = null;
+    await signedIn.forget();
+
+    (release as unknown as () => void)();
+    await inFlight;
+    held.hold = null;
+
+    // The forget has to be what survives, so the whole log still goes back up.
+    await phone.wrap().push(true);
+
+    const laptop = await device(fetch, 'laptop');
+    await laptop.push(true);
+    expect((await laptop.getSession(older.id))?.id).toBe(older.id);
+  });
+
+  it('keeps the device id, or the server counts one phone as two', async () => {
+    // Forgetting it would make this device look new and hold up collection for
+    // a whole retention window under a name nobody will use again.
+    const cursors = memoryCursorStore({ pulled: 40, pushed: 30, device: 'device-keepme001' });
+    const { fetch } = server();
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'x-001' },
+    });
+    await local.init();
+
+    await new SyncingRepository(local, 'a.b.c.d', cursors, { fetch }, () => now).forget();
+
+    expect(await cursors.read()).toEqual({ pulled: 0, pushed: 0, device: 'device-keepme001' });
+  });
+});

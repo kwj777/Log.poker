@@ -132,6 +132,12 @@ export const SignInCard = () => {
 
   const leave = async () => {
     setBusy(true);
+    // Before the token goes, and through the wrapper rather than around it, so
+    // a sync already in flight is fenced and cannot write the old cursors back
+    // afterwards. Without this the next person to sign in on this device
+    // inherits them and is served the tail of their own history. See
+    // `SyncingRepository.forget`.
+    await (await getSyncingRepository())?.forget();
     await signOut();
     recomposeRepository();
     setSession(null);
@@ -165,6 +171,10 @@ export const SignInCard = () => {
       setBusy(false);
       return;
     }
+    // The bucket is gone; now so is this device's memory of having filled it.
+    // `pushed` said the whole log had been sent, so signing in again pushed
+    // nothing and the emptied bucket stayed empty for good.
+    await (await getSyncingRepository())?.forget();
     await signOut();
     recomposeRepository();
     setSession(null);

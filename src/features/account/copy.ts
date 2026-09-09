@@ -131,18 +131,27 @@ export const describeSession = (syncs: boolean): string =>
  *
  * ## And why it names the other devices
  *
- * Nothing here can reach into somebody's other phone. A device still signed in
- * has its own copy and will upload it, which puts the bucket back within a
- * session or two, and there is no honest way to promise otherwise from this
- * screen. Saying it plainly is the whole of what can be done about it, and
- * leaving it out would make the button a promise the app cannot keep.
+ * Nothing here can reach into somebody's other phone, and there is no honest
+ * way to promise otherwise from this screen.
+ *
+ * **This paragraph used to say the opposite of what happens, and so did the
+ * sentence it justified.** It warned that another signed-in device would put
+ * its copy back within a session or two. It will not: a device pushes what
+ * changed since its own `pushed` cursor, and that cursor already says the
+ * whole log was sent. So the erase is permanent everywhere, and the warning
+ * was pointing at the one risk that was not real while the real one -- that
+ * nothing anywhere can undo this -- went unsaid.
+ *
+ * What another device does hold is its own local log, which is untouched and
+ * is not a copy of the server's. It goes back up only if that device is signed
+ * out and in again, which forgets its cursors the same way this does.
  */
 export const ERASE_EXPLAINS =
   'You can also erase the copy on the server. That signs this device out, and leaves your log here.';
 
 /** The step between the button and the deletion. Says what it reaches. */
 export const ERASE_CONFIRM =
-  'This deletes the copy Log is holding for you and signs this device out. The log on this device is untouched. Any other device still signed in has its own copy and will upload it again, so sign out there too if you want it gone for good.';
+  'This deletes the copy Log is holding for you and signs this device out. It cannot be undone, and no device will put it back. The log on this device is untouched, and so is the one on every other device you have signed in on.';
 
 /**
  * What to say when it did not happen.
@@ -158,4 +167,4 @@ export const ERASE_FAILED =
 
 /** And when it did. Read on the signed-out card, which is where it lands. */
 export const ERASE_DONE =
-  'Erased, and this device is signed out. Your log is still here.';
+  'Erased, and this device is signed out. Your log is still here, and signing in again would start carrying it across from scratch.';

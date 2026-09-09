@@ -46,6 +46,45 @@ describe('composing the repository', () => {
     expect(tokenless).not.toContain('collectTombstones');
   });
 
+  it('opens the database once, however many times the session changes', () => {
+    // A recompose used to open a second handle on the same database and drop
+    // the first without closing it, and there is nothing to close it with:
+    // `Repository` has no `close`. Six sign-ins in one process left six
+    // handles open.
+    //
+    // Measured before it was fixed, because the harm was worth knowing rather
+    // than assuming: all six worked, all six saw each other's writes -- they
+    // are views onto one database, not copies -- and Dexie closes a handle by
+    // default when another connection wants to upgrade or delete, so a stale
+    // one cannot block a migration. What was actually leaking was a connection
+    // per sign-in for the life of the process, which on native is a file
+    // descriptor rather than an object.
+    //
+    // The database is the part of the composition that does not depend on who
+    // is signed in, so it is held apart and opened once.
+    expect(source).toContain('const local = await openLocal();');
+    // Comments here discuss the old call by name, so count what ships.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code.match(/createRepository\(\)/g)).toHaveLength(1);
+    expect(code.indexOf('createRepository()')).toBeGreaterThan(code.indexOf('const openLocal ='));
+    expect(code.indexOf('createRepository()')).toBeLessThan(code.indexOf('const compose ='));
+  });
+
+  it('and a failed open is not the answer every later launch gets', () => {
+    // The same rule `getRepository` already had. Memoizing the promise is the
+    // whole fix, so memoizing a rejected one would turn a keychain that was
+    // not ready yet into an app that never opens its database again.
+    const opener = source.slice(at('const openLocal ='), at('const compose ='));
+    expect(opener).toContain('opened = null;');
+    expect(opener).toContain('throw error;');
+  });
+
+  it('and a recompose clears the composition without touching it', () => {
+    const recompose = source.slice(at('export const recomposeRepository'), source.length);
+    expect(recompose).toContain('pending = null;');
+    expect(recompose.slice(0, recompose.indexOf('};'))).not.toContain('opened = null');
+  });
+
   it('renews a token that is nearly out, on the one path that runs every launch', () => {
     // Thirty days was the whole life of a session until this line. On the
     // thirty-first `current()` cleared the token, the tokenless branch above

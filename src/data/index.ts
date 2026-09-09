@@ -22,6 +22,40 @@ import { TOMBSTONE_RETENTION_MS, type Repository } from './repository';
 let pending: Promise<Repository> | null = null;
 
 /**
+ * The local database, opened once and kept across every recompose.
+ *
+ * Held apart from `pending` because it is the one part of the composition that
+ * has nothing to do with who is signed in. `compose` used to call
+ * `createRepository()` itself, so a recompose opened a second handle on the
+ * same database and dropped the first without closing it -- and there is
+ * nothing to close it with, since `Repository` has no `close`.
+ *
+ * Six sign-ins in one process left six handles open. All of them work and all
+ * of them see each other's writes, because they are views onto one database
+ * rather than copies of it, so nothing diverged; Dexie also closes a handle by
+ * default when another connection wants to upgrade or delete, so a stale one
+ * cannot block a migration either. What was left was a connection per sign-in
+ * held for the life of the process, and a native SQLite handle is a file
+ * descriptor rather than an object.
+ *
+ * Opening once is a smaller fix than a `close` on the interface and a driver
+ * to implement it twice, and it is also the more honest shape: signing in
+ * re-decides whether there is a wrapper, and was never a reason to reopen the
+ * database underneath it.
+ */
+let opened: Promise<Repository> | null = null;
+
+const openLocal = (): Promise<Repository> => {
+  opened ??= createRepository().catch((error: unknown) => {
+    // Same reasoning as `getRepository`: a failure to open must not be the
+    // answer every later launch gets.
+    opened = null;
+    throw error;
+  });
+  return opened;
+};
+
+/**
  * The local repository, wrapped if this device holds a session that syncs.
  *
  * A failure to read the session is not a failure to open the app: the answer
@@ -29,7 +63,7 @@ let pending: Promise<Repository> | null = null;
  * the thing that can be missing.
  */
 const compose = async (): Promise<Repository> => {
-  const local = await createRepository();
+  const local = await openLocal();
   try {
     const session = await getSession();
     if (session === null || !session.syncs) {
@@ -119,6 +153,8 @@ export const getRepository = (): Promise<Repository> => {
  * Signing in has to reach the data layer somehow, and the alternative to this
  * is the data layer subscribing to the auth layer, which is a dependency in the
  * wrong direction for one event that happens twice in a lifetime.
+ *
+ * Only the composition. The database stays open: see `opened`.
  */
 export const recomposeRepository = (): void => {
   pending = null;

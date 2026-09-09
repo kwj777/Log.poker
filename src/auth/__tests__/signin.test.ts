@@ -83,10 +83,10 @@ describe('asking for a code', () => {
 
 describe('trading a code for a token', () => {
   it('returns the token rather than storing it', async () => {
-    const { fetch, calls } = answering(200, { token: '1700000000.full.cus_1.sig' });
+    const { fetch, calls } = answering(200, { token: '1700000000.full.log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4.sig' });
     expect(await redeemCode('player@example.com', '123456', { fetch })).toEqual({
       ok: true,
-      token: '1700000000.full.cus_1.sig',
+      token: '1700000000.full.log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4.sig',
     });
     const [call] = calls as unknown as { url: string; init: RequestInit }[];
     expect(call.url).toBe(`${SIGNIN_ORIGIN}/api/signin/code`);
@@ -149,7 +149,7 @@ describe('trading a code for a token', () => {
  * and nothing else, and the caller keeps what it had.
  */
 describe('renewing a token', () => {
-  const HELD = '1800000000.free.cus_1.signature';
+  const HELD = '1800000000.free.log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4.signature';
 
   it('sends the token it is renewing, as a bearer, and asks for JSON', async () => {
     const { fetch, calls } = answering(200, { token: 'fresher' });

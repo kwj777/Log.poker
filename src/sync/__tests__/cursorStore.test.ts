@@ -35,12 +35,19 @@ describe('carrying cursors across a launch', () => {
   });
 
   it('reads back every number it was given', async () => {
-    await cursorStore.write({ pulled: 40, pushed: 30, device: 'device-aaaa0001', settled: 20 });
+    await cursorStore.write({
+      pulled: 40,
+      pushed: 30,
+      device: 'device-aaaa0001',
+      settled: 20,
+      subject: 'log_abc',
+    });
     expect(await cursorStore.read()).toEqual({
       pulled: 40,
       pushed: 30,
       device: 'device-aaaa0001',
       settled: 20,
+      subject: 'log_abc',
     });
   });
 
@@ -48,7 +55,7 @@ describe('carrying cursors across a launch', () => {
     // `pulled` and `pushed` are worth one full re-sync each if they are lost.
     // `settled` is worth a resurrected session: a device that loses it sweeps
     // tombstones on the window while the bucket still holds the live rows.
-    await cursorStore.write({ pulled: 0, pushed: 0, device: 'device-aaaa0001', settled: 12_345 });
+    await cursorStore.write({ pulled: 0, pushed: 0, device: 'device-aaaa0001', settled: 12_345, subject: null });
     expect((await cursorStore.read()).settled).toBe(12_345);
   });
 
@@ -91,7 +98,7 @@ describe('carrying cursors across a launch', () => {
     try {
       await expect(cursorStore.read()).resolves.toEqual(freshCursors());
       await expect(
-        cursorStore.write({ pulled: 1, pushed: 1, device: 'device-aaaa0001', settled: 1 }),
+        cursorStore.write({ pulled: 1, pushed: 1, device: 'device-aaaa0001', settled: 1, subject: null }),
       ).resolves.toBeUndefined();
     } finally {
       // Put it back, or the getter throws again inside jest's own teardown and

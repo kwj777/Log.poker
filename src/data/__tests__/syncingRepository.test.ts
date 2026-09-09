@@ -101,7 +101,7 @@ const device = async (fetch: Fetch, name: string, id = `device-${name}0001`) => 
   return new SyncingRepository(
     local,
     'a.b.c.d',
-    memoryCursorStore({ pulled: 0, pushed: 0, device: id, settled: 0 }),
+    memoryCursorStore({ pulled: 0, pushed: 0, device: id, settled: 0, subject: null }),
     { fetch },
     () => now,
   );
@@ -447,8 +447,17 @@ describe('the loop around it', () => {
     held.offline = true;
 
     const session = await startSession(phone);
+    // The point of the test: the row is here whether or not the network is.
     expect(await phone.getSession(session.id)).not.toBeNull();
-    expect(phone.current().problem).not.toBe(null);
+
+    // And the failure is recorded, once the push that `touched` started has
+    // got as far as failing. This used to read `current()` straight after
+    // `startSession` and pass on the background push happening to have
+    // finished inside its awaits, which is a race rather than an assertion:
+    // one more await anywhere above the network call and it reads a run still
+    // in flight and sees no problem yet.
+    await phone.push(true);
+    expect(phone.current().problem).toBe('unreachable');
   });
 
   it('sends what it could not send, once it can', async () => {
@@ -584,7 +593,7 @@ describe('what the loop does with a bad day', () => {
     const phone = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-loaded01', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-loaded01', settled: 0, subject: null }),
       { fetch: refusing, budget: 1_200 },
       () => now,
     );
@@ -644,7 +653,7 @@ describe('what the loop does with a bad day', () => {
     const laptop = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-slow0001', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-slow0001', settled: 0, subject: null }),
       { fetch },
       () => now - SKEW,
     );
@@ -705,7 +714,7 @@ describe('what the loop does with a bad day', () => {
     const laptop = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-late00001', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-late00001', settled: 0, subject: null }),
       { fetch },
       () => now,
     );
@@ -744,7 +753,7 @@ describe('what the loop does with a bad day', () => {
     const phone = new SyncingRepository(
       local,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-heavy001', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-heavy001', settled: 0, subject: null }),
       { fetch, budget: 400 },
       () => now,
     );
@@ -803,7 +812,7 @@ describe('what the loop does with a bad day', () => {
     const reader = new SyncingRepository(
       brittle,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reader001', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reader001', settled: 0, subject: null }),
       { fetch },
       () => now,
     );
@@ -1075,7 +1084,7 @@ describe('resetting a device', () => {
     const reading = new SyncingRepository(
       gated,
       'a.b.c.d',
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reading01', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-reading01', settled: 0, subject: null }),
       { fetch },
       () => now,
     );
@@ -1136,7 +1145,7 @@ describe('forgetting where the conversation had got to', () => {
       ids: { next: () => `${name}-${String(++counter).padStart(3, '0')}` },
     });
     await local.init();
-    const cursors = memoryCursorStore({ pulled: 0, pushed: 0, device: id, settled: 0 });
+    const cursors = memoryCursorStore({ pulled: 0, pushed: 0, device: id, settled: 0, subject: null });
     return {
       cursors,
       wrap: () => new SyncingRepository(local, 'a.b.c.d', cursors, { fetch }, () => now),
@@ -1220,7 +1229,7 @@ describe('forgetting where the conversation had got to', () => {
   it('keeps the device id, or the server counts one phone as two', async () => {
     // Forgetting it would make this device look new and hold up collection for
     // a whole retention window under a name nobody will use again.
-    const cursors = memoryCursorStore({ pulled: 40, pushed: 30, device: 'device-keepme001', settled: 0 });
+    const cursors = memoryCursorStore({ pulled: 40, pushed: 30, device: 'device-keepme001', settled: 0, subject: null });
     const { fetch } = server();
     const driver = new NodeSqliteDriver(':memory:');
     drivers.push(driver);
@@ -1242,6 +1251,9 @@ describe('forgetting where the conversation had got to', () => {
       pushed: 0,
       device: 'device-keepme001',
       settled: 30,
+      // Kept as it was. A rewind is not a change of bucket, and `settle` is
+      // what notices one of those.
+      subject: null,
     });
   });
 
@@ -1272,9 +1284,105 @@ describe('forgetting where the conversation had got to', () => {
       pushed: 10,
       device: 'device-keepme001',
       settled: 99,
+      subject: null,
     });
     await wrapper.forget();
     expect((await cursors.read()).settled).toBe(99);
+  });
+
+  it('rewinds the push cursor when the token names a different bucket', async () => {
+    // The hole this closes has nothing to do with signing out, because `forget`
+    // already rewinds there. The way in is an expiry: `SessionManager.current`
+    // clears a token that has run out, on its own, with no card on screen and
+    // nothing calling `forget`. The cursors outlive the session, and the next
+    // sign-in on that device inherits them. A second person on a shared phone,
+    // or the same person after the family's other door stopped being taken,
+    // then has `pushed` saying their whole log was already sent -- to a bucket
+    // that is not theirs -- so the new one is never sent anything and the card
+    // reports it as up to date.
+    const cursors = memoryCursorStore({
+      pulled: 900,
+      pushed: 800,
+      device: 'device-shared001',
+      settled: 100,
+      subject: 'log_' + 'a1'.repeat(16),
+    });
+    const { fetch } = server();
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'x-001' },
+    });
+    await local.init();
+
+    const other = 'log_' + 'b2'.repeat(16);
+    const token = `${Math.floor((now + 3_600_000) / 1000)}.free.${other}.sig`;
+    await new SyncingRepository(local, token, cursors, { fetch }, () => now).push(true);
+
+    const held = await cursors.read();
+    expect(held.subject).toBe(other);
+    // Both, because it is a different conversation in both directions.
+    expect(held.pulled).toBe(0);
+    // And the high-water mark carries, so a tombstone that was already safe to
+    // collect stays safe. Zeroing it here is what would resurrect a delete.
+    expect(held.settled).toBe(800);
+  });
+
+  it('but leaves a device that is still talking to the same bucket alone', async () => {
+    // The rule has to cost nothing on the ordinary path, which is every sync
+    // by everybody who has not changed who they are signed in as.
+    const mine = 'log_' + 'c3'.repeat(16);
+    const cursors = memoryCursorStore({
+      pulled: 900,
+      pushed: 800,
+      device: 'device-shared001',
+      settled: 100,
+      subject: mine,
+    });
+    const { fetch } = server();
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'y-001' },
+    });
+    await local.init();
+
+    const token = `${Math.floor((now + 3_600_000) / 1000)}.free.${mine}.sig`;
+    await new SyncingRepository(local, token, cursors, { fetch }, () => now).push(true);
+    expect((await cursors.read()).settled).toBe(100);
+  });
+
+  it('and does not rewind on a token it cannot read, which is every expiry', async () => {
+    // `readClaim` answers null for an expired token, and a run past the
+    // thirtieth day would otherwise read that as a change of bucket and rewind
+    // on every launch. The server is the one that refuses a dead token.
+    const mine = 'log_' + 'd4'.repeat(16);
+    const cursors = memoryCursorStore({
+      pulled: 900,
+      pushed: 800,
+      device: 'device-shared001',
+      settled: 100,
+      subject: mine,
+    });
+    const { fetch } = server();
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'z-001' },
+    });
+    await local.init();
+
+    const dead = `${Math.floor((now - 3_600_000) / 1000)}.free.${'log_' + 'e5'.repeat(16)}.sig`;
+    await new SyncingRepository(local, dead, cursors, { fetch }, () => now).push(true);
+    const held = await cursors.read();
+    expect(held.subject).toBe(mine);
+    // `settled` is what tells the two branches apart: a rewind would have
+    // raised it to `pushed`. `pulled` cannot say, because a sync that succeeds
+    // overwrites it either way.
+    expect(held.settled).toBe(100);
   });
 
   it('and a local reset keeps it, because the bucket is still there', async () => {
@@ -1288,6 +1396,7 @@ describe('forgetting where the conversation had got to', () => {
       pushed: 30,
       device: 'device-keepme001',
       settled: 99,
+      subject: null,
     });
     await wrapper.clearAll();
     expect((await cursors.read()).settled).toBe(99);
@@ -1303,6 +1412,7 @@ describe('forgetting where the conversation had got to', () => {
       pushed: 30,
       device: 'device-keepme001',
       settled: 99,
+      subject: null,
     });
     await wrapper.forget({ erased: true });
     expect((await cursors.read()).settled).toBe(0);
@@ -1393,7 +1503,7 @@ describe('the token it sends', () => {
     const wrapper = new SyncingRepository(
       local,
       async () => current,
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-renew0001', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-renew0001', settled: 0, subject: null }),
       { fetch },
       () => now,
     );
@@ -1424,7 +1534,7 @@ describe('the token it sends', () => {
     const wrapper = new SyncingRepository(
       local,
       async () => current,
-      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-gone00001', settled: 0 }),
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-gone00001', settled: 0, subject: null }),
       { fetch },
       () => now,
     );

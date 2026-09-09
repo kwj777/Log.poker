@@ -64,6 +64,40 @@ export type Tier = (typeof TIERS)[number];
  */
 export const SUBJECT_PASSCODE = 'passcode';
 
+/** What every subject Log's own door mints begins with. */
+export const SUBJECT_PREFIX = 'log_';
+
+/**
+ * The exact shape of a subject Log minted, and the whole of who may sync.
+ *
+ * `subjectForEmail` is the only thing in the family that writes this shape:
+ * the prefix and thirty-two characters of an HMAC, which `hmacHex` emits in
+ * lowercase, so the character class is exact rather than approximate. The
+ * grammar above it is Untilt's and is much wider on purpose -- a Stripe
+ * customer id is a subject too -- and that width used to be the whole of the
+ * rule.
+ *
+ * **It cost a person their history, quietly.** Untilt mints for a customer, so
+ * its subject is `cus_...`; Log's door derives one from an address. Log took
+ * both and keyed a bucket off whichever arrived, and it cannot tell that they
+ * are the same person: a customer id does not carry the address, so nothing on
+ * this side can link them. Somebody who arrived with Untilt's token synced into
+ * one bucket, and when that token expired -- Log will not renew a paid claim,
+ * rightly, because the store is shared with the family -- they signed in at
+ * Log's own door under the other subject and found an empty log, with the full
+ * one in a bucket nothing would ever ask for again.
+ *
+ * There is no way to merge the two that is not also a way to reach somebody
+ * else's history, so the answer is to stop taking the second kind at all. Log
+ * mints its own tokens now and has never shipped a way to receive one of
+ * Untilt's, on either platform: the token store is `localStorage` on Log's own
+ * origin and `expo-secure-store` with no keychain access group, and the only
+ * caller of `signIn` is the card, holding what Log's door just minted. So this
+ * refuses a token that cannot arrive, which is the point -- the rule was true
+ * by accident and is now true by construction.
+ */
+export const OWN_SUBJECT = /^log_[0-9a-f]{32}$/;
+
 const SUBJECT_PATTERN = /^[A-Za-z0-9_]{1,64}$/;
 
 export interface Claim {
@@ -138,5 +172,17 @@ export const RENEW_WITHIN_MS = 10 * 24 * 60 * 60 * 1000;
 export const dueForRenewal = (claim: Claim | null, now: Timestamp): boolean =>
   claim !== null && claim.expiresAt > now && claim.expiresAt - now <= RENEW_WITHIN_MS;
 
+/**
+ * Whether this claim has a log of its own to carry.
+ *
+ * The client's half of the rule the server enforces in `hasOwnBucket`, and the
+ * two have to say the same thing: this decides whether the data layer builds a
+ * syncing wrapper at all, so a device that answered yes here and no there
+ * would sync into a wall of 403s and halt.
+ *
+ * The passcode line stays although the shape test already excludes it. Log
+ * inherits that refusal explicitly rather than by luck, and a rule that happens
+ * to exclude a passcode is not the same as one that refuses it.
+ */
 export const hasOwnSubject = (claim: Claim | null): boolean =>
-  claim !== null && claim.subject !== SUBJECT_PASSCODE;
+  claim !== null && claim.subject !== SUBJECT_PASSCODE && OWN_SUBJECT.test(claim.subject);

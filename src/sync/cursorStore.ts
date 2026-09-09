@@ -28,6 +28,9 @@ const KEY = 'log_sync_cursors';
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
+/** The token grammar's subject, which is what a cursor records having spoken to. */
+const SUBJECT = /^[A-Za-z0-9_]{1,64}$/;
+
 /**
  * A device id, invented exactly once and kept through everything.
  *
@@ -56,12 +59,15 @@ export const freshCursors = (): Cursors => ({
   pushed: 0,
   device: (invented ??= mint()),
   settled: 0,
+  subject: null,
 });
 
 const parse = (held: string | null): Cursors => {
   const fresh = freshCursors();
   try {
-    const { pulled, pushed, device, settled } = JSON.parse(held ?? '') as Partial<Cursors>;
+    const { pulled, pushed, device, settled, subject } = JSON.parse(
+      held ?? '',
+    ) as Partial<Cursors>;
     return {
       pulled: typeof pulled === 'number' && pulled > 0 ? pulled : 0,
       pushed: typeof pushed === 'number' && pushed > 0 ? pushed : 0,
@@ -72,6 +78,10 @@ const parse = (held: string | null): Cursors => {
       // the delete too, or never sent, in which case there is no bucket
       // waiting to send it back.
       settled: typeof settled === 'number' && settled > 0 ? settled : 0,
+      // Null for anything that is not a subject, which reads as "we do not know
+      // which bucket these are about". That is the answer that rewinds the push
+      // cursor once and then knows, rather than one that guesses at a bucket.
+      subject: typeof subject === 'string' && SUBJECT.test(subject) ? subject : null,
       // A stored id survives whatever else was wrong with the record. Minting
       // a new one makes this device look new to the server, which holds
       // collection up for a whole window under a name nobody will use again.

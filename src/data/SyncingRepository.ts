@@ -29,6 +29,7 @@
  * decisions it makes the fewer ways two devices have of never converging.
  */
 
+import { readClaim } from '../auth/token';
 import type { Timestamp } from '../domain/types';
 import { batchFor } from '../sync/batch';
 import { backoffMs, sync, type SyncOptions } from '../sync/client';
@@ -88,6 +89,14 @@ export interface Cursors {
    * because there is nothing anywhere to send a deleted row back.
    */
   settled: Timestamp;
+  /**
+   * Which bucket these cursors are a conversation with, or null if unknown.
+   *
+   * Null means a record written before this field existed, not a device that
+   * has never synced: a fresh one has zeroes in the numbers above and nothing
+   * to be wrong about. See `settle`.
+   */
+  subject: string | null;
 }
 
 /** Where the cursors live. Small enough that anything durable will do. */
@@ -97,7 +106,13 @@ export interface CursorStore {
 }
 
 export const memoryCursorStore = (
-  start: Cursors = { pulled: 0, pushed: 0, device: 'test-device-0001', settled: 0 },
+  start: Cursors = {
+    pulled: 0,
+    pushed: 0,
+    device: 'test-device-0001',
+    settled: 0,
+    subject: null,
+  },
 ): CursorStore => {
   let held = start;
   return {
@@ -317,6 +332,58 @@ export class SyncingRepository implements Repository {
     }
   }
 
+  /**
+   * Cursors that are about the bucket this token names, and not another one.
+   *
+   * A cursor is a place in one conversation, and nothing recorded which
+   * conversation. `pushed` says everything up to it has been sent; point the
+   * same device at a different bucket and it goes on saying so, so the new
+   * bucket is never sent anything and the app reports it as up to date.
+   *
+   * Signing out is not how that happens, because `forget` rewinds. The way in
+   * is an expiry: `SessionManager.current` clears a token that has run out, on
+   * its own, with no card on screen and nothing calling `forget`. So the
+   * cursors outlive the session, and the next sign-in on that device inherits
+   * them. If it is the same address it is the same bucket and they are right.
+   * If it is a different one -- a second person on a shared device, or the same
+   * person after the family's other door stopped being accepted -- they are a
+   * conversation with somewhere else.
+   *
+   * Two cases, and neither is a failure worth stopping for:
+   *
+   * **A different subject.** Back to the start of the conversation, keeping
+   * `settled` at the high-water mark so a tombstone that was safe to collect
+   * stays safe. The pull cursor goes too, though the server would clamp it
+   * anyway: a bundle refuses a cursor from a device it has never answered.
+   *
+   * **No subject at all**, which is every install on the day this ships. It
+   * cannot be known whether those cursors are about this bucket, so the push
+   * cursor is rewound and the pull cursor is not. That costs one re-push per
+   * install, once, which the merge absorbs as a no-op because it is idempotent
+   * and commutative, and it is the direction that cannot lose anything. Not
+   * rewinding would freeze anybody already in the broken state there for good.
+   */
+  private async settle(cursors: Cursors, token: string): Promise<Cursors> {
+    const speaking = readClaim(token, this.clock())?.subject ?? null;
+    // Nothing to compare against: an expired or unreadable token is the
+    // server's to refuse, and guessing from it would rewind on every launch
+    // past the thirtieth day.
+    if (speaking === null || cursors.subject === speaking) return cursors;
+
+    const settled =
+      cursors.subject === null
+        ? { ...cursors, pushed: 0, subject: speaking }
+        : {
+            ...cursors,
+            pulled: 0,
+            pushed: 0,
+            settled: Math.max(cursors.settled, cursors.pushed),
+            subject: speaking,
+          };
+    await this.cursors.write(settled);
+    return settled;
+  }
+
   private async run(): Promise<void> {
     this.announce({ running: true });
 
@@ -327,7 +394,23 @@ export class SyncingRepository implements Repository {
     const epoch = this.epoch;
     const startedAt = this.clock();
 
-    const cursors = await this.cursors.read();
+    // Read before the cursors rather than after them, because which bucket this
+    // token names decides whether those cursors mean anything. Read now rather
+    // than when this wrapper was built; see the constructor.
+    //
+    // It also means a run with nobody to sync for touches the database not at
+    // all, where it used to read every change since the mark and announce a
+    // backlog first.
+    const token = await this.token();
+    if (token === null) {
+      // Signed out from under this run. Not a failure to back off from and not
+      // a thing to retry: there is nobody to sync for any more.
+      this.halted = true;
+      this.announce({ running: false, problem: null });
+      return;
+    }
+
+    const cursors = await this.settle(await this.cursors.read(), token);
     // The floor is the mark and nothing else. It was briefly
     // `Math.min(pushed, startedAt)`, which is the clock, and a floor at the
     // clock excludes everything written before the clock: a device whose mark
@@ -353,16 +436,6 @@ export class SyncingRepository implements Repository {
     // cap, and an oversized body is refused rather than trimmed.
     const batch = batchFor(pending, floor, this.options.budget);
     if (batch.more) this.dirty = true;
-
-    // Read now rather than when this wrapper was built. See the constructor.
-    const token = await this.token();
-    if (token === null) {
-      // Signed out from under this run. Not a failure to back off from and not
-      // a thing to retry: there is nobody to sync for any more.
-      this.halted = true;
-      this.announce({ running: false, problem: null });
-      return;
-    }
 
     const outcome = await sync(
       { since: cursors.pulled, changes: batch.changes, device: cursors.device },
@@ -614,6 +687,10 @@ export class SyncingRepository implements Repository {
       pushed: 0,
       device: held.device,
       settled: settled ?? held.settled,
+      // Kept, so a rewind is not mistaken for a change of bucket. `forget` is
+      // already the honest way to start a conversation over; `settle` is for
+      // the one nobody announced.
+      subject: held.subject,
     });
   }
 

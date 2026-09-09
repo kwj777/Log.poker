@@ -30,7 +30,7 @@ const sign = (payload: string): string =>
 const mint = (
   {
     tier = 'full' as Tier,
-    subject = 'cus_QRSTUV123',
+    subject = 'log_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1',
     expiresAt = NOW + 30 * 24 * 3_600_000,
   } = {},
 ): string => {
@@ -44,7 +44,7 @@ describe('reading a token', () => {
     expect(claim).toEqual({
       expiresAt: NOW + 30 * 24 * 3_600_000,
       tier: 'full',
-      subject: 'cus_QRSTUV123',
+      subject: 'log_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1',
     });
   });
 
@@ -83,7 +83,7 @@ describe('reading a token', () => {
   });
 
   it('refuses a tier this build does not know', () => {
-    const payload = `${Math.floor((NOW + 3_600_000) / 1000)}.admin.cus_1`;
+    const payload = `${Math.floor((NOW + 3_600_000) / 1000)}.admin.log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4`;
     expect(readClaim(`${payload}.${sign(payload)}`, NOW)).toBeNull();
   });
 
@@ -102,7 +102,7 @@ describe('reading a token', () => {
 
   it('refuses an expiry that is not a plain number', () => {
     for (const expiry of ['-1', '1e9', '12345678901234', 'soon']) {
-      const payload = `${expiry}.full.cus_1`;
+      const payload = `${expiry}.full.log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4`;
       expect(readClaim(`${payload}.${sign(payload)}`, NOW)).toBeNull();
     }
   });
@@ -110,7 +110,7 @@ describe('reading a token', () => {
   it('reads a token whose signature is wrong, and says so in the name', () => {
     // Not an oversight, and worth pinning so that nobody later reads a claim
     // as proof of anything. This side has no key. The server checks.
-    const payload = `${Math.floor((NOW + 3_600_000) / 1000)}.full.cus_1`;
+    const payload = `${Math.floor((NOW + 3_600_000) / 1000)}.full.log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4`;
     expect(readClaim(`${payload}.not-a-real-signature`, NOW)).not.toBeNull();
   });
 });
@@ -159,7 +159,7 @@ describe('what a claim is worth', () => {
  */
 describe('whether a token is due to be replaced', () => {
   const NOW = 1_700_000_000_000;
-  const claimAt = (expiresAt: number) => ({ expiresAt, tier: 'free' as const, subject: 'cus_1' });
+  const claimAt = (expiresAt: number) => ({ expiresAt, tier: 'free' as const, subject: 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4' });
 
   it('is not, with most of the month still on it', () => {
     expect(dueForRenewal(claimAt(NOW + RENEW_WITHIN_MS + 60_000), NOW)).toBe(false);

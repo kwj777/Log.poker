@@ -41,10 +41,22 @@
  * bucket. Untilt only mails an address that has bought, so that run needs an
  * address that has.
  *
- * The token this mints names the subject `gatecheck`, so a successful run
- * writes a bucket, and the run erases it again on the way out. A token that
- * came from signing in belongs to a person, and nothing is ever erased in that
- * mode.
+ * **In that mode the pass is now a 403 rather than a 200.** Log's sync takes
+ * only subjects its own door mints, and Untilt mints a different kind, so a
+ * token of Untilt's gets as far as the gate and is turned away there. Getting
+ * that far is the whole proof: a wrong key answers 401 without ever reaching
+ * the question of who the token names.
+ *
+ * The token this mints names a subject of its own, so a successful run writes
+ * a bucket, and the run erases it again on the way out. A token that came from
+ * signing in belongs to a person, and nothing is ever erased in that mode.
+ *
+ * That subject used to be the literal `gatecheck`, and the gate now asks for a
+ * subject this app's own door minted rather than for anything Untilt would
+ * sign. So it is derived here the way `subjectForGateCheck` derives it in
+ * `src/sync/verify.ts`, from a preimage no address can produce. Mirrored
+ * rather than imported for the same reason the signature is: this script runs
+ * on `node` with nothing installed.
  */
 
 import { createHmac } from 'node:crypto';
@@ -52,14 +64,17 @@ import { createInterface } from 'node:readline/promises';
 
 /** Untilt's format, and the same one `src/sync/verify.ts` re-derives. */
 const TTL_SECONDS = 3600;
-const SUBJECT = 'gatecheck';
+
+/** `subjectForGateCheck`, mirrored. Must satisfy `OWN_SUBJECT` in token.ts. */
+const subjectFor = (secret) =>
+  'log_' + createHmac('sha256', secret).update('log.gatecheck').digest('hex').slice(0, 32);
 
 const base64url = (bytes) =>
   bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 /** `<expiry>.<tier>.<subject>.<signature>`, HMAC-SHA256 over the first three. */
 const mint = (secret) => {
-  const payload = `${Math.floor(Date.now() / 1000) + TTL_SECONDS}.full.${SUBJECT}`;
+  const payload = `${Math.floor(Date.now() / 1000) + TTL_SECONDS}.full.${subjectFor(secret)}`;
   return `${payload}.${base64url(createHmac('sha256', secret).update(payload).digest())}`;
 };
 
@@ -200,8 +215,8 @@ const explain = (status, body, minted) => {
           '  npm run check:gate -- --signin <your email>',
         ]
       : [
-          'That token verified. The key on the site is the key Untilt signs with,',
-          'and cross-device history will work for whoever holds this token.',
+          'That token verified and named a subject this site mints, so cross-device',
+          'history will work for whoever holds it.',
           '',
           'Nothing was erased: this token names a real person, and their bucket is',
           'theirs. It now holds an empty push, which is a no-op.',
@@ -231,10 +246,20 @@ const explain = (status, body, minted) => {
 
   if (status === 403) {
     return [
-      'The key is right and the token is real: it got past the gate. What it was',
-      'refused for is who it names: the shared `passcode` subject has no bucket',
-      'of its own by design, and that is the only thing this endpoint answers',
-      '403 for. The tier is not asked about -- cross-device history is free.',
+      'The signature verified. **The key on the site is the key that signed this**',
+      'token, which is the question this script exists to answer, and a 403 has',
+      'answered it. What the token was refused for is who it names.',
+      '',
+      'Two subjects are refused, and neither is about the tier: cross-device',
+      'history is free and nothing reads it. The shared `passcode` subject has no',
+      'bucket of its own by design. And a subject from another door in the family',
+      'is refused too, which is what a token from Untilt now is: the two doors',
+      'mint different subjects for one person, and taking both put somebody a',
+      'history in a bucket nothing would ask for again.',
+      '',
+      'So under `--signin-origin https://untilt.poker` a 403 is the pass, not the',
+      'failure. It proves the key is the one Untilt signs with. A 401 there would',
+      'be the failure.',
     ];
   }
 
@@ -479,8 +504,8 @@ const run = async () => {
     say(
       '',
       erased.status === 204
-        ? `Erased the ${SUBJECT} bucket this check created.`
-        : `Could not erase the ${SUBJECT} bucket this check created (HTTP ${erased.status}).`,
+        ? 'Erased the bucket this check created.'
+        : `Could not erase the bucket this check created (HTTP ${erased.status}).`,
     );
   }
 

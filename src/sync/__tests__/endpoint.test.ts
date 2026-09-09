@@ -36,7 +36,7 @@ const base64url = (bytes: ArrayBuffer): string =>
 
 /** Minted exactly as Untilt mints one: HMAC-SHA256 over the first three parts. */
 const mint = async (
-  { tier = 'full', subject = 'cus_1', ttl = 3_600 }: { tier?: string; subject?: string; ttl?: number } = {},
+  { tier = 'full', subject = 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4', ttl = 3_600 }: { tier?: string; subject?: string; ttl?: number } = {},
 ): Promise<string> => {
   const payload = `${Math.floor(NOW / 1000) + ttl}.${tier}.${subject}`;
   const key = await crypto.subtle.importKey(
@@ -495,8 +495,8 @@ describe('what every answer carries', () => {
   it('keys the bucket by an HMAC rather than by the subject', async () => {
     const mine = fakeStore();
     const theirs = fakeStore();
-    await post(await mint({ subject: 'cus_1' }), push({ venues: [venue('v1')] }), mine);
-    await post(await mint({ subject: 'cus_2' }), push({ venues: [venue('v1')] }), theirs);
+    await post(await mint({ subject: 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4' }), push({ venues: [venue('v1')] }), mine);
+    await post(await mint({ subject: 'log_e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5' }), push({ venues: [venue('v1')] }), theirs);
     // Two people, two buckets, and neither key is a customer id.
     const keys = [mine, theirs].map((store) => store.writes.length);
     expect(keys).toEqual([1, 1]);

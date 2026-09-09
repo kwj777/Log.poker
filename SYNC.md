@@ -1174,6 +1174,95 @@ sign-out: `getToken` answers null once the token is gone, and the run stops
 rather than sending an empty bearer and taking a 401 and a backoff on behalf of
 somebody who is no longer there.
 
+### One person, two subjects, and the door that is closed now
+
+Untilt mints for a Stripe customer, so its subject is `cus_...`; Log's own door
+derives `log_` and thirty-two characters of an HMAC of the address. Log took
+both and keyed a bucket off whichever arrived, and it cannot tell that they are
+the same person: a customer id does not carry the address, so nothing on this
+side can link them.
+
+Somebody who arrived on Untilt's token synced into one bucket. Thirty days
+later it expired, `renew` refused to extend a paid claim (rightly: the store is
+shared with the family, so handing back a free token would take away access
+somewhere Log cannot see), and the next sign-in was at Log's own door under the
+other subject. New bucket empty, old one full and never asked for again, and an
+erase from the new session does not reach it either.
+
+**The way out is not to merge them.** Every merge is also a way to reach
+somebody else's history, and the whole of what a token proves is that its
+bearer holds a signed string: a mechanism that takes two of them and folds one
+bucket into another is a history-theft primitive the day it is slightly wrong.
+Five approaches were designed and attacked, and the four that moved data were
+all broken, in every case through the thing that was supposed to prove
+possession.
+
+**The population is empty, which is what settles it.** Log has never shipped a
+way to receive an Untilt-minted token. The token store is `localStorage` on
+Log's own origin on web, and `expo-secure-store` with no keychain access group
+on native, so the `family_access_token` key is shared in name and not in fact.
+`signIn` has exactly one caller, the card, holding what Log's door has just
+minted. There is no deep link that reads a token and nothing pastes one. So the
+split could not happen to anybody through the app, and the only thing keeping
+it that way was a configuration that the comment above that key says is meant
+to change.
+
+So the door is closed rather than a bridge built across it. `hasOwnBucket` asks
+for a subject this app's own door minted, `OWN_SUBJECT` being the exact shape
+`subjectForEmail` writes, and `hasOwnSubject` on the client says the same thing
+so a device cannot decide it syncs and then meet a wall of 403s. One predicate
+at one call site, so reading, writing and erasing tighten together.
+
+**Nothing is exempted, and erasing was the tempting one**, because refusing it
+leaves a bucket somebody can no longer read or delete. It is refused anyway: a
+foreign token cannot be renewed here, so it expires; `SessionManager.current`
+clears an expired token, which destroys the only string in the world naming
+that subject; and the erase control lives inside the signed-in branch of the
+card. The exemption would be reachable only by somebody not yet stranded, and
+gone for everybody it was written for.
+
+The gate check needed a subject of its own, since `gatecheck` is not a shape
+this door writes. `subjectForGateCheck` derives one from `'log.gatecheck'`
+where `subjectForEmail` derives from `'log.subject.' + address`, so no address
+can reach it -- the same domain separation the bucket names already rest on --
+and the gate keeps zero named exceptions. In `--signin-origin` mode against
+Untilt **the pass is now a 403 rather than a 200**: a token of Untilt's gets as
+far as the gate and is turned away by who it names, and getting that far is the
+proof, because a wrong key answers 401 without ever reaching the question.
+
+### A cursor did not know which bucket it was a conversation with
+
+Closing the door left the other half, and that half was never about Untilt.
+
+A cursor is a place in one conversation and nothing recorded which one.
+`pushed` says everything up to it has been sent; point the same device at a
+different bucket and it goes on saying so, so the new bucket is never sent
+anything and the card reports it up to date over an empty log.
+
+Signing out is not the way in, because `forget` rewinds. The way in is an
+expiry. `SessionManager.current` clears a token that has run out, on its own,
+with no card on screen and nothing calling `forget`, so the cursors outlive the
+session and the next sign-in inherits them. Same address, same bucket, and they
+are right. A different address -- a second person on a shared phone, or the
+same person after the other door stopped being taken -- and they are a
+conversation with somewhere else. The pull half of this was already covered:
+a bundle refuses a cursor from a device it has never answered. The push half
+was not.
+
+So a cursor records the subject it is speaking to, and `settle` reads it before
+anything else uses it. A different subject rewinds both cursors and carries
+`settled` at the high-water mark, so a tombstone that was safe to collect stays
+safe -- zeroing it there is the one move in this file that resurrects a delete
+on every device somebody owns. No subject at all, which is every install on the
+day this ships, rewinds the push cursor only: it cannot be known whether those
+cursors are about this bucket, one re-push per install is a no-op the merge
+absorbs, and not rewinding would freeze anybody already in the broken state
+there for good.
+
+An unreadable token is not a change of bucket. `readClaim` answers null for one
+that has expired, and treating that as a switch would rewind on every launch
+past the thirtieth day; refusing a dead token is the server's job.
+
 ### A sign-out was sweeping what a lapsed token was not
 
 `compose` sweeps tombstones on the ninety-day window when the session is null,
@@ -1358,29 +1447,6 @@ quietly during work like this.
 2. **Does the first release sync Log only, or is the shared account across all
    three apps a launch requirement?** Log-only is smaller and can use the same
    token without the App User ID work landing anywhere else.
-2. **One person can have two subjects, and therefore two buckets.** Untilt mints
-   for a Stripe customer, so its subject is `cus_...`; Log's own door derives
-   `log_` plus an HMAC of the address. Log accepts both, keys the bucket off
-   whichever arrived, and has no way to know they are the same person: a
-   customer id does not carry the address, so nothing here can link them.
-
-   Somebody who signed in through Untilt syncs into one bucket for thirty days.
-   Then the token expires, `renew` refuses to extend a paid claim (rightly --
-   the store is shared with the family, so handing back a free token would take
-   away access somewhere Log cannot see), and the next sign-in is through Log's
-   free door under the other subject. The new bucket is empty, the old one is
-   full and nothing will ever ask for it again. Not silent -- they are signed
-   out first -- but it looks exactly like the history being gone, and an erase
-   from the new session does not reach the old bucket either.
-
-   Three ways out, none of them free. Stop accepting Untilt's tokens, which
-   makes the split impossible and strands today's holders sooner rather than
-   later. Warn before the expiry, which is honest and fixes nothing. Or have
-   the free door take a still-valid paid token alongside the new one and merge
-   the old bucket into the new, which is the only one that keeps the history
-   and the only one that needs new endpoint surface. It is a product question
-   about whether Log is still part of the family's account or standing on its
-   own, which is why it is here rather than fixed.
 3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
    bundle-at-rest shape fits them and keeps the family on one piece of
    infrastructure. A player with ten years of history and a device that has been

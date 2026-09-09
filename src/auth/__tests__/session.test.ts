@@ -14,7 +14,7 @@ import { SessionManager, memoryTokenStore, type TokenStore } from '../session';
 const NOW = 1_700_000_000_000;
 const HOUR = 3_600_000;
 
-const token = (expiresAt: number, tier = 'full', subject = 'cus_1'): string =>
+const token = (expiresAt: number, tier = 'full', subject = 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4'): string =>
   `${Math.floor(expiresAt / 1000)}.${tier}.${subject}.signature`;
 
 const live = token(NOW + 30 * 24 * HOUR);
@@ -36,7 +36,7 @@ describe('the session a device holds', () => {
     const store = memoryTokenStore();
     await store.write(live);
     const session = await new SessionManager(store, () => NOW).current();
-    expect(session?.claim.subject).toBe('cus_1');
+    expect(session?.claim.subject).toBe('log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
     expect(session?.syncs).toBe(true);
   });
 
@@ -142,8 +142,8 @@ describe('a store with nowhere to write', () => {
  */
 describe('renewing before it runs out', () => {
   const DAY = 24 * HOUR;
-  const nearlyOut = token(NOW + 3 * DAY, 'free', 'cus_1');
-  const fresh = token(NOW + 30 * DAY, 'free', 'cus_1');
+  const nearlyOut = token(NOW + 3 * DAY, 'free', 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
+  const fresh = token(NOW + 30 * DAY, 'free', 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
 
   const held = async (store: TokenStore) => store.read();
 
@@ -205,7 +205,7 @@ describe('renewing before it runs out', () => {
     // session check, and one that quietly signed somebody out would be a
     // renewal that did the exact thing it exists to prevent.
     const store = memoryTokenStore();
-    const dead = token(NOW - HOUR, 'free', 'cus_1');
+    const dead = token(NOW - HOUR, 'free', 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4');
     await store.write(dead);
     let asked = 0;
     const wrote = await new SessionManager(store, () => NOW).renewIfDue(async () => {
@@ -296,7 +296,7 @@ describe('renewing before it runs out', () => {
     );
     for (let spin = 0; spin < 50 && arrive === null; spin += 1) await Promise.resolve();
 
-    const theirs = token(NOW + 30 * DAY, 'free', 'cus_2');
+    const theirs = token(NOW + 30 * DAY, 'free', 'log_e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5');
     await manager.signOut();
     await manager.signIn(theirs);
     (arrive as unknown as () => void)();

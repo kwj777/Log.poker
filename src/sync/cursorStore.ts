@@ -9,6 +9,14 @@
  *
  * The keychain, not because a cursor is a secret but because it has to be
  * forgotten at the same moment the token is.
+ *
+ * That last sentence described nothing for a while. **Nothing forgot them**,
+ * on either engine: not signing out, not erasing the copy on the server. So
+ * an erased log could never go back up, because `pushed` still said it had
+ * all been sent, and the next person to sign in on a device inherited the
+ * last one's place in a conversation with a different bucket.
+ * `SyncingRepository.forget` is what makes it true, and the card calls it
+ * wherever it puts a token down.
  */
 
 import * as SecureStore from 'expo-secure-store';

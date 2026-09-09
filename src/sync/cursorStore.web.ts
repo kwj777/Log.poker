@@ -6,6 +6,14 @@
  * `clearAll` wipes the log, and cursors that went with it would leave a reset
  * device believing it had already seen everything, so its log would come back
  * empty and stay that way.
+ *
+ * They are still forgotten at the same moment the token is, which for a while
+ * **nothing did**, on either engine: not signing out, not erasing the copy on
+ * the server. So an erased log could never go back up, because `pushed` still
+ * said it had all been sent, and the next person to sign in on a device
+ * inherited the last one's place in a conversation with a different bucket.
+ * `SyncingRepository.forget` is what does it, and the card calls it wherever
+ * it puts a token down.
  */
 
 import { randomId } from '../data/support';

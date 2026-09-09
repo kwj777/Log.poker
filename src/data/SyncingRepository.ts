@@ -531,6 +531,53 @@ export class SyncingRepository implements Repository {
   }
 
   /**
+   * Back to the beginning of the conversation, keeping the device id.
+   *
+   * The id survives, because forgetting it would make this device look like a
+   * new one to the server and hold up collection for a whole retention window
+   * under a name nobody will ever use again.
+   */
+  private async rewind(): Promise<void> {
+    const { device } = await this.cursors.read();
+    await this.cursors.write({ pulled: 0, pushed: 0, device });
+  }
+
+  /**
+   * Stop, and forget where this device had got to with the server.
+   *
+   * For the two moments the app deliberately puts a token down: signing out,
+   * and erasing the copy on the server. Both used to leave the cursors exactly
+   * where they were, and `cursorStore`'s own header has always claimed the
+   * opposite -- *"it has to be forgotten at the same moment the token is"* --
+   * so this is the line that makes the comment true.
+   *
+   * Leaving them was not tidy-up left undone. It was silent data loss twice
+   * over.
+   *
+   * **After an erase**, `pushed` still said the whole log had been sent. So
+   * signing in again pushed nothing, the emptied bucket stayed empty, and the
+   * history was gone from sync for good while the app went on reporting *up to
+   * date*. That is the opposite of what the erase copy promised, which was
+   * that a device still signed in would put its copy back.
+   *
+   * **And after a sign-out**, the next person to sign in on this device
+   * inherited them: `pulled` sent as `since` against a bucket that had never
+   * issued it, so they were served the tail of their own history and told it
+   * was all of it.
+   *
+   * The epoch bump is the fence. A run already in flight checks it before it
+   * applies anything or writes a cursor back, so a push that started before
+   * this cannot land afterwards and restore the numbers it was carrying.
+   * `halted` is the other half: nothing new starts either.
+   */
+  async forget(): Promise<void> {
+    this.epoch += 1;
+    this.halted = true;
+    this.dirty = false;
+    await this.rewind();
+  }
+
+  /**
    * A local truncate, and it does not push.
    *
    * Reset means this device, not every device: see `Repository.clearAll`. The
@@ -540,11 +587,7 @@ export class SyncingRepository implements Repository {
   async clearAll(): Promise<void> {
     this.epoch += 1;
     await this.local.clearAll();
-    const { device } = await this.cursors.read();
-    // The device id survives a reset, because forgetting it would make this
-    // device look like a new one to the server and hold up collection for a
-    // whole retention window under a name nobody will ever use again.
-    await this.cursors.write({ pulled: 0, pushed: 0, device });
+    await this.rewind();
     this.dirty = true;
     this.announce({ lastSyncedAt: null, pending: 0 });
 

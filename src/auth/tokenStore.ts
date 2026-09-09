@@ -19,7 +19,22 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { TokenStore } from './session';
 
-/** One key, named for the family rather than the app: all three share a token. */
+/**
+ * One key, named for the family rather than the app.
+ *
+ * **Named for it rather than shared with it, so far.** `SecureStore` is called
+ * with no options, so this is the app's own keychain service and no other app
+ * can read it; `app.json` carries no keychain access group. The name has always
+ * described the intention and never the arrangement, and reading it as the
+ * arrangement is how a whole design once got written on top of a sharing that
+ * was not happening.
+ *
+ * The account is meant to be shared across the three, and the access group is
+ * what would do it. **The order matters and one way round is silent**: the
+ * others have to be minting the family's own subject first, because a shared
+ * store carrying a token this app's gate refuses is a device that stops syncing
+ * for somebody who did nothing. See SYNC.md, "One identity for three apps".
+ */
 const KEY = 'family_access_token';
 
 export const tokenStore = {

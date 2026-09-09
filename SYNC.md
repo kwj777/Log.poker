@@ -1174,6 +1174,87 @@ sign-out: `getToken` answers null once the token is gone, and the run stops
 rather than sending an empty bearer and taking a 401 and a backoff on behalf of
 somebody who is no longer there.
 
+### One identity for three apps
+
+The account is shared across the family, and entitlements go through
+RevenueCat. That decides a question the sync has been carrying since the free
+door landed: **what is a person, to this family?**
+
+**One string, and it is the address-derived subject.** `log_` and thirty-two
+characters of `hmacHex(secret, 'log.subject.' + normalizeEmail(address))`, which
+is what `subjectForEmail` already writes. It is the sync subject in all three
+apps and it is the RevenueCat App User ID, and those are the same string rather
+than two that have to be kept in step.
+
+**It cannot be the purchase record, and that is not a preference.** Log is free
+in its entirety, so a Log user has bought nothing: no Stripe customer, no
+RevenueCat purchase, nothing a billing system has ever heard of. An identity
+that only exists once somebody pays cannot be the identity of an app that never
+charges. So the derivation runs the other way round -- the address makes the
+subject, and the subject is handed to RevenueCat as the App User ID -- rather
+than a customer id being borrowed as a name for somebody who is not a customer.
+That is also why the split two sections down happened at all, and closing it
+was the first half of this.
+
+It is a good App User ID for a second reason. It is an HMAC, so it is stable,
+opaque, and does not contain the address: the family can hand it to a vendor
+without handing over anybody's mailbox, and nothing that leaks it can turn it
+back into a person without the key.
+
+**Each app still gets its own bucket.** `bucketFor` is
+`hmacHex(secret, 'log.sync.' + subject)`, so an app that keys on a different
+domain string under the same subject lands somewhere else. One identity, three
+buckets, no collision, and nothing has to agree about anything except the
+subject.
+
+#### The preimage is frozen
+
+`'log.subject.' + normalizeEmail(address)`, copied byte for byte, including the
+`log.` that will read wrong in another repository. It is not a name, it is the
+input to a hash, and changing it gives the same person a different subject,
+which orphans every bucket exactly the way changing `GATE_SECRET` would.
+`normalizeEmail` goes with it: it lowercases, and a family where one app does
+and one does not gives `Player@example.com` two identities and two histories.
+
+#### The order these land in, which is the part that is silent
+
+1. **Untilt mints the family subject**, in place of the Stripe customer id.
+2. **Then** the token store is genuinely shared.
+3. Not before. A shared store with Untilt still minting `cus_...` puts a token
+   in Log's keychain that Log refuses, and sync stops on a device whose owner
+   did nothing wrong.
+
+The gate that refuses a foreign subject is not in tension with a shared
+account: it is what makes one safe. A shared account built by accepting
+whatever the family signs is the two-subject split with more doors into it. A
+shared account built on one identity is a gate that already accepts exactly
+that identity and nothing else.
+
+Two things that were true only by accident become load bearing here, and both
+are already written the right way. `renew` refuses to extend anything but the
+free tier, and its reason -- that handing back a free token in place of a paid
+one takes away access somewhere Log cannot see -- describes a shared store,
+which today there is not. After step 2 there is. And `hasOwnSubject` on the
+client has to keep saying what `hasOwnBucket` says on the server, because after
+step 2 a token Log will not sync with can arrive on a device that never visited
+Log's door.
+
+#### What none of this solves: the web
+
+`log.poker` and `untilt.poker` are different registrable domains.
+`localStorage` is per origin and a `__Host-` cookie is scoped to one host, so
+there is no shared store to share: on the web the family cannot hand a token
+sideways at all. RevenueCat does not close this either, being an entitlement
+SDK rather than a browser sign-in.
+
+So a shared account on the web needs something that does not exist yet: one
+sign-in origin for the family, or a hand-off where one app redirects to another
+carrying a one-time code that is traded for a token. Both are real designs with
+their own theft surface, and neither is written. **The native half can ship
+without it**, on a keychain access group, and the web stays one sign-in per app
+until somebody designs the hand-off. That is worth deciding deliberately rather
+than discovering.
+
 ### One person, two subjects, and the door that is closed now
 
 Untilt mints for a Stripe customer, so its subject is `cus_...`; Log's own door
@@ -1444,9 +1525,11 @@ quietly during work like this.
    mints the free tier for anybody who can read their mail, and **Untilt is
    untouched**. See [what the free door landed](#what-the-free-door-landed).
 
-2. **Does the first release sync Log only, or is the shared account across all
-   three apps a launch requirement?** Log-only is smaller and can use the same
-   token without the App User ID work landing anywhere else.
+2. ~~**Does the first release sync Log only, or is the shared account across
+   all three apps a launch requirement?**~~ **Settled: shared, and the App User
+   ID is RevenueCat's.** See [one identity for three
+   apps](#one-identity-for-three-apps) for what that requires and in which
+   order, because two of the steps are silent if they land the wrong way round.
 3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
    bundle-at-rest shape fits them and keeps the family on one piece of
    infrastructure. A player with ten years of history and a device that has been

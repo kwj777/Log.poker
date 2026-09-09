@@ -131,6 +131,60 @@ describe('why a token was refused', () => {
   });
 });
 
+describe('the subject, which three apps have to derive identically', () => {
+  /**
+   * A fixed vector, because this is a contract across repositories.
+   *
+   * The account is shared across the family and the subject is the identity:
+   * one string that is the sync subject in each app and the RevenueCat App
+   * User ID. It cannot be the purchase record, because Log is free and a Log
+   * user has bought nothing for a billing system to have heard of, so it runs
+   * the other way -- the address makes the subject, and the subject is what a
+   * vendor is handed.
+   *
+   * Which makes the preimage frozen. `'log.subject.' + normalizeEmail(address)`
+   * copied byte for byte, including the `log.` that will read wrong in another
+   * repository: it is the input to a hash rather than a name, and changing it
+   * gives the same person a different subject and orphans every bucket, the
+   * same way changing the key would. A vector is the only form of that rule
+   * another codebase can check itself against, so here it is, with the answer
+   * written out rather than recomputed by the test's own copy of the algorithm.
+   */
+  const VECTOR = { secret: 'family-gate-secret', address: 'Player@Example.COM' };
+  const EXPECTED = 'log_dd63349789b05bdc192591f2e6ac664d';
+
+  it('is this exact string for this exact address', async () => {
+    expect(await subjectForEmail(VECTOR.secret, VECTOR.address)).toBe(EXPECTED);
+  });
+
+  it('and the same one however the address was capitalized', async () => {
+    // The other half of the contract, and a way the family can split without
+    // anybody noticing: one app lowercasing and one not gives `Player@` and
+    // `player@` two identities and two histories.
+    for (const written of ['player@example.com', 'PLAYER@EXAMPLE.COM', '  Player@Example.COM  ']) {
+      expect(await subjectForEmail(VECTOR.secret, written)).toBe(EXPECTED);
+    }
+  });
+
+  it('and it is the shape the gate takes, or the family cannot sign in at all', async () => {
+    expect(OWN_SUBJECT.test(EXPECTED)).toBe(true);
+  });
+
+  it('and carries no address, which is what makes it safe to hand a vendor', async () => {
+    // Handed to RevenueCat as the App User ID, so it must not be the mailbox.
+    // An HMAC is stable, opaque and cannot be turned back into a person by
+    // anybody without the key.
+    const subject = await subjectForEmail(VECTOR.secret, VECTOR.address);
+    expect(subject).not.toContain('Player');
+    expect(subject.toLowerCase()).not.toContain('example');
+    expect(subject).not.toContain('@');
+  });
+
+  it('and a different key gives a different one, so the key is part of it too', async () => {
+    expect(await subjectForEmail('another-gate-secret', VECTOR.address)).not.toBe(EXPECTED);
+  });
+});
+
 describe('who may sync', () => {
   it('lets a subject of their own through', async () => {
     expect(hasOwnBucket(await verifyToken(SECRET, mint(), NOW))).toBe(true);

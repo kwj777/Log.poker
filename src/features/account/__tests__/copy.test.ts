@@ -146,16 +146,28 @@ describe('what it says once somebody is signed in', () => {
     expect(said).not.toMatch(/\$\s*\d/);
   });
 
-  it('tells the one session that cannot sync why, without inventing a price', () => {
-    // The false branch used to mean "has not bought" and now means "typed a
-    // shared passcode". Copy that still pointed at the other two apps would be
-    // selling something that is not for sale, to somebody whose problem is
-    // that their subject is not theirs.
+  it('tells a session that cannot sync what to do, without inventing a price', () => {
+    // The false branch used to mean "has not bought". Copy that still pointed
+    // at the other two apps would be selling something that is not for sale,
+    // to somebody whose problem is that their subject is not theirs.
     const said = describeSession(false);
-    expect(said).toMatch(/passcode/i);
     expect(said).toMatch(/address of your own/i);
     expect(said).not.toMatch(/\$\s*\d/);
     expect(said).not.toMatch(/buy|purchase|pay|upgrade|other two/i);
+  });
+
+  it('and does not name a cause, because there are two and it cannot tell', () => {
+    // A shared passcode is one. The other arrives once the family shares a
+    // token store: a sign-in made at one of the other apps, naming a subject
+    // this one will not sync with, on a device that never visited this door.
+    // `describeSession` is handed a boolean and could not tell them apart if
+    // it wanted to, so naming either one is a coin flip that reads as a
+    // statement of fact. It used to name the passcode, which was right while
+    // that was the only way in.
+    const said = describeSession(false);
+    expect(said).not.toMatch(/passcode/i);
+    // And still says the one thing both have in common, which is what to do.
+    expect(said).toMatch(/signing in/i);
   });
 
   it('promises nothing leaves the device either way', () => {

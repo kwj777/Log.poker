@@ -106,14 +106,23 @@ export const describeSync = (state: {
  * What a held session is worth, said without a number or a SKU.
  *
  * There is no number to say. Cross-device history is free, so the false branch
- * is not somebody who has not paid: it is somebody holding a shared passcode,
- * which names a door rather than a person, and the words have to say that
- * rather than imply a price.
+ * is not somebody who has not paid, and the words have to say that rather than
+ * imply a price.
+ *
+ * **It also does not say which reason it is**, and that is deliberate rather
+ * than vague. There are two now. A shared passcode names a door rather than a
+ * person, so it has no bucket by design. And once the family shares a token
+ * store, a sign-in made at one of the other apps can arrive here naming a
+ * subject this one will not sync with, on a device that never visited this
+ * door. Naming the passcode was right while it was the only way in and would
+ * be a plain lie to the second person, who has not typed one. What both have
+ * in common is the only thing worth saying: no history of their own here yet,
+ * and the way to start one. See SYNC.md, "One identity for three apps".
  */
 export const describeSession = (syncs: boolean): string =>
   syncs
     ? 'Signed in. Your history follows you to your other devices, at no charge.'
-    : 'Signed in with a shared passcode, which is a door rather than a person. Carrying your history needs an address of your own.';
+    : 'This sign-in does not carry a history of its own. Carrying yours between devices needs signing in here with an address of your own.';
 
 /* --------------------------------------------------------------- erasing */
 

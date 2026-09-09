@@ -245,6 +245,17 @@ still lands on a day Netlify Blobs does not. It also does not spend the caller
 limit, which exists to bound mail: charging launches against it would let a few
 devices behind one office network refuse a colleague's sign-in.
 
+**And it must not put a token back that somebody has just put down.** Renewal
+is the one operation on `SessionManager` with a network round trip in the
+middle, and it runs at launch without being awaited, so the seconds it spends
+out there are seconds somebody can spend signing out or erasing. Writing
+afterwards signed the device silently back in, with a fresh thirty days, and
+after an erase into a bucket that had just been deleted. A generation counter
+fences it, bumped at the *start* of a sign-out rather than the end: a
+comparison against the stored token would still see the old one sitting there
+while the clear was in the keychain's hands, and write over the top of somebody
+leaving.
+
 The one property the client half is written around is that **every way of
 failing leaves the token alone**. A refusal, a dead network, an answer that is
 not a token, a store that will not write: in all of them what was there is still

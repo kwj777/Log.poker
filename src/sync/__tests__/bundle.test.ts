@@ -1051,11 +1051,122 @@ describe('a cursor the bundle cannot place', () => {
     // whose stamps begin again from nothing. A device still holding a cursor
     // from the old one asks for everything after a number no record will ever
     // reach, and would be told nothing for the rest of its life.
-    const before = mergeIntoBundle(null, changeSet({ venues: [venue('v1')] }), 0, T0);
-    expect(before.cursor).toBeGreaterThan(0);
+    //
+    // The stale cursor has to end up *above* where the fresh bundle starts, or
+    // the device is served everything regardless and this proves nothing. It
+    // gets there on its own: a stamp is `max(now, heardThrough + 1)`, so a
+    // bundle that takes more rounds than the clock takes milliseconds runs its
+    // own stamps past the wall clock. Erase that bucket and the replacement
+    // begins at the clock again, below every number the device is holding.
+    let held: unknown = null;
+    let stale = 0;
+    for (const id of ['v1', 'v2', 'v3', 'v4', 'v5']) {
+      const merged = mergeIntoBundle(held, changeSet({ venues: [venue(id)] }), stale, T0);
+      held = merged.bundle;
+      stale = merged.cursor;
+    }
+    expect(stale).toBeGreaterThan(T0);
 
-    const erased = mergeIntoBundle(null, changeSet({ venues: [venue('v2')] }), before.cursor, T0);
-    expect(erased.changes.venues.map((change) => change.record.id)).toEqual(['v2']);
+    const erased = mergeIntoBundle(null, changeSet({ venues: [venue('after')] }), stale, T0);
+    expect(erased.changes.venues.map((change) => change.record.id)).toEqual(['after']);
+  });
+
+  it('and so is one from a device this bundle has never answered', () => {
+    // The other half, and the one that was missing. Being ahead of
+    // `heardThrough` is only one of the two ways a cursor can be from
+    // somewhere else: a cursor from another bucket is just a number, and it is
+    // at least as likely to fall below this bundle's stamps as above them, at
+    // which point it reads as an ordinary place in a conversation that never
+    // happened. The device is answered with everything after it and nothing
+    // before -- the tail of its own history, presented as all of it.
+    //
+    // A second person signing in on a device the first had synced a lot on is
+    // exactly how that number arises.
+    //
+    // The stale cursor has to land *between* this bundle's records for the old
+    // check to pass it and for the damage to show, which is why the two are
+    // built on either side of it.
+    const early = mergeIntoBundle(
+      null,
+      changeSet({ venues: [venue('early')] }),
+      0,
+      T0,
+      'device-mine00001',
+    );
+
+    // Another bucket, synced to a stamp above that record and below the next.
+    let theirs: unknown = null;
+    let stale = 0;
+    for (const id of ['t1', 't2']) {
+      const merged = mergeIntoBundle(
+        theirs,
+        changeSet({ venues: [venue(id)] }),
+        stale,
+        T0 + HOUR,
+        'device-theirs001',
+      );
+      theirs = merged.bundle;
+      stale = merged.cursor;
+    }
+
+    const mine = mergeIntoBundle(
+      early.bundle,
+      changeSet({ venues: [venue('late')] }),
+      early.cursor,
+      T0 + 2 * HOUR,
+      'device-mine00001',
+    );
+
+    // Below this bundle's newest stamp and above its oldest, so the check that
+    // only asked "is it ahead?" let it straight through.
+    expect(stale).toBeLessThan(mine.cursor);
+    expect(stale).toBeGreaterThan(early.cursor);
+
+    const { changes } = mergeIntoBundle(
+      mine.bundle,
+      changeSet({}),
+      stale,
+      T0 + 3 * HOUR,
+      'device-theirs001',
+    );
+    expect(changes.venues.map((change) => change.record.id).sort()).toEqual(['early', 'late']);
+  });
+
+  /**
+   * Three rounds an hour apart, and the id of the one left behind the cursor.
+   *
+   * The gap matters. A cursor is inclusive of the records stamped at it, so
+   * the newest always comes back whatever the cursor says; only a record from
+   * an earlier round is genuinely behind the mark, and only that one can show
+   * whether a place was kept or thrown away.
+   */
+  const threeRounds = (device?: string) => {
+    let bundle: unknown = null;
+    let cursor = 0;
+    let at = T0;
+    for (const id of ['old', 'middle', 'newest']) {
+      const merged = mergeIntoBundle(bundle, changeSet({ venues: [venue(id)] }), cursor, at, device);
+      bundle = merged.bundle;
+      cursor = merged.cursor;
+      at += HOUR;
+    }
+    return { bundle, cursor, at };
+  };
+
+  it('but a device it has answered keeps its place', () => {
+    // The rule has to cost nothing on the ordinary path, which is every sync
+    // by every device that has ever synced here.
+    const { bundle, cursor, at } = threeRounds('device-known0001');
+    const { changes } = mergeIntoBundle(bundle, changeSet({}), cursor, at, 'device-known0001');
+    expect(changes.venues.map((change) => change.record.id)).not.toContain('old');
+  });
+
+  it('and a device that does not name itself is left alone', () => {
+    // One that sends no id is served without being counted, deliberately.
+    // Clamping it would mean a full answer on every sync rather than once.
+    const { bundle, cursor, at } = threeRounds();
+    const { changes } = mergeIntoBundle(bundle, changeSet({}), cursor, at);
+    expect(changes.venues.map((change) => change.record.id)).not.toContain('old');
   });
 
   it('and so is one that arrived corrupted', () => {

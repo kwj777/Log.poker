@@ -700,7 +700,30 @@ export const mergeIntoBundle = (
   // and is answered with silence for the rest of its life. The same clamp
   // covers a cursor that was corrupted, and one restored onto a second device
   // from somebody else's backup. Re-pulling is free; being told nothing is not.
-  const from = since > bundle.heardThrough ? 0 : Math.max(0, since);
+  //
+  // **Being ahead is only one of the two ways a cursor can be from elsewhere,
+  // and it was the only one checked.** A cursor from another bucket is just a
+  // number, and it is at least as likely to fall *below* this bundle's
+  // `heardThrough` as above it -- at which point it reads as a perfectly
+  // ordinary place in a conversation that never happened. The device is then
+  // answered with everything after it and nothing before, which is the tail of
+  // its own history presented as the whole of it. Silent, permanent until
+  // something else moves those records, and worst on the case that produces it:
+  // a second person signing in on a device the first had synced a lot on.
+  //
+  // The other half of the check is the device map, which is the only record of
+  // who this bundle has actually spoken to. **A device that has never been
+  // answered here cannot be holding a number this bundle issued.** So a named
+  // device with no mark starts from nothing, whatever it claims.
+  //
+  // Only a named one. A device that sends no id is served without being
+  // counted, deliberately, and clamping it would mean a full answer on every
+  // sync forever rather than once. The cost of the rule where it does apply is
+  // one full pull for a device this bundle has forgotten, which takes six
+  // months of not syncing, or for the sixty-fifth device somebody owns.
+  const spokenTo = !namesADevice(device) || bundle.devices[device] !== undefined;
+  const placeable = since <= bundle.heardThrough && spokenTo;
+  const from = placeable ? Math.max(0, since) : 0;
 
   // What this device has acknowledged, which is the number it sent and nothing
   // else.

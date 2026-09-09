@@ -1174,6 +1174,39 @@ sign-out: `getToken` answers null once the token is gone, and the run stops
 rather than sending an empty bearer and taking a 401 and a backoff on behalf of
 somebody who is no longer there.
 
+### The unplaceable cursor was only half checked
+
+**Being ahead of `heardThrough` is one of the two ways a cursor can be from
+somewhere else, and it was the only one the clamp looked at.** A cursor from
+another bucket is just a number, and it is at least as likely to land below this
+bundle's stamps as above them. Below, it reads as a perfectly ordinary place in
+a conversation that never happened, and the device is answered with everything
+after it and nothing before: the tail of its own history handed over as the
+whole of it. That is quieter than the silence the clamp was written for, because
+records do come back and the sync reports success.
+
+The case that produces it is the one already written down two sections above --
+a second person signing in on a device the first had synced a lot on. The clamp
+was named there as the reason that is no longer silent data loss, and for the
+half of the number line it never covered, that was not true.
+
+The other half of the check is the device map, which is the only record of who
+this bundle has answered. **A device that has never been answered here cannot be
+holding a number this bundle issued**, so a named device with no mark starts
+from nothing whatever its cursor claims. Named only: a device that sends no id
+is served without being counted, deliberately, and clamping it would mean a full
+answer on every sync forever rather than once. Where the rule does apply it
+costs one full pull, and only to a device this bundle has forgotten -- six
+months of not syncing -- or to the sixty-fifth device somebody owns.
+
+The test that was supposed to hold the original half up turned out to prove
+nothing: it built both bundles at the same instant, so the stale cursor sat
+below the fresh bundle's records and they came back whether the clamp fired or
+not. It passes now by way of the mechanism that makes the erased case real --
+a stamp is `max(now, heardThrough + 1)`, so a bundle taking more rounds than the
+clock takes milliseconds runs its own stamps past the wall clock, and the
+replacement bucket starts below every number the device holds.
+
 ---
 
 ## What must not break

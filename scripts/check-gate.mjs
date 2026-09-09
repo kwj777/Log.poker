@@ -232,8 +232,9 @@ const explain = (status, body, minted) => {
   if (status === 403) {
     return [
       'The key is right and the token is real: it got past the gate. What it was',
-      'refused for is who it names. A free tier cannot write, and the shared',
-      '`passcode` subject has no bucket of its own by design.',
+      'refused for is who it names: the shared `passcode` subject has no bucket',
+      'of its own by design, and that is the only thing this endpoint answers',
+      '403 for. The tier is not asked about -- cross-device history is free.',
     ];
   }
 

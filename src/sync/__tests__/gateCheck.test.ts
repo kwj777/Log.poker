@@ -269,6 +269,33 @@ describe('the deploy-log lines it tells somebody to search for', () => {
   });
 });
 
+/* ------------------------------------------- and the rest of what it explains */
+
+describe('what it says a 403 means', () => {
+  const script = readFileSync(SCRIPT, 'utf8');
+  const endpoint = readFileSync(join(__dirname, '..', 'endpoint.ts'), 'utf8');
+
+  const advice = script.slice(script.indexOf('if (status === 403) {'), script.indexOf('if (status === 503'));
+
+  it('names the one thing that endpoint actually refuses', () => {
+    // The same drift the deploy-log table above exists to stop, in prose
+    // instead of a table. This used to say "a free tier cannot write", which
+    // was true while a write sat behind the paid tier. That check is gone --
+    // cross-device history is free -- so the advice sent whoever ran it to
+    // look at a tier nothing reads, past the one subject that is refused.
+    expect(advice).toContain('passcode');
+    expect(advice).not.toMatch(/free tier cannot/i);
+  });
+
+  it('because there is still only the one', () => {
+    // If a second 403 ever appears in that endpoint, the advice above is
+    // incomplete and this is what says so.
+    const refusals = [...endpoint.matchAll(/return json\(\{ error: '[^']+' \}, 403\)/g)];
+    expect(refusals).toHaveLength(1);
+    expect(endpoint).toContain("if (!hasOwnBucket(claim)) return json({ error: 'forbidden' }, 403);");
+  });
+});
+
 /* --------------------------------------------------- and what it will not do */
 
 describe('what the gate check will never do', () => {

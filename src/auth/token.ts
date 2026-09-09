@@ -37,10 +37,17 @@ import type { Timestamp } from '../domain/types';
 /**
  * What Untilt's tokens can say. Anything else is not a token we understand.
  *
- * Parsed and then read by nothing. **Cross-device history is free**, so what a
- * person has paid for decides nothing on this side of the family. The field
- * stays in the grammar because the grammar is Untilt's and not ours to trim:
- * dropping it here would make this accept a shape Untilt does not mint.
+ * **Cross-device history is free**, so what a person has paid for decides
+ * nothing about who may sync: reading, writing and erasing all ask only for a
+ * verified token with a subject of its own. The field stays in the grammar
+ * because the grammar is Untilt's and not ours to trim: dropping it here would
+ * make this accept a shape Untilt does not mint.
+ *
+ * One place does read it, and it is not a gate on syncing. `renew` refuses to
+ * extend anything but `free`, because the token sits in a store the family
+ * shares and replacing a paid one with a free one would take away access
+ * somewhere Log cannot see. This comment said the field was read by nothing,
+ * which was true when it was written and stopped being true one endpoint later.
  */
 export const TIERS = ['full', 'free'] as const;
 

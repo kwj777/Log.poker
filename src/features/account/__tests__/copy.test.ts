@@ -59,6 +59,51 @@ describe('what it says after asking for a code', () => {
   });
 });
 
+describe('and what nothing on this screen is allowed to say', () => {
+  /**
+   * The rule above, applied to the screen rather than to one constant.
+   *
+   * It was written against `CODE_SENT` because that is where the price had
+   * been. It survived somewhere the check could not see and nor could anybody
+   * else: the email field's `accessibilityLabel` read "the email address you
+   * paid with", so the only person told that Log had been bought was somebody
+   * using a screen reader. A label is not in `copy.ts`, is not on screen to be
+   * read back during review, and is exactly the kind of string a rule scoped
+   * to one file leaves behind.
+   *
+   * The account feature is the scope, and deliberately not the whole app. Log
+   * is a poker app: "buy-in", "entry cost" and "fees paid" are the vocabulary
+   * of the thing it records, and a word list swept across every screen would
+   * match those on every run until somebody turned it off. Nothing on this
+   * surface has a reason to use them, which is what makes the rule meaningful
+   * exactly here.
+   */
+  const BOUGHT = /\b(purchase|purchased|bought|buy|paid|pay|subscription|subscriber|price|pricing|refund|billed|billing)\b/i;
+
+  /** Comments discuss the price rule at length; only what ships is bound. */
+  const shipped = (source: string): string =>
+    source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  const files = ['copy.ts', 'SignInCard.tsx'];
+
+  it.each(files)('%s says nothing about having bought Log', (file) => {
+    const source = shipped(read('src', 'features', 'account', file));
+
+    const said = [
+      // Every string literal, which covers labels, hints and placeholders --
+      // the ones a reviewer looking at the rendered card never sees.
+      ...[...source.matchAll(/(['"`])((?:\\.|(?!\1)[^\\])*?)\1/g)].map((match) => match[2]),
+      // And text sitting directly in the markup.
+      ...[...source.matchAll(/>([^<>{}]{4,})</g)].map((match) => match[1]),
+    ];
+
+    // The sweep has to be finding something, or a change to how these files
+    // are written turns it into a test that passes by reading nothing.
+    expect(said.length).toBeGreaterThan(10);
+    expect(said.filter((line) => BOUGHT.test(line))).toEqual([]);
+  });
+});
+
 describe('what it says when something fails', () => {
   it('has one sentence for every failure the client can return', () => {
     for (const failure of FAILURES) {

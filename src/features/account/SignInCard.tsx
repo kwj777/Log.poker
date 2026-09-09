@@ -274,7 +274,7 @@ export const SignInCard = () => {
             autoComplete="email"
             returnKeyType="send"
             onSubmitEditing={() => void ask()}
-            accessibilityLabel="The email address you paid with"
+            accessibilityLabel="The email address to send the code to"
           />
           <Button
             label="Email me a code"

@@ -1280,6 +1280,29 @@ quietly during work like this.
 2. **Does the first release sync Log only, or is the shared account across all
    three apps a launch requirement?** Log-only is smaller and can use the same
    token without the App User ID work landing anywhere else.
+2. **One person can have two subjects, and therefore two buckets.** Untilt mints
+   for a Stripe customer, so its subject is `cus_...`; Log's own door derives
+   `log_` plus an HMAC of the address. Log accepts both, keys the bucket off
+   whichever arrived, and has no way to know they are the same person: a
+   customer id does not carry the address, so nothing here can link them.
+
+   Somebody who signed in through Untilt syncs into one bucket for thirty days.
+   Then the token expires, `renew` refuses to extend a paid claim (rightly --
+   the store is shared with the family, so handing back a free token would take
+   away access somewhere Log cannot see), and the next sign-in is through Log's
+   free door under the other subject. The new bucket is empty, the old one is
+   full and nothing will ever ask for it again. Not silent -- they are signed
+   out first -- but it looks exactly like the history being gone, and an erase
+   from the new session does not reach the old bucket either.
+
+   Three ways out, none of them free. Stop accepting Untilt's tokens, which
+   makes the split impossible and strands today's holders sooner rather than
+   later. Warn before the expiry, which is honest and fixes nothing. Or have
+   the free door take a still-valid paid token alongside the new one and merge
+   the old bucket into the new, which is the only one that keeps the history
+   and the only one that needs new endpoint surface. It is a product question
+   about whether Log is still part of the family's account or standing on its
+   own, which is why it is here rather than fixed.
 3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
    bundle-at-rest shape fits them and keeps the family on one piece of
    infrastructure. A player with ten years of history and a device that has been

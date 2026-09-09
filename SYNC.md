@@ -1329,6 +1329,26 @@ quietly during work like this.
    and the only one that needs new endpoint surface. It is a product question
    about whether Log is still part of the family's account or standing on its
    own, which is why it is here rather than fixed.
+2. **Is a sign-out a device that does not sync, or one whose sync may resume?**
+   `compose` sweeps tombstones on the ninety-day window when the session is
+   null, and deliberately does not when the session is there and the token is
+   missing. That second branch carries the reasoning: a device may hold
+   tombstones it never managed to push while the server still holds the live
+   rows, so dropping them locally loses the delete loudly, on the next sync,
+   when those rows come back down onto every device the person owns.
+
+   A sign-out lands in the first branch. It can also be in exactly the state
+   the second one is protecting against: delete something offline, sign out
+   before reconnecting, leave it ninety days, sign back in. The cursors were
+   forgotten at sign-out, so the re-sign-in is a full pull, and the row comes
+   back with nothing left locally to refuse it. Had the tombstone survived, the
+   same pull would have pushed it and the delete would have won.
+
+   Narrow, and not obviously wrong: sweeping is correct and necessary for a
+   device that never signs in, or the database grows where it should shrink.
+   The fix, if it is one, needs a signal that this device once synced, and that
+   signal has to survive `forget()` without recreating what `forget()` was
+   added to stop -- a second account inheriting the first one's cursors.
 3. ~~**Netlify Blobs, or a real database?**~~ **Settled: Blobs.** The
    bundle-at-rest shape fits them and keeps the family on one piece of
    infrastructure. A player with ten years of history and a device that has been

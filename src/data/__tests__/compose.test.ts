@@ -56,6 +56,24 @@ describe('composing the repository', () => {
     expect(renew).toBeLessThan(at('void syncing.push()'));
   });
 
+  it('tells the screens when a sync brings something down', () => {
+    // A pull writes rows straight into the local database and the store above
+    // holds what the screens render. Nothing connected the two, so the history
+    // somebody had just signed in for sat there until they reopened the app.
+    const wired = at('syncing.subscribe(');
+    expect(at('const syncing = new SyncingRepository(')).toBeLessThan(wired);
+    expect(source).toContain('state.applied === seen');
+  });
+
+  it('and wires that up on the wrapper it is building, not once and forever', () => {
+    // Signing in builds a new wrapper. A subscription made once, outside this
+    // function, would be listening to an object nothing writes to any more --
+    // on exactly the sync that matters most, the first one after a sign-in.
+    const composeBody = source.slice(at('const compose = async'), at('export const getRepository'));
+    expect(composeBody).toContain('syncing.subscribe(');
+    expect(source).toContain('export const onSyncApplied');
+  });
+
   it('and never waits on it, because nothing in Log waits on the network', () => {
     // `void`, not `await`. A renewal that hung would hang the launch, and the
     // app opens on the local database whatever the network is doing.
@@ -80,5 +98,31 @@ describe('composing the repository', () => {
     const started = source.slice(at('new SyncingRepository(local, token, cursorStore)'));
     expect(started).toMatch(/void syncing\.push\(\)/);
     expect(started.indexOf('void syncing.push()')).toBeLessThan(started.indexOf('return syncing;'));
+  });
+});
+
+/**
+ * And the other end of the same wire.
+ *
+ * Read rather than run, for the reason the file above is read rather than run:
+ * `src/data/index.ts` reaches the native database through modules that have
+ * nothing to execute in Node, so the store that imports it cannot be loaded
+ * here either. What can be pinned is that the two ends exist and are joined.
+ */
+describe('the store listening for it', () => {
+  const store = readFileSync(join(__dirname, '..', '..', 'store', 'useLogStore.ts'), 'utf8');
+
+  it('subscribes when it hydrates, and reloads the log when told', () => {
+    expect(store).toContain('onSyncApplied');
+    expect(store).toContain('listen(() => void get().refresh());');
+  });
+
+  it('and only once, however many times the app hydrates', () => {
+    // `hydrate` is called from a `useEffect`, which React runs twice in
+    // development, and nothing here ever unsubscribes: the store outlives
+    // every screen. A second listener is a second full reload of the log on
+    // every answer, forever.
+    expect(store).toContain('let listening = false;');
+    expect(store).toMatch(/if \(listening\) return;\s*listening = true;/);
   });
 });

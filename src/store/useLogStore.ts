@@ -11,7 +11,7 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 
-import { getRepository } from '../data';
+import { getRepository, onSyncApplied } from '../data';
 import { planImport, venueNameKey, type ImportedSession } from '../domain/import';
 import {
   selectHandsForSession,
@@ -138,6 +138,29 @@ const loadAll = async () => {
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : 'Something went wrong';
 
+/**
+ * Subscribe to the sync once, however many times the app hydrates.
+ *
+ * A pull writes rows straight into the local database, and the arrays below
+ * are what the screens actually render: without this the history somebody had
+ * just signed in for arrived and then sat there until they quit and reopened
+ * the app. On a device that has just been signed in on, which is the one most
+ * likely to be pulling a whole log down, that looks exactly like sync not
+ * working.
+ *
+ * Guarded because `hydrate` is called from a `useEffect` and React will run
+ * that twice in development, and because nothing here ever unsubscribes: the
+ * store outlives every screen, so a second listener would be a second full
+ * reload of the log on every answer, forever.
+ */
+let listening = false;
+
+const listen = (refresh: () => void): void => {
+  if (listening) return;
+  listening = true;
+  onSyncApplied(refresh);
+};
+
 export const useLogStore = create<LogState>((set, get) => ({
   status: 'idle',
   error: null,
@@ -153,6 +176,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     set({ status: 'loading', error: null });
     try {
       set({ ...(await loadAll()), status: 'ready' });
+      listen(() => void get().refresh());
     } catch (error) {
       set({ status: 'error', error: describeError(error) });
     }

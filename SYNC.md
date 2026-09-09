@@ -1134,6 +1134,29 @@ id, its fields and its children all stay, and its stamp is untouched, because
 this is reconciling with a decision the server is already in the middle of
 making rather than an edit worth pushing back.
 
+### And the one nobody could see
+
+**A pull landed rows and nothing told the screens.** The wrapper writes what
+comes back straight into the local database; `useLogStore` holds the arrays
+every screen renders and reloads them only when the app asks. The two never
+spoke. So the history somebody had just signed in for arrived, sat there, and
+did not appear until they quit and reopened the app, which on the one device
+most likely to be pulling a whole log down looks exactly like sync not working.
+
+`SyncState` carries a count of answers that changed the log, `compose` wires
+that to a signal that survives a recompose, and the store subscribes once and
+refreshes. Stable across a recompose because signing in builds a *new* wrapper:
+a subscription made once and for all would be listening to an object nothing
+writes to any more, on precisely the sync that matters most.
+
+It counts an answer that carried records rather than one that carried anything
+new, and the difference is worth naming: both comparisons read one millisecond
+back, so a device that has pulled everything is served its own boundary records
+again and counts that. The cost is one redundant reload per sync on a device
+that is syncing anyway, and every write in the app already reloads the log.
+Telling the two apart would mean asking `applyChanges` what it actually wrote,
+on both engines, for less than that costs.
+
 ---
 
 ## What must not break

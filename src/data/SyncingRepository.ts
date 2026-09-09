@@ -110,6 +110,22 @@ export interface SyncState {
   problem: SyncFailure | null;
   /** True while a request is in flight. */
   running: boolean;
+  /**
+   * How many answers have changed the local database.
+   *
+   * Not for showing. It is a number that goes up so that anything reading the
+   * log can tell that it has moved underneath them, and it is here rather than
+   * on a signal of its own because there is already one subscription and two
+   * would be two to keep wired.
+   *
+   * Nothing was told before this existed. A pull writes rows straight into the
+   * local database, the store above holds the arrays the screens render, and
+   * the two never spoke: the history somebody signed in for arrived, sat
+   * there, and did not appear until the app was restarted. On the one screen
+   * where that is most likely to be noticed, the dashboard of a device that
+   * has just been signed in on, it looks exactly like sync not working.
+   */
+  applied: number;
 }
 
 export class SyncingRepository implements Repository {
@@ -147,8 +163,10 @@ export class SyncingRepository implements Repository {
     pending: 0,
     problem: null,
     running: false,
+    applied: 0,
   };
   private listeners = new Set<(state: SyncState) => void>();
+  private applied = 0;
 
   constructor(
     local: Repository,
@@ -360,10 +378,14 @@ export class SyncingRepository implements Repository {
 
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
+      // Counted here rather than after the fence below, because the rows are
+      // in the local database either way and what reads them has to know. A
+      // run that is fenced still applied what it applied.
+      this.applied += 1;
     }
 
     if (epoch !== this.epoch) {
-      this.announce({ running: false, problem: null });
+      this.announce({ running: false, problem: null, applied: this.applied });
       return;
     }
 
@@ -419,6 +441,7 @@ export class SyncingRepository implements Repository {
       // with nothing left to send, and thousands of records still here.
       pending: batch.more ? countChanges(pending) - countChanges(batch.changes) : 0,
       lastSyncedAt: this.clock(),
+      applied: this.applied,
     });
   }
 

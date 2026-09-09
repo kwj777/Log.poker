@@ -71,6 +71,16 @@ const compose = async (): Promise<Repository> => {
     // itself. See `SyncingRepository`.
     const syncing = new SyncingRepository(local, token, cursorStore);
 
+    // Whatever a sync brings down, the screens hear about. Wired here, on the
+    // wrapper this call is building, so it is re-wired every recompose and the
+    // one after a sign-in is not the one that gets missed. See `onSyncApplied`.
+    let seen = 0;
+    syncing.subscribe((state) => {
+      if (state.applied === seen) return;
+      seen = state.applied;
+      for (const watcher of watchers) watcher();
+    });
+
     // One pull on the way up, because otherwise a device that only reads never
     // syncs again. Every other sync in the app is the tail of a write, so a
     // laptop somebody signs in on, reads their history on, and never types into
@@ -108,6 +118,28 @@ export const getRepository = (): Promise<Repository> => {
  */
 export const recomposeRepository = (): void => {
   pending = null;
+};
+
+/**
+ * Told when a sync has changed the local database underneath the screens.
+ *
+ * Stable across a recompose, which is the whole reason it is here rather than
+ * on the wrapper. Signing in builds a new `SyncingRepository`, and anything
+ * subscribed to the old one would be listening to an object nothing writes to
+ * any more -- on exactly the sync that matters most, the first one after a
+ * sign-in.
+ *
+ * A pull writes rows straight into the local database. The store above holds
+ * the arrays the screens render and reloads them only when the app asks it to,
+ * so before this the history somebody had just signed in for arrived and then
+ * sat there, invisible, until they quit and reopened. Which on a device that
+ * has just been signed in on looks exactly like sync not working.
+ */
+const watchers = new Set<() => void>();
+
+export const onSyncApplied = (listener: () => void): (() => void) => {
+  watchers.add(listener);
+  return () => watchers.delete(listener);
 };
 
 /** The syncing wrapper, when there is one. Settings asks; nothing else does. */

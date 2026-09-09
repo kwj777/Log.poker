@@ -1161,3 +1161,48 @@ describe('forgetting where the conversation had got to', () => {
     expect(await cursors.read()).toEqual({ pulled: 0, pushed: 0, device: 'device-keepme001' });
   });
 });
+
+/* ------------------------------------------------------- telling the screens */
+
+/**
+ * Whether anything can tell that a pull moved the log.
+ *
+ * The rows go straight into the local database, and the store above holds the
+ * arrays every screen renders. Nothing connected the two: the history somebody
+ * signed in for arrived and then sat there, invisible, until the app was quit
+ * and reopened.
+ */
+describe('saying that an answer changed the log', () => {
+  it('counts up when an answer carries records', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.push();
+
+    const seen: number[] = [];
+    laptop.subscribe((state) => seen.push(state.applied));
+
+    await laptop.push(true);
+    expect((await laptop.getSession(session.id))?.id).toBe(session.id);
+    expect(Math.max(...seen)).toBe(1);
+  });
+
+  it('and not when there was nothing in it at all', async () => {
+    // Which is a narrower case than it sounds, and worth being exact about:
+    // both comparisons read one millisecond back, so a device that has already
+    // pulled everything is served its own boundary records again on the next
+    // sync and counts that. The redundant reload is one per sync on a device
+    // that is syncing anyway, and every other write in the app already reloads
+    // the log, so it is cheaper than the machinery to tell the two apart.
+    const { fetch } = server();
+    const alone = await device(fetch, 'alone');
+
+    const seen: number[] = [];
+    alone.subscribe((state) => seen.push(state.applied));
+
+    await alone.push(true);
+    expect(seen.every((count) => count === 0)).toBe(true);
+  });
+});

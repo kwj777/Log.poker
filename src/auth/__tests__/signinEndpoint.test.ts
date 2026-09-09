@@ -401,11 +401,70 @@ describe('trading a code for a token', () => {
     for (let i = 0; i < MAX_ATTEMPTS; i += 1) {
       expect((await trade({ email: EMAIL, code: '000000' }, surroundings)).status).toBe(400);
     }
-    expect((await trade({ email: EMAIL, code: '000000' }, surroundings)).status).toBe(429);
+    // 400 and not 429. A 429 here was an oracle: an address with no code
+    // answers 400 forever, so a sixth guess drawing a different status said
+    // that this address had asked for one in the last fifteen minutes.
+    expect((await trade({ email: EMAIL, code: '000000' }, surroundings)).status).toBe(400);
     // Dead, so the right code no longer works either. That is the point: a
     // code somebody is working on is a code worth losing.
     expect((await trade({ email: EMAIL, code: CODE }, surroundings)).status).toBe(400);
-    expect([...store.held.keys()].some((key) => key.startsWith('code/'))).toBe(false);
+    // And the record stays. It used to be deleted here, which handed back the
+    // mail budget living on it: see `spent`, and the two tests below.
+    expect([...store.held.keys()].some((key) => key.startsWith('code/'))).toBe(true);
+  });
+
+  it('and keeps the mail budget, which is the reason it is spent rather than deleted', async () => {
+    // Ask, guess wrong six times, ask again. That loop used to send a second
+    // mail seconds after the first, to an address that never asked for either,
+    // because deleting the record took `sent` and `issuedAt` with it.
+    const store = fakeStore();
+    const surroundings = world(store);
+    await ask({ email: EMAIL }, surroundings);
+    expect(surroundings.sent).toHaveLength(1);
+
+    for (let i = 0; i <= MAX_ATTEMPTS; i += 1) {
+      await trade({ email: EMAIL, code: '000000' }, surroundings);
+    }
+
+    // The cooldown still knows when the last one went.
+    expect((await ask({ email: EMAIL }, surroundings)).status).toBe(202);
+    expect(surroundings.sent).toHaveLength(1);
+  });
+
+  it('and the daily cap still counts to five across as many killed codes', async () => {
+    // The same loop with the clock moved past the cooldown each time. Five
+    // mails, then nothing, however many codes were killed on the way.
+    const store = fakeStore();
+    const { surroundings, tick } = clocked(store);
+
+    for (let round = 0; round < DAILY_LIMIT + 3; round += 1) {
+      await ask({ email: EMAIL }, surroundings);
+      for (let guess = 0; guess <= MAX_ATTEMPTS; guess += 1) {
+        await trade({ email: EMAIL, code: '000000' }, surroundings);
+      }
+      tick(COOLDOWN_MS + 1);
+    }
+
+    expect(surroundings.sent).toHaveLength(DAILY_LIMIT);
+  });
+
+  it('and a real sign-in does not hand the address its own budget back either', async () => {
+    // The success path deleted the same record for its own good reason, and
+    // took the same counter with it: somebody signing in reset their own
+    // five-a-day every time they did it.
+    const store = fakeStore();
+    const { surroundings, tick } = clocked(store);
+    await ask({ email: EMAIL }, surroundings);
+    expect((await trade({ email: EMAIL, code: CODE }, surroundings)).status).toBe(200);
+
+    tick(COOLDOWN_MS + 1);
+    for (let round = 0; round < DAILY_LIMIT + 2; round += 1) {
+      await ask({ email: EMAIL }, surroundings);
+      tick(COOLDOWN_MS + 1);
+    }
+
+    // One for the sign-in, four more before the cap. Not five more.
+    expect(surroundings.sent).toHaveLength(DAILY_LIMIT);
   });
 
   it('refuses a body with the fields missing', async () => {
@@ -415,10 +474,10 @@ describe('trading a code for a token', () => {
   });
 
   it('hands out no token when the code cannot be spent', async () => {
-    // A delete that failed is a code that is still live. Answering with the
+    // A write that failed is a code that is still live. Answering with the
     // token anyway would hand out a credential and leave the way to it open.
     const { store, surroundings } = await signedIn();
-    store.deleteThrows = true;
+    store.writeThrows = true;
     const answer = await trade({ email: EMAIL, code: CODE }, surroundings);
     expect(answer.status).toBe(503);
     expect(await answer.text()).not.toContain('token');
@@ -508,7 +567,8 @@ describe('what happens when requests arrive together', () => {
       trade({ email: EMAIL, code: '000000' }, surroundings),
     );
     expect(answers.some((one) => one.status === 200)).toBe(false);
-    expect([...store.held.keys()].some((key) => key.startsWith('code/'))).toBe(false);
+    // Spent rather than deleted, so the record is still there holding the mail
+    // budget. What matters is that the code in it is gone, asserted below.
     // And it stays dead: the right code cannot rescue it either.
     expect((await trade({ email: EMAIL, code: CODE }, surroundings)).status).not.toBe(200);
   });

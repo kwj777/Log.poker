@@ -47,8 +47,17 @@
  * before anything is generated or sent. A code is six digits, single use, good
  * for fifteen minutes, and dies after five wrong guesses.
  *
+ * **A second audit found all three could simply be reset.** Every one of those
+ * numbers lives on the `code/` record and nowhere else, and both paths that
+ * finished with a code deleted the whole record: the exhaustion branch and the
+ * successful redemption. Deleting it handed the budget back, so `askFor` read
+ * nothing, skipped the cooldown entirely and started `sent` again at zero.
+ * Ask, guess wrong six times, ask again: seven requests a mail, forever, at an
+ * address that never asked for any of it, and five fresh guesses a cycle
+ * against six digits. A code is spent rather than deleted now; see `spent`.
+ *
  * **Every one of those was a per-round-trip bound rather than a per-day one
- * until an audit said so.** All three counters were read, decided on and
+ * until an earlier audit said so.** All three counters were read, decided on and
  * written back without a condition, which is a lost update: a dozen requests
  * for one address arriving together read the same `sent`, pass the same cap
  * and send a dozen mails; twenty guesses fired at once all read `attempts` at
@@ -432,6 +441,36 @@ const undone = (held: Pending | null, now: number): Pending =>
   held ?? { hash: '', issuedAt: 0, expiresAt: 0, attempts: 0, sent: 0, windowStartedAt: now };
 
 /**
+ * A code taken out of a record, with the mail budget left in it.
+ *
+ * **Both paths that finish with a code used to delete the whole record**, and
+ * the record is the only place `sent`, `windowStartedAt` and `issuedAt` live:
+ * the whole of "at most one mail a minute and five a day to any one address".
+ * Deleting it handed all of that back. `askFor` reads nothing, so `current` is
+ * null, the cooldown is not checked at all and `sent` starts again at zero.
+ *
+ * That made both numbers in the header above untrue, and one of them by way of
+ * a loop anybody could run against anybody: ask for a code, guess wrong six
+ * times, ask again. Seven requests a mail, repeatable, to an address that never
+ * asked for any of it. `signinSweep.ts` is built around never doing this by
+ * accident -- *"Collecting one inside its window hands that budget straight
+ * back"* -- and the redemption path was doing it on request.
+ *
+ * So a spent code leaves the record where it is with the code gone from it:
+ * `expiresAt` at zero, so `redeem` refuses it before looking at anything, and
+ * an empty `hash`, so there is nothing left to compare against even if it did.
+ * `sent`, `windowStartedAt` and `issuedAt` are untouched and go on binding
+ * until the window rolls, at which point the sweep collects it -- which is
+ * exactly what the sweep's own rule already says: `windowRolled(value, now) &&
+ * value.expiresAt <= now`.
+ *
+ * `attempts` is left as it was rather than zeroed. Nothing reads it once the
+ * code is gone, and a record that says how many guesses were made is worth
+ * more to somebody reading a store than one that pretends there were none.
+ */
+const spent = (held: Pending): Pending => ({ ...held, hash: '', expiresAt: 0 });
+
+/**
  * Ask for a code.
  *
  * Answers 202 to everything it did not refuse outright, whether a mail was
@@ -608,18 +647,34 @@ const redeem = async (
     const held = isPending(found) ? found : null;
     if (held === null || held.expiresAt <= now) return json({ error: 'rejected' }, 400);
 
-    if (held.attempts >= MAX_ATTEMPTS) {
-      // Dead rather than merely refused: a code that has been guessed at five
-      // times is a code somebody is working on, and leaving it alive for the
-      // rest of its fifteen minutes is leaving them to it.
-      await store.delete(key).catch(() => {});
-      return json({ error: 'throttled' }, 429);
-    }
-
     const guard = guardFor(stored);
     if (guard === null) {
       console.error('signin: pending record read carried no tag to write against');
       return json({ error: 'unreachable' }, 503);
+    }
+
+    if (held.attempts >= MAX_ATTEMPTS) {
+      // Dead rather than merely refused: a code that has been guessed at five
+      // times is a code somebody is working on, and leaving it alive for the
+      // rest of its fifteen minutes is leaving them to it. Spent rather than
+      // deleted, because the record is also the mail budget. See `spent`.
+      let killed: { modified: boolean; etag?: string };
+      try {
+        killed = await store.setJSON(key, spent(held), guard);
+      } catch {
+        console.error('signin: could not spend the code');
+        return json({ error: 'unreachable' }, 503);
+      }
+      if (!landed(killed)) continue;
+
+      // 400, not the 429 this used to answer. A 429 here was an oracle: an
+      // address with no code answers 400 however many times it is guessed at,
+      // so a sixth guess drawing a 429 said *this address asked for a code in
+      // the last fifteen minutes*. That is the disclosure the ask path spends
+      // its whole design avoiding, arriving by the back door. The header two
+      // hundred lines up claims this path cannot tell a wrong code from an
+      // address it never issued one for; now it cannot.
+      return json({ error: 'rejected' }, 400);
     }
 
     // The guess is paid for first. Nothing below looks at the code until this
@@ -632,26 +687,35 @@ const redeem = async (
       console.error('signin: could not count the guess');
       return json({ error: 'unreachable' }, 503);
     }
-    if (!landed(counted)) continue;
+    const tag = counted.etag;
+    if (!landed(counted) || tag === undefined) continue;
 
     if (!safeEqual(held.hash, await hashOf(secret, email, code))) {
       return json({ error: 'rejected' }, 400);
     }
 
-    // Spent before it is answered. A delete that fails is a code that stays
-    // live for its fifteen minutes, which is worth a 503 rather than a token:
-    // the alternative hands out a credential and leaves the way to it open.
+    // Spent before it is answered. A write that fails is a code that stays live
+    // for its fifteen minutes, which is worth a 503 rather than a token: the
+    // alternative hands out a credential and leaves the way to it open.
     //
-    // Two correct redemptions racing can both get through, because the store
-    // has no conditional delete and the second one's read predates the first
-    // one's delete. Both mint the same subject from the same address, so what
-    // that costs is one duplicate token to the person who already had one.
+    // The record stays and only the code leaves it, because a delete here gave
+    // the mail budget back to whoever had just used it: a real sign-in reset
+    // its own address's five-a-day every time. See `spent`.
+    //
+    // Conditional on the tag the counted guess just earned, so this is the
+    // record this round read and wrote and nothing else. Two correct
+    // redemptions racing used to both get through, because a delete cannot be
+    // conditional; now the loser's write does not land and it goes round
+    // again, reads a spent code and is refused. One duplicate token became one
+    // 400 to somebody who already holds a token from the other tap.
+    let done: { modified: boolean; etag?: string };
     try {
-      await store.delete(key);
+      done = await store.setJSON(key, spent(held), { onlyIfMatch: tag });
     } catch {
       console.error('signin: could not spend the code');
       return json({ error: 'unreachable' }, 503);
     }
+    if (!landed(done)) continue;
 
     const token = await mintToken(secret, {
       subject: await subjectForEmail(secret, email),

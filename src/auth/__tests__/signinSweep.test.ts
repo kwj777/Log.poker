@@ -285,16 +285,22 @@ describe('what it must not collect, because the mail budget lives there', () => 
     expect((await trade(endpoint(store, clock.now))).status).toBe(200);
   });
 
-  it('and leaves a dead code that is still answering 429, rather than turning it into a 400', async () => {
-    // Five wrong guesses arms a refusal that lasts the rest of the code's
-    // life. Collecting it would answer 400 instead, which is a quieter answer
-    // to somebody who is guessing.
+  it('and leaves a code that is dead but not yet expired, because the budget is on it', async () => {
+    // Five wrong guesses arm a refusal that lasts the rest of the code's life,
+    // and the record it is on is also the whole of the address's mail budget.
+    // Collecting it inside the window would hand that back, which is the one
+    // thing this sweep exists not to do.
+    //
+    // This asserted a 429 until the endpoint stopped answering one. That
+    // status was an oracle -- an address with no code answers 400 however many
+    // times it is guessed at -- so a dead code answers 400 now, and the sweep
+    // leaving the record alone is the property that survived the change.
     const { store, clock } = fakeStore(NOW);
     await ask(endpoint(store, clock.now));
     rewrite(store, { windowStartedAt: NOW - DAY_MS - 1, attempts: MAX_ATTEMPTS });
 
     expect((await sweep(store, clock.now)).collected).toBe(0);
-    expect((await trade(endpoint(store, clock.now), '000000')).status).toBe(429);
+    expect((await trade(endpoint(store, clock.now), '000000')).status).toBe(400);
   });
 });
 

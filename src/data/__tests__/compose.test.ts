@@ -88,14 +88,23 @@ describe('composing the repository', () => {
   it('leaves a syncing device to collect to the line the server drew', () => {
     // Not a rule this file applies: it hands the local repository to the
     // wrapper, and the wrapper collects to `collectedThrough` and no further.
-    expect(source).toContain('new SyncingRepository(local, token, cursorStore)');
+    expect(source).toContain('new SyncingRepository(local, getToken, cursorStore)');
+  });
+
+  it('and hands it somewhere to ask for a token rather than one token', () => {
+    // The string read above is a token as it was at launch. A renewal writes a
+    // fresh one beside it, and a tab left open past thirty days went on
+    // sending the old one, took a 401, and halted for good with a valid token
+    // in the store. Nothing on screen would have said why.
+    expect(source).toContain('new SyncingRepository(local, getToken, cursorStore)');
+    expect(source).not.toContain('new SyncingRepository(local, token,');
   });
 
   it('pulls once on the way up, so a device nobody writes on still syncs', () => {
     // Every other sync in the app is the tail of a write. Without this, a
     // laptop signed in and only ever read from takes one answer and stays on
     // it, which is the one question the feature exists to answer.
-    const started = source.slice(at('new SyncingRepository(local, token, cursorStore)'));
+    const started = source.slice(at('new SyncingRepository(local, getToken, cursorStore)'));
     expect(started).toMatch(/void syncing\.push\(\)/);
     expect(started.indexOf('void syncing.push()')).toBeLessThan(started.indexOf('return syncing;'));
   });

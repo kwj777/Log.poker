@@ -130,7 +130,7 @@ export interface SyncState {
 
 export class SyncingRepository implements Repository {
   private readonly local: Repository;
-  private readonly token: string;
+  private readonly token: () => Promise<string | null>;
   private readonly cursors: CursorStore;
   private readonly options: SyncingOptions;
   private readonly clock: () => Timestamp;
@@ -168,15 +168,31 @@ export class SyncingRepository implements Repository {
   private listeners = new Set<(state: SyncState) => void>();
   private applied = 0;
 
+  /**
+   * A string, or somewhere to ask for one.
+   *
+   * A string was all this took, and it was captured once when the wrapper was
+   * built. That is fine for as long as the token does not change, and it
+   * changes: `renewIfDue` writes a fresh one to the store beside this at
+   * launch, and this went on sending the one it was handed. On a process that
+   * outlives thirty days -- a browser tab left open, which is the ordinary way
+   * to use the web build -- the captured token expires, the endpoint answers
+   * 401, `halted` latches, and sync stops for good while the token sitting in
+   * the store is perfectly valid. Nothing on screen would say why.
+   *
+   * Asked per request instead, so a renewal is picked up by the next sync and
+   * a sign-out is too. Still accepts a plain string, because a test that means
+   * "this token, always" should be able to say that.
+   */
   constructor(
     local: Repository,
-    token: string,
+    token: string | (() => Promise<string | null>),
     cursors: CursorStore = memoryCursorStore(),
     options: SyncingOptions = {},
     clock: () => Timestamp = Date.now,
   ) {
     this.local = local;
-    this.token = token;
+    this.token = typeof token === 'string' ? async () => token : token;
     this.cursors = cursors;
     this.options = options;
     this.clock = clock;
@@ -321,9 +337,19 @@ export class SyncingRepository implements Repository {
     const batch = batchFor(pending, floor, this.options.budget);
     if (batch.more) this.dirty = true;
 
+    // Read now rather than when this wrapper was built. See the constructor.
+    const token = await this.token();
+    if (token === null) {
+      // Signed out from under this run. Not a failure to back off from and not
+      // a thing to retry: there is nobody to sync for any more.
+      this.halted = true;
+      this.announce({ running: false, problem: null });
+      return;
+    }
+
     const outcome = await sync(
       { since: cursors.pulled, changes: batch.changes, device: cursors.device },
-      this.token,
+      token,
       this.options,
     );
 

@@ -1157,6 +1157,23 @@ that is syncing anyway, and every write in the app already reloads the log.
 Telling the two apart would mean asking `applyChanges` what it actually wrote,
 on both engines, for less than that costs.
 
+### And which token it carries
+
+**The wrapper captured the token once, when it was built.** That is fine for as
+long as a token does not change, and it changes: `renewIfDue` writes a fresh one
+to the store beside it at launch, and nothing re-read it. On a process that
+outlives thirty days -- a browser tab left open, which is the ordinary way to
+use the web build -- the captured token expires, the endpoint answers 401,
+`halted` latches, and sync stops for good while a perfectly valid token sits in
+the store. Nothing on screen would say why, because from the app's side there
+is no problem: `getSession` is happy, the card says signed in.
+
+`compose` hands it `getToken` instead of a string, so every request reads the
+token as it is now. A renewal is picked up by the next sync, and so is a
+sign-out: `getToken` answers null once the token is gone, and the run stops
+rather than sending an empty bearer and taking a 401 and a backoff on behalf of
+somebody who is no longer there.
+
 ---
 
 ## What must not break

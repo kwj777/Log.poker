@@ -69,7 +69,11 @@ const compose = async (): Promise<Repository> => {
     // A syncing device does not decide this for itself: the server draws the
     // line from every device it has heard from, and this one only knows about
     // itself. See `SyncingRepository`.
-    const syncing = new SyncingRepository(local, token, cursorStore);
+    // `getToken` rather than the string read above, so a renewal is picked up
+    // by the next sync. A tab left open past thirty days used to go on sending
+    // the token it was built with, get a 401, and halt for good with a
+    // perfectly valid one in the store. See the constructor.
+    const syncing = new SyncingRepository(local, getToken, cursorStore);
 
     // Whatever a sync brings down, the screens hear about. Wired here, on the
     // wrapper this call is building, so it is re-wired every recompose and the

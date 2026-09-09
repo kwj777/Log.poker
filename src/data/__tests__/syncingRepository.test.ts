@@ -1280,3 +1280,89 @@ describe('saying that an answer changed the log', () => {
     expect(seen.every((count) => count === 0)).toBe(true);
   });
 });
+
+/* ------------------------------------------------------- which token it sends */
+
+/**
+ * The token this wrapper carries, and when it reads it.
+ *
+ * It used to be a string, captured once when the wrapper was built. Renewal
+ * writes a fresh one to the store beside it at launch and nothing re-read it,
+ * so a process outliving thirty days -- a browser tab left open, which is the
+ * ordinary way to use the web build -- went on sending the token it started
+ * with. The endpoint answers 401, `halted` latches, and sync stops for good
+ * with a perfectly valid token sitting in the store. Nothing on screen says why.
+ */
+describe('the token it sends', () => {
+  /** A server that writes down the bearer it was handed on every request. */
+  const watching = () => {
+    const { fetch, held } = server();
+    const bearers: (string | null)[] = [];
+    const watched = (async (url: string, init: RequestInit) => {
+      const auth = (init.headers as Record<string, string> | undefined)?.Authorization ?? null;
+      bearers.push(auth === null ? null : auth.replace('Bearer ', ''));
+      return fetch(url, init);
+    }) as unknown as Fetch;
+    return { fetch: watched, held, bearers };
+  };
+
+  it('is read again on every sync, so a renewal is picked up', async () => {
+    const { fetch, bearers } = watching();
+    let current = 'first.token.here.sig';
+
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'r-001' },
+    });
+    await local.init();
+    const wrapper = new SyncingRepository(
+      local,
+      async () => current,
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-renew0001' }),
+      { fetch },
+      () => now,
+    );
+
+    await wrapper.push(true);
+    expect(bearers).toEqual(['first.token.here.sig']);
+
+    // What `renewIfDue` does: a fresh one lands in the store beside it.
+    current = 'second.token.here.sig';
+    tick(HOUR);
+    await wrapper.push(true);
+    expect(bearers[bearers.length - 1]).toBe('second.token.here.sig');
+  });
+
+  it('and a sign-out stops it rather than sending nothing to the server', async () => {
+    // `getToken` answers null once the token is gone. Sending that would be a
+    // 401 and a backoff for a device that has nobody to sync for.
+    const { fetch, bearers } = watching();
+    let current: string | null = 'a.b.c.d';
+
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => 'g-001' },
+    });
+    await local.init();
+    const wrapper = new SyncingRepository(
+      local,
+      async () => current,
+      memoryCursorStore({ pulled: 0, pushed: 0, device: 'device-gone00001' }),
+      { fetch },
+      () => now,
+    );
+
+    await wrapper.push(true);
+    expect(bearers).toHaveLength(1);
+
+    current = null;
+    tick(HOUR);
+    await wrapper.push(true);
+    expect(bearers).toHaveLength(1);
+    expect(wrapper.current().problem).toBeNull();
+  });
+});

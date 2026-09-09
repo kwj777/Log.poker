@@ -83,4 +83,4 @@ If that walk is the part you find hard, and it is the part most people find hard
 
 And log the hand. Not because a bad beat needs commemorating, but because "I folded correctly and the runner-runner came" is a sentence you can only trust about yourself if you wrote it down at the time. Three months from now, when you are trying to work out whether you have been running bad or playing bad, this hand is one honest data point instead of one vivid memory. Vivid memories are exactly the ones that lie.
 
-[Log is free, works with no signal, and never sends anything anywhere](/app). Fifteen seconds, and the fold is on the record as a fold rather than as a grudge.
+[Log is free, all of it, and works with no signal and no account](/app). Fifteen seconds, and the fold is on the record as a fold rather than as a grudge.

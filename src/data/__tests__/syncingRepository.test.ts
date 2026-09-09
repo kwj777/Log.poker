@@ -908,6 +908,80 @@ describe('collecting tombstones, once nobody is still waiting', () => {
     expect(await laptop.listSessions()).toEqual([]);
   });
 
+  it('takes a live hand with the session it hangs off, on the server and on both devices', async () => {
+    // The one assertion in `collect` that nothing checked. Its orphan sweep
+    // deletes any child whose session is no longer in the bundle, with no
+    // horizon and no acked check, and the comment justifying that says *both
+    // device engines take that child with the session when they sweep*. That
+    // sentence is load-bearing for a rule which permanently destroys live
+    // records, and it was asserted nowhere: the server rule is tested in
+    // `bundle.test.ts`, each engine's sweep in the repository contract, and
+    // the agreement between them by nothing at all. If either side drifts, the
+    // server destroys a row the devices still hold, or keeps one they dropped
+    // and re-serves it to every device forever.
+    //
+    // A live child under a session tombstone is not exotic. It is what happens
+    // whenever one device logs a hand on a session another has just deleted.
+    const { fetch, held } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    const session = await startSession(phone);
+    await phone.push();
+    await laptop.push(true);
+
+    tick(DAY);
+    await laptop.deleteSession(session.id);
+    await laptop.push();
+
+    // The phone has not heard about the delete yet, so the session is still
+    // live here and a hand can be logged on it. It goes up in the same round
+    // that brings the tombstone down.
+    tick(HOUR);
+    const hand = await phone.createHand({ sessionId: session.id, at: now });
+    await phone.push(true);
+    expect(await phone.getSession(session.id)).toBeNull();
+
+    // It reached the server and was served on: both ends are holding a live
+    // hand under a tombstoned session, which is the state being collected.
+    await laptop.push(true);
+    for (const repository of [phone, laptop]) {
+      const { hands } = await repository.listChangedSince(0);
+      expect(hands.some((change) => change.record.id === hand.id)).toBe(true);
+    }
+
+    // Two rounds each past the window, as above: the first records each device
+    // as caught up, the second is the one allowed to sweep.
+    tick(RETENTION + DAY);
+    await phone.push(true);
+    await laptop.push(true);
+    tick(DAY);
+    await phone.push(true);
+    await laptop.push(true);
+
+    // The session went, and the hand went with it, in all three places. A hand
+    // left on the server here would be served in every full pull from then on
+    // and skipped by every device that received it.
+    for (const repository of [phone, laptop]) {
+      const { sessions, hands } = await repository.listChangedSince(0);
+      expect(sessions.some((change) => change.record.id === session.id)).toBe(false);
+      expect(hands.some((change) => change.record.id === hand.id)).toBe(false);
+    }
+
+    // And gone from the bundle, which is the only place it can be seen to be
+    // gone. A device asked about an orphaned hand skips it -- its session is
+    // missing -- so every device looks identical whether the server dropped it
+    // or is still holding it. That is exactly why it can rot there: served in
+    // every full pull from then on, and skipped by everything that receives it.
+    const bundle = held.bundle as { records: { hands: Record<string, unknown> } };
+    expect(Object.keys(bundle.records.hands)).toEqual([]);
+
+    const fresh = await device(fetch, 'fresh');
+    await fresh.push(true);
+    expect(await fresh.listHands()).toEqual([]);
+    expect(await fresh.listSessions()).toEqual([]);
+  });
+
   it('never collects further than the server has', async () => {
     // A device that swept on its own clock could drop a tombstone the others
     // have not seen, and then push the live row back itself.

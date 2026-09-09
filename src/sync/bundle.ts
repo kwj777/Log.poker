@@ -615,6 +615,17 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
 
   // And whatever is left pointing at a session that is not here any more.
   //
+  // The assertion two paragraphs down -- that both device engines take such a
+  // child with the session -- is the one this rule rests on, and it was
+  // asserted nowhere: the rule here is tested in `bundle.test.ts`, each
+  // engine's sweep in the repository contract, and the agreement between them
+  // by nothing at all. It is now, in `syncingRepository.test.ts`, against the
+  // real merge and a real device through the whole lifecycle. Worth having
+  // written down because this rule permanently destroys live records, and
+  // because a device cannot see whether it ran: an orphaned child is skipped
+  // on the way in, so every device looks identical whether the server dropped
+  // it or is still serving it in every full pull for good.
+  //
   // A live child can sit under a session tombstone: another device logs a hand
   // on a session this one has already deleted, and nothing reconciles the pair.
   // Both device engines take that child with the session when they sweep, and

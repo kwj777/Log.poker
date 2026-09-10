@@ -196,6 +196,37 @@ describe('the app is under /app', () => {
   });
 });
 
+describe('the two sitemaps, at two addresses', () => {
+  it('names the page address, rather than trusting a directory index', () => {
+    // The same reasoning the guides get their rules for: Netlify would usually
+    // serve dist/sitemap/index.html here, and usually is a setting.
+    expect(ruleAt('/sitemap')).toBeGreaterThan(-1);
+    expect(netlify).toContain('to = "/sitemap/index.html"');
+  });
+
+  it('and the trailing slash somebody will type', () => {
+    expect(ruleAt('/sitemap/')).toBeGreaterThan(-1);
+  });
+
+  it('leaves the XML alone, which is the one that must not break', () => {
+    // A rule capturing /sitemap.xml would take the crawlers' sitemap off the
+    // site to fix a page for people. Nothing may send that address anywhere.
+    expect(ruleAt('/sitemap.xml')).toBe(-1);
+    expect(netlify).not.toContain('to = "/sitemap.xml"');
+    expect(netlify).not.toContain('from = "/sitemap*"');
+  });
+
+  it('and is not shadowed by the rules that match everything', () => {
+    expect(ruleAt('/sitemap')).toBeLessThan(ruleAt('/app/*'));
+  });
+
+  it('points at a file the build actually writes', () => {
+    // The rule and the generator have to name the same path, and they are in
+    // different files with nothing else holding them together.
+    expect(read('scripts', 'build-blog.mjs')).toContain("join('sitemap', 'index.html')");
+  });
+});
+
 describe('the installed app is the app', () => {
   it.each(['id', 'start_url', 'scope'] as const)('manifest %s is /app', (key) => {
     expect(manifest[key]).toBe('/app');

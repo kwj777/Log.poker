@@ -354,6 +354,15 @@ npx serve dist      # or any static server with a single-page fallback
   client router rather than 404ing. There is deliberately no catch-all at the
   root: an unknown address gets `404.html` rather than quietly resolving to the
   app.
+- **Extensionless addresses** -- each guide is served from its `.html` file at
+  the address its canonical names, and `/sitemap` from `sitemap/index.html`.
+  Netlify would usually do both on its own, and usually is a setting rather
+  than a guarantee. The sitemap needs it more than the guides do, because it
+  has a sibling: `/sitemap.xml` is a real file, so "which of these does
+  `/sitemap` mean" is worth answering in configuration. The rule matches that
+  one path exactly and leaves the XML alone, which the site tests assert in
+  both directions -- capturing `/sitemap.xml` would take the crawlers' sitemap
+  off the site to fix a page for people.
 - **Cache headers** -- `index.html`, `sw.js` and the manifest are
   `must-revalidate` so a deploy reaches returning visitors immediately;
   everything under `_expo/` and `assets/` is content-hashed by the bundler and
@@ -960,15 +969,15 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 46 passed
-Tests:       1351 passed
+Tests:       1356 passed
 
   dexieRepository   118   the IndexedDB path, against real IndexedDB
   sqlRepository     118   the SQLite path, against real SQLite
   bundle             66   what ships to each platform, against the real output
+  site               56   the marketing/app split, the PWA, the sitemap
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   sessionImport      52   reading a session-summary export
-  site               51   the marketing/app split, the PWA, the sitemap
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   syncingRepository  48   two devices and one server, no fakes in between
   stats              45   P/L, rebuys, duration, win rate, groupings

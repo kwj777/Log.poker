@@ -69,6 +69,29 @@
   to = "/tilt.html"
   status = 200
 
+# The sitemap page, which needs a rule more than the guides do.
+#
+# It is a directory index -- dist/sitemap/index.html -- and Netlify would
+# usually serve it at /sitemap on its own, the same "usually" the guides above
+# do not rely on. The difference here is that /sitemap has a sibling: the XML
+# sitemap is a real file at /sitemap.xml, and "which of these does /sitemap
+# mean" is a question worth answering in configuration rather than leaving to
+# whichever rule fires first.
+#
+# It does not shadow the XML. Netlify matches this path exactly, and
+# /sitemap.xml is not /sitemap; `src/site/__tests__/site.test.ts` asserts both,
+# because getting that wrong would take the crawlers' sitemap off the site to
+# fix a page for people.
+[[redirects]]
+  from = "/sitemap"
+  to = "/sitemap/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/sitemap/"
+  to = "/sitemap/index.html"
+  status = 200
+
 # The .html address of each guide also resolves, because Netlify serves a real
 # file before it consults these rules, so each page is reachable at two URLs.
 # That is handled by the canonical in each document rather than by a forced

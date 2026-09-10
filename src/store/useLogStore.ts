@@ -5,7 +5,14 @@
  * sessions, hands and mood, and splitting them would mean coordinating refreshes
  * across stores for no benefit at this size. The whole dataset is held in memory
  * -- a heavy live player logs a few hundred sessions a year, which is trivial --
- * and the repository stays the source of truth, re-read after every write.
+ * and the repository stays the source of truth: nothing here is patched in
+ * memory from what a write returned, it is read back from the database.
+ *
+ * **Read back, but not all of it.** A write says which of the four tables it
+ * could have disturbed and only those are re-read. That is a good deal faster
+ * on a log with years in it, and it also stops a write invalidating every
+ * memoized view in the app; see `load` and `read` below, which is where both of
+ * those live and where the reasoning for them is written down.
  */
 
 import { useMemo } from 'react';
@@ -92,7 +99,8 @@ interface LogState {
   lastMidSessionPromptAt: number | null;
 
   hydrate: () => Promise<void>;
-  refresh: () => Promise<void>;
+  /** Defaults to every slice; a write names only what it could have changed. */
+  refresh: (parts?: readonly Slice[]) => Promise<void>;
 
   createVenue: (name: string, isHomeGame: boolean) => Promise<Venue>;
   renameVenue: (id: string, name: string) => Promise<void>;
@@ -122,17 +130,103 @@ interface LogState {
   clearAll: () => Promise<void>;
 }
 
-/** Read everything back from storage. Cheap, and it keeps derived views honest. */
-const loadAll = async () => {
+/**
+ * The four reads the store holds, named so a write can say which it disturbed.
+ *
+ * `activeSession` is not one of them. It is a session, it changes exactly when
+ * the sessions do, and giving it a name of its own would only create a way for
+ * the two to be refreshed apart.
+ */
+type Slice = 'venues' | 'sessions' | 'hands' | 'moodEntries';
+
+const EVERYTHING: readonly Slice[] = ['venues', 'sessions', 'hands', 'moodEntries'];
+
+/**
+ * Read back the slices a write could have changed, and only those.
+ *
+ * This used to read all four every time, on the argument that it is cheap and
+ * it keeps derived views honest. The second half is right and is why the
+ * repository is still the source of truth here: nothing below is patched in
+ * memory from what a write returned, it is read back from the database.
+ *
+ * The first half stopped being true as the log grew, which is the case this
+ * app is built for. Against five years of a heavy live player -- 600 sessions,
+ * 3600 hands -- one reload measures 49ms on Node's SQLite, and every rebuy
+ * during a live session paid it. `listHands` is 31ms of that, and the store
+ * holds every hand ever logged so that one screen can count them.
+ *
+ * There is a second cost that is easier to miss and can be larger. A reload
+ * replaced all four arrays, so every `useMemo` downstream of any of them
+ * recomputed, whatever had actually changed. Logging a hand re-ran the
+ * tournament bootstrap on the variance tab -- two thousand resamples of every
+ * entry -- because the sessions array was a new array, even though it held the
+ * same sessions.
+ *
+ * Reading only what changed fixes both, and the second one falls out for free:
+ * a slice that is not reloaded keeps the exact array it had, so the memos over
+ * it are never invalidated in the first place. No comparison, nothing to keep
+ * in step.
+ *
+ * The cost of being wrong here is a screen that does not notice a change, so
+ * the callers below name a slice whenever there is a case for it. `sessionCount`
+ * is the one that is easy to miss: it is derived at read time, so writing a
+ * session changes every venue.
+ */
+const load = async (parts: ReadonlySet<Slice>): Promise<Map<Slice, Partial<LogState>>> => {
   const repository = await getRepository();
-  const [venues, sessions, hands, moodEntries, activeSession] = await Promise.all([
-    repository.listVenues(),
-    repository.listSessions(),
-    repository.listHands(),
-    repository.listMoodEntries(),
-    repository.getActiveSession(),
+  const loaded = new Map<Slice, Partial<LogState>>();
+  await Promise.all([
+    parts.has('venues')
+      ? repository.listVenues().then((venues) => void loaded.set('venues', { venues }))
+      : null,
+    parts.has('sessions')
+      ? Promise.all([repository.listSessions(), repository.getActiveSession()]).then(
+          ([sessions, activeSession]) => void loaded.set('sessions', { sessions, activeSession }),
+        )
+      : null,
+    parts.has('hands')
+      ? repository.listHands().then((hands) => void loaded.set('hands', { hands }))
+      : null,
+    parts.has('moodEntries')
+      ? repository
+          .listMoodEntries()
+          .then((moodEntries) => void loaded.set('moodEntries', { moodEntries }))
+      : null,
   ]);
-  return { venues, sessions, hands, moodEntries, activeSession };
+  return loaded;
+};
+
+/**
+ * Which read owns each slice, so a slow one cannot land on top of a fast one.
+ *
+ * Two reloads can be in flight at once -- a write during a sync, two writes in
+ * a row -- and nothing said which of them the store should believe. Whichever
+ * resolved last won, which on two overlapping reads of the same table is the
+ * older answer as often as not, and it stayed on screen until something else
+ * wrote.
+ *
+ * Counted per slice rather than once for the store, because the reloads are no
+ * longer all the same shape. A hand write and a full sync overlap on `hands`
+ * and nowhere else: one number would make the sync's venues and sessions stale
+ * too, and throw away three good slices to settle one.
+ */
+const owner: Record<Slice, number> = { venues: 0, sessions: 0, hands: 0, moodEntries: 0 };
+
+/** Claim the slices, read them, and keep whichever are still this read's to set. */
+const read = async (parts: readonly Slice[]): Promise<Partial<LogState>> => {
+  // Claimed before the read starts, so a reload that overtakes this one owns
+  // the slices they share whichever of them finishes first.
+  const mine = new Map<Slice, number>();
+  for (const slice of parts) mine.set(slice, (owner[slice] += 1));
+
+  const patch: Partial<LogState> = {};
+  for (const [slice, values] of await load(new Set(parts))) {
+    // Somebody newer has read this table since. Their answer is the current
+    // one, and this is a picture of the database from before their write.
+    if (owner[slice] !== mine.get(slice)) continue;
+    Object.assign(patch, values);
+  }
+  return patch;
 };
 
 const describeError = (error: unknown): string =>
@@ -175,16 +269,16 @@ export const useLogStore = create<LogState>((set, get) => ({
     if (get().status === 'loading') return;
     set({ status: 'loading', error: null });
     try {
-      set({ ...(await loadAll()), status: 'ready' });
+      set({ ...(await read(EVERYTHING)), status: 'ready', error: null });
       listen(() => void get().refresh());
     } catch (error) {
       set({ status: 'error', error: describeError(error) });
     }
   },
 
-  refresh: async () => {
+  refresh: async (parts = EVERYTHING) => {
     try {
-      set({ ...(await loadAll()), error: null });
+      set({ ...(await read(parts)), error: null });
     } catch (error) {
       set({ error: describeError(error) });
     }
@@ -193,20 +287,22 @@ export const useLogStore = create<LogState>((set, get) => ({
   createVenue: async (name, isHomeGame) => {
     const repository = await getRepository();
     const venue = await repository.createVenue({ name, isHomeGame });
-    await get().refresh();
+    await get().refresh(['venues']);
     return venue;
   },
 
   renameVenue: async (id, name) => {
     const repository = await getRepository();
+    // Sessions too: `SessionWithChildren` carries its venue, so a rename that
+    // did not reload them would leave the old name on every row that shows one.
     await repository.updateVenue(id, { name });
-    await get().refresh();
+    await get().refresh(['venues', 'sessions']);
   },
 
   deleteVenue: async (id) => {
     const repository = await getRepository();
     await repository.deleteVenue(id);
-    await get().refresh();
+    await get().refresh(['venues', 'sessions']);
   },
 
   startSession: async ({
@@ -236,21 +332,23 @@ export const useLogStore = create<LogState>((set, get) => ({
       await repository.createMoodEntry({ sessionId: session.id, phase: 'start', score: mood, at });
     }
     set({ lastMidSessionPromptAt: null });
-    await get().refresh();
+    // Venues, because `sessionCount` is derived at read time and this changed it.
+    await get().refresh(mood == null ? ['sessions', 'venues'] : ['sessions', 'venues', 'moodEntries']);
     return session;
   },
 
   addRebuy: async (sessionId, amount) => {
     const repository = await getRepository();
+    // Rebuys are children of the session, so the sessions read carries them.
     const rebuy = await repository.addRebuy({ sessionId, amount, at: Date.now() });
-    await get().refresh();
+    await get().refresh(['sessions']);
     return rebuy;
   },
 
   removeRebuy: async (id) => {
     const repository = await getRepository();
     await repository.deleteRebuy(id);
-    await get().refresh();
+    await get().refresh(['sessions']);
   },
 
   endSession: async (sessionId, cashOut, mood, result) => {
@@ -269,17 +367,19 @@ export const useLogStore = create<LogState>((set, get) => ({
       await repository.createMoodEntry({ sessionId, phase: 'end', score: mood, at: endedAt });
     }
     set({ lastMidSessionPromptAt: null });
-    await get().refresh();
+    await get().refresh(mood == null ? ['sessions'] : ['sessions', 'moodEntries']);
   },
 
   updateSessionNotes: async (sessionId, notes) => {
     const repository = await getRepository();
     await repository.updateSession(sessionId, { notes });
-    await get().refresh();
+    await get().refresh(['sessions']);
   },
 
   deleteSession: async (sessionId) => {
     const repository = await getRepository();
+    // Everything: the tombstone cascades to the session's hands and mood
+    // entries, and it changes the venue's `sessionCount` on the way past.
     await repository.deleteSession(sessionId);
     await get().refresh();
   },
@@ -331,7 +431,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       throw error;
     }
 
-    await get().refresh();
+    await get().refresh(['sessions', 'venues']);
     return {
       imported: plan.writes.length,
       duplicates: plan.duplicates,
@@ -350,7 +450,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       tags: input.tags ?? [],
       amount: input.amount ?? null,
     });
-    await get().refresh();
+    await get().refresh(['hands']);
     return hand;
   },
 
@@ -363,20 +463,20 @@ export const useLogStore = create<LogState>((set, get) => ({
       tags: patch.tags,
       amount: patch.amount,
     });
-    await get().refresh();
+    await get().refresh(['hands']);
   },
 
   deleteHand: async (id) => {
     const repository = await getRepository();
     await repository.deleteHand(id);
-    await get().refresh();
+    await get().refresh(['hands']);
   },
 
   logMood: async (sessionId, phase, score) => {
     const repository = await getRepository();
     await repository.createMoodEntry({ sessionId, phase, score, at: Date.now() });
     if (phase === 'mid') set({ lastMidSessionPromptAt: Date.now() });
-    await get().refresh();
+    await get().refresh(['moodEntries']);
   },
 
   dismissMidSessionPrompt: () => set({ lastMidSessionPromptAt: Date.now() }),

@@ -539,6 +539,40 @@ src/
   theme/                  palette, spacing, type scale
 ```
 
+### What a write reads back
+
+The store holds four tables in memory and the repository stays the source of
+truth: nothing is patched in memory from what a write returned, it is read back
+from the database. What changed is how much of it is read back. A write now
+names the tables it could have disturbed, and only those are re-read.
+
+Against five years of a heavy live player -- 600 sessions, 3600 hands -- the old
+reload measured **49ms, paid on every write**, including every rebuy tapped
+during a live session. Naming the tables takes a rebuy to 10ms and a mood entry
+to 8ms. Logging a hand is still 29ms, because `listHands` is 31ms of that 49 and
+the store holds every hand ever logged so that Settings can count them; making
+that read per session is the next thing here, and it needs the hand list to
+become asynchronous.
+
+The second cost is easier to miss and can be the larger one. Replacing an array
+invalidates every `useMemo` over it, so logging a hand re-ran the tournament
+bootstrap on the variance tab -- two thousand resamples of every entry --
+because the sessions array was new, not because it was different. A table that
+is not re-read keeps the array it had, so this falls out for free rather than
+needing anything compared.
+
+The risk it introduces is a screen that does not notice a change, so each write
+names a table whenever there is a case for it. `sessionCount` is the one that is
+easy to miss: it is derived at read time, so writing a session changes every
+venue.
+
+**Which read owns each table is counted per table.** Two reloads can be in
+flight at once -- a write during a sync, two writes in a row -- and whichever
+resolved last used to win, which on two overlapping reads of one table is the
+older answer as often as not. One counter for the whole store would not do:
+a hand write and a full sync overlap on `hands` and nowhere else, and settling
+that would throw away three good tables.
+
 ### The repository interface
 
 Persistence sits behind a single interface with two implementations:
@@ -806,8 +840,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 42 passed
-Tests:       1306 passed
+Test Suites: 43 passed
+Tests:       1315 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -846,6 +880,7 @@ Tests:       1306 passed
   handOffs           11   where a hand-off goes, and what the mid-session card says
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
+  useLogStore         9   what a write reads back, and what it leaves alone
   plan                8   what an import will write, before it writes it
   tokenStore.web      8   the browser token store
   columns             7   header matching

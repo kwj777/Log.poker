@@ -29,6 +29,7 @@ import {
   type HandTag,
   type Position,
 } from '../../src/domain/types';
+import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { CardPicker } from '../../src/features/hands/CardPicker';
 import { MAX_BOARD, isBoard } from '../../src/domain/handNotation';
 import { useLogStore } from '../../src/store/useLogStore';
@@ -51,6 +52,7 @@ export default function LogHandScreen() {
   const [amount, setAmount] = useState('');
   const [showAmount, setShowAmount] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   if (!session) {
     return (
@@ -86,6 +88,7 @@ export default function LogHandScreen() {
   const save = async () => {
     if (!hasSomething || partialBoard || saving) return;
     setSaving(true);
+    setFailed(null);
     try {
       await logHand({
         sessionId: session.id,
@@ -100,7 +103,11 @@ export default function LogHandScreen() {
       });
       successFeedback();
       router.back();
-    } catch {
+    } catch (error) {
+      // Said rather than swallowed. A spinner that stops and a screen that does
+      // not move is what success looks like from a foot away, so a hand that
+      // failed to save read as one that saved.
+      setFailed(describeFailure(error, 'That hand could not be saved.'));
       setSaving(false);
     }
   };
@@ -226,6 +233,8 @@ export default function LogHandScreen() {
           Worth it when the runout is the story: a cooler, a bad beat, a bluff that got there.
         </Text>
       )}
+
+      <ErrorNote message={failed} />
     </Screen>
   );
 }

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AmountInput } from '../../src/components/AmountInput';
 import { Button } from '../../src/components/Button';
+import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { Card } from '../../src/components/Card';
 import { MoodPicker } from '../../src/components/MoodPicker';
 import { Screen } from '../../src/components/Screen';
@@ -46,6 +47,7 @@ export default function ActiveSessionScreen() {
   const [endMood, setEndMood] = useState<MoodScore | null>(null);
   const [finishPosition, setFinishPosition] = useState('');
   const [entrants, setEntrants] = useState('');
+  const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const elapsed = useElapsed(session?.startedAt ?? null);
@@ -86,11 +88,17 @@ export default function ActiveSessionScreen() {
     const amount = parseAmount(rebuyAmount);
     if (amount === null || amount <= 0 || busy) return;
     setBusy(true);
+    setFailed(null);
     try {
       await addRebuy(session.id, amount);
       successFeedback();
       setRebuyOpen(false);
       setRebuyAmount('');
+    } catch (error) {
+      // There was no catch here at all, so a throw was an unhandled rejection:
+      // the sheet stayed open, the spinner stopped, and nothing said the money
+      // had not gone in.
+      setFailed(describeFailure(error, `That ${rebuyWord.toLowerCase()} could not be saved.`));
     } finally {
       setBusy(false);
     }
@@ -99,6 +107,7 @@ export default function ActiveSessionScreen() {
   const commitCashOut = async () => {
     if (cashOutCents === null || cashOutCents < 0 || busy) return;
     setBusy(true);
+    setFailed(null);
     try {
       await endSession(session.id, cashOutCents, endMood, {
         finishPosition: parseCount(finishPosition),
@@ -107,6 +116,10 @@ export default function ActiveSessionScreen() {
       warningFeedback();
       setCashOutOpen(false);
       router.replace(`/session/${session.id}`);
+    } catch (error) {
+      // The worst one to lose silently: this is the moment the result is
+      // written, and the sheet closing is the only thing that ever said so.
+      setFailed(describeFailure(error, 'That session could not be closed out.'));
     } finally {
       setBusy(false);
     }
@@ -246,6 +259,7 @@ export default function ActiveSessionScreen() {
           disabled={(parseAmount(rebuyAmount) ?? 0) <= 0}
           loading={busy}
         />
+        <ErrorNote message={failed} />
       </Sheet>
 
       <Sheet
@@ -318,6 +332,7 @@ export default function ActiveSessionScreen() {
           disabled={cashOutCents === null || cashOutCents < 0}
           loading={busy}
         />
+        <ErrorNote message={failed} />
       </Sheet>
     </>
   );

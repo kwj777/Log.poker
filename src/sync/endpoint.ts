@@ -42,6 +42,7 @@
  */
 
 import { mergeIntoBundle } from './bundle';
+import { countRecords, describe, observe } from './observe';
 import { rateCheck, readWindow } from './rateLimit';
 import { BUNDLE_VERSION } from './protocol';
 import { bearerFrom, bucketFor, checkToken, hasOwnBucket } from './verify';
@@ -288,6 +289,9 @@ export const handleSync = async (
     // request this person's devices ever make again, with nothing in the answer
     // to say why.
     let merged;
+    // Timed because how long a merge takes is one of the two numbers that would
+    // say the bundle has outgrown being one object. See `observe`.
+    const started = performance.now();
     try {
       merged = mergeIntoBundle(
         stored === null ? null : stored.data,
@@ -340,6 +344,11 @@ export const handleSync = async (
       console.error('sync: bucket write reported no tag, treating as not written');
       return json({ error: 'unreachable' }, 503);
     }
+
+    // Said after the write, so a line only ever describes a bundle that is
+    // really stored. Nothing here identifies whose it is; see `observe`.
+    const seen = observe(countRecords(merged.bundle), performance.now() - started, round + 1);
+    if (seen) console.warn(describe(seen));
 
     return json(
       {

@@ -756,6 +756,15 @@ two merges that disagree in a year.
   millisecond is free, because applying a record twice is a no-op.
 - **Writes never wait on it.** Everything commits locally and returns; the push
   happens after. A card room has no wifi and that is the normal case.
+- **Coming back to the front is a sync too.** Every other trigger is the tail
+  of a local write, and one is the tail of a launch, which between them leave
+  out the device doing the reading: a laptop with the tab open took its answer
+  once and then sat on it for as long as the tab lived. `AppState` covers both
+  platforms, because react-native-web implements it over `visibilitychange`,
+  so a phone leaving the app switcher and a tab being selected are one event.
+  It keeps the backoff -- a server that is down is not helped by everybody
+  alt-tabbing -- and adds a thirty-second throttle, because passing through a
+  tab is not the same as returning to it.
 
 `src/data/index.ts` is where the wrapper is composed in, which is what keeps all
 of this out of every feature folder: a screen asks for a repository and gets
@@ -798,7 +807,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 42 passed
-Tests:       1301 passed
+Tests:       1306 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -808,9 +817,9 @@ Tests:       1301 passed
   sessionImport      52   reading a session-summary export
   site               51   the marketing/app split, the PWA, the sitemap
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
+  syncingRepository  48   two devices and one server, no fakes in between
   stats              45   P/L, rebuys, duration, win rate, groupings
   verify             44   checking a token, and every way past it that must not work
-  syncingRepository  43   two devices and one server, no fakes in between
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
   copy               32   what the sign-in and the sync are allowed to say

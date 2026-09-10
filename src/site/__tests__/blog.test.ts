@@ -66,6 +66,7 @@ const feed = readFileSync(join(site, 'blog', 'feed.xml'), 'utf8');
 const sitemap = readFileSync(join(site, 'sitemap.xml'), 'utf8');
 /** Every post the build published, by the slug it published it at. The listing
  * only, not the footer, which links the feed at a /blog path of its own. */
+const sitemapPage = readFileSync(join(site, 'sitemap', 'index.html'), 'utf8');
 const listing = index.slice(index.indexOf('<ul class="posts">'), index.indexOf('</ul>'));
 const published = [...listing.matchAll(/<a href="\/blog\/([^"]+)">/g)].map((match) => match[1]);
 
@@ -183,6 +184,47 @@ describe('the blog is findable', () => {
     expect(locs.slice(0, 2)).toEqual(['https://log.poker/', 'https://log.poker/app']);
     expect(locs).toContain('https://log.poker/blog');
     for (const slug of published) expect(locs).toContain(`https://log.poker/blog/${slug}`);
+  });
+
+  it('and lists the same pages again at /sitemap, for the people', () => {
+    // The XML is a list of addresses with no names on it. This is the same
+    // list a reader can use, and the build refuses to publish them if they
+    // disagree -- so what this asserts from outside is that the refusal works.
+    const crawled = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
+      .map((match) => match[1].replace('https://log.poker', '') || '/')
+      .sort();
+    const linked = [...sitemapPage.matchAll(/<li>\s*<a href="([^"]+)"/g)]
+      .map((match) => match[1])
+      .sort();
+    expect(linked).toEqual(crawled);
+  });
+
+  it('names every page rather than only addressing it', () => {
+    expect(sitemapPage).toContain('Running bad or playing bad');
+    expect(sitemapPage).toContain('How big a bankroll');
+    expect(sitemapPage).toContain('Pot odds and outs');
+    expect(sitemapPage).toContain('Tilt');
+    for (const slug of published) expect(sitemapPage).toContain(`/blog/${slug}`);
+  });
+
+  it('is reachable from the pages it lists, or nobody will ever see it', () => {
+    expect(read('public', 'home.html')).toContain('href="/sitemap"');
+    expect(read('public', 'running-bad.html')).toContain('href="/sitemap"');
+    expect(index).toContain('href="/sitemap"');
+    expect(readFileSync(join(site, 'blog', published[0], 'index.html'), 'utf8')).toContain(
+      'href="/sitemap"',
+    );
+  });
+
+  it('fetches nothing to render, same as every other page here', () => {
+    expect(sitemapPage).not.toMatch(/<script\b/);
+    expect(sitemapPage).not.toMatch(/<link[^>]+stylesheet/);
+    // Every URL it reaches for is this site's own.
+    for (const [, url] of sitemapPage.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)) {
+      expect(url.startsWith('https://log.poker') || url === 'https://gamblingtherapy.org').toBe(
+        true,
+      );
+    }
   });
 
   it('dates every entry, in the past', () => {

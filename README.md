@@ -286,6 +286,7 @@ What a build produces:
 | `/blog/<slug>` | A post. Written as `blog/<slug>/index.html`, so the URL carries no `.html` and needs no redirect rule. |
 | `/blog/feed.xml` | RSS 2.0, with the full post in `content:encoded`. |
 | `/sitemap.xml` | `public/sitemap.xml`, which stays the hand-written truth for the front door and the app, plus one entry per post. |
+| `/sitemap` | The same list with the names on, for people rather than crawlers. |
 
 Three things are worth knowing before changing any of it:
 
@@ -590,6 +591,60 @@ resolved last used to win, which on two overlapping reads of one table is the
 older answer as often as not. One counter for the whole store would not do:
 a hand write and a full sync overlap on `hands` and nowhere else, and settling
 that would throw away three good tables.
+
+### Two sitemaps, and what keeps them the same
+
+`/sitemap.xml` is for crawlers and says nothing a reader would want: addresses,
+no titles, no order that means anything. `/sitemap` is the same list with the
+names on, which is the page somebody lands on when they know the site has
+written something about bankrolls and cannot remember where. It is linked from
+the front door, every guide, the blog index and every post, because a sitemap
+nothing links to is a page nobody finds.
+
+It is built by `scripts/build-blog.mjs` rather than beside the guides, because
+that is the generator that reads `content/blog`. A sitemap page written by
+`build-content.mjs` would be missing every post published since it last ran.
+
+The two are generated from different sources -- the XML from the hand-written
+`public/sitemap.xml`, the page from `scripts/pages.mjs` -- so **the build
+compares them and refuses to publish either if they disagree**. Adding a page
+to one and forgetting the other publishes a sitemap that is missing a page,
+which is worse than having none: it reads as complete. The check earned itself
+on its first run, by catching `/blog` listed in the XML and only in the
+footer of the page.
+
+`scripts/pages.mjs` exists for the same reason the guides are generated: the
+four guide titles were in `build-content.mjs` for the cross-links at the foot
+of every guide, and the sitemap needs the same four under the same names. Two
+copies of a list is a list that goes wrong in one place.
+
+### A render that throws
+
+Expo Router ships an `ErrorBoundary` and **does not apply it**: a route is
+wrapped only if it exports one, and nothing here did. A throw anywhere in the
+tree unmounted the tree, which on web is a white page in the app's background
+color with nothing on it and nothing to do next.
+
+`app/_layout.tsx` exports one now, so it is the backstop under every screen at
+once. `retry` re-renders the route rather than reloading the app, which is the
+right first move: the local database is untouched by a render throwing, so
+whatever was logged is still logged, and a screen that fell over on one odd
+record often comes back.
+
+The screen it shows **asks for nothing** -- no safe area, no theme context, no
+store -- because the tree it replaces is the tree that would have provided
+those. Wrapping it in its own `SafeAreaProvider` was the first attempt and is
+worse than it looks: that provider renders nothing until it has measured, so
+the screen that exists to say something would say it a frame late, and say
+nothing at all anywhere the measurement never arrives. Centered content with
+generous padding does not need the insets to be right. The same screen is what
+the root layout shows when the database will not open, which is the same thing
+from where the player is sitting.
+
+A boundary per screen would keep the tab bar alive so the other three tabs
+stayed reachable, which is nicer. It needs `unstable_settings.screenErrorBoundary`,
+and reaching for an unstable API is a decision to make on purpose rather than on
+the way past.
 
 ### The hands are not in the store
 
@@ -904,8 +959,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 45 passed
-Tests:       1342 passed
+Test Suites: 46 passed
+Tests:       1351 passed
 
   dexieRepository   118   the IndexedDB path, against real IndexedDB
   sqlRepository     118   the SQLite path, against real SQLite
@@ -920,11 +975,11 @@ Tests:       1342 passed
   verify             44   checking a token, and every way past it that must not work
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
+  blog               32   the post grammar, the share cards, and what it refuses
   copy               32   what the sign-in and the sync are allowed to say
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
-  blog               28   the post grammar, the share cards, and what it refuses
   palette            27   the theme matches BRAND.md
   endpoint           26   the sync endpoint, end to end
   session            24   holding a token, and stores that fail as real ones do
@@ -952,6 +1007,7 @@ Tests:       1342 passed
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   readme              6   the test table adds up and says what each suite is for
+  errorBoundary       5   a render that throws, and the way back from it
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

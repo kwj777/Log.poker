@@ -570,10 +570,7 @@ names the tables it could have disturbed, and only those are re-read.
 Against five years of a heavy live player -- 600 sessions, 3600 hands -- the old
 reload measured **49ms, paid on every write**, including every rebuy tapped
 during a live session. Naming the tables takes a rebuy to 10ms and a mood entry
-to 8ms. Logging a hand is still 29ms, because `listHands` is 31ms of that 49 and
-the store holds every hand ever logged so that Settings can count them; making
-that read per session is the next thing here, and it needs the hand list to
-become asynchronous.
+to 8ms.
 
 The second cost is easier to miss and can be the larger one. Replacing an array
 invalidates every `useMemo` over it, so logging a hand re-ran the tournament
@@ -593,6 +590,35 @@ resolved last used to win, which on two overlapping reads of one table is the
 older answer as often as not. One counter for the whole store would not do:
 a hand write and a full sync overlap on `hands` and nowhere else, and settling
 that would throw away three good tables.
+
+### The hands are not in the store
+
+They were, all of them, and it was the most expensive thing in the app. A hand
+belongs to a session and every screen that shows hands is a screen about one
+session, so the array was only ever filtered -- while `listHands()` read and
+mapped every hand in the log on each hand write, to keep a number Settings
+prints on one line.
+
+What the store keeps instead is that number, from a `countHands()` the two
+repositories answer without reading a row. On the same 3600-hand log:
+
+| | |
+| --- | --- |
+| `listHands()`, what a hand write used to read | 40.8ms |
+| `countHands()`, what it reads now | 0.26ms |
+| `listHands(sessionId)`, what a screen reads once | 0.11ms |
+
+`useHandsForSession` does that per-session read, so the hands arrive a moment
+after the screen does. **Null means not read yet, and it is not the same as
+none**: "no hands logged for this session" is true of a session with none and
+false of one whose hands are still coming, and the two are one frame apart. Both
+callers branch on it, and a test holds the read open to prove they do.
+
+Which session an answer is about is checked when it is read rather than when it
+arrives. Storing the hands and swapping them when the next read lands leaves a
+render where this session is described by the last one's hands, and nothing on
+screen distinguishes them, because a hand does not say which session it came
+from. Deriving it makes that render unreachable rather than short-lived.
 
 ### The repository interface
 
@@ -879,10 +905,10 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 45 passed
-Tests:       1329 passed
+Tests:       1342 passed
 
-  dexieRepository   115   the IndexedDB path, against real IndexedDB
-  sqlRepository     115   the SQLite path, against real SQLite
+  dexieRepository   118   the IndexedDB path, against real IndexedDB
+  sqlRepository     118   the SQLite path, against real SQLite
   bundle             66   what ships to each platform, against the real output
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
@@ -915,17 +941,17 @@ Tests:       1329 passed
   handNotation       16   parse, round-trip, hand classes
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
+  useLogStore        13   what a write reads back, and what it leaves alone
   handOffs           11   where a hand-off goes, and what the mid-session card says
   history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
-  useLogStore         9   what a write reads back, and what it leaves alone
   plan                8   what an import will write, before it writes it
+  sessionDetail       8   one session and the hands that belong to it
   tokenStore.web      8   the browser token store
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   readme              6   the test table adds up and says what each suite is for
-  sessionDetail       5   one session and the hands that belong to it
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

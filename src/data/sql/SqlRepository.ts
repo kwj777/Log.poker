@@ -936,6 +936,14 @@ export class SqlRepository implements Repository {
     return rows.map(toHand);
   }
 
+  async countHands(): Promise<number> {
+    const row = await first<{ n: number }>(
+      this.driver,
+      `SELECT COUNT(*) AS n FROM hands WHERE deleted_at IS NULL`,
+    );
+    return row?.n ?? 0;
+  }
+
   async getHand(id: string): Promise<Hand | null> {
     const row = await first<HandRow>(
       this.driver,

@@ -21,6 +21,7 @@ const repository = {
   listVenues: jest.fn(),
   listSessions: jest.fn(),
   listHands: jest.fn(),
+  countHands: jest.fn(),
   listMoodEntries: jest.fn(),
   getActiveSession: jest.fn(),
   createVenue: jest.fn(),
@@ -45,6 +46,7 @@ const stubReads = () => {
   repository.listVenues.mockImplementation(async () => [{ id: 'v1', name: 'Aria' }]);
   repository.listSessions.mockImplementation(async () => [{ id: 's1', rebuys: [] }]);
   repository.listHands.mockImplementation(async () => [{ id: 'h1', sessionId: 's1' }]);
+  repository.countHands.mockImplementation(async () => 1);
   repository.listMoodEntries.mockImplementation(async () => [{ id: 'm1', sessionId: 's1' }]);
   repository.getActiveSession.mockImplementation(async () => null);
 };
@@ -52,7 +54,7 @@ const stubReads = () => {
 const readCounts = () => ({
   venues: repository.listVenues.mock.calls.length,
   sessions: repository.listSessions.mock.calls.length,
-  hands: repository.listHands.mock.calls.length,
+  hands: repository.countHands.mock.calls.length,
   moodEntries: repository.listMoodEntries.mock.calls.length,
 });
 
@@ -111,17 +113,44 @@ describe('what a write leaves alone', () => {
     expect(after.sessions).toBe(before.sessions);
     expect(after.venues).toBe(before.venues);
     expect(after.moodEntries).toBe(before.moodEntries);
-    expect(after.hands).not.toBe(before.hands);
   });
 
-  it('and a rebuy the same hands array', async () => {
+  it('and a rebuy leaves the hands where they were', async () => {
     const before = useLogStore.getState();
     await useLogStore.getState().addRebuy('s1', 10_000);
     const after = useLogStore.getState();
 
-    expect(after.hands).toBe(before.hands);
     expect(after.moodEntries).toBe(before.moodEntries);
     expect(after.sessions).not.toBe(before.sessions);
+    // Nothing re-reads a session's hands over a rebuy.
+    expect(after.handsVersion).toBe(before.handsVersion);
+  });
+});
+
+describe('telling the hands hook to read again', () => {
+  it('moves the version when a hand is logged', async () => {
+    const before = useLogStore.getState().handsVersion;
+    await useLogStore.getState().logHand({ sessionId: 's1' });
+    expect(useLogStore.getState().handsVersion).toBeGreaterThan(before);
+  });
+
+  it('and when a session is deleted, which takes its hands with it', async () => {
+    const before = useLogStore.getState().handsVersion;
+    await useLogStore.getState().deleteSession('s1');
+    expect(useLogStore.getState().handsVersion).toBeGreaterThan(before);
+  });
+
+  it('but not when only a venue was renamed', async () => {
+    const before = useLogStore.getState().handsVersion;
+    await useLogStore.getState().renameVenue('v1', 'Aria High Limit');
+    expect(useLogStore.getState().handsVersion).toBe(before);
+  });
+
+  it('counts the hands rather than reading them', async () => {
+    await useLogStore.getState().logHand({ sessionId: 's1' });
+    // The whole point: a hand write must not read every hand in the log.
+    expect(repository.listHands).not.toHaveBeenCalled();
+    expect(repository.countHands).toHaveBeenCalled();
   });
 });
 
@@ -134,9 +163,9 @@ describe('two reloads in flight at once', () => {
       releaseSlow = resolve;
     });
 
-    repository.listHands.mockImplementationOnce(async () => {
+    repository.countHands.mockImplementationOnce(async () => {
       await slow;
-      return [{ id: 'stale' }];
+      return 99;
     });
 
     const first = useLogStore.getState().refresh(['hands']);
@@ -145,7 +174,7 @@ describe('two reloads in flight at once', () => {
     releaseSlow();
     await first;
 
-    expect(useLogStore.getState().hands).toEqual([{ id: 'h1', sessionId: 's1' }]);
+    expect(useLogStore.getState().handCount).toBe(1);
   });
 
   it('and does not let it drop the slices nobody else claimed', async () => {
@@ -156,9 +185,9 @@ describe('two reloads in flight at once', () => {
     const slow = new Promise<void>((resolve) => {
       releaseSlow = resolve;
     });
-    repository.listHands.mockImplementationOnce(async () => {
+    repository.countHands.mockImplementationOnce(async () => {
       await slow;
-      return [{ id: 'stale' }];
+      return 99;
     });
     repository.listVenues.mockImplementationOnce(async () => [{ id: 'v-from-the-slow-read' }]);
 
@@ -168,7 +197,7 @@ describe('two reloads in flight at once', () => {
     releaseSlow();
     await full;
 
-    expect(useLogStore.getState().hands).toEqual([{ id: 'h1', sessionId: 's1' }]);
+    expect(useLogStore.getState().handCount).toBe(1);
     expect(useLogStore.getState().venues).toEqual([{ id: 'v-from-the-slow-read' }]);
   });
 });

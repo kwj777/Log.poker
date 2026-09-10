@@ -30,7 +30,7 @@ import { PageMeta } from '../../src/components/PageMeta';
 export default function SettingsScreen() {
   const venues = useLogStore((state) => state.venues);
   const sessions = useLogStore((state) => state.sessions);
-  const hands = useLogStore((state) => state.hands);
+  const handCount = useLogStore((state) => state.handCount);
   const deleteVenue = useLogStore((state) => state.deleteVenue);
   const refresh = useLogStore((state) => state.refresh);
   const clearAll = useLogStore((state) => state.clearAll);
@@ -127,8 +127,8 @@ export default function SettingsScreen() {
         </Text>
         <View style={styles.dataStats}>
           <Text variant="caption" color={colors.textTertiary}>
-            {sessions.length} session{sessions.length === 1 ? '' : 's'} · {hands.length} hand
-            {hands.length === 1 ? '' : 's'} · {venues.length} venue
+            {sessions.length} session{sessions.length === 1 ? '' : 's'} · {handCount} hand
+            {handCount === 1 ? '' : 's'} · {venues.length} venue
             {venues.length === 1 ? '' : 's'}
           </Text>
         </View>

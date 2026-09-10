@@ -656,6 +656,17 @@ export class DexieRepository implements Repository {
     return records.filter(isLive).map(toHand).sort((a, b) => b.at - a.at);
   }
 
+  async countHands(): Promise<number> {
+    // `deletedAt` is not indexed -- see the tombstone note in the README -- so
+    // this counts what survives the filter rather than asking the index. Still
+    // one pass over keys instead of reading and mapping every row.
+    let live = 0;
+    await this.db.hands.each((record) => {
+      if (isLive(record)) live += 1;
+    });
+    return live;
+  }
+
   async getHand(id: string): Promise<Hand | null> {
     const record = await this.db.hands.get(id);
     return record && isLive(record) ? toHand(record) : null;

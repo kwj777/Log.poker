@@ -354,6 +354,15 @@ npx serve dist      # or any static server with a single-page fallback
   client router rather than 404ing. There is deliberately no catch-all at the
   root: an unknown address gets `404.html` rather than quietly resolving to the
   app.
+- **Extensionless addresses** -- each guide is served from its `.html` file at
+  the address its canonical names, and `/sitemap` from `sitemap/index.html`.
+  Netlify would usually do both on its own, and usually is a setting rather
+  than a guarantee. The sitemap needs it more than the guides do, because it
+  has a sibling: `/sitemap.xml` is a real file, so "which of these does
+  `/sitemap` mean" is worth answering in configuration. The rule matches that
+  one path exactly and leaves the XML alone, which the site tests assert in
+  both directions -- capturing `/sitemap.xml` would take the crawlers' sitemap
+  off the site to fix a page for people.
 - **Cache headers** -- `index.html`, `sw.js` and the manifest are
   `must-revalidate` so a deploy reaches returning visitors immediately;
   everything under `_expo/` and `assets/` is content-hashed by the bundler and
@@ -959,16 +968,16 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 46 passed
-Tests:       1351 passed
+Test Suites: 49 passed
+Tests:       1394 passed
 
   dexieRepository   118   the IndexedDB path, against real IndexedDB
   sqlRepository     118   the SQLite path, against real SQLite
   bundle             66   what ships to each platform, against the real output
+  site               56   the marketing/app split, the PWA, the sitemap
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   sessionImport      52   reading a session-summary export
-  site               51   the marketing/app split, the PWA, the sitemap
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   syncingRepository  48   two devices and one server, no fakes in between
   stats              45   P/L, rebuys, duration, win rate, groupings
@@ -985,6 +994,7 @@ Tests:       1351 passed
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
+  sessionExport      21   the log written out, and read back by the importer
   token              21   the family token grammar, against signed fixtures
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
@@ -997,6 +1007,7 @@ Tests:       1351 passed
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
   useLogStore        13   what a write reads back, and what it leaves alone
+  csvWriter          11   writing CSV, and reading back exactly what was written
   handOffs           11   where a hand-off goes, and what the mid-session card says
   history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
@@ -1007,6 +1018,7 @@ Tests:       1351 passed
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   readme              6   the test table adds up and says what each suite is for
+  settingsExport      6   the export card, and what it refuses to write
   errorBoundary       5   a render that throws, and the way back from it
 ```
 
@@ -1311,6 +1323,62 @@ read -44%. Both numbers are true, and neither is any use without the other.
 
 ---
 
+## Exporting
+
+Settings → **Export** writes the log as CSV: a download on web, a share sheet on
+native. Two files, because they are two shapes.
+
+**The sessions file is one Log reads back.** Its headers are the ones
+`src/domain/import` already knows, which makes the export a backup rather than a
+printout and makes moving between two devices without signing in a file rather
+than a retype. The round-trip test runs the real writer into the real importer
+and compares the session that went in with the draft that came out.
+
+Three decisions that file is written around, each of them found by that test
+rather than reasoned out first:
+
+- **`Finish position`, not `Finish`.** `finish` is an alias of `endedAt` in this
+  importer -- an end *time* -- so a column called that was thrown away as a
+  duplicate of `Ended`, with no error and no warning anybody would see. A
+  tournament came back not knowing where it placed.
+- **`(ante 5)`, not `(5 ante)`.** The ante pattern reads the word and then the
+  number. `formatStakes` in `src/domain/money.ts` writes it the other way round,
+  so the app's own display format is the one shape the export must not copy.
+- **Rebuys folded into the buy-in.** The importer has no rebuy column, and a
+  session that cost 500 must not read back as one that cost 300. What a
+  re-import loses is when each rebuy happened, which is a real loss and a
+  smaller one than the money being wrong.
+
+Money is written as numbers rather than as formatted money, because the first
+thing anybody does with this file is sum a column. Dates are written year-first,
+which is the one shape `parseTimestamp` reads without consulting the date-order
+setting at all -- so a session played in March cannot come back in February
+because the reader was set to the other convention.
+
+**The hands file does not round-trip**, and is not a hand history. Log records
+the cards you were dealt, where you were sitting, what you tagged it, one line
+about what happened, and optionally what the pot swung. **It does not record the
+board** -- nothing asks for a flop, turn or river and there is nowhere to put
+one -- so there is no column for it. An empty `Board` column would read as a
+hand history that had failed to fill itself in. The importer reads no hands at
+all, so this file is a record rather than a backup; it is here because a note
+somebody typed at a table is theirs.
+
+Neither button is offered when there is nothing to put in the file. A header row
+with nothing under it is exactly what this app's own importer refuses.
+
+### Why the native half gets a dependency
+
+`pickCsvFile.ts` declined two native modules for the import direction, on the
+argument that nobody keeps their tracker exports on a phone and pasting works
+everywhere. The asymmetry here is deliberate: **your log is on your phone**,
+getting it off is the whole feature, there is nothing to paste from, and an
+export that only worked in a browser would be one the players who use the app
+most cannot reach. So `expo-file-system` and `expo-sharing`, and a file written
+into the cache directory rather than into documents -- it needs to live for as
+long as the share sheet takes to hand it somewhere permanent, and not one
+minute longer.
+
 ## Importing an online history
 
 Log is built for the felt, but plenty of people play both. An online player's
@@ -1375,9 +1443,9 @@ bankroll is a failure nobody notices until it has compounded for months.
 
 Ordered roughly by how much each is worth against how much it costs.
 
-1. **CSV export** -- the data model is already designed for it: every record is
-   timestamped, money is integer cents, and hands are in a portable notation.
-   Wants a share sheet on native and a download on web.
+1. ~~**CSV export**~~ -- **landed.** A download on web, a share sheet on
+   native, and the sessions file is one the importer reads back. See
+   [Exporting](#exporting).
 2. **Cloud sync and auth** -- the reason every record carries a client-generated
    id and an `updatedAt`. It was going to be the one feature the family pass
    added to this app, and it is free instead.

@@ -58,6 +58,16 @@ export const HandRow = ({
           No note
         </Text>
       )}
+      {/*
+        The runout, under the note rather than beside the cards: it is three to
+        five cards wide and would push everything else off a phone. Absent on
+        most hands, which is why it takes no room when there is none.
+      */}
+      {hand.board ? (
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={1}>
+          {formatNotation(hand.board)}
+        </Text>
+      ) : null}
       {hand.tags.length > 0 ? (
         <View style={styles.tags}>
           {hand.tags.map((tag) => (

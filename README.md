@@ -968,11 +968,11 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 49 passed
-Tests:       1394 passed
+Test Suites: 50 passed
+Tests:       1428 passed
 
-  dexieRepository   118   the IndexedDB path, against real IndexedDB
-  sqlRepository     118   the SQLite path, against real SQLite
+  dexieRepository   124   the IndexedDB path, against real IndexedDB
+  sqlRepository     124   the SQLite path, against real SQLite
   bundle             66   what ships to each platform, against the real output
   site               56   the marketing/app split, the PWA, the sitemap
   content            55   every figure in the guides, re-derived and read back
@@ -991,10 +991,11 @@ Tests:       1394 passed
   merge              30   two devices disagreeing, and who wins
   palette            27   the theme matches BRAND.md
   endpoint           26   the sync endpoint, end to end
+  migrations         26   a filled v2 database walked forward, both engines
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
-  migrations         22   a filled v2 database walked forward, both engines
-  sessionExport      21   the log written out, and read back by the importer
+  handNotation       23   parse, round-trip, hand classes
+  sessionExport      22   the log written out, and read back by the importer
   token              21   the family token grammar, against signed fixtures
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
@@ -1003,12 +1004,11 @@ Tests:       1394 passed
   gateCheck          18   the key-on-the-site script, run rather than read
   money              18   cents arithmetic, parsing, formatting
   seed               17   the demo dataset stays coherent
-  handNotation       16   parse, round-trip, hand classes
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
+  handOffs           14   where a hand-off goes, and what the mid-session card says
   useLogStore        13   what a write reads back, and what it leaves alone
   csvWriter          11   writing CSV, and reading back exactly what was written
-  handOffs           11   where a hand-off goes, and what the mid-session card says
   history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
@@ -1017,6 +1017,7 @@ Tests:       1394 passed
   tokenStore.web      8   the browser token store
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
+  logHand             7   logging a hand, and the board that is optional on it
   readme              6   the test table adds up and says what each suite is for
   settingsExport      6   the export card, and what it refuses to write
   errorBoundary       5   a render that throws, and the way back from it
@@ -1356,13 +1357,12 @@ setting at all -- so a session played in March cannot come back in February
 because the reader was set to the other convention.
 
 **The hands file does not round-trip**, and is not a hand history. Log records
-the cards you were dealt, where you were sitting, what you tagged it, one line
-about what happened, and optionally what the pot swung. **It does not record the
-board** -- nothing asks for a flop, turn or river and there is nowhere to put
-one -- so there is no column for it. An empty `Board` column would read as a
-hand history that had failed to fill itself in. The importer reads no hands at
-all, so this file is a record rather than a backup; it is here because a note
-somebody typed at a table is theirs.
+the cards you were dealt, the runout if you kept it, where you were sitting,
+what you tagged it, one line about what happened, and optionally what the pot
+swung. The importer reads no hands at all, so this file is a record rather than
+a backup; it is here because a note somebody typed at a table is theirs. The
+`Board` column is empty on most rows, because the board is optional and most
+hands are logged at a table before there is a runout to log.
 
 Neither button is offered when there is nothing to put in the file. A header row
 with nothing under it is exactly what this app's own importer refuses.
@@ -1378,6 +1378,55 @@ most cannot reach. So `expo-file-system` and `expo-sharing`, and a file written
 into the cache directory rather than into documents -- it needs to live for as
 long as the share sheet takes to hand it somewhere permanent, and not one
 minute longer.
+
+## The board on a hand
+
+A hand can carry the runout, and usually does not. It is optional, collapsed
+behind an **Add** beside the pot swing that was already optional and already
+collapsed there, so the hand somebody logs at a table is the hand they logged
+before: two cards, a tag, a line, save. The screen still says that takes about
+ten seconds and it still does.
+
+**The reason it exists is the tags.** A hand can be tagged bad beat, cooler,
+misplayed or bluff, and three of those four are claims about a runout. The
+record asked players to classify a hand in terms it could not then show. `AsKd
+· BTN · "Ran into aces"` does not say whether the aces held.
+
+The second reason is `drillHandOff`. It carries the hand class and the position
+to TiltProof and is documented as becoming a real hand-off, the drill opening
+preloaded with the spot. `AKo` on the button is a holding; `AKo` on the button
+on a king-high flop is a decision somebody made. Without a board the hand-off
+was capped at what it could ever become, so the board goes with it now -- but
+only when it is a whole one, because the far side cannot tell a half-typed board
+from a flop.
+
+### What counts as a board
+
+Three cards, four, or five. **Not one and not two**: a hand that saw a flop saw
+three cards at once, so a two-card board is not an early runout, it is somebody
+who stopped tapping. The save waits and the line under the picker says which it
+needs, rather than storing a thing that never happened or quietly dropping what
+was typed.
+
+The same notation as the hole cards, because a board is cards in order and
+nothing else -- which street a card belongs to is its position in the string.
+That is one format to keep in step rather than two, and it means anything that
+reads a Log hand reads a Log board.
+
+`parseNotation` refuses a string that repeats a card, which covers a board
+arguing with itself. What it cannot see is the other picker: the hole cards and
+the board are two strings and one deck, so the board picker is told what the
+player is holding and grays those cards out. `clashingCards` is the pure half of
+that.
+
+### What it cost
+
+Less than it looks. The sync layer needed nothing: `sanitize` validates an id
+and a stamp and passes record fields through untouched, so a new field
+replicates with no `BUNDLE_VERSION` bump. IndexedDB needed nothing either, on
+the same argument the tombstone column made -- the property is not indexed, so a
+record written before it existed reads as null. SQLite needed one appended
+migration, and the conformance suite and the migration test carry the rest.
 
 ## Importing an online history
 

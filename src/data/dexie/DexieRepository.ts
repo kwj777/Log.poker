@@ -143,6 +143,10 @@ const toHand = (record: HandRecord): Hand => ({
   id: record.id,
   sessionId: record.sessionId,
   holeCards: record.holeCards,
+  // Records written before this field existed have no property at all, and it
+  // is not indexed, so there is nothing to migrate: absent reads as null. The
+  // same argument the tombstone column made.
+  board: record.board ?? null,
   position: record.position,
   note: record.note,
   tags: [...record.tags],

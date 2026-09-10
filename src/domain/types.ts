@@ -165,6 +165,16 @@ export interface Hand {
    * This is the hand-off format for TiltProof drills; see `handNotation.ts`.
    */
   holeCards: string | null;
+  /**
+   * The board, in the same notation: three cards for a flop, four for a turn,
+   * five for the whole runout, and null when it was not recorded.
+   *
+   * Optional and expected to be null on most hands. It is here because three
+   * of the four tags a hand can carry -- bad beat, cooler, bluff -- are claims
+   * about a runout, and without this the record cannot show the runout they are
+   * claims about. See `isBoard` for what counts as one.
+   */
+  board: string | null;
   position: Position | null;
   note: string | null;
   tags: HandTag[];
@@ -205,5 +215,5 @@ export type NewSession = Pick<Session, 'venueId' | 'gameType' | 'buyIn' | 'start
   >;
 export type NewRebuy = Pick<Rebuy, 'sessionId' | 'amount' | 'at'>;
 export type NewHand = Pick<Hand, 'sessionId' | 'at'> &
-  Partial<Pick<Hand, 'holeCards' | 'position' | 'note' | 'tags' | 'amount'>>;
+  Partial<Pick<Hand, 'holeCards' | 'board' | 'position' | 'note' | 'tags' | 'amount'>>;
 export type NewMoodEntry = Pick<MoodEntry, 'sessionId' | 'phase' | 'score' | 'at'>;

@@ -104,6 +104,8 @@ interface HandRow {
   id: string;
   session_id: string;
   hole_cards: string | null;
+  /** Undefined on a row written before the column existed. See `toHand`. */
+  board?: string | null;
   position: string | null;
   note: string | null;
   tags: string;
@@ -209,6 +211,10 @@ const toHand = (row: HandRow): Hand => ({
   id: row.id,
   sessionId: row.session_id,
   holeCards: row.hole_cards,
+  // `?? null` rather than the bare column: a row written before the migration
+  // added it comes back undefined rather than null, and the two are the same
+  // hand -- one logged without a board.
+  board: row.board ?? null,
   position: (row.position as Position | null) ?? null,
   note: row.note,
   tags: parseTags(row.tags),
@@ -461,12 +467,13 @@ export class SqlRepository implements Repository {
         if (!sessions.has(record.sessionId)) continue;
         await this.driver.run(
           `INSERT INTO hands (
-             id, session_id, hole_cards, position, note, tags, amount, at,
+             id, session_id, hole_cards, board, position, note, tags, amount, at,
              created_at, updated_at, deleted_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              session_id = excluded.session_id,
              hole_cards = excluded.hole_cards,
+             board = excluded.board,
              position = excluded.position,
              note = excluded.note,
              tags = excluded.tags,
@@ -477,7 +484,8 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= hands.updated_at`,
           [
-            record.id, record.sessionId, record.holeCards, record.position, record.note,
+            record.id, record.sessionId, record.holeCards, record.board ?? null,
+            record.position, record.note,
             JSON.stringify(record.tags ?? []), record.amount, record.at,
             record.createdAt, record.updatedAt, deletedAt,
           ],
@@ -958,12 +966,13 @@ export class SqlRepository implements Repository {
     if (!session) throw new NotFoundError('Session', input.sessionId);
     const hand = buildHand(input, this.ctx);
     await this.driver.run(
-      `INSERT INTO hands (id, session_id, hole_cards, position, note, tags, amount, at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO hands (id, session_id, hole_cards, board, position, note, tags, amount, at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         hand.id,
         hand.sessionId,
         hand.holeCards,
+        hand.board,
         hand.position,
         hand.note,
         JSON.stringify(hand.tags),
@@ -982,10 +991,11 @@ export class SqlRepository implements Repository {
     const next = applyPatch<Hand>(existing, patch);
     next.updatedAt = this.ctx.clock.now();
     await this.driver.run(
-      `UPDATE hands SET hole_cards = ?, position = ?, note = ?, tags = ?, amount = ?, at = ?, updated_at = ?
+      `UPDATE hands SET hole_cards = ?, board = ?, position = ?, note = ?, tags = ?, amount = ?, at = ?, updated_at = ?
        WHERE id = ?`,
       [
         next.holeCards,
+        next.board,
         next.position,
         next.note,
         JSON.stringify(next.tags),

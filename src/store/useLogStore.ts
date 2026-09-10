@@ -74,6 +74,8 @@ export interface ImportSummary {
 export interface LogHandInput {
   sessionId: string;
   holeCards?: string | null;
+  /** The runout, when it is known. Usually null; see `Hand.board`. */
+  board?: string | null;
   position?: Position | null;
   note?: string | null;
   tags?: HandTag[];
@@ -467,6 +469,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       sessionId: input.sessionId,
       at: input.at ?? Date.now(),
       holeCards: input.holeCards ?? null,
+      board: input.board ?? null,
       position: input.position ?? null,
       note: input.note ?? null,
       tags: input.tags ?? [],
@@ -480,6 +483,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     const repository = await getRepository();
     await repository.updateHand(id, {
       holeCards: patch.holeCards,
+      board: patch.board,
       position: patch.position,
       note: patch.note,
       tags: patch.tags,

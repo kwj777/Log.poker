@@ -30,6 +30,7 @@ import {
   type Position,
 } from '../../src/domain/types';
 import { CardPicker } from '../../src/features/hands/CardPicker';
+import { MAX_BOARD, isBoard } from '../../src/domain/handNotation';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
@@ -42,6 +43,8 @@ export default function LogHandScreen() {
   const logHand = useLogStore((state) => state.logHand);
 
   const [holeCards, setHoleCards] = useState<string | null>(null);
+  const [board, setBoard] = useState<string | null>(null);
+  const [showBoard, setShowBoard] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [tags, setTags] = useState<HandTag[]>([]);
   const [note, setNote] = useState('');
@@ -70,13 +73,26 @@ export default function LogHandScreen() {
   const hasSomething =
     holeCards !== null || position !== null || tags.length > 0 || note.trim() !== '';
 
+  /**
+   * A board that is one card or two, which is not an early runout.
+   *
+   * Three cards arrive at once, so this is somebody who started tapping and
+   * stopped. Storing it would put a thing that never happened in the log, and
+   * silently dropping it would lose what they did type -- so the save waits and
+   * the line below says why.
+   */
+  const partialBoard = showBoard && board !== null && !isBoard(board);
+
   const save = async () => {
-    if (!hasSomething || saving) return;
+    if (!hasSomething || partialBoard || saving) return;
     setSaving(true);
     try {
       await logHand({
         sessionId: session.id,
         holeCards,
+        // Only what is on screen: collapsing the section leaves what was typed
+        // in place, and a board nobody can see is not one they chose to log.
+        board: showBoard ? board : null,
         position,
         tags,
         note: note.trim() === '' ? null : note.trim(),
@@ -96,7 +112,7 @@ export default function LogHandScreen() {
           <Button
             label="Save hand"
             onPress={() => void save()}
-            disabled={!hasSomething}
+            disabled={!hasSomething || partialBoard}
             loading={saving}
           />
           <Button label="Cancel" variant="ghost" size="medium" onPress={() => router.back()} />
@@ -155,6 +171,7 @@ export default function LogHandScreen() {
         action={
           <Button
             label={showAmount ? 'Hide' : 'Add'}
+            accessibilityLabel={showAmount ? 'Hide the pot swing' : 'Add a pot swing'}
             variant="ghost"
             size="small"
             onPress={() => setShowAmount((current) => !current)}
@@ -172,6 +189,41 @@ export default function LogHandScreen() {
       ) : (
         <Text variant="caption" color={colors.textTertiary} style={styles.amountHint}>
           Skip it unless the number is the point of the hand.
+        </Text>
+      )}
+
+      <SectionHeader
+        title="Board (optional)"
+        action={
+          <Button
+            label={showBoard ? 'Hide' : 'Add'}
+            accessibilityLabel={showBoard ? 'Hide the board' : 'Add a board'}
+            variant="ghost"
+            size="small"
+            onPress={() => setShowBoard((current) => !current)}
+          />
+        }
+      />
+      {showBoard ? (
+        <>
+          {/*
+            Told the hole cards, because one deck: without it the board would
+            deal a card the player is already holding.
+          */}
+          <CardPicker value={board} onChange={setBoard} cardCount={MAX_BOARD} exclude={holeCards} />
+          <Text
+            variant="caption"
+            color={partialBoard ? colors.loss : colors.textTertiary}
+            style={styles.amountHint}
+          >
+            {partialBoard
+              ? 'A board is three cards, four or five. Add the rest of the flop, or clear it.'
+              : 'Stop at the flop if that is where the hand did.'}
+          </Text>
+        </>
+      ) : (
+        <Text variant="caption" color={colors.textTertiary} style={styles.amountHint}>
+          Worth it when the runout is the story: a cooler, a bad beat, a bluff that got there.
         </Text>
       )}
     </Screen>

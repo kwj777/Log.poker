@@ -60,7 +60,7 @@ export type SessionPatch = Partial<
   >
 >;
 export type HandPatch = Partial<
-  Pick<Hand, 'holeCards' | 'position' | 'note' | 'tags' | 'amount' | 'at'>
+  Pick<Hand, 'holeCards' | 'board' | 'position' | 'note' | 'tags' | 'amount' | 'at'>
 >;
 
 /**

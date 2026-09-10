@@ -21,6 +21,7 @@ const hand = (id: string, sessionId: string): Hand => ({
   id,
   sessionId,
   holeCards: 'AsKd',
+  board: null,
   position: 'BTN',
   note: null,
   tags: [],

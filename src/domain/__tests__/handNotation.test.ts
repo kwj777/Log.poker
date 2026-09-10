@@ -1,4 +1,8 @@
 import {
+  boardStreet,
+  cardToString,
+  clashingCards,
+  isBoard,
   FULL_DECK,
   cardsToNotation,
   cardsEqual,
@@ -98,5 +102,51 @@ describe('cards', () => {
     expect(FULL_DECK).toHaveLength(52);
     expect(new Set(FULL_DECK.map((card) => `${card.rank}${card.suit}`)).size).toBe(52);
     expect(FULL_DECK[0].rank).toBe('A');
+  });
+});
+
+describe('boards', () => {
+  it('accepts a flop, a turn and a river', () => {
+    expect(isBoard('7c2sKh')).toBe(true);
+    expect(isBoard('7c2sKhAd')).toBe(true);
+    expect(isBoard('7c2sKhAd9d')).toBe(true);
+  });
+
+  it('refuses one card and two, which are not boards but half-typed ones', () => {
+    // A hand that saw a flop saw three cards at once. Two is somebody who
+    // stopped tapping, and storing it would log a thing that never happened.
+    expect(isBoard('7c')).toBe(false);
+    expect(isBoard('7c2s')).toBe(false);
+  });
+
+  it('refuses six, and refuses nothing at all', () => {
+    expect(isBoard('7c2sKhAd9d3h')).toBe(false);
+    expect(isBoard(null)).toBe(false);
+    expect(isBoard('')).toBe(false);
+  });
+
+  it('refuses a board that deals the same card twice', () => {
+    expect(isBoard('7c2s7c')).toBe(false);
+  });
+
+  it('names the street it ran to', () => {
+    expect(boardStreet('7c2sKh')).toBe('flop');
+    expect(boardStreet('7c2sKhAd')).toBe('turn');
+    expect(boardStreet('7c2sKhAd9d')).toBe('river');
+    expect(boardStreet('7c2s')).toBeNull();
+    expect(boardStreet(null)).toBeNull();
+  });
+
+  it('finds a card dealt in both the hand and the board', () => {
+    // The one duplicate `parseNotation` cannot see, because it only ever reads
+    // one string: two strings, one deck.
+    expect(clashingCards('AsKd', '7c2sAs').map(cardToString)).toEqual(['As']);
+    expect(clashingCards('AsKd', '7c2sKh')).toEqual([]);
+  });
+
+  it('and reports nothing to compare when either side is missing', () => {
+    expect(clashingCards('AsKd', null)).toEqual([]);
+    expect(clashingCards(null, '7c2sKh')).toEqual([]);
+    expect(clashingCards('AsKd', 'nonsense')).toEqual([]);
   });
 });

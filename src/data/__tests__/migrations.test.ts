@@ -297,11 +297,15 @@ describe('the migration list', () => {
     // A device that ran version 3 last month will never run it again, so
     // editing one changes nothing there and everything on a fresh install, and
     // the two stop agreeing without anything erroring.
-    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4]);
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5]);
     expect(MIGRATIONS[1].statements).toEqual([
       'ALTER TABLE sessions ADD COLUMN import_key TEXT',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)',
     ]);
+  });
+
+  it('adds the board to the hands and to nothing else', () => {
+    expect(MIGRATIONS[4].statements).toEqual(['ALTER TABLE hands ADD COLUMN board TEXT']);
   });
 
   it('puts the tombstone column on every table that syncs', () => {
@@ -310,5 +314,66 @@ describe('the migration list', () => {
     for (const table of ['venues', 'sessions', 'rebuys', 'hands', 'mood_entries']) {
       expect(tombstones).toContain(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
     }
+  });
+});
+
+describe('a hand written before there was anywhere to put the board', () => {
+  let driver: NodeSqliteDriver;
+  let repository: SqlRepository;
+
+  beforeEach(async () => {
+    driver = new NodeSqliteDriver(':memory:');
+    // The database exactly as the shipped v4 left it: tombstones, no board.
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 4)) {
+      for (const statement of migration.statements) await driver.execute(statement);
+    }
+    await driver.execute('PRAGMA user_version = 4');
+
+    await driver.run(
+      `INSERT INTO venues (id, name, is_home_game, created_at, updated_at)
+       VALUES ('v1', 'Aria', 0, ?, ?)`,
+      [T0, T0],
+    );
+    await driver.run(
+      `INSERT INTO sessions (id, venue_id, format, game_type, small_blind, big_blind, ante,
+         currency, buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
+         notes, import_key, created_at, updated_at)
+       VALUES ('s1', 'v1', 'cash', 'NLHE', 100, 200, NULL, 'USD', 30000, NULL, 45000, NULL,
+         NULL, ?, ?, NULL, NULL, ?, ?)`,
+      [T0, T0 + 3_600_000, T0, T0],
+    );
+    await driver.run(
+      `INSERT INTO hands (id, session_id, hole_cards, position, note, tags, amount, at,
+         created_at, updated_at)
+       VALUES ('h1', 's1', 'AsKd', 'BTN', 'Ran into aces', '["cooler"]', -25000, ?, ?, ?)`,
+      [T0, T0, T0],
+    );
+
+    repository = new SqlRepository(driver);
+    await repository.init();
+  });
+
+  afterEach(async () => {
+    await driver.close();
+  });
+
+  it('walks to the current version', async () => {
+    const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
+    expect(row.user_version).toBe(LATEST_VERSION);
+  });
+
+  it('reads as a hand logged without a board, which is what it was', async () => {
+    const hand = await repository.getHand('h1');
+    expect(hand?.board).toBeNull();
+    // And nothing else about it moved.
+    expect(hand?.holeCards).toBe('AsKd');
+    expect(hand?.tags).toEqual(['cooler']);
+    expect(hand?.amount).toBe(-25_000);
+  });
+
+  it('and takes one afterwards, which is the ordinary way round', async () => {
+    // The runout is not known when the hand is logged at the table.
+    await repository.updateHand('h1', { board: '7c2sKhAd9d' });
+    expect((await repository.getHand('h1'))?.board).toBe('7c2sKhAd9d');
   });
 });

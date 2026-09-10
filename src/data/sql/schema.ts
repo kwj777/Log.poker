@@ -132,6 +132,20 @@ export const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE mood_entries ADD COLUMN deleted_at INTEGER`,
     ],
   },
+  {
+    // The board, which a hand had nowhere to put.
+    //
+    // Three of the four tags a hand can carry are claims about a runout -- bad
+    // beat, cooler, bluff -- and until this column the record could not show
+    // the runout they were claims about. Optional, and null on every row
+    // written before it existed, which is what a hand logged without one looks
+    // like anyway: there is no migration to do beyond making the column exist.
+    //
+    // No index, for the reason the tombstone column above gives: it is null on
+    // most rows and nothing queries on it.
+    version: 5,
+    statements: [`ALTER TABLE hands ADD COLUMN board TEXT`],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

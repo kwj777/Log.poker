@@ -25,6 +25,15 @@ interface ButtonProps {
   /** Rendered before the label -- an icon or a small badge. */
   leading?: ReactNode;
   style?: ViewStyle;
+  /**
+   * Announced instead of the label, when the label alone does not say enough.
+   *
+   * The case it exists for is two buttons that read the same and do different
+   * things -- an "Add" beside a pot swing and an "Add" beside a board are one
+   * word each and indistinguishable to anybody who cannot see which heading
+   * they sit under.
+   */
+  accessibilityLabel?: string;
   /** Announced to screen readers when the label alone is not enough. */
   accessibilityHint?: string;
   /**
@@ -44,6 +53,7 @@ export const Button = ({
   loading = false,
   leading,
   style,
+  accessibilityLabel,
   accessibilityHint,
   href,
 }: ButtonProps) => {
@@ -53,6 +63,7 @@ export const Button = ({
     <Pressable
       {...(href === undefined ? {} : { href })}
       accessibilityRole={href === undefined ? 'button' : 'link'}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy: loading }}
       accessibilityHint={accessibilityHint}
       disabled={inactive}

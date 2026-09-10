@@ -52,6 +52,7 @@ const hand = (id: string, over: Partial<Hand> = {}): Hand => ({
   id,
   sessionId: 's1',
   holeCards: 'AsKd',
+  board: null,
   position: 'BTN',
   note: null,
   tags: [],

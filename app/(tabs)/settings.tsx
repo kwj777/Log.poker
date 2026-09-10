@@ -20,6 +20,15 @@ import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
 import { ALLOW_DEMO_SEED, ALLOW_SIGN_IN } from '../../src/config';
 import { getRepository, STORAGE_ENGINE } from '../../src/data';
+import { toCsvFile } from '../../src/domain/export/csv';
+import {
+  HAND_HEADERS,
+  SESSION_HEADERS,
+  exportFileName,
+  handRows,
+  sessionRows,
+} from '../../src/domain/export/sessionExport';
+import { saveCsv } from '../../src/features/export/saveCsv';
 import { seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
@@ -49,6 +58,37 @@ export default function SettingsScreen() {
       setMessage(`Seeded ${result.sessions} sessions, ${result.hands} hands.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Seeding failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Write the log out as a file.
+   *
+   * Read from the repository rather than from the store, which is the source
+   * of truth and, since the hands stopped being held in memory, the only place
+   * all of them are. An export is a deliberate act somebody waits a moment
+   * for, so the one full read it costs is the right kind of expensive.
+   */
+  const exportCsv = async (kind: 'sessions' | 'hands') => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const repository = await getRepository();
+      const all = await repository.listSessions();
+      const [headers, rows] =
+        kind === 'sessions'
+          ? [SESSION_HEADERS, sessionRows(all)]
+          : [HAND_HEADERS, handRows(await repository.listHands(), all)];
+
+      const result = await saveCsv(exportFileName(kind), toCsvFile(headers, rows));
+      // Backing out of a share sheet is not a failure and gets no message.
+      if (result.saved) {
+        setMessage(`Exported ${rows.length} ${kind === 'sessions' ? 'session' : 'hand'}${rows.length === 1 ? '' : 's'}.`);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Export failed');
     } finally {
       setBusy(false);
     }
@@ -116,6 +156,38 @@ export default function SettingsScreen() {
           size="medium"
           onPress={() => router.push('/import')}
         />
+      </Card>
+
+      <SectionHeader title="Export" />
+      <Card>
+        <Text color={colors.textSecondary} style={styles.body}>
+          Your log as a spreadsheet. The sessions file is the one Log reads back, so it is a
+          backup as well as a record: import it here and it lands as the sessions it came from.
+        </Text>
+        <View style={styles.exportRow}>
+          <Button
+            label="Sessions"
+            variant="secondary"
+            size="medium"
+            style={styles.exportButton}
+            // Nothing to write and nothing to read back: a header row on its own
+            // is a file this app's own importer refuses.
+            disabled={busy || sessions.length === 0}
+            onPress={() => void exportCsv('sessions')}
+          />
+          <Button
+            label="Hands"
+            variant="secondary"
+            size="medium"
+            style={styles.exportButton}
+            disabled={busy || handCount === 0}
+            onPress={() => void exportCsv('hands')}
+          />
+        </View>
+        <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>
+          Hands carry your cards, seat, tags and note. Log does not record the board, so there
+          is no column for it.
+        </Text>
       </Card>
 
       <SectionHeader title="Your data" />
@@ -233,6 +305,16 @@ const styles = StyleSheet.create({
   body: {
     lineHeight: 23,
     marginBottom: spacing.lg,
+  },
+  exportRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  exportButton: {
+    flex: 1,
+  },
+  exportNote: {
+    marginTop: spacing.md,
   },
   dataStats: {
     marginTop: -spacing.sm,

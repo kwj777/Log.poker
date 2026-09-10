@@ -8,16 +8,47 @@
 
 import { useEffect } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { Button } from '../src/components/Button';
+import { ErrorScreen } from '../src/components/ErrorScreen';
 import { APP_DESCRIPTION, PageMeta } from '../src/components/PageMeta';
-import { Text } from '../src/components/Text';
 import { syncOnResume } from '../src/data';
 import { useLogStore } from '../src/store/useLogStore';
 import { colors, spacing } from '../src/theme';
+
+/**
+ * What a render throwing looks like, rather than what it used to look like.
+ *
+ * Expo Router ships an `ErrorBoundary` and **does not apply it**: a route is
+ * wrapped only if it exports one. Nothing here did, so a throw anywhere in the
+ * tree unmounted the tree, and on web that is a white page with the app's
+ * background color and nothing to do next. Exported from the root layout, so it
+ * is the backstop for every screen at once.
+ *
+ * `retry` re-renders the route rather than reloading the app, which is the
+ * right first move: the local database is untouched by a render throwing, so
+ * whatever was logged is still logged, and a screen that fell over on one odd
+ * record often comes back.
+ *
+ * A boundary per screen would keep the tab bar alive so the other three tabs
+ * stayed reachable, which is nicer. It needs `unstable_settings.screenErrorBoundary`,
+ * and reaching for an unstable API is a decision to make on purpose rather than
+ * on the way past.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <ErrorScreen
+      title="Something went wrong"
+      // The message, because it is the only thing anybody can act on -- a bug
+      // report that says "it broke" and one that quotes a line are different
+      // reports. It is a local error about local data and goes nowhere.
+      detail={error.message || 'This screen stopped working.'}
+      onRetry={() => void retry()}
+    />
+  );
+}
 
 export default function RootLayout() {
   const status = useLogStore((state) => state.status);
@@ -99,21 +130,17 @@ export default function RootLayout() {
           <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
         </Stack>
       ) : (
-        <View style={styles.center}>
-          {status === 'error' ? (
-            <>
-              <Text variant="heading" center>
-                Couldn’t open your log
-              </Text>
-              <Text color={colors.textSecondary} center style={styles.message}>
-                {error ?? 'The local database could not be opened.'}
-              </Text>
-              <Button label="Try again" onPress={() => void hydrate()} style={styles.retry} />
-            </>
-          ) : (
+        status === 'error' ? (
+          <ErrorScreen
+            title="Couldn’t open your log"
+            detail={error ?? 'The local database could not be opened.'}
+            onRetry={() => void hydrate()}
+          />
+        ) : (
+          <View style={styles.center}>
             <ActivityIndicator color={colors.accent} size="large" />
-          )}
-        </View>
+          </View>
+        )
       )}
     </SafeAreaProvider>
   );
@@ -126,12 +153,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.background,
     padding: spacing.xl,
-  },
-  message: {
-    marginTop: spacing.sm,
-  },
-  retry: {
-    marginTop: spacing.xl,
-    alignSelf: 'stretch',
   },
 });

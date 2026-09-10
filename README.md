@@ -955,6 +955,39 @@ Erasure is not metered. A `DELETE` does not read the bundle, so metering it
 would add the round trip this whole design avoids, and a second delete of a
 bucket that is already gone costs nothing worth defending against.
 
+#### How big the bundle gets, and how we would know
+
+The one open question about the bundle is whether it needs a size cap, and it
+cannot be answered from here. What a synthetic twenty-year log weighs is known
+-- 20,012 records, 5.89MB, 148ms to merge one more hand into, measured against
+the real `mergeIntoBundle`. Whether anybody's real log is anywhere near that is
+not known, and no amount of reasoning produces that number. So the endpoint says
+how big each bundle was, and the question gets settled by observation.
+
+**Records, not bytes.** Measuring bytes means `JSON.stringify` over the whole
+bundle, and `setJSON` is about to do exactly that: the measurement would double
+the most expensive thing in the request, 23ms of serializing to find out what
+serializing costs. Counting records is 2ms for the same bundle and is a faithful
+proxy, because a record is almost exactly **300 bytes** from one year to twenty
+with no knee in the curve. So the count is measured and the size is arithmetic
+from it, plainly labeled as an estimate: one number observed, one derived.
+
+**It names nobody.** The bucket is an HMAC of the subject precisely so the store
+never holds a customer id, and putting that bucket in a deploy log would undo it
+-- a stable per-person handle, next to how much poker they play. A line carries
+sizes and durations and nothing else. The distribution is what the decision
+needs; who is in it is not.
+
+**Only the tail speaks.** Nothing is said below a thousand records, roughly a
+year of heavy play, or the log buries the answer under the question. The cost of
+that is worth naming: silence means "nobody is large" only once you know the
+path runs at all, and an empty log looks identical to a broken one. The tests
+are what tell those apart.
+
+A line is written after the write rather than before, so it only ever describes
+a bundle that really landed, and it names which threshold it crossed -- the
+record count, the merge duration, or a write that had to go round again.
+
 #### Tombstones are collected, carefully
 
 A tombstone is kept for **ninety days**, and then only goes if nobody is still
@@ -1008,8 +1041,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 51 passed
-Tests:       1452 passed
+Test Suites: 52 passed
+Tests:       1471 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1022,7 +1055,7 @@ Tests:       1452 passed
   syncingRepository  48   two devices and one server, no fakes in between
   stats              45   P/L, rebuys, duration, win rate, groupings
   verify             44   checking a token, and every way past it that must not work
-  endpoint           37   the sync endpoint, end to end
+  endpoint           42   the sync endpoint, end to end
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
   blog               32   the post grammar, the share cards, and what it refuses
@@ -1047,6 +1080,7 @@ Tests:       1452 passed
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
   handOffs           14   where a hand-off goes, and what the mid-session card says
+  observe            14   how big the bundle was, said without saying whose
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
   csvWriter          11   writing CSV, and reading back exactly what was written

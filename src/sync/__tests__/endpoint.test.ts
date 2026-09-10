@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { SYNC_URL } from '../client';
 import { handleSync, type BlobStore, type Surroundings } from '../endpoint';
 import { BUNDLE_VERSION, emptyChangeSet } from '../protocol';
+import { NOTABLE_RECORDS } from '../observe';
 import { RATE_LIMIT } from '../rateLimit';
 
 const source = readFileSync(
@@ -607,5 +608,91 @@ describe('asking too often', () => {
   it('keeps a window it cannot read from locking anybody out', async () => {
     const store = fakeStore({ held: { ...stored(0), rate: 'nonsense' } });
     expect((await post(await mint(), push(), store)).status).toBe(200);
+  });
+});
+
+describe('saying how big the bundle was', () => {
+  /**
+   * A stored bundle holding `n` hands, under a session that exists.
+   *
+   * The parent matters: the merge drops a child pointing at a session it does
+   * not hold, so a bundle of orphans counts as nothing at all.
+   */
+  const withHands = (n: number) => {
+    const sessions: Record<string, unknown> = {
+      s1: {
+        record: {
+          id: 's1', venueId: 'v1', format: 'cash', gameType: 'NLHE', stakes: null,
+          currency: 'USD', buyIn: 30000, fee: null, cashOut: 45000, entrants: null,
+          finishPosition: null, startedAt: NOW, endedAt: NOW, notes: null,
+          importKey: null, createdAt: NOW, updatedAt: NOW,
+        },
+        deletedAt: null,
+        heardAt: NOW,
+      },
+    };
+    const hands: Record<string, unknown> = {};
+    for (let i = 0; i < n; i += 1) {
+      hands[`h${i}`] = {
+        record: { id: `h${i}`, sessionId: 's1', at: NOW, createdAt: NOW, updatedAt: NOW },
+        deletedAt: null,
+        heardAt: NOW,
+      };
+    }
+    return {
+      version: BUNDLE_VERSION,
+      records: { venues: {}, sessions, rebuys: {}, hands, moodEntries: {} },
+      devices: {},
+      folded: {},
+      rate: { since: NOW, count: 1 },
+      heardThrough: NOW,
+      collectedThrough: 0,
+    };
+  };
+
+  let said: string[];
+  let warn: jest.SpyInstance;
+
+  beforeEach(() => {
+    said = [];
+    warn = jest.spyOn(console, 'warn').mockImplementation((text: string) => void said.push(text));
+  });
+  afterEach(() => warn.mockRestore());
+
+  it('says nothing about an ordinary log', async () => {
+    const store = fakeStore({ held: withHands(20) });
+    await post(await mint(), push(), store);
+    expect(said).toEqual([]);
+  });
+
+  it('reports one big enough to be worth knowing about', async () => {
+    const store = fakeStore({ held: withHands(NOTABLE_RECORDS + 50) });
+    await post(await mint(), push(), store);
+    expect(said).toHaveLength(1);
+    expect(said[0]).toContain('records');
+    expect(said[0]).toContain('MB est');
+  });
+
+  it('and only once the bundle is really stored', async () => {
+    // A line describing a bundle that lost its write race would be describing
+    // something that does not exist.
+    const store = fakeStore({ held: withHands(NOTABLE_RECORDS + 50), writeThrows: true });
+    await post(await mint(), push(), store);
+    expect(said).toEqual([]);
+  });
+
+  it('counts the rounds a contended write took', async () => {
+    const store = fakeStore({ held: withHands(NOTABLE_RECORDS + 50), contended: 2 });
+    await post(await mint(), push(), store);
+    expect(said[0]).toContain('3 rounds');
+    expect(said[0]).toContain('contended');
+  });
+
+  it('names nobody, whatever it says', async () => {
+    // The bucket is an HMAC precisely so the store never holds a customer id.
+    const store = fakeStore({ held: withHands(NOTABLE_RECORDS + 50) });
+    await post(await mint(), push(), store);
+    expect(said[0]).not.toMatch(/[0-9a-f]{16,}/);
+    expect(said[0]).not.toContain('log_');
   });
 });

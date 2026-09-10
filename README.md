@@ -539,6 +539,27 @@ src/
   theme/                  palette, spacing, type scale
 ```
 
+### The session list is virtualized, and the hand lists are not
+
+`app/(tabs)/history.tsx` used to be `filtered.map` inside the screen's
+`ScrollView`, which mounted a component per session with nothing to stop it --
+on a screen that is one of four tabs and stays mounted, holding a log the data
+layer is explicitly built to grow for years. Five years of a heavy live player
+is 600 rows, and a test asserts that nothing like that number is mounted now.
+
+The card that used to wrap the whole list is drawn per row instead: a
+`FlatList` has no single element around its items to put it on. The header
+stays inside `ListHeaderComponent` so it scrolls with the sessions, as it did
+before. Pinning the filters in place might well be nicer, and is not that
+change's to decide.
+
+**The two hand lists are left as they are**, in `app/session/[id].tsx` and
+`app/session/active.tsx`. A session's hands are bounded by what somebody taps
+in during one sitting -- nothing imports hands, so there is no path to a
+thousand of them -- and virtualizing a list inside the screen's own scroll view
+means either nesting one scroller in another or restructuring the screen
+around it. That is real complexity bought against a list of tens.
+
 ### What a write reads back
 
 The store holds four tables in memory and the repository stays the source of
@@ -834,14 +855,31 @@ knows about itself.
 
 ### Testing
 
+**Two Jest projects, because they are two different costs.** `node` is the
+domain and the data layer -- pure TypeScript with no React Native imports, on
+ts-jest in Node, and the bulk of the suite. `ui` is everything that renders, on
+the `jest-expo` preset, which is much heavier: a React Native environment, the
+whole module graph, and a transform over `node_modules`. Keeping them apart is
+what stops the second one slowing down the first, which is the one worth
+running on every save. `npx jest --selectProjects node` runs that half alone.
+
+The split is by extension rather than by folder: a test that renders is a
+`.tsx` file and a test that does not is a `.ts` file, which is already true of
+the thing being tested.
+
+Screen tests live in `src/__tests__/screens/` rather than beside the screens
+they test, and they have to: **expo-router routes every file it finds under
+`app/`, and it does not ignore `__tests__`** -- so a test next to its screen
+would ship as a route.
+
 One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 **both** implementations -- real SQLite via `node:sqlite`, real IndexedDB via
 `fake-indexeddb`. Ordering, cascade behavior, patch semantics and constraint
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 43 passed
-Tests:       1315 passed
+Test Suites: 45 passed
+Tests:       1329 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
@@ -878,6 +916,7 @@ Tests:       1315 passed
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
   handOffs           11   where a hand-off goes, and what the mid-session card says
+  history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
   useLogStore         9   what a write reads back, and what it leaves alone
@@ -886,6 +925,7 @@ Tests:       1315 passed
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   readme              6   the test table adds up and says what each suite is for
+  sessionDetail       5   one session and the hands that belong to it
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

@@ -24,6 +24,13 @@ module.exports = defineConfig([
     },
   },
   {
+    // A Jest setup file runs in Jest, which is neither of the above.
+    files: ['jest.setup.ui.js'],
+    languageOptions: {
+      globals: { jest: 'readonly' },
+    },
+  },
+  {
     files: ['public/sw.js'],
     languageOptions: {
       // A service worker has neither DOM nor React Native globals.

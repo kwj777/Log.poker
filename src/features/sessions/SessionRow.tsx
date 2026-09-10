@@ -38,8 +38,10 @@ export const SessionRow = ({ session, onPress, standalone = false }: SessionRowP
         ? session.gameType
         : `${formatStakes(session.stakes, currency)} · ${session.gameType}`;
 
+  // Named so a test can count how many of these a long history actually
+  // mounts, which is the difference between a virtualized list and a loop.
   const content = (
-    <View style={styles.row}>
+    <View style={styles.row} testID="session-row">
       <View style={styles.body}>
         <Text variant="bodyStrong" numberOfLines={1}>
           {session.venue?.name ?? 'Unknown venue'}

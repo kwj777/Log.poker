@@ -114,12 +114,11 @@ export const sessionRows = (sessions: readonly SessionWithChildren[]): string[][
 /**
  * The hands, which are notes rather than a hand history.
  *
- * **Log does not record the board.** A hand here is the cards the player was
- * dealt, where they were sitting, what they tagged it, one line about what
- * happened and optionally what the pot swung. There is no flop, turn or river
- * in the data model and nothing asks for one, so there is nothing to write in
- * a column for it -- and a file with an empty `Board` column would suggest
- * this is a hand history that had failed to fill it in.
+ * A hand here is the cards the player was dealt, the runout if they recorded
+ * one, where they were sitting, what they tagged it, one line about what
+ * happened, and optionally what the pot swung. The board is written in the
+ * same notation as the cards and is empty on most rows, because it is optional
+ * and most hands are logged at the table before there is a runout to log.
  *
  * The importer has no columns for any of this and does not read hands at all,
  * so this file does not round-trip. It is here because a note somebody typed
@@ -131,6 +130,7 @@ export const HAND_HEADERS = [
   'Session',
   'Venue',
   'Cards',
+  'Board',
   'Position',
   'Tags',
   'Pot swing',
@@ -154,6 +154,7 @@ export const handRows = (
         stamp(session?.startedAt ?? null),
         session?.venue?.name ?? '',
         hand.holeCards ?? '',
+        hand.board ?? '',
         hand.position ?? '',
         hand.tags.join(' '),
         money(hand.amount),

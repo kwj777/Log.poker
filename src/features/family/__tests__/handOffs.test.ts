@@ -54,10 +54,29 @@ describe('the sixty-second reset', () => {
   });
 
   it('and the drill hand-off still carries the hand it was given', () => {
-    const handOff = drillHandOff({ holeCards: 'AsKd', position: 'BTN' });
+    const handOff = drillHandOff({ holeCards: 'AsKd', board: null, position: 'BTN' });
     expect(handOff.handClass).toBe('AKo');
     expect(new URL(handOff.url).searchParams.get('hand')).toBe('AKo');
     expect(new URL(handOff.url).searchParams.get('position')).toBe('BTN');
+  });
+
+  it('carries the board too, which is what makes it a spot', () => {
+    // `AKo` on the button is a holding. `AKo` on the button on a king-high
+    // flop is a decision somebody made, which is the thing there is to drill.
+    const handOff = drillHandOff({ holeCards: 'AsKd', board: '7c2sKh', position: 'BTN' });
+    expect(new URL(handOff.url).searchParams.get('board')).toBe('7c2sKh');
+  });
+
+  it('but never a half-typed one, which would describe a runout that did not happen', () => {
+    // Two cards is somebody who stopped tapping, and the far side has no way
+    // to tell that from a flop.
+    const handOff = drillHandOff({ holeCards: 'AsKd', board: '7c2s', position: 'BTN' });
+    expect(new URL(handOff.url).searchParams.get('board')).toBeNull();
+  });
+
+  it('and says nothing about a board when there is none', () => {
+    const handOff = drillHandOff({ holeCards: 'AsKd', board: null, position: 'BTN' });
+    expect(new URL(handOff.url).searchParams.get('board')).toBeNull();
   });
 });
 

@@ -30,16 +30,33 @@ interface CardPickerProps {
   /** Current notation, e.g. `"AsKd"`. */
   value: string | null;
   onChange: (notation: string | null) => void;
-  /** How many cards to collect -- 2 for hold'em, 4 for Omaha. */
+  /** How many cards to collect -- 2 for hold'em, 4 for Omaha, 5 for a board. */
   cardCount?: number;
+  /**
+   * Cards already dealt elsewhere in this hand, as notation.
+   *
+   * One deck. `parseNotation` refuses a string that repeats a card, which
+   * covers this picker arguing with itself, and cannot see the other picker at
+   * all -- so the board has to be told what the hole cards are or it will
+   * happily deal the ace of spades twice.
+   */
+  exclude?: string | null;
 }
 
-export const CardPicker = ({ value, onChange, cardCount = 2 }: CardPickerProps) => {
+export const CardPicker = ({
+  value,
+  onChange,
+  cardCount = 2,
+  exclude = null,
+}: CardPickerProps) => {
   const cards = parseNotation(value) ?? [];
   const [pendingRank, setPendingRank] = useState<Rank | null>(null);
 
   const complete = cards.length >= cardCount;
-  const taken = new Set(cards.map((card) => `${card.rank}${card.suit}`));
+  const taken = new Set([
+    ...cards.map((card) => `${card.rank}${card.suit}`),
+    ...(parseNotation(exclude) ?? []).map((card) => `${card.rank}${card.suit}`),
+  ]);
 
   const addCard = (card: Card) => {
     const next = [...cards, card].slice(0, cardCount);

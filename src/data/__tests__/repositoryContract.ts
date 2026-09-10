@@ -701,6 +701,77 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listHands()).toHaveLength(2);
       });
 
+      it('stores a board, and reads it back', async () => {
+        const session = await newSession();
+        const hand = await repository.createHand({
+          sessionId: session.id,
+          at: T0,
+          holeCards: 'AsKd',
+          board: '7c2sKh',
+        });
+        expect(hand.board).toBe('7c2sKh');
+        expect((await repository.getHand(hand.id))?.board).toBe('7c2sKh');
+      });
+
+      it('defaults it to null, which is what most hands are', async () => {
+        const session = await newSession();
+        const hand = await repository.createHand({ sessionId: session.id, at: T0 });
+        expect(hand.board).toBeNull();
+      });
+
+      it('patches a board onto a hand logged without one', async () => {
+        // Logging the cards at the table and the runout afterwards is the
+        // ordinary way round: the flop is not dealt when the hand is logged.
+        const session = await newSession();
+        const hand = await repository.createHand({
+          sessionId: session.id,
+          at: T0,
+          holeCards: 'AsKd',
+        });
+        const updated = await repository.updateHand(hand.id, { board: '7c2sKhAd9d' });
+        expect(updated.board).toBe('7c2sKhAd9d');
+        expect((await repository.getHand(hand.id))?.board).toBe('7c2sKhAd9d');
+      });
+
+      it('and clears one back to nothing', async () => {
+        const session = await newSession();
+        const hand = await repository.createHand({
+          sessionId: session.id,
+          at: T0,
+          board: '7c2sKh',
+        });
+        expect((await repository.updateHand(hand.id, { board: null })).board).toBeNull();
+      });
+
+      it('leaves the board alone when a patch does not mention it', async () => {
+        const session = await newSession();
+        const hand = await repository.createHand({
+          sessionId: session.id,
+          at: T0,
+          board: '7c2sKh',
+        });
+        const updated = await repository.updateHand(hand.id, { note: 'checked it back' });
+        expect(updated.board).toBe('7c2sKh');
+      });
+
+      it('carries the board across a sync', async () => {
+        // The bundle passes record fields through untouched, so this is really
+        // asking whether both engines write what they were handed.
+        const session = await newSession();
+        await repository.applyChanges({
+          venues: [], sessions: [], rebuys: [], moodEntries: [],
+          hands: [{
+            record: {
+              id: 'from-the-phone', sessionId: session.id, holeCards: 'AsKd',
+              board: '7c2sKhAd', position: null, note: null, tags: [], amount: null,
+              at: T0, createdAt: T0, updatedAt: T0,
+            },
+            deletedAt: null,
+          }],
+        } as Parameters<Repository['applyChanges']>[0]);
+        expect((await repository.getHand('from-the-phone'))?.board).toBe('7c2sKhAd');
+      });
+
       it('counts every live hand without reading one', async () => {
         const venue = await newVenue();
         const one = await newSession({ venueId: venue.id });
@@ -1326,7 +1397,7 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
           hands: [{
             record: {
               id: 'logged-elsewhere', sessionId: session.id, holeCards: 'AsKd',
-              position: null, note: null, tags: [], amount: null, at: T0,
+              board: null, position: null, note: null, tags: [], amount: null, at: T0,
               createdAt: T0, updatedAt: T0,
             },
             deletedAt: null,

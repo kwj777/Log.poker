@@ -105,6 +105,8 @@ export interface HandRecord {
   id: string;
   sessionId: string;
   holeCards: string | null;
+  /** Absent on a record written before the field existed. Not indexed. */
+  board?: string | null;
   position: Position | null;
   note: string | null;
   tags: HandTag[];

@@ -16,7 +16,7 @@
  */
 
 import { FAMILY_LINKS } from '../../config';
-import { toHandClass } from '../../domain/handNotation';
+import { isBoard, toHandClass } from '../../domain/handNotation';
 import type { Hand, Position } from '../../domain/types';
 
 export interface DrillHandOff {
@@ -30,15 +30,22 @@ export interface DrillHandOff {
  * "Drill this in TiltProof" for a hand the player flagged as misplayed.
  *
  * Post-MVP this becomes a real hand-off -- the drill opens preloaded with the
- * spot. For now it carries the hand class and position as query parameters so
- * the landing page can at least greet the player with the right spot, and so
- * the link shape does not have to change later.
+ * spot. For now it carries what it knows as query parameters so the landing
+ * page can at least greet the player with the right spot, and so the link
+ * shape does not have to change later.
+ *
+ * **The board is what makes it a spot rather than a holding.** `AKo` on the
+ * button is a preflop class and there is only so much to drill about it; `AKo`
+ * on the button on a king-high flop is a decision somebody made. Sent only
+ * when it is a board -- a half-typed one would describe a runout that did not
+ * happen, and the far side has no way to tell.
  */
-export const drillHandOff = (hand: Pick<Hand, 'holeCards' | 'position'>): DrillHandOff => {
+export const drillHandOff = (hand: Pick<Hand, 'holeCards' | 'board' | 'position'>): DrillHandOff => {
   const handClass = toHandClass(hand.holeCards);
   const params = new URLSearchParams({ source: 'log' });
   if (handClass !== null) params.set('hand', handClass);
   if (hand.position !== null) params.set('position', hand.position as Position);
+  if (isBoard(hand.board)) params.set('board', hand.board as string);
 
   return {
     url: `${FAMILY_LINKS.tiltproof}/drill?${params.toString()}`,

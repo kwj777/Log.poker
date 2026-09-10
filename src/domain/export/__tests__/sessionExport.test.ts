@@ -16,7 +16,6 @@ import { resolveColumns } from '../../import/columns';
 import { parseSessionCsv } from '../../import/sessionImport';
 import { toCsv } from '../csv';
 import {
-  HAND_HEADERS,
   SESSION_HEADERS,
   exportFileName,
   handRows,
@@ -216,6 +215,7 @@ describe('the hands, which are notes rather than a hand history', () => {
     id: 'h1',
     sessionId: 's1',
     holeCards: 'AsKd',
+    board: null,
     position: 'BTN',
     note: null,
     tags: [],
@@ -226,19 +226,16 @@ describe('the hands, which are notes rather than a hand history', () => {
     ...over,
   });
 
-  it('says nothing about the board, because nothing records one', () => {
-    // Log asks for the cards you were dealt and never for the flop, so there
-    // is no column for it. An empty `Board` column would read as a hand
-    // history that had failed to fill itself in.
-    expect(HAND_HEADERS).not.toContain('Board');
-    for (const header of HAND_HEADERS) {
-      expect(header.toLowerCase()).not.toMatch(/board|flop|turn|river/);
-    }
-  });
-
-  it('carries the cards, the seat, the tags and the line that was typed', () => {
+  it('carries the cards, the runout, the seat, the tags and the line that was typed', () => {
     const rows = handRows(
-      [hand({ tags: ['cooler', 'misplayed'], note: 'Ran into aces', amount: -25_000 })],
+      [
+        hand({
+          board: '7c2sKh',
+          tags: ['cooler', 'misplayed'],
+          note: 'Ran into aces',
+          amount: -25_000,
+        }),
+      ],
       [session()],
     );
     expect(rows[0]).toEqual([
@@ -246,12 +243,25 @@ describe('the hands, which are notes rather than a hand history', () => {
       expect.stringContaining('2026-03-14'),
       'Aria',
       'AsKd',
+      '7c2sKh',
       'BTN',
       'cooler misplayed',
       '-250.00',
       'USD',
       'Ran into aces',
     ]);
+  });
+
+  it('leaves the board cell empty on a hand logged without one, which is most', () => {
+    const rows = handRows([hand({ board: null })], [session()]);
+    expect(rows[0][4]).toBe('');
+  });
+
+  it('writes the board in the same notation as the cards', () => {
+    // One format, so anything that reads a Log hand reads a Log board.
+    const rows = handRows([hand({ holeCards: 'AsKd', board: '7c2sKhAd9d' })], [session()]);
+    expect(rows[0][3]).toBe('AsKd');
+    expect(rows[0][4]).toBe('7c2sKhAd9d');
   });
 
   it('names the session by when it started rather than by an id nobody can read', () => {

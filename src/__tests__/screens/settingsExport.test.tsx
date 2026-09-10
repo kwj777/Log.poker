@@ -58,7 +58,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockRepository.listSessions.mockImplementation(async () => [session('s1'), session('s2')]);
   mockRepository.listHands.mockImplementation(async () => [
-    { id: 'h1', sessionId: 's1', holeCards: 'AsKd', position: 'BTN', note: null, tags: [], amount: null, at: 1, createdAt: 1, updatedAt: 1 },
+    { id: 'h1', sessionId: 's1', holeCards: 'AsKd', board: '7c2sKh', position: 'BTN', note: null, tags: [], amount: null, at: 1, createdAt: 1, updatedAt: 1 },
   ]);
   load();
 });
@@ -98,7 +98,7 @@ describe('exporting the log', () => {
     await waitFor(() => expect(mockSaved).toHaveLength(1));
     expect(mockSaved[0].name).toMatch(/^log-hands-/);
     expect(mockSaved[0].text).toContain('Cards');
-    expect(mockSaved[0].text).not.toMatch(/board|flop|turn|river/i);
+    expect(mockSaved[0].text).toContain('Board');
   });
 
   it('does not offer a file there is nothing to put in', async () => {

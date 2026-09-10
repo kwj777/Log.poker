@@ -1,5 +1,5 @@
 /**
- * Hand notation: the stable wire format for hole cards.
+ * Hand notation: the stable wire format for the cards in a hand.
  *
  * A card is two characters -- rank then suit -- and a hand is those cards
  * concatenated in the order they were picked: `"AsKd"`, `"Th9h"`, `"7c7d"`.
@@ -7,8 +7,14 @@
  * (PokerStars hand histories, solvers, TiltProof's drill importer), so a Log
  * hand can be handed to another app without a translation layer.
  *
+ * The same format carries the board, because a board is cards in order and
+ * nothing else: three of them are a flop, four are a flop and a turn, five are
+ * the whole runout. Which street a card belongs to is its position, so there is
+ * nothing to store beyond the cards themselves and no second format to keep in
+ * step with this one.
+ *
  * Everything in this file is pure and platform-free so it can be reused by the
- * repositories, the UI, and a future CSV/JSON exporter alike.
+ * repositories, the UI, and the CSV exporter alike.
  */
 
 export const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'] as const;
@@ -103,3 +109,57 @@ export const formatNotation = (notation: string | null | undefined): string => {
 export const FULL_DECK: readonly Card[] = RANKS.slice()
   .reverse()
   .flatMap((rank) => SUITS.map((suit) => ({ rank, suit })));
+
+/* ------------------------------------------------------------------ boards */
+
+/**
+ * How many cards a board can have.
+ *
+ * Not one and not two. A hand that saw a flop saw three cards at once, so a
+ * two-card board is not an early runout, it is somebody who stopped tapping --
+ * and storing it would put a thing that never happened in the log.
+ */
+export const BOARD_SIZES = [3, 4, 5] as const;
+
+export const MAX_BOARD = 5;
+
+/** Whether a notation is a board somebody could actually have been dealt. */
+export const isBoard = (notation: string | null | undefined): boolean => {
+  const cards = parseNotation(notation);
+  return cards !== null && (BOARD_SIZES as readonly number[]).includes(cards.length);
+};
+
+/**
+ * The street a board runs to, or null if it is not a board.
+ *
+ * Named rather than counted, because "three cards" is what is stored and
+ * "flop" is what a person means.
+ */
+export const boardStreet = (notation: string | null | undefined): 'flop' | 'turn' | 'river' | null => {
+  const cards = parseNotation(notation);
+  if (cards === null) return null;
+  if (cards.length === 3) return 'flop';
+  if (cards.length === 4) return 'turn';
+  if (cards.length === 5) return 'river';
+  return null;
+};
+
+/**
+ * Cards that appear in both notations.
+ *
+ * `parseNotation` already refuses a string that repeats a card, so this is the
+ * case it cannot see: the hole cards and the board are two strings, and the
+ * same card in each is a deck with two of it. Empty when either side is absent
+ * or unparseable, because there is nothing to compare rather than nothing
+ * wrong.
+ */
+export const clashingCards = (
+  a: string | null | undefined,
+  b: string | null | undefined,
+): Card[] => {
+  const left = parseNotation(a);
+  const right = parseNotation(b);
+  if (left === null || right === null) return [];
+  const taken = new Set(right.map(cardToString));
+  return left.filter((card) => taken.has(cardToString(card)));
+};

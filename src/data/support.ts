@@ -237,6 +237,7 @@ export const buildHand = (input: NewHand, ctx: RepositoryContext): Hand => {
     id: ctx.ids.next(),
     sessionId: input.sessionId,
     holeCards: input.holeCards ?? null,
+    board: input.board ?? null,
     position: input.position ?? null,
     note: input.note ?? null,
     tags: input.tags ? [...input.tags] : [],

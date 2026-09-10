@@ -29,12 +29,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The version netlify.toml builds with. The test suite needs it for a
       # more specific reason: `node:sqlite` is what `SqlRepository` is tested
       # against, and it does not exist before 22.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm

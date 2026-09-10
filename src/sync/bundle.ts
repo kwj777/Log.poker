@@ -58,6 +58,7 @@ import {
   type ChangeSet,
 } from '../data/repository';
 import { answerFrom } from './batch';
+import { readWindow } from './rateLimit';
 import {
   BUNDLE_VERSION,
   SYNC_TABLES,
@@ -164,14 +165,20 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
   const bundle = emptyBundle();
   if (typeof stored !== 'object' || stored === null) return bundle;
 
-  const { records, devices, folded, collectedThrough, heardThrough, version } = stored as {
+  const { records, devices, folded, rate, collectedThrough, heardThrough, version } = stored as {
     records?: unknown;
     devices?: unknown;
     folded?: unknown;
+    rate?: unknown;
     collectedThrough?: unknown;
     heardThrough?: unknown;
     version?: unknown;
   };
+
+  // Kept across a version change, unlike the device marks below. It is a
+  // minute of counting rather than anything about a record, so there is
+  // nothing a migration could make wrong about it.
+  bundle.rate = readWindow(rate);
 
   const migrating = version !== BUNDLE_VERSION;
 

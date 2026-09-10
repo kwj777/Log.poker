@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { SYNC_URL } from '../client';
 import { handleSync, type BlobStore, type Surroundings } from '../endpoint';
 import { BUNDLE_VERSION, emptyChangeSet } from '../protocol';
+import { RATE_LIMIT } from '../rateLimit';
 
 const source = readFileSync(
   join(__dirname, '..', '..', '..', 'netlify', 'functions', 'sync.mts'),
@@ -501,5 +502,110 @@ describe('what every answer carries', () => {
     const keys = [mine, theirs].map((store) => store.writes.length);
     expect(keys).toEqual([1, 1]);
     expect(source).not.toMatch(/getStore\([^)]*subject/);
+  });
+});
+
+describe('asking too often', () => {
+  const stored = (count: number, since = NOW) => ({
+    version: BUNDLE_VERSION,
+    records: { venues: {}, sessions: {}, rebuys: {}, hands: {}, moodEntries: {} },
+    devices: {},
+    folded: {},
+    rate: { since, count },
+    heardThrough: NOW,
+    collectedThrough: 0,
+  });
+
+  it('serves a request inside the budget and counts it', async () => {
+    const store = fakeStore({ held: stored(3) });
+    const token = await mint();
+
+    expect((await post(token, push(), store)).status).toBe(200);
+    expect((store.held as { rate: { count: number } }).rate.count).toBe(4);
+  });
+
+  it('opens a window on the first request a fresh bucket sees', async () => {
+    const store = fakeStore();
+    const token = await mint();
+
+    expect((await post(token, push(), store)).status).toBe(200);
+    expect((store.held as { rate: { since: number; count: number } }).rate).toEqual({
+      since: NOW,
+      count: 1,
+    });
+  });
+
+  it('refuses one over the budget, with 429', async () => {
+    const store = fakeStore({ held: stored(RATE_LIMIT) });
+    const token = await mint();
+
+    const response = await post(token, push(), store);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'refused' });
+  });
+
+  it('and says when to come back', async () => {
+    const store = fakeStore({ held: stored(RATE_LIMIT, NOW - 20_000) });
+    const response = await post(await mint(), push(), store);
+    expect(response.headers.get('Retry-After')).toBe('40');
+  });
+
+  it('costs a read and no write, which is less than answering', async () => {
+    // The whole reason the count lives in the bundle: refusing stops before
+    // the merge and before the write, so the expensive half is never paid.
+    const store = fakeStore({ held: stored(RATE_LIMIT) });
+    await post(await mint(), push(), store);
+    expect(store.writes).toEqual([]);
+  });
+
+  it('does not let a refused request push the count any higher', async () => {
+    // A client in a loop must not hold its own door shut by knocking.
+    const store = fakeStore({ held: stored(RATE_LIMIT) });
+    await post(await mint(), push(), store);
+    expect((store.held as { rate: { count: number } }).rate.count).toBe(RATE_LIMIT);
+  });
+
+  it('serves it again once the window has run out', async () => {
+    const store = fakeStore({ held: stored(RATE_LIMIT, NOW - 60_000) });
+    expect((await post(await mint(), push(), store)).status).toBe(200);
+    expect((store.held as { rate: { count: number } }).rate.count).toBe(1);
+  });
+
+  it('counts a request once however many rounds it takes to land', async () => {
+    // A round that loses the write race re-reads and decides again. Each
+    // request adds one to what it read, and only the winning write persists.
+    const store = fakeStore({ held: stored(10), contended: 2 });
+    expect((await post(await mint(), push(), store)).status).toBe(200);
+    expect((store.held as { rate: { count: number } }).rate.count).toBe(11);
+  });
+
+  it('leaves the erasure alone, which is rare and deliberate', async () => {
+    // A DELETE does not read the bundle, so metering it would add the round
+    // trip this design exists to avoid -- and a second delete of a bucket that
+    // is already gone costs nothing worth defending against.
+    const store = fakeStore({ held: stored(RATE_LIMIT) });
+    const response = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${await mint()}` },
+      }),
+      world(store),
+    );
+    expect(response.status).toBe(204);
+    expect(store.erased).toBe(1);
+  });
+
+  it('still refuses a bad token before it reads anything at all', async () => {
+    // The limit protects the store. A request with no usable token never
+    // reaches it, which is cheaper than any counter could make it.
+    const store = fakeStore({ held: stored(RATE_LIMIT) });
+    const response = await post('not-a-token', push(), store);
+    expect(response.status).toBe(401);
+    expect(store.writes).toEqual([]);
+  });
+
+  it('keeps a window it cannot read from locking anybody out', async () => {
+    const store = fakeStore({ held: { ...stored(0), rate: 'nonsense' } });
+    expect((await post(await mint(), push(), store)).status).toBe(200);
   });
 });

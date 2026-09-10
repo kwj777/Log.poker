@@ -42,6 +42,7 @@
  */
 
 import { mergeIntoBundle } from './bundle';
+import { rateCheck, readWindow } from './rateLimit';
 import { BUNDLE_VERSION } from './protocol';
 import { bearerFrom, bucketFor, checkToken, hasOwnBucket } from './verify';
 
@@ -100,10 +101,11 @@ const guardFor = (stored: { etag?: string } | null): { onlyIfNew: true } | { onl
   return stored.etag ? { onlyIfMatch: stored.etag } : null;
 };
 
-const json = (body: unknown, status: number): Response =>
+const json = (body: unknown, status: number, extra: Record<string, string> = {}): Response =>
   new Response(body === null ? null : JSON.stringify(body), {
     status,
     headers: {
+      ...extra,
       ...(body === null ? {} : { 'Content-Type': 'application/json; charset=utf-8' }),
       // Per person, and never cached by anything in between.
       'Cache-Control': 'private, no-store, must-revalidate',
@@ -250,6 +252,30 @@ export const handleSync = async (
       return json({ error: 'unreachable' }, 503);
     }
 
+    // Asked too often, and refused before the expensive half.
+    //
+    // Here rather than before the read because the count is in the bundle: the
+    // read had to happen either way, and stopping now skips the merge and the
+    // write, so a refused request costs strictly less than a served one. See
+    // `src/sync/rateLimit.ts` for why the counter does not have a record of its
+    // own.
+    //
+    // Decided again on each round rather than once, because a round that loses
+    // the write race re-reads a bundle another device may have moved. Every
+    // request adds one to whatever it read and only the winning write persists,
+    // so a request is counted once however many rounds it takes.
+    // `readWindow` rather than a whole `readBundle`: the count is one small
+    // field and parsing a year of records to reach it would undo the point.
+    const stamped = stored === null ? null : (stored.data as { rate?: unknown } | null);
+    const rate = rateCheck(readWindow(stamped?.rate), now);
+    if (!rate.allowed) {
+      // Nothing in the answer about who or how much: it is the same 429 to a
+      // client in a loop and to somebody probing with a token they should not
+      // have.
+      console.error('sync: refusing a request over the rate limit');
+      return json({ error: 'refused' }, 429, { 'Retry-After': String(rate.retryAfter) });
+    }
+
     // A device that names itself is recorded, so its tombstones are not
     // collected out from under it. One that does not is served without being
     // counted, which is strictly safer: an unnamed device holds nothing up and
@@ -274,6 +300,11 @@ export const handleSync = async (
       console.error('sync: merge threw');
       return json({ error: 'refused' }, 400);
     }
+
+    // Onto the bundle that is about to be written, so the count is stored by
+    // the same conditional write everything else is. A lost race stores
+    // nothing, which is right: that round did not serve anybody.
+    merged.bundle.rate = rate.next;
 
     const guard = guardFor(stored);
     if (guard === null) {

@@ -41,6 +41,7 @@
  * property that makes this safe rather than lucky.
  */
 
+import { freshWindow, type RateWindow } from './rateLimit';
 import type { Change, ChangeSet } from '../data/repository';
 import type { Timestamp } from '../domain/types';
 
@@ -157,6 +158,16 @@ export interface Bundle {
    */
   heardThrough: Timestamp;
   /**
+   * How often this person has asked, lately.
+   *
+   * Server bookkeeping like `folded` and `heardAt`: it never goes on the wire
+   * and no device is told about it. It lives here rather than in a record of
+   * its own because every POST already reads this object, so checking a limit
+   * kept here costs nothing extra and refusing costs less than answering. See
+   * `src/sync/rateLimit.ts`.
+   */
+  rate: RateWindow;
+  /**
    * Tombstones deleted before this have been collected and are gone.
    *
    * Which makes it the line under which the server can no longer tell a record
@@ -200,6 +211,7 @@ export interface DeviceMark {
 const bare = <T>(): Record<string, T> => Object.create(null) as Record<string, T>;
 
 export const emptyBundle = (): Bundle => ({
+  rate: freshWindow(),
   version: BUNDLE_VERSION,
   records: {
     venues: bare(),

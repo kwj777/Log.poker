@@ -915,6 +915,46 @@ two merges that disagree in a year.
 of this out of every feature folder: a screen asks for a repository and gets
 one, and whether it talks to a server is not a question it can ask.
 
+#### Asked too often
+
+A person gets **120 requests a minute**, and the 121st is a 429 with a
+`Retry-After`. The client already treats that as `refused`, which arms the same
+exponential backoff a dead network does, so nothing on the device needed
+changing.
+
+**The count lives in the bundle**, which every POST already reads and every
+served POST already writes. So checking costs nothing that was not being spent,
+and refusing costs *less* than answering: it stops before the merge and before
+the write. A counter in a record of its own was the obvious shape and is the
+worse one, because it puts a second read in front of every request that is fine
+in order to make the rare request that is not slightly cheaper.
+
+It is decided again on each round of the write-race loop rather than once. A
+round that loses re-reads a bundle another device may have moved, every request
+adds one to whatever it read, and only the winning write persists -- so a
+request is counted once however many rounds it takes to land.
+
+**What it protects is the store, from a client in a loop**: a bug, a retry that
+lost its backoff, a device whose clock makes it think the wait is over every
+time. That is the realistic failure, and it is somebody's own bucket being
+hammered by their own app. It does **not** make an unauthenticated flood
+cheaper and cannot: a request with no usable token is refused before the store
+is opened at all, so it already costs an HMAC and nothing else. What it still
+costs is the function invocation, and no counter kept behind that function can
+change that -- only a rule at the edge would, and this endpoint deliberately
+does not depend on one being configured.
+
+The window is fixed rather than sliding, so two full budgets can land either
+side of a boundary. That is the known cost of the simplest correct thing, and it
+does not matter at this line: 120 is an order of magnitude above what a client
+doing its job asks for -- a first sync draining five years is bounded by the
+half-megabyte push cap at single figures of requests -- so twice it is still an
+order of magnitude below a loop.
+
+Erasure is not metered. A `DELETE` does not read the bundle, so metering it
+would add the round trip this whole design avoids, and a second delete of a
+bucket that is already gone costs nothing worth defending against.
+
 #### Tombstones are collected, carefully
 
 A tombstone is kept for **ninety days**, and then only goes if nobody is still
@@ -968,8 +1008,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 50 passed
-Tests:       1428 passed
+Test Suites: 51 passed
+Tests:       1452 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -982,6 +1022,7 @@ Tests:       1428 passed
   syncingRepository  48   two devices and one server, no fakes in between
   stats              45   P/L, rebuys, duration, win rate, groupings
   verify             44   checking a token, and every way past it that must not work
+  endpoint           37   the sync endpoint, end to end
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
   blog               32   the post grammar, the share cards, and what it refuses
@@ -990,7 +1031,6 @@ Tests:       1428 passed
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
   palette            27   the theme matches BRAND.md
-  endpoint           26   the sync endpoint, end to end
   migrations         26   a filled v2 database walked forward, both engines
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
@@ -1007,6 +1047,7 @@ Tests:       1428 passed
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
   handOffs           14   where a hand-off goes, and what the mid-session card says
+  rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
   csvWriter          11   writing CSV, and reading back exactly what was written
   history             9   the session list, its filters, and how much of it mounts

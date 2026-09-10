@@ -187,6 +187,15 @@ export interface Repository {
 
   /** All hands, newest first, optionally scoped to one session. */
   listHands(sessionId?: string): Promise<Hand[]>;
+  /**
+   * How many live hands there are, without reading any of them.
+   *
+   * Settings prints this number and nothing else needs it. It exists because
+   * the alternative was holding every hand ever logged in memory so that one
+   * line of one screen could call `.length` on it, which is what the store used
+   * to do and what made a hand write the most expensive write in the app.
+   */
+  countHands(): Promise<number>;
   getHand(id: string): Promise<Hand | null>;
   createHand(input: NewHand): Promise<Hand>;
   updateHand(id: string, patch: HandPatch): Promise<Hand>;

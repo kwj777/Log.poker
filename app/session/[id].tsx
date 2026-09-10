@@ -185,8 +185,14 @@ export default function SessionDetailScreen() {
         </>
       ) : null}
 
-      <SectionHeader title={`Hands (${hands.length})`} />
-      {hands.length === 0 ? (
+      {/*
+        Null is "not read yet", which is not "none": the hands are read per
+        session now rather than held in the store. Saying "no hands logged" in
+        that gap would be wrong rather than early, so the count and the card
+        both wait for the answer.
+      */}
+      <SectionHeader title={hands === null ? 'Hands' : `Hands (${hands.length})`} />
+      {hands === null ? null : hands.length === 0 ? (
         <Card>
           <Text color={colors.textSecondary}>No hands logged for this session.</Text>
         </Card>

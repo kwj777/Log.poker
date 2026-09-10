@@ -16,5 +16,19 @@ const METRICS: Metrics = {
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
 };
 
-export const renderScreen = (element: ReactElement) =>
-  render(<SafeAreaProvider initialMetrics={METRICS}>{element}</SafeAreaProvider>);
+const wrap = (element: ReactElement) => (
+  <SafeAreaProvider initialMetrics={METRICS}>{element}</SafeAreaProvider>
+);
+
+/**
+ * Renders inside the providers, and re-renders inside them too.
+ *
+ * The second half is the part worth having a helper for: `rerender` replaces
+ * the whole tree, so handing it a bare screen drops the provider and the screen
+ * throws on the safe-area hook. Every caller would have to remember the wrapper
+ * a second time.
+ */
+export const renderScreen = async (element: ReactElement) => {
+  const view = await render(wrap(element));
+  return { ...view, rerender: (next: ReactElement) => view.rerender(wrap(next)) };
+};

@@ -701,6 +701,38 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listHands()).toHaveLength(2);
       });
 
+      it('counts every live hand without reading one', async () => {
+        const venue = await newVenue();
+        const one = await newSession({ venueId: venue.id });
+        const two = await newSession({ venueId: venue.id });
+        expect(await repository.countHands()).toBe(0);
+
+        await repository.createHand({ sessionId: one.id, at: T0 });
+        await repository.createHand({ sessionId: two.id, at: T0 + HOUR });
+        expect(await repository.countHands()).toBe(2);
+      });
+
+      it('and stops counting one that has been tombstoned', async () => {
+        // The count is what Settings prints. A tombstone that still counted
+        // would make deleting a hand look like it had not worked.
+        const session = await newSession();
+        const hand = await repository.createHand({ sessionId: session.id, at: T0 });
+        await repository.createHand({ sessionId: session.id, at: T0 + HOUR });
+        expect(await repository.countHands()).toBe(2);
+
+        await repository.deleteHand(hand.id);
+        expect(await repository.countHands()).toBe(1);
+      });
+
+      it('and stops counting the hands a deleted session took with it', async () => {
+        const session = await newSession();
+        await repository.createHand({ sessionId: session.id, at: T0 });
+        await repository.createHand({ sessionId: session.id, at: T0 + HOUR });
+
+        await repository.deleteSession(session.id);
+        expect(await repository.countHands()).toBe(0);
+      });
+
       it('updates a hand and replaces its tags wholesale', async () => {
         const session = await newSession();
         const hand = await repository.createHand({

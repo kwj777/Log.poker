@@ -701,6 +701,9 @@ export class SyncingRepository implements Repository {
   listHands(sessionId?: string) {
     return this.local.listHands(sessionId);
   }
+  countHands() {
+    return this.local.countHands();
+  }
   getHand(id: string) {
     return this.local.getHand(id);
   }

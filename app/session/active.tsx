@@ -157,7 +157,13 @@ export default function ActiveSessionScreen() {
                 : 'None yet'
             }
           />
-          <StatTile label="Hands" value={String(hands.length)} hint="logged" />
+          {/* `--` while the read is out, which is what every other unknown
+              number in the app shows. */}
+          <StatTile
+            label="Hands"
+            value={hands === null ? '--' : String(hands.length)}
+            hint="logged"
+          />
         </View>
 
         <View style={styles.actions}>
@@ -184,8 +190,10 @@ export default function ActiveSessionScreen() {
 
         <MidSessionCheckIn session={session} elapsedMs={elapsed} />
 
-        <SectionHeader title={`Hands this session (${hands.length})`} />
-        {hands.length === 0 ? (
+        <SectionHeader
+          title={hands === null ? 'Hands this session' : `Hands this session (${hands.length})`}
+        />
+        {hands === null ? null : hands.length === 0 ? (
           <Card>
             <Text color={colors.textSecondary}>
               Nothing logged yet. Tap <Text variant="bodyStrong">Log hand</Text> when something

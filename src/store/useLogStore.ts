@@ -15,16 +15,12 @@
  * those live and where the reasoning for them is written down.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 
 import { getRepository, onSyncApplied } from '../data';
 import { planImport, venueNameKey, type ImportedSession } from '../domain/import';
-import {
-  selectHandsForSession,
-  selectMoodForSession,
-  selectSessionById,
-} from './selectors';
+import { selectMoodForSession, selectSessionById } from './selectors';
 import type {
   GameType,
   Hand,
@@ -92,8 +88,26 @@ interface LogState {
   venues: Venue[];
   sessions: SessionWithChildren[];
   activeSession: SessionWithChildren | null;
-  hands: Hand[];
   moodEntries: MoodEntry[];
+
+  /**
+   * How many hands are logged, which is all the store knows about them.
+   *
+   * It used to hold every one. A hand belongs to a session and every screen
+   * that shows hands is a screen about one session, so all that array ever did
+   * was get filtered -- while costing the most expensive read in the app on
+   * every hand write, to serve one line of Settings that wanted this number.
+   */
+  handCount: number;
+  /**
+   * Bumped whenever the hands may have changed, and read by nothing else.
+   *
+   * With the hands themselves out of the store, `useHandsForSession` is what
+   * reads them, and it needs to be told when to read again. A counter rather
+   * than a signal, because it is state the hook can depend on: it goes in a
+   * dependency array and React does the rest.
+   */
+  handsVersion: number;
 
   /** Timestamp of the last mid-session mood prompt, so it is not repeated. */
   lastMidSessionPromptAt: number | null;
@@ -185,7 +199,7 @@ const load = async (parts: ReadonlySet<Slice>): Promise<Map<Slice, Partial<LogSt
         )
       : null,
     parts.has('hands')
-      ? repository.listHands().then((hands) => void loaded.set('hands', { hands }))
+      ? repository.countHands().then((handCount) => void loaded.set('hands', { handCount }))
       : null,
     parts.has('moodEntries')
       ? repository
@@ -261,8 +275,9 @@ export const useLogStore = create<LogState>((set, get) => ({
   venues: [],
   sessions: [],
   activeSession: null,
-  hands: [],
   moodEntries: [],
+  handCount: 0,
+  handsVersion: 0,
   lastMidSessionPromptAt: null,
 
   hydrate: async () => {
@@ -278,7 +293,14 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   refresh: async (parts = EVERYTHING) => {
     try {
-      set({ ...(await read(parts)), error: null });
+      const patch = await read(parts);
+      // A hands read that landed means the hands may have moved, and the hook
+      // that holds them is watching this number rather than the store.
+      set((state) => ({
+        ...patch,
+        error: null,
+        handsVersion: 'handCount' in patch ? state.handsVersion + 1 : state.handsVersion,
+      }));
     } catch (error) {
       set({ error: describeError(error) });
     }
@@ -500,12 +522,52 @@ export const useLogStore = create<LogState>((set, get) => ({
  * array (a stable reference) and deriving inside `useMemo` keeps the comparison
  * honest.
  */
-export const useHandsForSession = (sessionId: string | null): Hand[] => {
-  const hands = useLogStore((state) => state.hands);
-  return useMemo(
-    () => (sessionId === null ? [] : selectHandsForSession(hands, sessionId)),
-    [hands, sessionId],
-  );
+/**
+ * One session's hands, read when they are wanted rather than held for ever.
+ *
+ * The store used to hold every hand in the log and this filtered them. That is
+ * why a hand write was the most expensive write in the app: 3600 rows read and
+ * mapped so that six could be shown.
+ *
+ * **Null means not read yet, and it is not the same as none.** A screen that
+ * treats them alike says "no hands logged for this session" in the gap before
+ * the first read lands, which is a sentence that is wrong rather than merely
+ * early. The two callers both branch on it.
+ *
+ * Reloaded when `handsVersion` moves, which is any write or sync that touched
+ * the hands. The previous answer is left on screen while the next one is read,
+ * so logging a hand does not blank the list it is being added to.
+ */
+export const useHandsForSession = (sessionId: string | null): Hand[] | null => {
+  const version = useLogStore((state) => state.handsVersion);
+  const [answer, setAnswer] = useState<{ sessionId: string; hands: Hand[] } | null>(null);
+
+  useEffect(() => {
+    if (sessionId === null) return;
+    // Guarded rather than canceled: the read cannot be stopped, but an answer
+    // that arrives after this hook has moved on must not be kept.
+    let live = true;
+    void (async () => {
+      try {
+        const repository = await getRepository();
+        const rows = await repository.listHands(sessionId);
+        if (live) setAnswer({ sessionId, hands: rows });
+      } catch {
+        // The screen keeps whatever it had. A failed read here is the local
+        // database being unavailable, which the root layout already reports.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [sessionId, version]);
+
+  // Derived rather than stored, which is what makes the answer to the wrong
+  // question unreachable rather than merely short-lived: moving to another
+  // session reads as unknown on the same render, without a state change to
+  // schedule and a frame of the previous session's hands to get through first.
+  if (sessionId === null) return [];
+  return answer !== null && answer.sessionId === sessionId ? answer.hands : null;
 };
 
 export const useMoodForSession = (sessionId: string | null): MoodEntry[] => {

@@ -1,0 +1,70 @@
+# Every check that can run without a secret, run on every change.
+#
+# The suite is the point. There are 1301 tests in here and nothing ran them
+# except somebody remembering to, which is the state that lets a red commit
+# reach production: the Netlify build command is `npm run build:web`, and it
+# checks nothing at all.
+#
+# `check:gate` is deliberately absent. It asks the live site whether the key it
+# holds is the right one, which needs a secret and a deploy to exist, so it is
+# an operational check rather than a test of the change in front of it.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A branch that is pushed twice in a minute does not need the first run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The version netlify.toml builds with. The test suite needs it for a
+      # more specific reason: `node:sqlite` is what `SqlRepository` is tested
+      # against, and it does not exist before 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The house-style pass. Ordinarily the first half of `npm test`, run on
+      # its own here because the other half is split out below.
+      - name: Prose
+        run: npm run check:prose
+
+      # The guides are generated from their sources, the same way the test
+      # table below is generated from the suite.
+      - name: Guides match their generator
+        run: npm run build:content -- --check
+
+      # Jest directly rather than `npm test`, so the report can be handed to
+      # the step below instead of paying for a second full run of the suite.
+      - name: Test
+        run: npx jest --json --outputFile="${{ runner.temp }}/jest-report.json"
+
+      # The README's test table is generated, and it had gone stale: it claimed
+      # 41 suites and 1241 tests against a real 42 and 1301. It cannot live in
+      # `npm test`, because finding out what the suite does means running it.
+      # This is the place it can live.
+      - name: Test table is current
+        run: npm run test:table -- --check --from "${{ runner.temp }}/jest-report.json"

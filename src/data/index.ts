@@ -177,6 +177,26 @@ export const recomposeRepository = (): void => {
 };
 
 /**
+ * Sync because the app came back to the front, if there is anything to sync.
+ *
+ * The one trigger the engine did not have. Writes push, and a launch pulls
+ * once, so the device that only reads -- the laptop with the tab open, the
+ * phone that was in a pocket -- had no way back to the server for as long as
+ * the process lived. See `SyncingRepository.resume`, which owns the question of
+ * whether an arrival at the front is worth a request.
+ *
+ * Silent about all three of the ways there is nothing to do: nothing composed
+ * yet, which means the launch pull has not run and will; a composition that
+ * failed, which is not this call's to report; and a signed-out device, whose
+ * repository is the plain local one and has no server to ask.
+ */
+export const syncOnResume = async (): Promise<void> => {
+  if (pending === null) return;
+  const repository = await pending.catch(() => null);
+  if (repository instanceof SyncingRepository) await repository.resume();
+};
+
+/**
  * Told when a sync has changed the local database underneath the screens.
  *
  * Stable across a recompose, which is the whole reason it is here rather than

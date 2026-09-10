@@ -99,6 +99,15 @@ export interface Cursors {
   subject: string | null;
 }
 
+/**
+ * How long a foreground has to have been away to be worth a request.
+ *
+ * Long enough that moving between two tabs costs nothing, short enough that
+ * picking the phone up at the table and looking at the laptop is a fresh
+ * answer rather than a stale one.
+ */
+const RESUME_THROTTLE_MS = 30_000;
+
 /** Where the cursors live. Small enough that anything durable will do. */
 export interface CursorStore {
   read(): Promise<Cursors>;
@@ -181,6 +190,8 @@ export class SyncingRepository implements Repository {
   private epoch = 0;
   private failures = 0;
   private nextAttemptAt = 0;
+  /** When `resume` last let a sync through. See `resume`. */
+  private lastResumeAt = 0;
   /**
    * Set once the token has stopped meaning anything, and never cleared here.
    *
@@ -295,6 +306,50 @@ export class SyncingRepository implements Repository {
     } finally {
       this.inFlight = null;
     }
+  }
+
+  /**
+   * Sync because the app came back to the front.
+   *
+   * Every other sync in this app is the tail of a local write, and one is the
+   * tail of a launch. Between them they miss the case the feature exists for:
+   * **the device that is reading rather than writing.** A laptop with the tab
+   * open took its answer at launch and then sat on it for as long as the tab
+   * lived, so a session logged on the phone at the table reached it when the
+   * browser was restarted and not before. Backgrounding the native app and
+   * coming back was the same nothing. What that looks like from the outside is
+   * not "sync is a little behind", it is "sync does not work".
+   *
+   * `push(true)` rather than `push()`, because a device that is only reading
+   * is never dirty and the plain call returns without asking anything after
+   * its first success. The two guards `force` lifts are not wanted equally,
+   * though, so the one worth keeping is applied here instead:
+   *
+   * **The backoff stays.** It is what stands between a server that is down and
+   * every device pointed at it, and coming to the front is not a reason to
+   * skip it. Somebody moving between two tabs generates the same event as
+   * somebody coming back after a day, and a request per switch is exactly the
+   * traffic the window exists to shed.
+   *
+   * **The throttle is the other half of that**, and it applies to the runs that
+   * succeed, which no backoff ever slows down. Alt-tabbing is ordinary
+   * behavior; a full request each way is not.
+   *
+   * A clock that has moved backwards reads as a long enough wait rather than an
+   * impossible one, on the same reasoning as `waiting()`: a negative gap is a
+   * device that has just corrected its date, and the answer to that is to sync,
+   * not to sit out the size of the jump.
+   */
+  async resume(): Promise<void> {
+    if (this.halted) return;
+    if (this.waiting()) return;
+
+    const at = this.clock();
+    const since = at - this.lastResumeAt;
+    if (since >= 0 && since < RESUME_THROTTLE_MS) return;
+
+    this.lastResumeAt = at;
+    await this.push(true);
   }
 
   /**

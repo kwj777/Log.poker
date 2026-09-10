@@ -7,7 +7,7 @@
  */
 
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Button } from '../src/components/Button';
 import { APP_DESCRIPTION, PageMeta } from '../src/components/PageMeta';
 import { Text } from '../src/components/Text';
+import { syncOnResume } from '../src/data';
 import { useLogStore } from '../src/store/useLogStore';
 import { colors, spacing } from '../src/theme';
 
@@ -26,6 +27,32 @@ export default function RootLayout() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  /**
+   * Ask the server again whenever the app comes back to the front.
+   *
+   * `AppState` rather than a platform split, because react-native-web
+   * implements it over `visibilitychange` and reports the same `active`: a
+   * phone leaving the app switcher and a browser tab being selected are the
+   * same event here, and they are the same event for the player too.
+   *
+   * Here rather than in the data layer, which is where the rest of the sync
+   * wiring lives, for the ordinary reason: a listener needs somewhere to be
+   * removed, and `compose` runs again on every sign-in. This runs once for the
+   * life of the app.
+   *
+   * Nothing to do on the way back but ask. A pull that changes anything
+   * announces itself through `onSyncApplied`, which the store is already
+   * subscribed to, so the screens reload themselves.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncOnResume();
+    });
+    // Optional, because react-native-web hands back nothing at all when there
+    // is no DOM to listen to, which is what a prerender is.
+    return () => subscription?.remove();
+  }, []);
 
   return (
     <SafeAreaProvider>

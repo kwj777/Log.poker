@@ -1549,3 +1549,103 @@ describe('the token it sends', () => {
     expect(wrapper.current().problem).toBeNull();
   });
 });
+
+describe('the device that only reads', () => {
+  /**
+   * The case every other trigger misses.
+   *
+   * A push is the tail of a local write and there is one pull at launch, so a
+   * device that is only being read from had no way back to the server for as
+   * long as the process lived. The laptop with the tab open is the ordinary
+   * shape of that, and it is also the device most likely to be asking the one
+   * question this feature exists to answer.
+   */
+  it('sees what the other one logged, on coming back to the front', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop');
+
+    // The laptop takes its answer at launch, and from here on only reads.
+    await laptop.push();
+
+    const session = await startSession(phone);
+    await phone.push();
+
+    // Without this line the laptop sits on its launch answer until the tab is
+    // closed, and the session is nowhere.
+    tick(HOUR);
+    await laptop.resume();
+
+    const there = await laptop.getSession(session.id);
+    expect(there?.id).toBe(session.id);
+    expect(there?.venue?.name).toBe('Aria');
+  });
+
+  it('does not spend a request on every switch between two tabs', async () => {
+    const { held, fetch } = server();
+    const laptop = await device(fetch, 'laptop');
+
+    await laptop.resume();
+    const spent = held.calls;
+
+    // Half the window, which is one alt-tab and back.
+    tick(15_000);
+    await laptop.resume();
+    expect(held.calls).toBe(spent);
+
+    // And past it, which is somebody returning rather than passing through.
+    tick(30_000);
+    await laptop.resume();
+    expect(held.calls).toBeGreaterThan(spent);
+  });
+
+  it('leaves a failing server alone, however often it is opened', async () => {
+    // The backoff is what stands between a server that is down and every
+    // device pointed at it. Coming to the front is not a reason to skip it.
+    const { held, fetch } = server();
+    const laptop = await device(fetch, 'laptop');
+    held.offline = true;
+
+    await laptop.push(true);
+    const spent = held.calls;
+
+    tick(1_000);
+    await laptop.resume();
+    expect(held.calls).toBe(spent);
+
+    // And asks again once the wait is over.
+    tick(10 * 60_000);
+    held.offline = false;
+    await laptop.resume();
+    expect(held.calls).toBeGreaterThan(spent);
+  });
+
+  it('does not ask at all once the token has stopped meaning anything', async () => {
+    const { held, fetch } = server();
+    const laptop = await device(fetch, 'laptop');
+    held.unauthorized = true;
+
+    await laptop.push(true);
+    expect(laptop.current().problem).toBe('unauthorized');
+
+    const spent = held.calls;
+    tick(HOUR);
+    await laptop.resume();
+    expect(held.calls).toBe(spent);
+  });
+
+  it('syncs after the clock has moved backwards rather than sitting out the jump', async () => {
+    // A phone that finds the network and corrects its date reads as having
+    // resumed in the future. Treated as a long enough wait, on the same
+    // reasoning the backoff window uses.
+    const { held, fetch } = server();
+    const laptop = await device(fetch, 'laptop');
+
+    await laptop.resume();
+    const spent = held.calls;
+
+    tick(-HOUR);
+    await laptop.resume();
+    expect(held.calls).toBeGreaterThan(spent);
+  });
+});

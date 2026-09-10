@@ -142,6 +142,19 @@ message it prints names the file, the line and the word. `npm run test:watch`
 leaves it out: the tight loop is for the tests, and a half-written comment
 should not interrupt it.
 
+Every one of those except `test:table` on its own runs in CI, on each pull
+request and on every push to `main`
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). It had to: the
+Netlify build command is `npm run build:web`, which checks nothing, so until
+this existed the whole suite ran only when somebody remembered to run it. The
+test table is the evidence of what that costs -- it sat two suites and sixty
+tests out of date, and the script that catches it had been written months
+before.
+
+`check:gate` is the one check that is not there. It asks the live site whether
+the key it holds is Untilt's, which needs a secret and a deploy to exist: an
+operational check rather than a test of the change in front of it.
+
 ### Demo data
 
 Settings → **Load demo data** seeds 20 mixed-result sessions with hands and mood
@@ -526,6 +539,40 @@ src/
   theme/                  palette, spacing, type scale
 ```
 
+### What a write reads back
+
+The store holds four tables in memory and the repository stays the source of
+truth: nothing is patched in memory from what a write returned, it is read back
+from the database. What changed is how much of it is read back. A write now
+names the tables it could have disturbed, and only those are re-read.
+
+Against five years of a heavy live player -- 600 sessions, 3600 hands -- the old
+reload measured **49ms, paid on every write**, including every rebuy tapped
+during a live session. Naming the tables takes a rebuy to 10ms and a mood entry
+to 8ms. Logging a hand is still 29ms, because `listHands` is 31ms of that 49 and
+the store holds every hand ever logged so that Settings can count them; making
+that read per session is the next thing here, and it needs the hand list to
+become asynchronous.
+
+The second cost is easier to miss and can be the larger one. Replacing an array
+invalidates every `useMemo` over it, so logging a hand re-ran the tournament
+bootstrap on the variance tab -- two thousand resamples of every entry --
+because the sessions array was new, not because it was different. A table that
+is not re-read keeps the array it had, so this falls out for free rather than
+needing anything compared.
+
+The risk it introduces is a screen that does not notice a change, so each write
+names a table whenever there is a case for it. `sessionCount` is the one that is
+easy to miss: it is derived at read time, so writing a session changes every
+venue.
+
+**Which read owns each table is counted per table.** Two reloads can be in
+flight at once -- a write during a sync, two writes in a row -- and whichever
+resolved last used to win, which on two overlapping reads of one table is the
+older answer as often as not. One counter for the whole store would not do:
+a hand write and a full sync overlap on `hands` and nowhere else, and settling
+that would throw away three good tables.
+
 ### The repository interface
 
 Persistence sits behind a single interface with two implementations:
@@ -743,6 +790,15 @@ two merges that disagree in a year.
   millisecond is free, because applying a record twice is a no-op.
 - **Writes never wait on it.** Everything commits locally and returns; the push
   happens after. A card room has no wifi and that is the normal case.
+- **Coming back to the front is a sync too.** Every other trigger is the tail
+  of a local write, and one is the tail of a launch, which between them leave
+  out the device doing the reading: a laptop with the tab open took its answer
+  once and then sat on it for as long as the tab lived. `AppState` covers both
+  platforms, because react-native-web implements it over `visibilitychange`,
+  so a phone leaving the app switcher and a tab being selected are one event.
+  It keeps the backoff -- a server that is down is not helped by everybody
+  alt-tabbing -- and adds a thirty-second throttle, because passing through a
+  tab is not the same as returning to it.
 
 `src/data/index.ts` is where the wrapper is composed in, which is what keeps all
 of this out of every feature folder: a screen asks for a repository and gets
@@ -784,49 +840,51 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 41 passed
-Tests:       1241 passed
+Test Suites: 43 passed
+Tests:       1315 passed
 
   dexieRepository   115   the IndexedDB path, against real IndexedDB
   sqlRepository     115   the SQLite path, against real SQLite
-  bundle             63   what ships to each platform, against the real output
+  bundle             66   what ships to each platform, against the real output
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   sessionImport      52   reading a session-summary export
+  site               51   the marketing/app split, the PWA, the sitemap
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
-  site               48   the marketing/app split, the PWA, the sitemap
+  syncingRepository  48   two devices and one server, no fakes in between
   stats              45   P/L, rebuys, duration, win rate, groupings
+  verify             44   checking a token, and every way past it that must not work
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
-  verify             35   checking a token, and every way past it that must not work
+  copy               32   what the sign-in and the sync are allowed to say
   mood               32   what tilt costs, and when to say nothing
-  syncingRepository  32   two devices and one server, no fakes in between
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
   blog               28   the post grammar, the share cards, and what it refuses
-  copy               28   what the sign-in and the sync are allowed to say
   palette            27   the theme matches BRAND.md
-  endpoint           25   the sync endpoint, end to end
+  endpoint           26   the sync endpoint, end to end
+  session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   migrations         22   a filled v2 database walked forward, both engines
   token              21   the family token grammar, against signed fixtures
+  compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
-  session            20   holding a token, and stores that fail as real ones do
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
+  gateCheck          18   the key-on-the-site script, run rather than read
   money              18   cents arithmetic, parsing, formatting
   seed               17   the demo dataset stays coherent
   handNotation       16   parse, round-trip, hand classes
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
-  gateCheck          13   the key-on-the-site script, run rather than read
   handOffs           11   where a hand-off goes, and what the mid-session card says
   importIntegration   9   parse → store → read back, against real SQLite
   selectors           9   store reads and filters
+  useLogStore         9   what a write reads back, and what it leaves alone
   plan                8   what an import will write, before it writes it
   tokenStore.web      8   the browser token store
   columns             7   header matching
-  compose             7   which repository a device gets, and the unsafe sweep
+  cursorStore         7   which cursors survive a launch, and what a lost one costs
   readme              6   the test table adds up and says what each suite is for
 ```
 

@@ -1041,8 +1041,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 52 passed
-Tests:       1471 passed
+Test Suites: 53 passed
+Tests:       1478 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1093,6 +1093,7 @@ Tests:       1471 passed
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   logHand             7   logging a hand, and the board that is optional on it
+  writeFailures       7   what the player sees when a write does not work
   readme              6   the test table adds up and says what each suite is for
   settingsExport      6   the export card, and what it refuses to write
   errorBoundary       5   a render that throws, and the way back from it
@@ -1123,6 +1124,61 @@ that does not need the results: that the rows add up to the stated total, that
 the order is a function of the numbers, and that no placeholder was left behind.
 Only `--check` can see a suite missing from the table altogether, because seeing
 that means knowing what suites exist.
+
+### When a write does not work
+
+Every screen that writes says so when the write fails. That is a rule rather
+than a habit, because three of them used to say nothing: logging a hand and
+starting a session each caught the throw and stopped their spinner, and the
+rebuy and the cash-out had no `catch` at all, so a throw was an unhandled
+rejection. In every case the screen simply did not move, **which from a foot
+away is what success looks like** -- a write that failed read as one that
+worked, and the record was quietly not there.
+
+The failures are not exotic. IndexedDB has a quota, a phone runs out of disk,
+and a constraint can be violated. The cash-out is the one that mattered most,
+because it is the moment the result is written.
+
+`ErrorNote` is what they all say it with, and it is announced as well as drawn:
+a message that appears silently under a button is one a screen reader taps past.
+It sits where the action was -- inside the sheet for a rebuy, under the form for
+a hand -- and the screen keeps what was typed, so nothing has to be entered from
+memory a second time.
+
+### Tap targets
+
+`layout.tapTarget` is 48, and the chips and the card picker both say in their
+own comments that this is the floor. `Button size="small"` draws at 36 and is
+used in twenty-one places, so it makes the difference up in `hitSlop`: small is
+meant to look small, not to be harder to hit. The `Explain` badge does the same
+from 22.
+
+**Vertically only.** Slop on the sides would spread each button into its
+neighbor -- two small buttons in a row sit a `spacing.sm` gap apart, and six
+points either way would have them overlapping in the middle, so a tap aimed at
+one could land on the other. Height is the dimension that is short anyway.
+
+### The advisories that cannot be fixed
+
+`npm audit` reports fifteen moderate advisories, all of them transitive through
+Expo's toolchain, and **none of them should be acted on**. That is worth writing
+down, because both of the obvious remedies are worse than the problem.
+
+Only one reaches a browser: `decode-uri-component`, through `query-string`,
+through `expo-router`, which calls `parse` -- and `parse` decodes through the
+flagged function. The impact is that a crafted URL can hang the tab of whoever
+opens it. It is client-side and self-inflicted; nothing on the server side uses
+that library.
+
+- **`npm audit fix --force` proposes a downgrade**, `expo-router` 57 to 5.1.11
+  and `expo-sharing` 57 to 14.0.8. That would take the app off SDK 57 entirely.
+- **An `overrides` entry to `decode-uri-component@^0.5.0` breaks it.** The audit
+  count drops and it looks fixed, but 0.5.0 is ESM-only and `query-string@7`
+  reaches it with `require`, so `parse` throws `decodeComponent is not a
+  function` at runtime. The `ui` suites catch it: five of them fail to load.
+
+So the answer is to wait for Expo to move to a patched `query-string`, and to
+leave this paragraph here so that nobody has to rediscover the two traps.
 
 ### Money
 

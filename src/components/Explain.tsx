@@ -28,7 +28,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { GlossaryEntry } from '../domain/glossary';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, layout, radius, spacing, typography } from '../theme';
 import { Sheet } from './Sheet';
 import { Text } from './Text';
 import { tapFeedback } from './haptics';
@@ -53,7 +53,9 @@ export const Explain = ({ title, entries, label }: ExplainProps) => {
         accessibilityRole="button"
         accessibilityLabel={label ?? `What these mean: ${title}`}
         accessibilityHint="Opens a short explanation"
-        hitSlop={spacing.sm}
+        // The badge draws at 22 and the floor is 48, so it needs 13 a side
+        // rather than the 8 it had -- which left it at 38 and still short.
+        hitSlop={Math.ceil((layout.tapTarget - 22) / 2)}
         onPress={() => {
           tapFeedback();
           setOpen(true);

@@ -65,6 +65,7 @@ export const Button = ({
       accessibilityRole={href === undefined ? 'button' : 'link'}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy: loading }}
+      hitSlop={slopFor(size)}
       accessibilityHint={accessibilityHint}
       disabled={inactive}
       onPress={() => {
@@ -134,6 +135,26 @@ const sizeStyles: Record<Size, ViewStyle> = {
   large: { minHeight: 56, paddingHorizontal: spacing.xl },
   medium: { minHeight: layout.tapTarget, paddingHorizontal: spacing.lg },
   small: { minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radius.sm },
+};
+
+/**
+ * What each size is short of a real target, made up in touch area.
+ *
+ * `small` draws at 36 and `layout.tapTarget` is 48, which the rest of this
+ * design system treats as the floor -- the chips and the card picker both say
+ * so in their own comments. Small is meant to look small; it is not meant to be
+ * harder to hit, and it is used in twenty-one places.
+ *
+ * **Vertical only.** Slop on the sides would spread each button into its
+ * neighbor: two small buttons in a row sit a `spacing.sm` gap apart, and six
+ * points of slop each way would have them overlapping in the middle, so a tap
+ * aimed at one could land on the other. Height is the dimension that is short
+ * anyway; a button is as wide as its label.
+ */
+const slopFor = (size: Size) => {
+  const drawn = sizeStyles[size].minHeight;
+  const short = layout.tapTarget - (typeof drawn === 'number' ? drawn : layout.tapTarget);
+  return short > 0 ? { top: Math.ceil(short / 2), bottom: Math.ceil(short / 2) } : undefined;
 };
 
 const variantStyles: Record<Variant, ViewStyle> = {

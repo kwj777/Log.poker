@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 
 import { AmountInput } from '../../src/components/AmountInput';
 import { Button } from '../../src/components/Button';
+import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { Chip, ChipGroup } from '../../src/components/Chip';
 import { MoodPicker } from '../../src/components/MoodPicker';
 import { Screen } from '../../src/components/Screen';
@@ -67,6 +68,7 @@ export default function NewSessionScreen() {
   const [buyIn, setBuyIn] = useState(String(defaults.buyIn / 100));
   const [fee, setFee] = useState(String(defaults.fee / 100));
   const [mood, setMood] = useState<MoodScore | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
   const tournament = format === 'tournament';
@@ -96,7 +98,10 @@ export default function NewSessionScreen() {
       // Replace rather than push: backing out of a live session into the "start
       // a session" screen would be a dead end.
       router.replace('/session/active');
-    } catch {
+    } catch (error) {
+      // Told, rather than left on a screen that has not moved. A session that
+      // failed to start and one that is starting look identical otherwise.
+      setFailed(describeFailure(error, 'That session could not be started.'));
       setStarting(false);
     }
   };
@@ -202,6 +207,8 @@ export default function NewSessionScreen() {
       <Text variant="caption" color={colors.textTertiary} style={styles.moodHint}>
         Logged alongside your result. Skip it. It’s never required.
       </Text>
+
+      <ErrorNote message={failed} />
     </Screen>
   );
 }

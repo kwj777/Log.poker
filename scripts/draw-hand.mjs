@@ -227,8 +227,9 @@ export const FIGURES = {
     which suit. Her two cards are drawn face down because they were never shown: she
     folded, and the only reason anybody believes they were queens is that she said so
     afterwards. The flop came two eights and a third card I did not write down, giving
-    me trip eights. The turn was a nine, giving me eights full of nines. She folded
-    there, so no river was dealt.`,
+    me trip eights. The turn was a nine, giving me eights full of nines. She called to
+    see the river, which is also drawn face down and was not the queen she needed, and
+    folded when I bet it.`,
     rows: [
       {
         type: 'hands',
@@ -244,11 +245,14 @@ export const FIGURES = {
         outcomes: [['ME', 'Trip eights', 'gold']],
       },
       {
-        label: 'THE TURN',
-        cards: ['9?!'],
-        outcomes: [['ME', 'Eights full of nines', 'gold']],
+        label: 'THE TURN AND THE RIVER',
+        cards: ['9?!', '??'],
+        outcomes: [
+          ['ME', 'Eights full of nines', 'gold'],
+          ['HER', 'Not the third queen', 'muted'],
+        ],
       },
-      { type: 'note', text: 'SHE FOLDED. THERE WAS NO RIVER.' },
+      { type: 'note', text: 'SHE FOLDED WHEN I BET THE RIVER.' },
     ],
   },
 

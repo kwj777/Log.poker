@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 515" role="img"
+  aria-labelledby="told-me-queens-title told-me-queens-desc">
+  <title id="told-me-queens-title">The hand she said she had</title>
+  <desc id="told-me-queens-desc">My hand: an eight and a nine of the same suit, though I could not tell you which suit. Her two cards are drawn face down because they were never shown: she folded, and the only reason anybody believes they were queens is that she said so afterwards. The flop came two eights and a third card I did not write down, giving me trip eights. The turn was a nine, giving me eights full of nines. She called to see the river, which is also drawn face down and was not the queen she needed, and folded when I bet it.</desc>
+
+  <text x="121.8" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">MY HAND</text>
+  <g>
+    <title>The 8, and I could not tell you the suit</title>
+    <rect x="63.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" stroke-dasharray="4 3" />
+    <text x="70.8" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#8f8a80">8</text>
+    <text x="90.8" y="84" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="27"
+      text-anchor="middle" fill="#8f8a80">?</text>
+  </g>
+  <g>
+    <title>The 9, and I could not tell you the suit</title>
+    <rect x="125.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" stroke-dasharray="4 3" />
+    <text x="132.8" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#8f8a80">9</text>
+    <text x="152.8" y="84" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="27"
+      text-anchor="middle" fill="#8f8a80">?</text>
+  </g>
+  <text x="298.2" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">HER HAND</text>
+  <g>
+    <title>A card that was never shown</title>
+    <rect x="240.2" y="26" width="54" height="76" rx="5"
+      fill="#3d4a44" stroke="#2e3a35" stroke-width="1" />
+    <g transform="translate(245.2 42) scale(0.22)"
+      fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.75">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </g>
+  <g>
+    <title>A card that was never shown</title>
+    <rect x="302.2" y="26" width="54" height="76" rx="5"
+      fill="#3d4a44" stroke="#2e3a35" stroke-width="1" />
+    <g transform="translate(307.2 42) scale(0.22)"
+      fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.75">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </g>
+  <text x="210" y="124" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">SHE SAID </tspan>Two queens, once she was done with them</text>
+  <text x="210" y="174" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">THE FLOP</text>
+  <g>
+    <title>The 8, and I could not tell you the suit</title>
+    <rect x="121" y="184" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" stroke-dasharray="4 3" />
+    <text x="128" y="206" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#8f8a80">8</text>
+    <text x="148" y="242" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="27"
+      text-anchor="middle" fill="#8f8a80">?</text>
+  </g>
+  <g>
+    <title>The 8, and I could not tell you the suit</title>
+    <rect x="183" y="184" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" stroke-dasharray="4 3" />
+    <text x="190" y="206" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#8f8a80">8</text>
+    <text x="210" y="242" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="27"
+      text-anchor="middle" fill="#8f8a80">?</text>
+  </g>
+  <g>
+    <title>A card that was never shown</title>
+    <rect x="245" y="184" width="54" height="76" rx="5"
+      fill="#3d4a44" stroke="#2e3a35" stroke-width="1" />
+    <g transform="translate(250 200) scale(0.22)"
+      fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.75">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </g>
+  <text x="210" y="282" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Trip eights</text>
+  <text x="210" y="332" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">THE TURN AND THE RIVER</text>
+  <g>
+    <title>The 9, and I could not tell you the suit</title>
+    <rect x="152" y="342" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" stroke-dasharray="4 3" />
+    <text x="159" y="364" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#8f8a80">9</text>
+    <text x="179" y="400" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="27"
+      text-anchor="middle" fill="#8f8a80">?</text>
+  </g>
+  <g>
+    <title>A card that was never shown</title>
+    <rect x="214" y="342" width="54" height="76" rx="5"
+      fill="#3d4a44" stroke="#2e3a35" stroke-width="1" />
+    <g transform="translate(219 358) scale(0.22)"
+      fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.75">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </g>
+  <text x="210" y="440" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Eights full of nines</text>
+  <text x="210" y="462" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HER </tspan>Not the third queen</text>
+  <text x="210" y="507" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">SHE FOLDED WHEN I BET THE RIVER.</text>
+</svg>

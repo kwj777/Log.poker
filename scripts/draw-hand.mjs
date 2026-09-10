@@ -220,6 +220,42 @@ export const FIGURES = {
     ],
   },
 
+  /** The queens: a hand nobody turned over, drawn as the hand nobody turned over. */
+  'told-me-queens': {
+    title: 'The hand she said she had',
+    desc: `My hand: an eight and a nine of the same suit, though I could not tell you
+    which suit. Her two cards are drawn face down because they were never shown: she
+    folded, and the only reason anybody believes they were queens is that she said so
+    afterwards. The flop came two eights and a third card I did not write down, giving
+    me trip eights. The turn was a nine, giving me eights full of nines. She called to
+    see the river, which is also drawn face down and was not the queen she needed, and
+    folded when I bet it.`,
+    rows: [
+      {
+        type: 'hands',
+        groups: [
+          { label: 'MY HAND', cards: ['8?!', '9?!'] },
+          { label: 'HER HAND', cards: ['??', '??'] },
+        ],
+        outcomes: [['SHE SAID', 'Two queens, once she was done with them', 'muted']],
+      },
+      {
+        label: 'THE FLOP',
+        cards: ['8?!', '8?!', '??'],
+        outcomes: [['ME', 'Trip eights', 'gold']],
+      },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['9?!', '??'],
+        outcomes: [
+          ['ME', 'Eights full of nines', 'gold'],
+          ['HER', 'Not the third queen', 'muted'],
+        ],
+      },
+      { type: 'note', text: 'SHE FOLDED WHEN I BET THE RIVER.' },
+    ],
+  },
+
   /** The limp: two cards I am sure of, and a board I am not. */
   'limped-two-pair': {
     title: 'The hand a two-dollar limp bought',

@@ -36,6 +36,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { GUIDES } from './pages.mjs';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
 const SITE = 'https://log.poker';
@@ -271,12 +273,8 @@ const STYLE = `      :root {
       footer strong { color: var(--muted); }`;
 
 /** Every guide, in the order the footer lists them. */
-const NAV = [
-  ['/running-bad', 'Running bad or playing bad'],
-  ['/bankroll', 'How big a bankroll'],
-  ['/pot-odds', 'Pot odds and outs'],
-  ['/tilt', 'Tilt'],
-];
+/** The guides cross-link each other; the list itself lives in `pages.mjs`. */
+const NAV = GUIDES;
 
 const HELPLINE = `<p>
           These are record keeping and practice tools, not gambling advice. If
@@ -358,6 +356,7 @@ ${body}
           <a href="/">The three apps</a>
 ${others.map(([href, label]) => `          <a href="${href}">${label}</a>`).join('\n')}
           <a href="/blog">The Log Blog</a>
+          <a href="/sitemap">Sitemap</a>
         </nav>
         ${HELPLINE}
       </footer>

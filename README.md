@@ -1042,7 +1042,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 53 passed
-Tests:       1478 passed
+Tests:       1485 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1069,6 +1069,7 @@ Tests:       1478 passed
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
   sessionExport      22   the log written out, and read back by the importer
+  handOffs           21   where a hand-off goes, and what the mid-session card says
   token              21   the family token grammar, against signed fixtures
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
@@ -1079,7 +1080,6 @@ Tests:       1478 passed
   seed               17   the demo dataset stays coherent
   signin             16   the sign-in client, against a fake fetch
   client             14   the sync client, against a fake fetch
-  handOffs           14   where a hand-off goes, and what the mid-session card says
   observe            14   how big the bundle was, said without saying whose
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
@@ -1523,9 +1523,9 @@ misplayed or bluff, and three of those four are claims about a runout. The
 record asked players to classify a hand in terms it could not then show. `AsKd
 · BTN · "Ran into aces"` does not say whether the aces held.
 
-The second reason is `drillHandOff`. It carries the hand class and the position
-to TiltProof and is documented as becoming a real hand-off, the drill opening
-preloaded with the spot. `AKo` on the button is a holding; `AKo` on the button
+The second reason is `drillHandOff`. It hands the flagged hand to TiltProof's
+review, which opens on the spot the player logged rather than greeting them at a
+landing page. `AKo` on the button is a holding; `AKo` on the button
 on a king-high flop is a decision somebody made. Without a board the hand-off
 was capped at what it could ever become, so the board goes with it now -- but
 only when it is a whole one, because the far side cannot tell a half-typed board
@@ -1652,13 +1652,14 @@ Ordered roughly by how much each is worth against how much it costs.
    sessions and hands per hour, which need the hourly-rate math to become
    per-table: wall-clock hours stop meaning one thing the moment four tables are
    open.
-4. **Deep Untilt and TiltProof integration** -- the seams already exist in
-   `src/features/family/hooks.ts`. Today they build a URL; next they hand off a
-   real payload -- the flagged hand into a TiltProof drill, the rough stretch
-   into the matching Untilt exercise -- and eventually share an account across
+4. **Deep Untilt and TiltProof integration** -- the seams are in
+   `src/features/family/links.ts`. The TiltProof half has landed: a flagged hand
+   opens that app's review on the exact cards, the position and the board Log
+   recorded. What is left is the Untilt half, which still opens a front page
+   rather than the matching exercise, and eventually an account shared across
    the three apps. What the hand becomes on the far side of that link is
-   written up in TiltProof's README; the seam from this side, and where the URL
-   we emit today actually lands, is in
+   written up in TiltProof's README; the seam from this side, the address it
+   lands on and what does and does not cross it, is in
    [`design/tree-review.md`](design/tree-review.md).
 5. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.

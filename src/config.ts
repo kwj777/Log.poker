@@ -43,13 +43,29 @@ export const ALLOW_SIGN_IN = true;
  */
 export const BOTTOM_BAR_ID = 'log-tab-bar';
 
+const TILTPROOF_HOST = 'https://tiltproof.poker';
+
 /**
  * Where each app lives. `log.poker` is the family's front door and Log itself
  * is under /app, so a link meant to open the app has to say so.
+ *
+ * **TiltProof is laid out the same way, and that turns out to be load-bearing.**
+ * It serves a landing page at `/`, the app under `/app` and `/app/*`, and
+ * answers everything else with the app shell under a 404. So `tiltproof` is the
+ * front door -- the right thing for a cross-promo card, which wants the landing
+ * page -- and anything meant to open a *screen* in that app has to go through
+ * `tiltproofApp`.
+ *
+ * Kept as two entries rather than one because a link that drops the prefix does
+ * not fail loudly. It renders "That page does not exist", which is how the
+ * hand-off at `/drill?hand=...` stayed broken for its whole shipped life.
+ * Neither repository had the prefix written down anywhere, which is most of why
+ * nobody caught it, so it is written down here.
  */
 export const FAMILY_LINKS = {
   untilt: 'https://untilt.poker',
-  tiltproof: 'https://tiltproof.poker',
+  tiltproof: TILTPROOF_HOST,
+  tiltproofApp: `${TILTPROOF_HOST}/app`,
   log: 'https://log.poker/app',
 } as const;
 

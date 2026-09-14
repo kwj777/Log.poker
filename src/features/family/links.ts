@@ -16,7 +16,7 @@
  */
 
 import { FAMILY_LINKS } from '../../config';
-import { isBoard, toHandClass } from '../../domain/handNotation';
+import { cardsToNotation, isBoard, parseNotation, toHandClass } from '../../domain/handNotation';
 import type { Hand, Position } from '../../domain/types';
 
 export interface DrillHandOff {
@@ -27,28 +27,82 @@ export interface DrillHandOff {
 }
 
 /**
+ * The screen on the far side of the hand-off, written out in full.
+ *
+ * Two things are pinned here and both were wrong at once, which is why this is
+ * a constant with a test on it rather than a literal inside a template string.
+ * The `/app` prefix is TiltProof's, recorded beside `FAMILY_LINKS`; `/review`
+ * is the route, and it is the only one this hand-off may use. `/drill` was
+ * neither: not under the prefix, and not a route in either place, since
+ * TiltProof's `app/drill/[mode].tsx` wants a mode segment and does not count
+ * `review` among its modes.
+ *
+ * Pinned for the same reason `RESET_MEDITATION_ID` is. The far side answers an
+ * address it does not have with its own 404, so getting this wrong costs a
+ * player the whole feature and costs this app no error at all.
+ */
+export const TILTPROOF_REVIEW = `${FAMILY_LINKS.tiltproofApp}/review`;
+
+/**
+ * Positions TiltProof's review spells differently from Log's record.
+ *
+ * Eight of the nine in `POSITIONS` are already the short form that side reads.
+ * `UTG1` is the ninth, over there it is `UTG+1`, and a position that side does
+ * not know is shown back to the player as typed rather than refused. So the
+ * mismatch would be invisible from here and wrong on one seat in nine.
+ */
+const REVIEW_POSITIONS: Partial<Record<Position, string>> = { UTG1: 'UTG+1' };
+
+/**
  * "Drill this in TiltProof" for a hand the player flagged as misplayed.
  *
- * Post-MVP this becomes a real hand-off -- the drill opens preloaded with the
- * spot. For now it carries what it knows as query parameters so the landing
- * page can at least greet the player with the right spot, and so the link
- * shape does not have to change later.
+ * Opens TiltProof's review on the spot, which is a real hand-off rather than a
+ * greeting: `hand` and `position` are read on arrival and the player lands on
+ * the hand they logged. Unknown parameters are ignored over there rather than
+ * refused, so this can carry more than the review reads today without the link
+ * breaking; `hand` is the one it cannot do without.
+ *
+ * **The exact cards, not the class.** Log stores `AsKd` and knows it, so
+ * sending `AKo` throws away something it already has: a class is twelve
+ * holdings, and the suits are what decide card removal and whether a board the
+ * player types is even legal -- nobody holds `AhKs` on a board with the king of
+ * spades in it. Sent as a class the review has to stop and ask which suits
+ * these were. Sent whole, that screen never appears. The class stays on the
+ * return value because the *label* wants it: "Drill AKo in TiltProof" is what a
+ * person calls the hand.
  *
  * **The board is what makes it a spot rather than a holding.** `AKo` on the
  * button is a preflop class and there is only so much to drill about it; `AKo`
  * on the button on a king-high flop is a decision somebody made. Sent only
  * when it is a board -- a half-typed one would describe a runout that did not
  * happen, and the far side has no way to tell.
+ *
+ * **The note deliberately does not cross.** It is free text a player wrote
+ * about their own play, a query string lands in browser history and in every
+ * log that sees the URL, and the review works without it. Same call, for the
+ * same reason, as keeping the mood score out of `resetHandOff`.
+ *
+ * Worth knowing and not enforced here: the review is postflop only, because it
+ * grades against a range written on the screen and preflop that is 1,712,304
+ * runouts per combination rather than 990. A hand that ended preflop still
+ * opens the link; the player just cannot finish the review. Whether Log should
+ * offer the hand-off on such a hand at all is a question for `HandRow`, not for
+ * the URL builder.
  */
 export const drillHandOff = (hand: Pick<Hand, 'holeCards' | 'board' | 'position'>): DrillHandOff => {
-  const handClass = toHandClass(hand.holeCards);
+  const cards = parseNotation(hand.holeCards);
+  const holding = cards !== null && cards.length === 2 ? cardsToNotation(cards) : null;
+  const handClass = toHandClass(holding);
+
   const params = new URLSearchParams({ source: 'log' });
-  if (handClass !== null) params.set('hand', handClass);
-  if (hand.position !== null) params.set('position', hand.position as Position);
+  if (holding !== null) params.set('hand', holding);
+  if (hand.position !== null) {
+    params.set('position', REVIEW_POSITIONS[hand.position] ?? hand.position);
+  }
   if (isBoard(hand.board)) params.set('board', hand.board as string);
 
   return {
-    url: `${FAMILY_LINKS.tiltproof}/drill?${params.toString()}`,
+    url: `${TILTPROOF_REVIEW}?${params.toString()}`,
     label: handClass === null ? 'Drill this spot in TiltProof' : `Drill ${handClass} in TiltProof`,
     handClass,
   };

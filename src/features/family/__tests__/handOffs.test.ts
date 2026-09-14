@@ -10,13 +10,20 @@
  * `endpoint.test.ts` reads the function it cannot call: this repository has no
  * component renderer. What is read is one property, and it is the property the
  * whole feature is safe or unsafe on.
+ *
+ * The TiltProof block below is the other half of that argument and was learned
+ * the expensive way. `drillHandOff` pointed at an address that app has never
+ * served, for the whole time it shipped, and nothing here noticed -- a wrong URL
+ * raises nothing on this side and renders a 404 on the far one. So the emitted
+ * address and the whole parameter set are pinned literally, not sampled.
  */
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { FAMILY_LINKS } from '../../../config';
-import { RESET_MEDITATION_ID, drillHandOff, resetHandOff } from '../links';
+import { POSITIONS } from '../../../domain/types';
+import { RESET_MEDITATION_ID, TILTPROOF_REVIEW, drillHandOff, resetHandOff } from '../links';
 
 const source = (...parts: string[]): string =>
   readFileSync(join(__dirname, '..', '..', '..', '..', ...parts), 'utf8');
@@ -52,31 +59,107 @@ describe('the sixty-second reset', () => {
     expect(resetHandOff().label).toMatch(/sixty seconds/i);
     expect(resetHandOff().label).not.toMatch(/\$|\b(buy|try|upgrade|unlock)\b/i);
   });
+});
 
-  it('and the drill hand-off still carries the hand it was given', () => {
-    const handOff = drillHandOff({ holeCards: 'AsKd', board: null, position: 'BTN' });
+describe('the TiltProof hand-off', () => {
+  const spot = (over: Partial<Parameters<typeof drillHandOff>[0]> = {}) =>
+    drillHandOff({ holeCards: 'AsKd', board: null, position: 'BTN', ...over });
+
+  const query = (over?: Partial<Parameters<typeof drillHandOff>[0]>) =>
+    new URL(spot(over).url).searchParams;
+
+  it('lands on the review, under the /app prefix that is TiltProof’s app', () => {
+    // Both halves of this were wrong at once and each alone was enough to break
+    // it: `/drill` is not a route over there, and nothing outside `/app` reaches
+    // that app at all -- it answers with its own 404. Pinned whole, because a
+    // wrong address here fails silently on the far side and never here.
+    expect(TILTPROOF_REVIEW).toBe('https://tiltproof.poker/app/review');
+
+    const url = new URL(spot().url);
+    expect(url.origin).toBe(FAMILY_LINKS.tiltproof);
+    expect(url.pathname).toBe('/app/review');
+  });
+
+  it('sends the exact cards, because Log has them and a class is twelve hands', () => {
+    // The suits are not decoration: they decide card removal, and they decide
+    // whether a board the player types is even legal -- nobody holds `AhKs` on a
+    // board containing the king of spades. Sent as `AKo` the review has to stop
+    // and ask which twelve it was.
+    expect(query().get('hand')).toBe('AsKd');
+    expect(query({ holeCards: 'Th9h' }).get('hand')).toBe('Th9h');
+    expect(query({ holeCards: '7c7d' }).get('hand')).toBe('7c7d');
+  });
+
+  it('and never the class, which is the shape this used to send', () => {
+    expect(query().get('hand')).not.toBe('AKo');
+    expect(query({ holeCards: 'Th9h' }).get('hand')).not.toBe('T9s');
+  });
+
+  it('still calls the hand what a person calls it, in the label', () => {
+    // The class is the right thing to say out loud even though it is the wrong
+    // thing to send, so it stays on the return value for the label's sake.
+    const handOff = spot();
     expect(handOff.handClass).toBe('AKo');
-    expect(new URL(handOff.url).searchParams.get('hand')).toBe('AKo');
-    expect(new URL(handOff.url).searchParams.get('position')).toBe('BTN');
+    expect(handOff.label).toBe('Drill AKo in TiltProof');
+  });
+
+  it('says nothing about a hand it was never given', () => {
+    // The far side answers a link with no hand with "That link is missing the
+    // hand", which is the honest outcome: a hand logged without cards has no
+    // spot to review.
+    expect(query({ holeCards: null }).get('hand')).toBeNull();
+    expect(spot({ holeCards: null }).handClass).toBeNull();
+    expect(spot({ holeCards: null }).label).toBe('Drill this spot in TiltProof');
+  });
+
+  it('spells every seat Log can record the way the review reads it', () => {
+    // Eight of the nine already match. `UTG1` is the ninth, and a position that
+    // side does not know is shown back as typed rather than refused, so the
+    // mismatch would never surface from here. Looped over `POSITIONS` so adding
+    // a tenth seat has to answer this question too.
+    const understood = ['UTG', 'UTG+1', 'MP', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+    for (const position of POSITIONS) {
+      expect(understood).toContain(query({ position }).get('position'));
+    }
+    expect(query({ position: 'UTG1' }).get('position')).toBe('UTG+1');
+    expect(query({ position: 'BTN' }).get('position')).toBe('BTN');
+
+    // And percent-encoded on the wire, which is not a detail to tidy away: a
+    // raw `+` in a query string decodes as a space, so `UTG+1` written out
+    // literally arrives as `UTG 1`. `URLSearchParams` gets this right and
+    // hand-built string concatenation is where it would stop being right.
+    expect(spot({ position: 'UTG1' }).url).toContain('position=UTG%2B1');
   });
 
   it('carries the board too, which is what makes it a spot', () => {
     // `AKo` on the button is a holding. `AKo` on the button on a king-high
     // flop is a decision somebody made, which is the thing there is to drill.
-    const handOff = drillHandOff({ holeCards: 'AsKd', board: '7c2sKh', position: 'BTN' });
-    expect(new URL(handOff.url).searchParams.get('board')).toBe('7c2sKh');
+    expect(query({ board: '7c2sKh' }).get('board')).toBe('7c2sKh');
   });
 
   it('but never a half-typed one, which would describe a runout that did not happen', () => {
     // Two cards is somebody who stopped tapping, and the far side has no way
     // to tell that from a flop.
-    const handOff = drillHandOff({ holeCards: 'AsKd', board: '7c2s', position: 'BTN' });
-    expect(new URL(handOff.url).searchParams.get('board')).toBeNull();
+    expect(query({ board: '7c2s' }).get('board')).toBeNull();
   });
 
   it('and says nothing about a board when there is none', () => {
-    const handOff = drillHandOff({ holeCards: 'AsKd', board: null, position: 'BTN' });
-    expect(new URL(handOff.url).searchParams.get('board')).toBeNull();
+    expect(query().get('board')).toBeNull();
+  });
+
+  it('puts nothing in the address the player wrote about their own play', () => {
+    // The note is optional over there and this is Log's call, not TiltProof's:
+    // a query string lands in a browser history and in every log that sees the
+    // URL, and the review works without it. Same reasoning as keeping the mood
+    // score out of `resetHandOff`, and pinned as the whole set of parameters so
+    // that adding one later is a decision somebody makes rather than a default.
+    const keys = [...query({ board: '7c2sKh' }).keys()].sort();
+    expect(keys).toEqual(['board', 'hand', 'position', 'source']);
+    expect(spot({ board: '7c2sKh' }).url).not.toMatch(/note/i);
+  });
+
+  it('says where it came from', () => {
+    expect(query().get('source')).toBe('log');
   });
 });
 

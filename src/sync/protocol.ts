@@ -267,6 +267,14 @@ export type SyncFailure =
   | 'unauthorized'
   /** Asked too often, or sent more than the endpoint will read. */
   | 'refused'
+  /**
+   * Sync is in the pass and this claim has not bought it.
+   *
+   * Its own reason rather than folded into `unauthorized`, because the two
+   * want opposite things from the person reading them: one is fixed by signing
+   * in again and the other is not fixed by anything this device can do.
+   */
+  | 'unpaid'
   /** No network, a timeout, or an answer that was not the shape promised. */
   | 'unreachable';
 

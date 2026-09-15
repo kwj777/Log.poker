@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { SignInFailure } from '../../../auth/signin';
+import { SUBJECT_PASSCODE, type Claim } from '../../../auth/token';
 import {
   CODE_SENT,
   ERASE_CONFIRM,
@@ -139,8 +140,24 @@ describe('what it says when something fails', () => {
 });
 
 describe('what it says once somebody is signed in', () => {
+  /**
+   * `describeSession` takes the session rather than a boolean now, because
+   * there are two ways to answer no and they want different sentences: a
+   * subject that is not this person's, and a tier that has not paid. It is
+   * handed both so it can tell them apart rather than guessing.
+   */
+  const sessionOf = (syncs: boolean, over: Partial<Claim> = {}): { claim: Claim; syncs: boolean } => ({
+    syncs,
+    claim: {
+      expiresAt: 1_800_000_000_000,
+      tier: 'free',
+      subject: 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4',
+      ...over,
+    },
+  });
+
   it('says what a session carries, and that it carries it for nothing', () => {
-    const said = describeSession(true);
+    const said = describeSession(sessionOf(true));
     expect(said).toMatch(/history follows you/i);
     expect(said).toMatch(/no charge/i);
     expect(said).not.toMatch(/\$\s*\d/);
@@ -150,7 +167,7 @@ describe('what it says once somebody is signed in', () => {
     // The false branch used to mean "has not bought". Copy that still pointed
     // at the other two apps would be selling something that is not for sale,
     // to somebody whose problem is that their subject is not theirs.
-    const said = describeSession(false);
+    const said = describeSession(sessionOf(false, { subject: SUBJECT_PASSCODE }));
     expect(said).toMatch(/address of your own/i);
     expect(said).not.toMatch(/\$\s*\d/);
     expect(said).not.toMatch(/buy|purchase|pay|upgrade|other two/i);
@@ -164,10 +181,29 @@ describe('what it says once somebody is signed in', () => {
     // it wanted to, so naming either one is a coin flip that reads as a
     // statement of fact. It used to name the passcode, which was right while
     // that was the only way in.
-    const said = describeSession(false);
+    const said = describeSession(sessionOf(false, { subject: SUBJECT_PASSCODE }));
     expect(said).not.toMatch(/passcode/i);
     // And still says the one thing both have in common, which is what to do.
     expect(said).toMatch(/signing in/i);
+  });
+
+  it('names the pass, and only for the one session it is true of', () => {
+    /**
+     * The second way to answer no, and it is reachable only once sync is in
+     * the pass: the subject really is theirs and the tier has not bought. The
+     * sentence above must not be given to this person, because "sign in with
+     * an address of your own" is advice they have already taken.
+     *
+     * It is also the one place this app says there is anything to buy, so it
+     * says what stays free in the same breath. Everything else here does.
+     */
+    const said = describeSession(sessionOf(false));
+    expect(said).toMatch(/part of the pass/i);
+    expect(said).toMatch(/free/i);
+    expect(said).not.toMatch(/address of your own/i);
+    // Still no number. The price lives in the family document and in whichever
+    // app is selling; repeating it here is a second place for it to rot.
+    expect(said).not.toMatch(/\$\s*\d/);
   });
 
   it('promises nothing leaves the device either way', () => {

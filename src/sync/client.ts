@@ -77,6 +77,11 @@ export const sync = async (
     clearTimeout(timer);
   }
 
+  // Ahead of the two below, because 402 is the one refusal that signing in
+  // again cannot mend and the copy for it says something different.
+  if (response.status === 402) {
+    return { ok: false, reason: 'unpaid' };
+  }
   if (response.status === 401 || response.status === 403) {
     return { ok: false, reason: 'unauthorized' };
   }

@@ -17,6 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import * as tokenModule from '../../auth/token';
 import { SYNC_URL } from '../client';
 import { handleSync, type BlobStore, type Surroundings } from '../endpoint';
 import { BUNDLE_VERSION, emptyChangeSet } from '../protocol';
@@ -245,9 +246,10 @@ describe('what has to be true before a byte is stored', () => {
   });
 
   it('and lets the free tier erase, as it always did', async () => {
-    // This one was already true, on an argument that has since been retired
-    // rather than won: erasing used to sit one check below a paid write, and
-    // now there is no paid check anywhere for it to sit below.
+    // True whichever way the pass switch points. The paid check came back and
+    // erasure sits above it rather than below, which is the same exemption on
+    // the same argument it was retired on: a purchase that has lapsed does not
+    // make the history behind it less theirs to remove.
     const store = fakeStore({ held: { version: BUNDLE_VERSION } });
     const answer = await handleSync(
       new Request('https://log.poker/api/sync', {
@@ -694,5 +696,91 @@ describe('saying how big the bundle was', () => {
     await post(await mint(), push(), store);
     expect(said[0]).not.toMatch(/[0-9a-f]{16,}/);
     expect(said[0]).not.toContain('log_');
+  });
+});
+
+describe('when sync is in the pass', () => {
+  /**
+   * The world `SYNC_NEEDS_PASS` turns on, which nothing in the app reaches
+   * today because the switch is false.
+   *
+   * Spied rather than mocked wholesale, so every other rule in this file stays
+   * the real one and the only thing that moves is the answer to "has this
+   * person paid". The rule itself is `syncIsPaidFor`, checked against both
+   * answers in `token.test.ts`; this is about what the endpoint does with it.
+   */
+  let gate: ReturnType<typeof jest.spyOn>;
+
+  beforeEach(() => {
+    gate = jest
+      .spyOn(tokenModule, 'paidForSync')
+      .mockImplementation((claim) => claim !== null && claim.tier === 'full');
+  });
+
+  afterEach(() => {
+    gate.mockRestore();
+  });
+
+  it('refuses a write from a tier that has not bought', async () => {
+    const store = fakeStore();
+    const answer = await post(
+      await mint({ tier: 'free' }),
+      push({ venues: [venue('venue-unpaid')] }),
+      store,
+    );
+
+    expect(answer.status).toBe(402);
+    expect(await answer.json()).toEqual({ error: 'unpaid' });
+    // Before the expensive half, and before anything lands.
+    expect(store.writes).toHaveLength(0);
+    expect(JSON.stringify(store.held)).not.toContain('venue-unpaid');
+  });
+
+  it('says 402 and not 403, because the two want different sentences', async () => {
+    /**
+     * 403 is what a subject that is not this person's gets, and the app turns
+     * that into "sign in again". Signing in again is exactly what will not
+     * mend a tier that has not bought, so sending this person round that loop
+     * would be advice that cannot work.
+     */
+    const store = fakeStore();
+    const unpaid = await post(await mint({ tier: 'free' }), push(), store);
+    const foreign = await post(await mint({ subject: 'passcode' }), push(), store);
+
+    expect(unpaid.status).toBe(402);
+    expect(foreign.status).toBe(403);
+  });
+
+  it('still lets that tier erase, which is the exemption that came back', async () => {
+    /**
+     * The one refusal this endpoint must never make. Gating DELETE would leave
+     * somebody a bucket they can neither read nor empty, and the argument for
+     * exempting it was retired rather than beaten when the old paid check went
+     * away: a purchase that has lapsed does not make the history behind it
+     * less theirs to remove.
+     */
+    const store = fakeStore({ held: { version: BUNDLE_VERSION } });
+    const answer = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${await mint({ tier: 'free' })}` },
+      }),
+      world(store),
+    );
+
+    expect(answer.status).toBe(204);
+    expect(store.erased).toBe(1);
+  });
+
+  it('serves a tier that has bought, exactly as it did before', async () => {
+    const store = fakeStore();
+    const answer = await post(
+      await mint({ tier: 'full' }),
+      push({ venues: [venue('venue-paid')] }),
+      store,
+    );
+
+    expect(answer.status).toBe(200);
+    expect(JSON.stringify(store.held)).toContain('venue-paid');
   });
 });

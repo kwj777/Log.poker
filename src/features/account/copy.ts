@@ -25,6 +25,7 @@
  */
 
 import type { SignInFailure } from '../../auth/signin';
+import { hasOwnSubject, SYNC_NEEDS_PASS, type Claim } from '../../auth/token';
 
 /** Which half of the flow is on screen. The same failure reads differently. */
 export type Stage = 'email' | 'code';
@@ -93,6 +94,12 @@ export const describeSync = (state: {
   if (state.problem === 'unauthorized') {
     return 'Sync has stopped: this device needs to sign in again.';
   }
+  // Its own line, because the one above it is advice and this one is not:
+  // signing in again is exactly what will not help, and sending somebody round
+  // that loop is worse than telling them the truth.
+  if (state.problem === 'unpaid') {
+    return 'Carrying your history between devices is part of the pass. Everything you have logged is still on this device.';
+  }
   if (state.problem !== null) {
     const waiting = state.pending === 1 ? '1 change is' : `${state.pending} changes are`;
     return `Could not reach the sync. ${waiting} waiting, and nothing is lost.`;
@@ -105,9 +112,12 @@ export const describeSync = (state: {
 /**
  * What a held session is worth, said without a number or a SKU.
  *
- * There is no number to say. Cross-device history is free, so the false branch
- * is not somebody who has not paid, and the words have to say that rather than
- * imply a price.
+ * There is still no number to say, and now there are two false branches rather
+ * than one. A subject that is not this person's has nothing to do with money
+ * and must never be shown a price. A tier that has not bought has, and is told
+ * so in words rather than in a figure: the price lives in the family document
+ * and in whichever app is selling, and repeating it here is one more place for
+ * it to rot.
  *
  * **It also does not say which reason it is**, and that is deliberate rather
  * than vague. There are two now. A shared passcode names a door rather than a
@@ -119,10 +129,24 @@ export const describeSync = (state: {
  * in common is the only thing worth saying: no history of their own here yet,
  * and the way to start one. See SYNC.md, "One identity for three apps".
  */
-export const describeSession = (syncs: boolean): string =>
-  syncs
-    ? 'Signed in. Your history follows you to your other devices, at no charge.'
-    : 'This sign-in does not carry a history of its own. Carrying yours between devices needs signing in here with an address of your own.';
+export const describeSession = (session: { claim: Claim; syncs: boolean }): string => {
+  if (session.syncs) {
+    // "At no charge" is a promise, so it is made only while it is true. With
+    // sync in the pass a signed-in syncing device has paid, and telling them
+    // it costs nothing is the kind of small lie that makes the rest suspect.
+    return SYNC_NEEDS_PASS
+      ? 'Signed in. Your history follows you to your other devices.'
+      : 'Signed in. Your history follows you to your other devices, at no charge.';
+  }
+  // The second reason, and it only exists once sync is in the pass: the
+  // subject is genuinely theirs, and the tier is not. Naming the pass here is
+  // the one place the app says there is something to buy, and it says what
+  // stays free in the same breath, because all of it does.
+  if (hasOwnSubject(session.claim)) {
+    return 'Signed in. Carrying your history between devices is part of the pass. Everything else here is free and stays that way.';
+  }
+  return 'This sign-in does not carry a history of its own. Carrying yours between devices needs signing in here with an address of your own.';
+};
 
 /* --------------------------------------------------------------- erasing */
 

@@ -335,6 +335,21 @@ describe('what it says a 403 means', () => {
     expect(advice).not.toMatch(/free tier cannot/i);
   });
 
+  it('explains the refusal that is about money, separately from the one that is not', () => {
+    /**
+     * The tier question came back, as a 402 in front of the two methods that
+     * move data. It is a different answer from the 403 above on purpose, and
+     * somebody running this from a terminal needs to be told which they got:
+     * one is the key or the subject, and the other is neither.
+     */
+    const paid = script.slice(script.indexOf('if (status === 402) {'), script.indexOf('if (status === 503'));
+    expect(paid).toContain('402');
+    expect(paid).toMatch(/tier/i);
+    // And the asymmetry, because it is the fastest way to tell the two apart
+    // from outside: a write refused and a delete served is the tier, not them.
+    expect(paid).toMatch(/204|delete/i);
+  });
+
   it('because there is still only the one', () => {
     // If a second 403 ever appears in that endpoint, the advice above is
     // incomplete and this is what says so.

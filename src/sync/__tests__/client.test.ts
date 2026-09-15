@@ -62,6 +62,18 @@ describe('one round trip', () => {
     }
   });
 
+  it('reads a 402 as unpaid, which signing in again would not mend', async () => {
+    /**
+     * Its own reason rather than folded into `unauthorized`, because the copy
+     * for the two says opposite things: one tells somebody to sign in again
+     * and the other must not, since they already have and it is not the
+     * problem. Nothing answers 402 today; the endpoint only can once sync is
+     * in the pass.
+     */
+    const { fetch } = answering(402, { error: 'unpaid' });
+    expect(await sync(request, 'x', { fetch })).toEqual({ ok: false, reason: 'unpaid' });
+  });
+
   it('separates our fault from theirs, because the loop treats them differently', async () => {
     const refused = answering(400, { error: 'refused' });
     expect(await sync(request, 'x', { fetch: refused.fetch })).toEqual({

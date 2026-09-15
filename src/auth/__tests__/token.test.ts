@@ -13,7 +13,7 @@
 
 import { createHmac } from 'node:crypto';
 
-import { RENEW_WITHIN_MS, dueForRenewal, SUBJECT_PASSCODE, TIERS, hasOwnSubject, readClaim, type Tier } from '../token';
+import { RENEW_WITHIN_MS, dueForRenewal, paidForSync, SUBJECT_PASSCODE, SYNC_NEEDS_PASS, syncIsPaidFor, TIERS, hasOwnSubject, readClaim, type Claim, type Tier } from '../token';
 
 const NOW = 1_700_000_000_000;
 const SECRET = 'test-gate-secret';
@@ -179,5 +179,47 @@ describe('whether a token is due to be replaced', () => {
 
   it('and is not, for no claim at all', () => {
     expect(dueForRenewal(null, NOW)).toBe(false);
+  });
+});
+
+describe('what sync costs', () => {
+  const claimOf = (tier: Tier): Claim => ({
+    expiresAt: 1_800_000_000_000,
+    tier,
+    subject: 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4',
+  });
+
+  it('is nothing today, for everybody, whatever their tier says', () => {
+    /**
+     * The claim the whole feature rests on. `SYNC_NEEDS_PASS` is false because
+     * this app cannot yet find out who has paid: its own door mints the free
+     * tier for every sign-in and refuses to renew anything else, so a live
+     * gate would refuse sync to the people who signed in here, buyers
+     * included. Written out rather than read off the constant, so a change to
+     * it has to change a test that says so.
+     */
+    expect(SYNC_NEEDS_PASS).toBe(false);
+    expect(paidForSync(claimOf('free'))).toBe(true);
+    expect(paidForSync(claimOf('full'))).toBe(true);
+    expect(paidForSync(null)).toBe(true);
+  });
+
+  it('is the pass, when the switch says so', () => {
+    expect(syncIsPaidFor(true, claimOf('full'))).toBe(true);
+    expect(syncIsPaidFor(true, claimOf('free'))).toBe(false);
+    expect(syncIsPaidFor(true, null)).toBe(false);
+  });
+
+  it('and is nothing when it does not, which is the same rule read twice', () => {
+    for (const tier of TIERS) expect(syncIsPaidFor(false, claimOf(tier))).toBe(true);
+    expect(syncIsPaidFor(false, null)).toBe(true);
+  });
+
+  it('answers whatever the switch is set to, so the two cannot drift', () => {
+    // The one assertion tying the bound form to the rule. Without it the
+    // constant could be flipped and `paidForSync` go on ignoring it.
+    for (const tier of TIERS) {
+      expect(paidForSync(claimOf(tier))).toBe(syncIsPaidFor(SYNC_NEEDS_PASS, claimOf(tier)));
+    }
   });
 });

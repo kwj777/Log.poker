@@ -1042,7 +1042,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 53 passed
-Tests:       1485 passed
+Tests:       1496 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1053,33 +1053,33 @@ Tests:       1485 passed
   sessionImport      52   reading a session-summary export
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   syncingRepository  48   two devices and one server, no fakes in between
+  endpoint           46   the sync endpoint, end to end
   stats              45   P/L, rebuys, duration, win rate, groupings
   verify             44   checking a token, and every way past it that must not work
-  endpoint           42   the sync endpoint, end to end
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
+  copy               33   what the sign-in and the sync are allowed to say
   blog               32   the post grammar, the share cards, and what it refuses
-  copy               32   what the sign-in and the sync are allowed to say
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
   palette            27   the theme matches BRAND.md
   migrations         26   a filled v2 database walked forward, both engines
+  token              25   the family token grammar, against signed fixtures
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
   sessionExport      22   the log written out, and read back by the importer
   handOffs           21   where a hand-off goes, and what the mid-session card says
-  token              21   the family token grammar, against signed fixtures
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
-  gateCheck          18   the key-on-the-site script, run rather than read
+  gateCheck          19   the key-on-the-site script, run rather than read
   money              18   cents arithmetic, parsing, formatting
   seed               17   the demo dataset stays coherent
   signin             16   the sign-in client, against a fake fetch
-  client             14   the sync client, against a fake fetch
+  client             15   the sync client, against a fake fetch
   observe            14   how big the bundle was, said without saying whose
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone

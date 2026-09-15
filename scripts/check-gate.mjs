@@ -250,16 +250,36 @@ const explain = (status, body, minted) => {
       'token, which is the question this script exists to answer, and a 403 has',
       'answered it. What the token was refused for is who it names.',
       '',
-      'Two subjects are refused, and neither is about the tier: cross-device',
-      'history is free and nothing reads it. The shared `passcode` subject has no',
+      'Two subjects are refused, and neither is about the tier: a 403 is always',
+      'about who the token names. What sync costs answers 402, below. The shared',
+      '`passcode` subject has no bucket of its own by design. And a subject',
       'bucket of its own by design. And a subject from another door in the family',
-      'is refused too, which is what a token from Untilt now is: the two doors',
-      'mint different subjects for one person, and taking both put somebody a',
-      'history in a bucket nothing would ask for again.',
+      'from another door in the family is refused too, which is what a token',
+      'from Untilt now is: the two doors mint different subjects for one person,',
+      'and taking both put somebody a history in a bucket nothing would ask for',
+      'again.',
       '',
       'So under `--signin-origin https://untilt.poker` a 403 is the pass, not the',
       'failure. It proves the key is the one Untilt signs with. A 401 there would',
       'be the failure.',
+    ];
+  }
+
+  if (status === 402) {
+    return [
+      'The signature verified and the subject is this person\'s own. **The key on',
+      'the site is the key that signed this token**, which is the question this',
+      'script exists to answer, and a 402 has answered it.',
+      '',
+      'What was refused is the tier. Sync is in the pass, and this claim carries',
+      '`free`. Note which door minted the token: this app mints the free tier for',
+      'every sign-in it makes and cannot find out who has bought, so a token from',
+      'this door answers 402 by construction once the gate is on. A paid claim is',
+      'one Untilt minted.',
+      '',
+      'Erasure is deliberately not behind this, so DELETE on the same token is',
+      'still 204. If a write says 402 and a delete says 403, the subject is the',
+      'problem and not the tier.',
     ];
   }
 

@@ -20,11 +20,17 @@
  *   Somewhere to put it.    No store configured, no sync, and it says so
  *                           rather than pretending.
  *
- * **There is no fourth check, and there used to be.** A write sat behind the
- * paid tier and a free one got 403. Cross-device history is free now, so a
- * verified token with a subject of its own is the whole condition: the same
- * three for a read, a write and an erasure, and nothing on this path reads
- * `claim.tier`.
+ * **And a fourth, in front of the two that move data.** A write and a read sit
+ * behind the pass, which `FAMILY-PRICING.md` rules Log's sync into. It is off:
+ * `paidForSync` answers yes to everybody while `SYNC_NEEDS_PASS` is false, and
+ * that is false because this app cannot yet find out who has bought. See
+ * `token.ts` for why, which is its own door minting the free tier for every
+ * sign-in it makes.
+ *
+ * **Erasure is not behind it**, and that is the one asymmetry here worth
+ * defending. A person must always be able to empty their own bucket, whatever
+ * they have or have not paid, or a refusal leaves them a copy of their whole
+ * poker history they can neither read nor remove.
  *
  * The bucket is an HMAC of the subject, so the store never holds a customer id.
  * What is in there is somebody's whole poker history, which is the most
@@ -45,6 +51,7 @@ import { mergeIntoBundle } from './bundle';
 import { countRecords, describe, observe } from './observe';
 import { rateCheck, readWindow } from './rateLimit';
 import { BUNDLE_VERSION } from './protocol';
+import { paidForSync } from '../auth/token';
 import { bearerFrom, bucketFor, checkToken, hasOwnBucket } from './verify';
 
 /** What this needs from a blob store, and nothing more. */
@@ -222,6 +229,27 @@ export const handleSync = async (
     }
     return json(null, 204);
   }
+
+  /**
+   * The pass, and only in front of the halves that move data.
+   *
+   * Below the erasure above it, deliberately. That exemption existed once and
+   * was retired when the tier check went away, on the note that it was "retired
+   * rather than won": the argument was that a purchase which has lapsed does not
+   * make the history behind it less theirs to remove, and it was never beaten,
+   * only made moot. It is not moot again. Gating DELETE would leave somebody a
+   * bucket they can neither read nor empty, which is the one shape of refusal
+   * this endpoint should never take.
+   *
+   * 402 rather than 403, and its own error rather than `forbidden`, because
+   * "not you" and "not bought" are different sentences to the person reading
+   * them and only one of them is mended by signing in again.
+   *
+   * Nothing reaches this today: `paidForSync` answers true for everybody while
+   * `SYNC_NEEDS_PASS` is false, and it is false because this app cannot yet
+   * find out who has paid. See `token.ts`.
+   */
+  if (!paidForSync(claim)) return json({ error: 'unpaid' }, 402);
 
   if (request.method !== 'POST') return json({ error: 'method' }, 405);
 

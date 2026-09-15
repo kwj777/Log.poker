@@ -168,11 +168,14 @@ export const verifyToken = async (
  * exemption is reachable only by somebody who is not yet stranded and has no
  * reason to use it, and unreachable by everybody it was written for.
  *
- * **This is the whole of who may sync.** There used to be a second question
- * below it, asking whether the tier had paid, and it is gone: cross-device
- * history is free, so a verified token with a subject of its own is the entire
- * condition for reading, writing and erasing alike. Nothing here reads
- * `claim.tier`.
+ * **This is the whole of who this bucket belongs to, and nothing about what
+ * they have paid.** The tier question came back, and it is deliberately not
+ * here: this predicate answers identity, it guards reading, writing and
+ * erasing alike, and erasing must never be refused to somebody whose bucket it
+ * is. What sync costs is `paidForSync` in `token.ts`, asked once in
+ * `endpoint.ts` and in front of the two methods that move data. Nothing in
+ * this file reads `claim.tier`, and that is a division of labor rather than an
+ * omission.
  */
 export const hasOwnBucket = (claim: Claim | null): claim is Claim =>
   claim !== null && claim.subject !== SUBJECT_PASSCODE && OWN_SUBJECT.test(claim.subject);

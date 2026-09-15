@@ -17,7 +17,7 @@
  */
 
 import type { Timestamp } from '../domain/types';
-import { dueForRenewal, hasOwnSubject, readClaim, type Claim } from './token';
+import { dueForRenewal, hasOwnSubject, paidForSync, readClaim, type Claim } from './token';
 
 /**
  * Somewhere to keep one string.
@@ -51,10 +51,16 @@ export const memoryTokenStore = (): TokenStore => {
 export interface Session {
   claim: Claim;
   /**
-   * Whether this session has a log of its own to carry.
+   * Whether this session carries a log between devices.
    *
-   * Not a purchase. Cross-device history is free; this is false only for a
-   * shared passcode, which names a door rather than a person.
+   * Two conditions now, where there was one. A subject of its own, which a
+   * shared passcode does not have because it names a door rather than a
+   * person. And whatever sync costs, which is nothing while `SYNC_NEEDS_PASS`
+   * is false and is the pass once it is not.
+   *
+   * Read by `data/index.ts` to decide whether to wrap the repository at all,
+   * so a false answer here is a device that never asks rather than one that
+   * asks and is turned away.
    */
   syncs: boolean;
 }
@@ -96,7 +102,7 @@ export class SessionManager {
       await this.store.clear();
       return null;
     }
-    return { claim, syncs: hasOwnSubject(claim) };
+    return { claim, syncs: hasOwnSubject(claim) && paidForSync(claim) };
   }
 
   /**
@@ -111,7 +117,7 @@ export class SessionManager {
     if (claim === null) return null;
     this.generation += 1;
     await this.store.write(token);
-    return { claim, syncs: hasOwnSubject(claim) };
+    return { claim, syncs: hasOwnSubject(claim) && paidForSync(claim) };
   }
 
   /**

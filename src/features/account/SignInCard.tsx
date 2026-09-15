@@ -194,7 +194,7 @@ export const SignInCard = () => {
     return (
       <Card>
         <Text color={colors.textSecondary} style={styles.body}>
-          {describeSession(session.syncs)}
+          {describeSession(session)}
         </Text>
         {syncState ? (
           <Text

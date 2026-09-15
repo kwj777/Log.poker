@@ -139,12 +139,19 @@ export const readClaim = (token: string | null, now: Timestamp): Claim | null =>
 /**
  * Whether this claim names somebody with a log of their own to carry.
  *
- * One condition, where there were two. The tier used to be the other one, and
- * removing it is the whole of making sync free: what is valuable in a tracker
- * is the player's own record, and an app that charges to read that back on a
- * second device is charging rent on their work rather than selling them
- * anything. There is no `log_plus`, there is no entitlement to check later,
- * and this function is not a gate waiting for a better one.
+ * One condition, and it is identity. The tier was the other one once, it was
+ * removed, and it is back beside this rather than inside it: see
+ * `paidForSync` below, which is the question about money and is asked
+ * separately so that this one can go on guarding erasure too.
+ *
+ * The argument that removed it is worth keeping rather than quietly losing,
+ * because it is still true and it is what the price has to be worth beating:
+ * what is valuable in a tracker is the player's own record, and an app that
+ * charges to read that back on a second device is charging rent on their work
+ * rather than selling them anything. `FAMILY-PRICING.md` has ruled the other
+ * way, that sync is inside the $99. What answers the argument is that the
+ * whole of the tracker stays free and only the carrying is bought, and that
+ * nobody is ever refused the right to empty their own bucket.
  *
  * What is left was never about money. **A passcode holder has no subject of
  * their own**: everybody who typed one shares the literal string, so carrying
@@ -186,3 +193,51 @@ export const dueForRenewal = (claim: Claim | null, now: Timestamp): boolean =>
  */
 export const hasOwnSubject = (claim: Claim | null): boolean =>
   claim !== null && claim.subject !== SUBJECT_PASSCODE && OWN_SUBJECT.test(claim.subject);
+
+/**
+ * Whether cross-device sync sits behind the pass.
+ *
+ * `FAMILY-PRICING.md` rules that Log's sync and goals are inside the $99. This
+ * is the switch that makes that true here, and it is off, because this app
+ * cannot yet find out who has paid.
+ *
+ * `signinEndpoint` mints `tier: 'free'` for every sign-in made at this app's
+ * own door, and says why in as many words: a paid claim is Untilt's to extend,
+ * because Untilt is the one that can ask Stripe whether it is still true. It
+ * also refuses to renew anything but free. So a live gate today would refuse
+ * sync to everybody who signed in here, the people who have paid included, and
+ * would hold them to a token this door will not renew. That is not the feature,
+ * it is the feature with its own front door shut.
+ *
+ * What has to exist first is the shared entitlement the family brief makes step
+ * 4: a way for this app to learn, for an address that just signed in here, that
+ * somebody bought. Until then everything that reads this is built, wired and
+ * tested against both answers, and the answer is false.
+ *
+ * Annotated `boolean` rather than left to infer `false`, so both branches stay
+ * code the compiler checks.
+ */
+export const SYNC_NEEDS_PASS: boolean = false;
+
+/**
+ * The rule, given whether sync is gated. One rule, one place.
+ *
+ * One place because two sides read it and they are not allowed to disagree:
+ * `hasOwnSubject` above already explains what a device that answers yes on the
+ * client and no on the server does, which is sync into a wall of refusals and
+ * halt. The client reads this to decide whether to wrap the repository at all,
+ * and `endpoint.ts` reads it to decide whether to serve the request, so there
+ * is no gap between what the app promises and what the server answers.
+ */
+export const syncIsPaidFor = (gated: boolean, claim: Claim | null): boolean =>
+  !gated || (claim !== null && claim.tier === 'full');
+
+/**
+ * The same rule with the switch applied, which is what both sides call.
+ *
+ * Split from `syncIsPaidFor` above so the gated answer can be tested without
+ * mocking a constant: a test that mocked the export would not change what this
+ * function reads, because the binding it closes over is the module's own.
+ */
+export const paidForSync = (claim: Claim | null): boolean =>
+  syncIsPaidFor(SYNC_NEEDS_PASS, claim);

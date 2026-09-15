@@ -1257,13 +1257,26 @@ there is no shared store to share: on the web the family cannot hand a token
 sideways at all. RevenueCat does not close this either, being an entitlement
 SDK rather than a browser sign-in.
 
-So a shared account on the web needs something that does not exist yet: one
-sign-in origin for the family, or a hand-off where one app redirects to another
-carrying a one-time code that is traded for a token. Both are real designs with
-their own theft surface, and neither is written. **The native half can ship
-without it**, on a keychain access group, and the web stays one sign-in per app
-until somebody designs the hand-off. That is worth deciding deliberately rather
-than discovering.
+So a shared account on the web needs something that did not exist when this was
+written: one sign-in origin for the family, or a hand-off where one app
+redirects to another carrying a one-time code that is traded for a token. Both
+are real designs with their own theft surface.
+
+**The second of the two is now written and built.** Untilt's `HANDOFF.md` is
+the design; `src/auth/handoff.ts` and `app/claim.tsx` are this app's end of it,
+and `/app/claim` is where a hand-off lands. It is switched off at the other end
+until `FAMILY_HANDOFF` is turned on there, so nothing arrives yet.
+
+Three things about it are worth having here rather than only there. The code
+travels in the URL fragment, so no server on either side writes it down. It is
+spent once and lasts ninety seconds. And **nothing that fails signs anybody
+out**: a hand-off that does not work leaves this device exactly as it was, with
+the ordinary sign-in one screen away, because Untilt answers an outage with a
+refusal rather than a free token and this end carries that through.
+
+**The native half can still ship without any of it**, on a keychain access
+group. A code in a URL fragment is a browser mechanism, and the native hand-off
+is a different design with a different threat model that nobody has written.
 
 ### One person, two subjects, and the door that is closed now
 

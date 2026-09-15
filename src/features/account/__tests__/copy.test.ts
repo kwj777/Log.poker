@@ -19,6 +19,7 @@ import { join } from 'node:path';
 
 import type { SignInFailure } from '../../../auth/signin';
 import { SUBJECT_PASSCODE, type Claim } from '../../../auth/token';
+import type { HandoffFailure } from '../../../auth/handoff';
 import {
   CODE_SENT,
   ERASE_CONFIRM,
@@ -28,6 +29,8 @@ import {
   NOTHING_LEAVES,
   describeSession,
   describeSync,
+  handoffFailed,
+  handoffWouldSwitch,
   messageFor,
 } from '../copy';
 
@@ -85,10 +88,21 @@ describe('and what nothing on this screen is allowed to say', () => {
   const shipped = (source: string): string =>
     source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-  const files = ['copy.ts', 'SignInCard.tsx'];
+  /*
+    `app/claim.tsx` is on this list although it is not in this folder, and it
+    belongs here for the reason the rule exists rather than by where it lives.
+    It is account surface: it signs somebody in, it is the one screen reached
+    by a link from an app that does charge, and it is therefore the likeliest
+    place in the whole codebase for "your purchase" to arrive by accident. It
+    did, on the first draft of it, three times.
+  */
+  const files = ['copy.ts', 'SignInCard.tsx', 'claim.tsx'];
+
+  const sourceOf = (file: string): string =>
+    file === 'claim.tsx' ? read('app', file) : read('src', 'features', 'account', file);
 
   it.each(files)('%s says nothing about having bought Log', (file) => {
-    const source = shipped(read('src', 'features', 'account', file));
+    const source = shipped(sourceOf(file));
 
     const said = [
       // Every string literal, which covers labels, hints and placeholders --
@@ -371,5 +385,89 @@ describe('erasing the copy on the server', () => {
   it('asks first, rather than deleting on one tap', () => {
     expect(card).toContain('confirmingErase');
     expect(card).toContain("variant=\"danger\"");
+  });
+});
+
+/**
+ * What the hand-off screen is allowed to say, and to do.
+ *
+ * The screen itself is not rendered here, for the reason at the top of this
+ * file. What can be checked in Node is the copy -- which is where the one rule
+ * that matters lives -- and the order the source does things in, which is a
+ * fact about a file.
+ */
+describe('carrying a purchase over from another app', () => {
+  const FAILURES: HandoffFailure[] = ['none', 'refused', 'throttled', 'unreachable'];
+  const claim = read('app', 'claim.tsx');
+
+  it('never says anything was bought, because on this side nothing was', () => {
+    // The rule the rest of this file keeps, met again at the one screen a link
+    // from a paid app lands on. What arrives through a hand-off is an identity
+    // rather than an entitlement; the tier rides inside the token and is the
+    // other app's to talk about.
+    for (const failure of FAILURES) {
+      expect(handoffFailed(failure)).not.toMatch(/purchase|bought|paid/i);
+    }
+    expect(handoffWouldSwitch).not.toMatch(/purchase|bought|paid/i);
+  });
+
+  it('never tells anybody they have not paid', () => {
+    // The rule the whole chain is built to keep. Untilt answers 503 rather
+    // than a free token when it cannot reach Stripe, precisely so an outage
+    // does not become that sentence, and this is the last place it can die.
+    for (const failure of FAILURES) {
+      expect(handoffFailed(failure)).not.toMatch(/have not (bought|paid)|did not (buy|pay)/i);
+      expect(handoffFailed(failure)).not.toMatch(/\bno purchase\b/i);
+    }
+  });
+
+  it('and offers the ordinary way in instead, every time', () => {
+    // Always available, costs one screen, and is the honest answer to all four
+    // of these -- none of which is a verdict on a purchase.
+    for (const failure of FAILURES) {
+      expect(handoffFailed(failure)).toMatch(/sign in|try the link/i);
+    }
+  });
+
+  it('says nothing is lost when it could not finish', () => {
+    // The one somebody may well be reading in the middle of an outage they
+    // have paid to be on the other side of.
+    expect(handoffFailed('unreachable')).toMatch(/nothing is lost/i);
+  });
+
+  it('warns before it switches accounts, and says nothing is deleted', () => {
+    // On this side a change of subject is a change of bucket, so a quiet swap
+    // moves somebody's history out from under them.
+    expect(handoffWouldSwitch).toMatch(/already signed in/i);
+    expect(handoffWouldSwitch).toMatch(/nothing is deleted/i);
+  });
+
+  it('takes the code out of the URL before it trades it', () => {
+    // A fragment reaches no server, but it is in this tab's history until the
+    // URL is replaced, and a back button or a shared screen is enough.
+    expect(claim.indexOf('replaceState')).toBeGreaterThan(-1);
+    expect(claim.indexOf('replaceState')).toBeLessThan(claim.indexOf('await claimHandoff'));
+  });
+
+  it('asks before it stores a hand-off for somebody else', () => {
+    const body = claim.slice(claim.indexOf('const traded = await claimHandoff'));
+    const asks = body.indexOf("kind: 'asking'");
+    expect(asks).toBeGreaterThan(-1);
+    // The token is held in state until they say yes, so the only path to
+    // `keep` with a session already held runs through the button.
+    expect(asks).toBeLessThan(body.indexOf('await keep(traded.token)'));
+  });
+
+  it('and never signs anybody out on its own', () => {
+    // Every failure here leaves the device exactly as it was. A hand-off that
+    // did not work is not a reason to take away what somebody already had.
+    expect(claim).not.toContain('signOut');
+  });
+
+  it('recomposes the repository after signing in, or nothing syncs', () => {
+    // The data layer composed itself before there was a token to compose with.
+    // `SignInCard` does the same and for the same reason.
+    const body = claim.slice(claim.indexOf('const keep = useCallback'));
+    expect(body.indexOf('recomposeRepository()')).toBeGreaterThan(body.indexOf('await signIn(token)'));
   });
 });

@@ -24,6 +24,7 @@
  * between them would undo that at the last step.
  */
 
+import type { HandoffFailure } from '../../auth/handoff';
 import type { SignInFailure } from '../../auth/signin';
 import { hasOwnSubject, SYNC_NEEDS_PASS, type Claim } from '../../auth/token';
 
@@ -76,6 +77,62 @@ export const messageFor = (failure: SignInFailure, stage: Stage): string => {
       return 'Could not reach the sign-in. Check your connection and try again.';
   }
 };
+
+/**
+ * One sentence for a hand-off that did not happen.
+ *
+ * Four outcomes with two rules between them, and both are about what these
+ * lines may not say.
+ *
+ * **None of them is a verdict on a purchase.** Untilt answers 503 rather than
+ * a free token when it cannot reach Stripe, precisely so an outage does not
+ * become "you have not paid for this", and it would be thrown away here by one
+ * careless line. So every one of these says what happened to the link and
+ * offers the ordinary way in, which is always available and costs one screen.
+ *
+ * **And none of them says anything was bought at all**, which is the rule the
+ * rest of this file already keeps: Log is free in its entirety, and what
+ * arrives through a hand-off is an identity rather than an entitlement. From
+ * this side it is a sign-in somebody did not have to type. What they may have
+ * paid for elsewhere is the other app's to talk about.
+ */
+export const handoffFailed = (failure: HandoffFailure): string => {
+  switch (failure) {
+    case 'none':
+      // Unknown, expired, already spent, or meant for another app. Untilt says
+      // one thing for all of them on purpose, so this does too. Ninety seconds
+      // is short, and the honest guess is that they took a while.
+      return 'That link has already been used, or it has run out. Sign in below and this ' +
+        'device picks up where your account left off.';
+    case 'refused':
+      return 'There was nothing to carry across on that account. Sign in below with the ' +
+        'address you use for the other apps.';
+    case 'throttled':
+      return 'That is a lot of tries. Give it a minute, or sign in below.';
+    case 'unreachable':
+      // The one somebody may well be reading in the middle of an outage they
+      // are on the wrong side of. Carefully vague, and never a refusal.
+      return 'Could not finish signing you in just now. Nothing is lost -- try the link ' +
+        'again, or sign in below.';
+  }
+};
+
+/**
+ * What a hand-off would do to a log that is already here.
+ *
+ * Asked rather than done, because on this side a change of subject is a change
+ * of bucket: the sessions this device syncs live under whoever it is signed in
+ * as, and swapping quietly would move somebody's history out from under them
+ * with nothing on screen to say so. Untilt's `HANDOFF.md` makes it the
+ * destination's decision for exactly that reason.
+ *
+ * Nothing is deleted either way, and the sentence says so: the other log is
+ * still in its own bucket and signing back in brings it back.
+ */
+export const handoffWouldSwitch =
+  'This device is already signed in as somebody else. Continuing switches it, so the ' +
+  'sessions it syncs will be the other account\'s from then on. Nothing is deleted: ' +
+  'signing back in brings this log back.';
 
 /**
  * What the sync is doing, in one line and without a spinner.

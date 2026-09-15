@@ -1041,8 +1041,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 53 passed
-Tests:       1504 passed
+Test Suites: 54 passed
+Tests:       1530 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1056,9 +1056,9 @@ Tests:       1504 passed
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   stats              45   P/L, rebuys, duration, win rate, groupings
+  copy               43   what the sign-in and the sync are allowed to say
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
-  copy               33   what the sign-in and the sync are allowed to say
   blog               32   the post grammar, the share cards, and what it refuses
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
@@ -1078,6 +1078,7 @@ Tests:       1504 passed
   gateCheck          19   the key-on-the-site script, run rather than read
   money              18   cents arithmetic, parsing, formatting
   seed               17   the demo dataset stays coherent
+  handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
   client             15   the sync client, against a fake fetch
   observe            14   how big the bundle was, said without saying whose

@@ -13,9 +13,17 @@
  *
  *     expiry     seconds since the epoch, not milliseconds
  *     tier       "full" or "free"
- *     subject    [A-Za-z0-9_]{1,64}, a Stripe customer id or "passcode"
- *     signature  base64url HMAC-SHA256 of the first three fields, under a key
- *                this app does not have and must never be given
+ *     subject    [A-Za-z0-9_]{1,64}, one this family's doors mint or "passcode"
+ *     signature  base64url HMAC-SHA256 of `family.` and the first three
+ *                fields, under a key this app does not have and must never be
+ *                given
+ *
+ * The `family.` in front of what is signed is the one thing in the grammar
+ * that is not visible on the wire. It is what keeps a token the family passes
+ * between its apps from also being the cookie that opens `untilt.poker`, which
+ * it otherwise would be, byte for byte. `src/sync/verify.ts` is where it is
+ * checked and where the argument is; nothing here changes, because the fields
+ * and their order did not.
  *
  * ## This file does not verify anything
  *

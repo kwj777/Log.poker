@@ -94,6 +94,55 @@ export type Refusal = 'absent' | 'malformed' | 'signature' | 'expired';
 export type Checked = { claim: Claim } | { refused: Refusal };
 
 /**
+ * What a token signs, which is not the same as the fields it carries.
+ *
+ * `family.` in front of the three fields, so that what the family passes
+ * between its apps is not the credential that opens `untilt.poker`. Untilt's
+ * `lib/access.js` is where this is decided and where the argument is written
+ * out; the short version is that the two used to be byte-identical -- four
+ * fields, one key, and Untilt's subject pattern admits a `log_` subject
+ * unchanged -- so a token handed to another origin was a thirty-day
+ * full-access cookie for Untilt, and tokens go places cookies do not.
+ *
+ * It is the trick Untilt already used for its sign-in links, and it is cheap
+ * because it does not touch the wire: four dot-separated fields in the same
+ * order, so `readClaim` does not change a line. Only what the signature is
+ * taken over differs, which is enough that neither credential verifies as the
+ * other in either direction.
+ */
+const FAMILY_PURPOSE = 'family';
+
+/**
+ * When this stops accepting the preimage it used to sign.
+ *
+ * Every token carrying the old signature is one this app's own door minted,
+ * because Log has never shipped a way to receive somebody else's, and they all
+ * run out within `TOKEN_TTL_MS` of the change landing. So the window only has
+ * to cover thirty days from the deploy, and this date is set a couple of
+ * months past the change being written, which is slack rather than a second
+ * deadline.
+ *
+ * It closes by itself on purpose. A migration that ends when somebody
+ * remembers to delete a branch is a migration that does not end, and what that
+ * branch keeps alive is an acceptance of the exact signature domain separation
+ * exists to stop accepting.
+ *
+ * Nothing is stranded by it. A device opened inside the last ten days of its
+ * token renews, which mints the new preimage and costs its owner nothing; one
+ * that is not signs in again, which is what an expired token already meant.
+ *
+ * **The window is not a hole this opened.** Taking the old preimage is taking
+ * what this app took yesterday, and the containment is the one already there:
+ * `hasOwnBucket` accepts only subjects this door minted, so an Untilt cookie
+ * -- the other thing that preimage signs -- cannot reach a bucket during the
+ * window any more than after it.
+ *
+ * Past this date the second branch in `checkToken` is unreachable and should
+ * go, and this constant with it.
+ */
+export const LEGACY_SIGNATURES_UNTIL: Timestamp = Date.parse('2026-11-15T00:00:00Z');
+
+/**
  * What a token proves, and what was wrong with it if it proves nothing.
  *
  * Fails closed on everything: no secret, no token, a shape this build does not
@@ -104,6 +153,11 @@ export type Checked = { claim: Claim } | { refused: Refusal };
  * that is both expired and wrongly signed says `signature`, because the expiry
  * is one person's problem and the key is everybody's. The ordinary one: nothing
  * should act on a claim it has not verified, and an expiry is a claim.
+ *
+ * Two preimages are tried while `LEGACY_SIGNATURES_UNTIL` is open, the current
+ * one first, so the ordinary case costs one HMAC and only the dying case costs
+ * two. A token that satisfies neither is `signature`, which is the answer it
+ * would have had before and the same 401 on the wire.
  */
 export const checkToken = async (
   secret: string,
@@ -120,8 +174,11 @@ export const checkToken = async (
   if (claim === null) return { refused: 'malformed' };
 
   const parts = token.split('.');
-  const expected = await sign(secret, parts.slice(0, 3).join('.'));
-  if (!safeEqual(parts[3], expected)) return { refused: 'signature' };
+  const payload = parts.slice(0, 3).join('.');
+  if (!safeEqual(parts[3], await sign(secret, `${FAMILY_PURPOSE}.${payload}`))) {
+    if (now >= LEGACY_SIGNATURES_UNTIL) return { refused: 'signature' };
+    if (!safeEqual(parts[3], await sign(secret, payload))) return { refused: 'signature' };
+  }
 
   return claim.expiresAt <= now ? { refused: 'expired' } : { claim };
 };
@@ -280,11 +337,16 @@ export const subjectForGateCheck = async (secret: string): Promise<string> =>
  * by construction, since the signature is the whole of what makes one, so it
  * is worth saying what that does and does not buy: the other two apps will
  * read the tier and give it exactly what an unpaid visitor already has.
+ *
+ * It signs the current preimage from the first day, rather than the old one
+ * for as long as `LEGACY_SIGNATURES_UNTIL` runs. That window is for tokens
+ * already sitting in people's stores; minting into it would only make more of
+ * them to wait for, and would put off the day the window can close.
  */
 export const mintToken = async (
   secret: string,
   { subject, tier, expiresAt }: { subject: string; tier: Tier; expiresAt: Timestamp },
 ): Promise<string> => {
   const payload = `${Math.floor(expiresAt / 1000)}.${tier}.${subject}`;
-  return `${payload}.${await sign(secret, payload)}`;
+  return `${payload}.${await sign(secret, `${FAMILY_PURPOSE}.${payload}`)}`;
 };

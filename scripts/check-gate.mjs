@@ -33,19 +33,27 @@
  * so a wrong key that is wrong consistently passes this.** Everything agrees
  * with itself.
  *
- * The hole is closed by pointing `--signin-origin` at `https://untilt.poker`.
- * A token Untilt signed is the only one that proves the key is *Untilt's*, and
- * that is worth knowing even though nothing in Log depends on it any more:
- * subjects and bucket names are HMACs under this key, so it is effectively
- * write once, and finding out it was the wrong one later means orphaning every
- * bucket. Untilt only mails an address that has bought, so that run needs an
- * address that has.
+ * That hole used to be closed by pointing `--signin-origin` at
+ * `https://untilt.poker`, on the reasoning that a token Untilt signed is the
+ * only one proving the key is *Untilt's* -- worth knowing even though nothing
+ * in Log depends on it any more, because subjects and bucket names are HMACs
+ * under this key, so it is effectively write once and finding out later means
+ * orphaning every bucket.
  *
- * **In that mode the pass is now a 403 rather than a 200.** Log's sync takes
- * only subjects its own door mints, and Untilt mints a different kind, so a
- * token of Untilt's gets as far as the gate and is turned away there. Getting
- * that far is the whole proof: a wrong key answers 401 without ever reaching
- * the question of who the token names.
+ * **That mode cannot answer the question any more, and the reason is on
+ * purpose.** A token the family passes between its apps is signed over
+ * `family.` and the fields; the cookie Untilt sets for itself is signed over
+ * the fields alone, so that handing one out is not handing out the other. See
+ * `FAMILY_PURPOSE` in `src/sync/verify.ts`. An Untilt sign-in hands out the
+ * second kind, so it now answers 401 here whether the key matches or not, and
+ * a 401 that means two things means neither.
+ *
+ * What restores it is the hand-off in Untilt's `HANDOFF.md`: its claim
+ * endpoint answers a real family token, which verifies here if and only if the
+ * keys agree, and names a subject this door would mint -- so the pass there is
+ * a 200 or a 402 rather than the 403 this mode used to look for. Steps 2 and 3
+ * of that document. Until they land, nothing in this script proves the key is
+ * Untilt's, and it says so rather than implying otherwise.
  *
  * The token this mints names a subject of its own, so a successful run writes
  * a bucket, and the run erases it again on the way out. A token that came from
@@ -72,10 +80,20 @@ const subjectFor = (secret) =>
 const base64url = (bytes) =>
   bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-/** `<expiry>.<tier>.<subject>.<signature>`, HMAC-SHA256 over the first three. */
+/**
+ * `<expiry>.<tier>.<subject>.<signature>`, where the signature is taken over
+ * `family.` and the first three fields rather than over the fields alone.
+ *
+ * Mirrored from `mintToken` in `src/sync/verify.ts`, prefix included, for the
+ * same reason the subject is: this script runs on `node` with nothing
+ * installed. A copy that signed the old preimage would keep working until
+ * `LEGACY_SIGNATURES_UNTIL` passes and then start reporting a wrong key on a
+ * right one, which is the one lie this script must never tell.
+ */
 const mint = (secret) => {
   const payload = `${Math.floor(Date.now() / 1000) + TTL_SECONDS}.full.${subjectFor(secret)}`;
-  return `${payload}.${base64url(createHmac('sha256', secret).update(payload).digest())}`;
+  const signature = createHmac('sha256', secret).update(`family.${payload}`).digest();
+  return `${payload}.${base64url(signature)}`;
 };
 
 /* --------------------------------------------------------------- arguments */
@@ -208,11 +226,12 @@ const explain = (status, body, minted) => {
       ? [
           'The key on the site is exactly the key you typed.',
           '',
-          'That rules out a mangled paste. It does not yet prove the key is the one',
+          'That rules out a mangled paste. It does not prove the key is the one',
           'Untilt signs with, which is the half that matters, because the two apps',
-          'agreeing is the whole feature. For that:',
-          '',
-          '  npm run check:gate -- --signin <your email>',
+          'agreeing is the whole feature -- and nothing in this script proves that',
+          'today. A token of Untilt\'s is signed for its own origin rather than for',
+          'the family, so it answers 401 here whichever key is on the site. The',
+          'hand-off in Untilt\'s HANDOFF.md is what brings the check back.',
         ]
       : [
           'That token verified and named a subject this site mints, so cross-device',
@@ -237,10 +256,15 @@ const explain = (status, body, minted) => {
       : [
           'The site refused that token.',
           '',
-          'The function log says which half was wrong. `signature` means the key on',
-          'the site is not the key Untilt signed this with, which is the thing to',
-          'fix. `expired` means the token is old: sign in again and retry.',
-          '`malformed` means what was passed to --token is not a token.',
+          'The function log says which half was wrong. `expired` means the token is',
+          'old: sign in again and retry. `malformed` means what was passed to',
+          '--token is not a token.',
+          '',
+          '`signature` is now two things and does not say which. The key on the site',
+          'may be the wrong key. Or the token may be signed for another purpose,',
+          'which is what a token from an Untilt sign-in is: that one signs the',
+          'fields alone and this door wants `family.` in front of them, so that a',
+          'token the family passes around is not also a cookie for untilt.poker.',
         ];
   }
 
@@ -252,16 +276,13 @@ const explain = (status, body, minted) => {
       '',
       'Two subjects are refused, and neither is about the tier: a 403 is always',
       'about who the token names. What sync costs answers 402, below. The shared',
-      '`passcode` subject has no bucket of its own by design. And a subject',
-      'bucket of its own by design. And a subject from another door in the family',
-      'from another door in the family is refused too, which is what a token',
-      'from Untilt now is: the two doors mint different subjects for one person,',
-      'and taking both put somebody a history in a bucket nothing would ask for',
-      'again.',
+      '`passcode` subject has no bucket of its own by design. And a subject from',
+      'another door in the family is refused too: the two doors mint different',
+      'subjects for one person, and taking both put somebody\'s history in a',
+      'bucket nothing would ever ask for again.',
       '',
-      'So under `--signin-origin https://untilt.poker` a 403 is the pass, not the',
-      'failure. It proves the key is the one Untilt signs with. A 401 there would',
-      'be the failure.',
+      'So a 403 is the pass, not the failure. Whatever it went on to refuse, the',
+      'signature verified first, and that is the question. A 401 is the failure.',
     ];
   }
 

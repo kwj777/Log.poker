@@ -126,6 +126,12 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen name="import" options={{ title: 'Import sessions · Log' }} />
+          {/* Where a purchase made at another of the family's apps lands. The
+              route has to exist under /app, because that is where this site
+              serves the app from and a link to /claim would be answered by the
+              marketing site's catch-all -- which is the failure that kept the
+              hand-off to TiltProof broken for its whole shipped life. */}
+          <Stack.Screen name="claim" options={{ title: 'Signing you in · Log' }} />
           <Stack.Screen name="session/active" options={{ title: 'Live session · Log' }} />
           <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
         </Stack>

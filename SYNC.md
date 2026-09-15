@@ -191,10 +191,20 @@ must inherit it explicitly rather than by luck.
 
 Checked against Untilt's `lib/access.js` as deployed. The two implementations of
 the format agree field for field -- four parts, the same expiry pattern, the
-same tiers, the same subject pattern, HMAC-SHA256 over the first three joined by
-dots, base64url unpadded -- and Log converts the expiry from seconds to
-milliseconds at the boundary, which is the one place the two would silently
-disagree if anybody moved it. Log will accept exactly the tokens Untilt mints.
+same tiers, the same subject pattern, HMAC-SHA256 base64url unpadded -- and Log
+converts the expiry from seconds to milliseconds at the boundary, which is the
+one place the two would silently disagree if anybody moved it.
+
+**What they deliberately no longer agree on is what the signature is taken
+over.** This paragraph used to end "Log will accept exactly the tokens Untilt
+mints", and that turned out to be the problem rather than the property: a token
+the family passes between its origins was byte-identical to the cookie that
+opens `untilt.poker`, so handing one to another app would have handed over a
+thirty-day full-access cookie with it, and tokens go places cookies do not. A
+family token now signs `family.` in front of the three fields. Untilt's own
+cookie still signs the fields alone, and this door refuses it. See
+`FAMILY_PURPOSE` in `src/sync/verify.ts`, and `HANDOFF.md` in Untilt for the
+hand-off this is the first step of.
 
 For thirty days. `COOKIE_MAX_AGE` is thirty days, `issueToken` stamps the expiry
 from it, and **there is no renewal path a bearer holder can use.**

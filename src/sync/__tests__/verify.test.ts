@@ -17,6 +17,7 @@ import {
   bucketFor,
   checkToken,
   hasOwnBucket,
+  LEGACY_SIGNATURES_UNTIL,
   mintToken,
   normalizeEmail,
   subjectForEmail,
@@ -32,8 +33,22 @@ const sign = (secret: string, payload: string): string =>
   createHmac('sha256', secret).update(payload).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-const mint = ({ secret = SECRET, tier = 'full', subject = 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', ttl = 2_592_000 } = {}) => {
-  const payload = `${Math.floor(NOW / 1000) + ttl}.${tier}.${subject}`;
+/*
+  Built here rather than through `mintToken`, and the prefix is spelled out
+  rather than imported. The preimage is the half of the format another
+  repository has to agree with byte for byte: Untilt signs the same string in
+  `lib/access.js`, and a helper that asked the minter what it had done would
+  agree with whatever the minter had been changed to, which is the failure
+  these tests exist to catch.
+*/
+const mint = ({ secret = SECRET, tier = 'full', subject = 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', ttl = 2_592_000, at = NOW } = {}) => {
+  const payload = `${Math.floor(at / 1000) + ttl}.${tier}.${subject}`;
+  return `${payload}.${sign(secret, `family.${payload}`)}`;
+};
+
+/** The same token signed the way this app signed before domain separation. */
+const legacyMint = ({ secret = SECRET, tier = 'full', subject = 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2', ttl = 2_592_000, at = NOW } = {}) => {
+  const payload = `${Math.floor(at / 1000) + ttl}.${tier}.${subject}`;
   return `${payload}.${sign(secret, payload)}`;
 };
 
@@ -73,6 +88,90 @@ describe('verifying a token', () => {
 
   it('refuses no token at all', async () => {
     expect(await verifyToken(SECRET, null, NOW)).toBeNull();
+  });
+});
+
+/**
+ * What the signature is taken over, which is the only difference between a
+ * token the family passes around and the cookie that opens `untilt.poker`.
+ *
+ * The wire shape is identical and is meant to be: four dot-separated fields in
+ * the same order, so nothing that parses one has to learn about the other. So
+ * nothing observable is being asserted here except the one thing that is not
+ * observable, which is why these build the preimage by hand rather than asking
+ * the minter what it did.
+ */
+describe('the preimage a token signs', () => {
+  const SUBJECT = 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2';
+  const payloadOf = (token: string): string => token.split('.').slice(0, 3).join('.');
+
+  it('is `family.` and the three fields, which is the string Untilt signs too', async () => {
+    const token = await mintToken(SECRET, { subject: SUBJECT, tier: 'full', expiresAt: NOW + TOKEN_TTL_MS });
+    expect(token).toBe(`${payloadOf(token)}.${sign(SECRET, `family.${payloadOf(token)}`)}`);
+  });
+
+  it('so a token this door mints is not also a cookie for untilt.poker', async () => {
+    // The collision this closes, and it was a real one rather than a
+    // theoretical one: Untilt's cookie signs the fields alone, and its subject
+    // pattern admits a `log_` subject unchanged, so for the same person at the
+    // same moment the two were the same bytes.
+    const token = await mintToken(SECRET, { subject: SUBJECT, tier: 'full', expiresAt: NOW + TOKEN_TTL_MS });
+    expect(token.split('.')[3]).not.toBe(sign(SECRET, payloadOf(token)));
+  });
+
+  it('and a cookie signed the other way is refused once the window has closed', async () => {
+    expect(await verifyToken(SECRET, legacyMint(), LEGACY_SIGNATURES_UNTIL)).toBeNull();
+  });
+
+  it('which is a refusal about the signature, not about who it names', async () => {
+    // Worth pinning apart, because the deploy log is the only thing anybody
+    // reads here and `signature` is the line that sends somebody to check a
+    // key. A subject this door would happily mint still fails on the preimage.
+    expect(await checkToken(SECRET, legacyMint({ at: LEGACY_SIGNATURES_UNTIL }), LEGACY_SIGNATURES_UNTIL))
+      .toEqual({ refused: 'signature' });
+  });
+});
+
+/**
+ * The window in which the old preimage still counts.
+ *
+ * Every token carrying it is one this door minted, and they all run out within
+ * `TOKEN_TTL_MS` of the change landing, so the window is a way of not signing
+ * anybody out for something they did not do. It closes on a date rather than
+ * on somebody remembering, which is the whole reason it can be trusted to
+ * close at all.
+ */
+describe('the legacy window', () => {
+  const JUST_INSIDE = LEGACY_SIGNATURES_UNTIL - 1000;
+
+  it('takes a token signed the old way while it is open', async () => {
+    const token = legacyMint({ at: JUST_INSIDE - TOKEN_TTL_MS + 60_000 });
+    expect(await verifyToken(SECRET, token, JUST_INSIDE)).toMatchObject({ tier: 'full' });
+  });
+
+  it('and refuses the same token one second later, when it has closed', async () => {
+    // The same bytes, unexpired, under the same key. Only the clock moved.
+    const token = legacyMint({ at: JUST_INSIDE - TOKEN_TTL_MS + 60_000 });
+    expect(await verifyToken(SECRET, token, LEGACY_SIGNATURES_UNTIL)).toBeNull();
+  });
+
+  it('never takes one signed with another key, open or closed', async () => {
+    // The window widens which preimage counts and nothing else. A wrong key is
+    // still a wrong key on both sides of the date.
+    const forged = legacyMint({ secret: OTHER });
+    expect(await verifyToken(SECRET, forged, NOW)).toBeNull();
+    expect(await verifyToken(SECRET, forged, LEGACY_SIGNATURES_UNTIL)).toBeNull();
+  });
+
+  it('and mints the new preimage from the first day rather than into the window', async () => {
+    // Minting the old one for as long as it is accepted would only make more
+    // tokens to wait for, and put off the day the window can be deleted.
+    const token = await mintToken(SECRET, {
+      subject: 'log_b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2',
+      tier: 'free',
+      expiresAt: LEGACY_SIGNATURES_UNTIL + TOKEN_TTL_MS,
+    });
+    expect(await verifyToken(SECRET, token, LEGACY_SIGNATURES_UNTIL)).toMatchObject({ tier: 'free' });
   });
 });
 

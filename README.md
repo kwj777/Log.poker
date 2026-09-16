@@ -241,6 +241,7 @@ The body starts here. Headings start at `##`, because the title is the h1.
 | `description` | Required, and it is doing three jobs: the index line, the meta description, and the feed summary. |
 | `updated` | Optional `YYYY-MM-DD`, for a post edited after it went out. |
 | `draft` | `draft: true` keeps it out of the index, the feed, the sitemap and the build entirely. |
+| `next` | Which app the post hands off to at the end: `log` (the default), `tiltproof` or `untilt`. |
 
 The Markdown is a deliberate subset: headings from `##` down, paragraphs, `-`
 and `1.` lists, `>` quotes, fenced code, `---`, and inline `**bold**`,
@@ -301,6 +302,28 @@ Three things are worth knowing before changing any of it:
   `og:image` at what it finds there, so a deploy never depends on a
   rasterizer being installable, and a post with no card yet falls back to the
   app icon rather than to a hole.
+
+### Where a post sends you next
+
+Each post ends on **one** call to action, chosen to match what the post is
+actually about. That is the shape the four guides settled on first, and the
+blog follows it rather than carrying a row of three apps on every page.
+
+| | |
+|---|---|
+| `next: log` | The default. Keeps the "Get the log" button. |
+| `next: tiltproof` | A post with a mistake in it worth drilling. Replaces the button with the guides' hand-off block. |
+| `next: untilt` | A post about the walk back to baseline. The same block. |
+
+**Instead of the button, not underneath it.** Two calls to action stacked is
+one too many and the second is the one nobody reads, so a test asserts the
+count is exactly one on every post.
+
+A post only earns a hand-off to one of the other two if it genuinely contains
+the thing that app addresses. Most do not: three of the first five have no
+mistake of the author's to drill and no tilt to walk back from, and the honest
+answer for those is Log. The copy in each block is the guides' copy word for
+word, which is also how it goes on saying how much of each app is free.
 
 ### Share cards
 
@@ -1042,7 +1065,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 54 passed
-Tests:       1530 passed
+Tests:       1536 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1057,9 +1080,9 @@ Tests:       1530 passed
   endpoint           46   the sync endpoint, end to end
   stats              45   P/L, rebuys, duration, win rate, groupings
   copy               43   what the sign-in and the sync are allowed to say
+  blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
-  blog               32   the post grammar, the share cards, and what it refuses
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins

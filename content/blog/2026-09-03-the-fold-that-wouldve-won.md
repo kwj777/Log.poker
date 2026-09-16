@@ -1,6 +1,7 @@
 ---
 title: The fold that would have won everything
 description: I folded ace-high with a backdoor flush draw into a dry side pot. Runner-runner spades. The right fold, the worst reveal, and the reason I did not tilt.
+next: untilt
 ---
 
 I folded the correct hand and then watched the deck hand me the nut flush, one card at a time, in front of everybody.

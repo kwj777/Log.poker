@@ -1,6 +1,7 @@
 ---
 title: Seven diamonds left, and one of them beat me
 description: I called an all-in with the ace-high flush and lost to a straight flush, nine to king. Seven diamonds could have completed my flush. Six of them win the pot. I caught the seventh.
+next: tiltproof
 ---
 
 The queen of diamonds came on the river and made me the best flush in the deck.

@@ -20,6 +20,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { FAMILY_LINKS } from '../../config';
 import { colors } from '../../theme';
 
 const ROOT = join(__dirname, '..', '..', '..');
@@ -120,10 +121,15 @@ describe('what a post becomes', () => {
     }
   });
 
-  it('sends a reader who finished a post to the app', () => {
+  it('ends every post on exactly one call to action', () => {
+    // It used to be the button on all of them. Now a post hands off to the one
+    // app it has earned the right to mention, so what is asserted is the count
+    // rather than which: one, never two, never none.
     for (const slug of published) {
-      expect(readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8'))
-        .toContain('<a class="btn" href="/app">');
+      const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
+      const button = page.includes('<a class="btn" href="/app">') ? 1 : 0;
+      const handoff = [...page.matchAll(/class="next"/g)].length;
+      expect(button + handoff).toBe(1);
     }
   });
 });
@@ -170,6 +176,68 @@ describe('the share card', () => {
     expect(read('scripts', 'build-blog.mjs')).not.toContain('resvg');
     expect(read('scripts', 'build-web.mjs')).not.toContain('build-og');
     expect(read('scripts', 'build-og.mjs')).toContain('@resvg/resvg-js');
+  });
+});
+
+describe('where a post sends you next', () => {
+  const model = read('scripts', 'posts.mjs');
+
+  it('keeps the button on a post that hands off to Log', () => {
+    // Which is the default, and the right answer for most posts: the button is
+    // the thing to press, and the post has just spent a thousand words on it.
+    const out = build(fixture({ '2026-01-02-plain.md': post('No hand-off declared.') }));
+    const page = readFileSync(join(out, 'blog', 'plain', 'index.html'), 'utf8');
+    expect(page).toContain('<a class="btn" href="/app">Get the log');
+    expect(page).not.toContain('class="next"');
+  });
+
+  it('replaces it on a post that hands off elsewhere', () => {
+    // Instead of, not underneath. Two calls to action stacked is one too many,
+    // and the second one is the one nobody reads.
+    const out = build(fixture({
+      '2026-01-02-drill.md': post('A mistake worth drilling.', 'next: tiltproof\n'),
+      '2026-01-03-reset.md': post('A walk back to baseline.', 'next: untilt\n'),
+    }));
+    const drill = readFileSync(join(out, 'blog', 'drill', 'index.html'), 'utf8');
+    expect(drill).toContain('<span class="name">TiltProof</span>');
+    expect(drill).toContain('href="https://tiltproof.poker"');
+    expect(drill).not.toContain('class="btn"');
+
+    const reset = readFileSync(join(out, 'blog', 'reset', 'index.html'), 'utf8');
+    expect(reset).toContain('<span class="name">Untilt</span>');
+    expect(reset).not.toContain('class="btn"');
+  });
+
+  it('refuses a hand-off to an app that does not exist', () => {
+    expect(refusal(fixture({ '2026-01-02-nope.md': post('Body.', 'next: tiltpoof\n') })))
+      .toMatch(/next must be one of/);
+  });
+
+  it('points at the hosts the family actually serves', () => {
+    // A typo here is a dead link on the one line of a post that asks for a
+    // click, so the two outbound ones are pinned to the app's own config.
+    expect(model).toContain(`href: '${FAMILY_LINKS.tiltproof}'`);
+    expect(model).toContain(`href: '${FAMILY_LINKS.untilt}'`);
+    // Log's is relative, because the blog is served from the same site.
+    expect(model).toContain("href: '/app'");
+  });
+
+  it('says how much of each app is free, wherever it sends you', () => {
+    // The half of the price rule that is easy to lose: a page that only ever
+    // says "free" makes a promise on behalf of apps that are paid past a
+    // point. See README, "The copy rule, and its second half".
+    const handoffs = model.slice(model.indexOf('export const HANDOFFS'), model.indexOf('};', model.indexOf('export const HANDOFFS')));
+    const blurbs = [...handoffs.matchAll(/what:\s*\n?\s*'([^']+)'/g)].map((match) => match[1]);
+    expect(blurbs).toHaveLength(3);
+    for (const blurb of blurbs) expect(blurb).toMatch(/\bfree\b/);
+  });
+
+  it('quotes no price, the same as every other page', () => {
+    for (const slug of published) {
+      const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
+      const ending = page.slice(page.indexOf('</article>'));
+      expect(ending).not.toMatch(/\$\s*\d/);
+    }
   });
 });
 

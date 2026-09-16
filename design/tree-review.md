@@ -69,7 +69,7 @@ of why. It is now recorded beside `FAMILY_LINKS` in `src/config.ts`, which keeps
 |---|---|---|
 | `hand` | **yes** | The exact cards, `AsKd`. Omitted when the hand was logged without them, and the review then says so and stops. |
 | `position` | no | The short form, with `UTG1` spelled `UTG+1` as that side reads it. |
-| `board` | no | Only a whole board, three cards, four or five. Not read over there yet, and ignored rather than refused. |
+| `board` | no | Only a whole board, three cards, four or five. Read on arrival as a prefill into the box the review asks the player to type. |
 | `source` | no | `log`. |
 | `note` | no | **Never.** See below. |
 | `tags` | no | Not sent today. |
@@ -89,7 +89,14 @@ the whole parameter set rather than each key, so adding one later is a decision
 somebody makes rather than a default.
 
 **Unknown parameters are ignored over there rather than refused**, which is what
-makes `board` safe to send ahead of the far side reading it.
+made `board` safe to send ahead of the far side reading it. It reads it now, as
+a prefill and not an answer: it goes into the box spaced out for editing and is
+validated by exactly the code that checks a typed one. That is the check
+neither side guarantees away. Log's picker stops a card being in the hand and
+the board at once, but nothing here checks it on the way out, and card removal
+is the whole reason to want exact cards, so a duplicate would otherwise corrupt
+every figure downstream. What this app holds is what somebody tapped into a
+phone at a table, so it is offered rather than assumed.
 
 ### The review is postflop only
 

@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 515" role="img"
+  aria-labelledby="seven-diamonds-title seven-diamonds-desc">
+  <title id="seven-diamonds-title">An ace-high flush, and the one card that beat it</title>
+  <desc id="seven-diamonds-desc">My hand: the ace of diamonds and the nine of spades. His: the king and ten of diamonds. The board ran the four, nine and jack of diamonds plus one card I did not write down, which already gave him a king-high flush while I held four to mine. The river was the queen of diamonds. It completed my ace-high flush and his straight flush, nine to king, on the same card. Gold-edged cards are the five that made my hand.</desc>
+
+  <text x="121.8" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">MY HAND</text>
+  <g>
+    <title>Ace of diamonds</title>
+    <rect x="63.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="70.8" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">A</text>
+    <text x="90.8" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>9 of spades</title>
+    <rect x="125.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="132.8" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#242b28">9</text>
+    <text x="152.8" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <text x="298.2" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">HIS HAND</text>
+  <g>
+    <title>King of diamonds</title>
+    <rect x="240.2" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="247.2" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">K</text>
+    <text x="267.2" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>Ten of diamonds</title>
+    <rect x="302.2" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="309.2" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">T</text>
+    <text x="329.2" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <text x="210" y="152" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">THE FLOP AND THE TURN</text>
+  <g>
+    <title>4 of diamonds</title>
+    <rect x="90" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="97" y="184" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">4</text>
+    <text x="117" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>9 of diamonds</title>
+    <rect x="152" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="159" y="184" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">9</text>
+    <text x="179" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>Jack of diamonds</title>
+    <rect x="214" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="221" y="184" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">J</text>
+    <text x="241" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>A card that was never shown</title>
+    <rect x="276" y="162" width="54" height="76" rx="5"
+      fill="#3d4a44" stroke="#2e3a35" stroke-width="1" />
+    <g transform="translate(281 178) scale(0.22)"
+      fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.75">
+      <path d="M100 125 L100 163" stroke="#c9a86a" stroke-width="8" />
+      <path d="M34 125 L166 125 L100 37 Z" stroke="#9aae80" stroke-width="6" />
+      <path d="M56 125 L100 66 L144 125" stroke="#75886a" stroke-width="6" />
+      <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
+    </g>
+  </g>
+  <text x="210" y="260" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Two nines, and four to the flush</text>
+  <text x="210" y="282" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>A king-high flush, already</text>
+  <text x="210" y="332" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">THE RIVER</text>
+  <g>
+    <title>Queen of diamonds</title>
+    <rect x="183" y="342" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="190" y="364" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">Q</text>
+    <text x="210" y="400" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <text x="210" y="440" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Ace-high flush</text>
+  <text x="210" y="462" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>Straight flush, nine to king</text>
+  <text x="210" y="507" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">HE WAS ALL IN. I CALLED.</text>
+</svg>

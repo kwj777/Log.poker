@@ -220,6 +220,43 @@ export const FIGURES = {
     ],
   },
 
+  /** The diamonds: one card made both hands, and only one of us knew what that meant. */
+  'seven-diamonds': {
+    title: 'An ace-high flush, and the one card that beat it',
+    desc: `My hand: the ace of diamonds and the nine of spades. His: the king and ten of
+    diamonds. The board ran the four, nine and jack of diamonds plus one card I did not
+    write down, which already gave him a king-high flush while I held four to mine. The
+    river was the queen of diamonds. It completed my ace-high flush and his straight
+    flush, nine to king, on the same card. Gold-edged cards are the five that made my
+    hand.`,
+    rows: [
+      {
+        type: 'hands',
+        groups: [
+          { label: 'MY HAND', cards: ['Ad!', '9s'] },
+          { label: 'HIS HAND', cards: ['Kd', 'Td'] },
+        ],
+      },
+      {
+        label: 'THE FLOP AND THE TURN',
+        cards: ['4d!', '9d!', 'Jd!', '??'],
+        outcomes: [
+          ['ME', 'Two nines, and four to the flush', 'muted'],
+          ['HIM', 'A king-high flush, already', 'muted'],
+        ],
+      },
+      {
+        label: 'THE RIVER',
+        cards: ['Qd!'],
+        outcomes: [
+          ['ME', 'Ace-high flush', 'gold'],
+          ['HIM', 'Straight flush, nine to king', 'muted'],
+        ],
+      },
+      { type: 'note', text: 'HE WAS ALL IN. I CALLED.' },
+    ],
+  },
+
   /** The queens: a hand nobody turned over, drawn as the hand nobody turned over. */
   'told-me-queens': {
     title: 'The hand she said she had',

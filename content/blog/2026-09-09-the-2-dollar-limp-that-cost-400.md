@@ -1,6 +1,7 @@
 ---
 title: The $2 mistake that cost me $400
 description: I limped the button with 7♠8♠ at $1/$2 instead of raising, flopped two pair, and lost to a bigger one. What the two dollars actually bought was four more opponents.
+next: tiltproof
 ---
 
 I saved two dollars.

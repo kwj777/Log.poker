@@ -29,7 +29,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BLOG, SITE, TAGLINE, TITLE, feedDate, longDate, readPosts } from './posts.mjs';
+import { BLOG, HANDOFFS, SITE, TAGLINE, TITLE, feedDate, longDate, readPosts } from './posts.mjs';
 import { GUIDES, TOP } from './pages.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -312,6 +312,13 @@ const STYLE = `      :root {
         font-size: clamp(1.8rem, 6vw, 2.3rem); line-height: 1.05;
       }
       .stat-note { margin: .5rem 0 0; color: var(--muted); font-size: .92rem; }
+      .next {
+        border: 1px solid var(--rim); border-radius: 3px; background: var(--raised);
+        padding: 1.1rem 1.2rem; display: flex; flex-direction: column; gap: .55rem;
+      }
+      .next .verb { font-size: .67rem; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); }
+      .next .name { font-family: var(--serif); font-size: 1.24rem; }
+      .next p { margin: 0; color: var(--muted); font-size: .93rem; }
       .cta { display: flex; flex-direction: column; align-items: center; gap: .8rem; text-align: center; }
       .btn {
         display: inline-block; background: var(--gold); color: #1c211f;
@@ -391,6 +398,33 @@ const jsonLd = (data) =>
     .split('\n')
     .map((line) => `      ${line}`)
     .join('\n')}\n    </script>\n`;
+
+/**
+ * What a post ends on, after it has said what it had to say.
+ *
+ * A post about Log keeps the button, because the button is the thing to press
+ * and the post has just spent a thousand words earning it. A post handing off
+ * to one of the other two gets the guides' block instead, and gets it *instead
+ * of* rather than underneath: two calls to action stacked is one too many, and
+ * the second one is the one nobody reads.
+ */
+const handoff = (post) => {
+  const next = HANDOFFS[post.next];
+  if (post.next === 'log') {
+    return `      <div class="cta">
+        <a class="btn" href="${next.href}">Get the log</a>
+        <p class="sub">${next.what}</p>
+      </div>`;
+  }
+  return `      <section>
+        <div class="next">
+          <span class="verb">${next.verb}</span>
+          <span class="name">${escapeHtml(next.name)}</span>
+          <p>${escapeHtml(next.what)}</p>
+          <p><a href="${next.href}">${next.href.replace('https://', '')}</a></p>
+        </div>
+      </section>`;
+};
 
 const indexPage = (posts) => `<!doctype html>
 <!--
@@ -502,10 +536,7 @@ ${head({
         </div>
       </article>
 
-      <div class="cta">
-        <a class="btn" href="/app">Get the log</a>
-        <p class="sub">Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
-      </div>
+${handoff(post)}
 
       <footer>
         <p>

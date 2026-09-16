@@ -25,7 +25,45 @@ export const TAGLINE =
 const FILENAME = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 /** Every front matter key a post may set. An unknown one is a typo, and throws. */
-const FIELDS = new Set(['title', 'description', 'updated', 'draft']);
+const FIELDS = new Set(['title', 'description', 'updated', 'draft', 'next']);
+
+/**
+ * The one app each post hands off to, after it has finished its argument.
+ *
+ * The guides settled this shape first and the blog follows it: one call to
+ * action per page, chosen to match what the page is actually about, rather
+ * than a row of three on everything. A post that hands off to TiltProof is a
+ * post with a mistake in it worth drilling, and a post that hands off to
+ * Untilt is one about the walk back to baseline. Most posts are neither, and
+ * the honest answer for those is Log, which is also the default.
+ *
+ * The copy is the guides' copy, word for word, because it already says how
+ * much of each app is free, which is the half of the price rule that is easy
+ * to lose. See README, "The copy rule, and its second half".
+ */
+export const HANDOFFS = {
+  log: {
+    verb: 'Observe',
+    name: 'Log',
+    href: '/app',
+    what:
+      'Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.',
+  },
+  tiltproof: {
+    verb: 'Learn',
+    name: 'TiltProof',
+    href: 'https://tiltproof.poker',
+    what:
+      'Drills that make the count automatic: real spots, an answer marked against a hand evaluator rather than a table somebody typed up, and the exact equity shown next to what you said. The early levels and the whole glossary are free. The point is to stop needing the shortcut.',
+  },
+  untilt: {
+    verb: 'Ground',
+    name: 'Untilt',
+    href: 'https://untilt.poker',
+    what:
+      'Short guided sessions written for poker players rather than adapted from something else: before you sit down, between the hands, and after the last one. The at-the-table resets are free, permanently, because the moment you need one is not the moment to be asked for a card.',
+  },
+};
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -76,6 +114,9 @@ export const parsePost = (filename, source, render) => {
   if (fields.updated && at(fields.updated).toISOString().slice(0, 10) !== fields.updated) {
     throw new Error(`${filename}: updated ${fields.updated} is not a real date`);
   }
+  if (fields.next && !HANDOFFS[fields.next]) {
+    throw new Error(`${filename}: next must be one of ${Object.keys(HANDOFFS).join(', ')}`);
+  }
 
   return {
     slug,
@@ -84,6 +125,7 @@ export const parsePost = (filename, source, render) => {
     title: fields.title,
     description: fields.description,
     draft: fields.draft === 'true',
+    next: fields.next ?? 'log',
     url: `${BLOG}/${slug}`,
     path: `/blog/${slug}`,
     markdown: split[2],

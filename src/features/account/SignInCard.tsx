@@ -40,10 +40,12 @@ import { Text } from '../../components/Text';
 import { colors, radius, spacing } from '../../theme';
 import {
   CODE_SENT,
+  DELETE_ACCOUNT,
   ERASE_CONFIRM,
   ERASE_DONE,
   ERASE_EXPLAINS,
   ERASE_FAILED,
+  NO_ACCOUNT_KEPT,
   NOTHING_LEAVES,
   describeSession,
   describeSync,
@@ -226,7 +228,7 @@ export const SignInCard = () => {
                 onPress={() => setConfirmingErase(false)}
               />
               <Button
-                label="Erase and sign out"
+                label="Delete and sign out"
                 variant="danger"
                 size="small"
                 onPress={() => void erase()}
@@ -239,9 +241,20 @@ export const SignInCard = () => {
             <Text variant="caption" color={colors.textTertiary} style={styles.note}>
               {ERASE_EXPLAINS}
             </Text>
+            <Text variant="caption" color={colors.textTertiary} style={styles.note}>
+              {NO_ACCOUNT_KEPT}
+            </Text>
+            {/*
+              `secondary` rather than `ghost`, which is the whole visual change
+              and the point of it. A ghost button is the quietest control this
+              app has, and the one control App Review is required to find
+              should not be the quietest thing on the screen. It is still not
+              the primary action on this card, because signing out is the thing
+              most people came here for.
+            */}
             <Button
-              label="Erase the copy on the server"
-              variant="ghost"
+              label={DELETE_ACCOUNT}
+              variant="secondary"
               size="small"
               onPress={() => setConfirmingErase(true)}
               style={styles.action}

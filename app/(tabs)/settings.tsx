@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Linking, Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { Button } from '../../src/components/Button';
@@ -18,7 +18,7 @@ import { Card } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
-import { ALLOW_DEMO_SEED, ALLOW_SIGN_IN } from '../../src/config';
+import { ALLOW_DEMO_SEED, ALLOW_SIGN_IN, PRIVACY_POLICY, SUPPORT_EMAIL } from '../../src/config';
 import { getRepository, STORAGE_ENGINE } from '../../src/data';
 import { toCsvFile } from '../../src/domain/export/csv';
 import {
@@ -34,6 +34,7 @@ import { SignInCard } from '../../src/features/account/SignInCard';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
+import { releaseLabel } from '../../src/version';
 import { PageMeta } from '../../src/components/PageMeta';
 
 export default function SettingsScreen() {
@@ -273,12 +274,56 @@ export default function SettingsScreen() {
 
       <FamilyCrossPromo exclude={['log']} style={styles.family} />
 
+      {/*
+        Help and legal, which is one section because it answers one question:
+        where does somebody go when the app is wrong, or when they want to
+        know what it does with their log.
+
+        It is also the section an app store requires. A privacy policy URL is
+        a field App Store Connect will not accept a build without, and a way
+        to reach a human is what a reviewer looks for when the rest of the
+        screen is about deleting things.
+      */}
+      <SectionHeader title="Help and legal" />
+      <Card>
+        <Text color={colors.textSecondary} style={styles.body}>
+          The privacy policy says what Log stores, where, and what leaves this
+          device. If something here is wrong, the address below reaches a person.
+        </Text>
+        <View style={styles.exportRow}>
+          <Button
+            label="Privacy policy"
+            variant="secondary"
+            size="medium"
+            style={styles.exportButton}
+            onPress={() => void Linking.openURL(PRIVACY_POLICY)}
+          />
+          <Button
+            label="Contact support"
+            variant="secondary"
+            size="medium"
+            style={styles.exportButton}
+            onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          />
+        </View>
+        <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>
+          {SUPPORT_EMAIL}
+        </Text>
+      </Card>
+
       <View style={styles.about}>
         <Text variant="caption" color={colors.textTertiary} center>
           Log · log.poker
         </Text>
         <Text variant="caption" color={colors.textTertiary} center>
           The session log that keeps you off tilt.
+        </Text>
+        {/*
+          The build, which is the first thing anybody asks about a bug and the
+          last thing anybody can find out. See `src/version.ts`.
+        */}
+        <Text variant="caption" color={colors.textTertiary} center>
+          {releaseLabel()}
         </Text>
       </View>
     </Screen>

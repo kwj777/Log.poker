@@ -293,7 +293,7 @@ const HELPLINE = `<p>
  * page: no rating, no author invented for the byline, no date pretending the
  * page was revised when it was not.
  */
-const render = ({ slug, title, description, updated, body }) => {
+const render = ({ slug, title, description, updated, body, type = 'Article' }) => {
   const url = `${SITE}${slug}`;
   const others = NAV.filter(([href]) => href !== slug);
   return `<!doctype html>
@@ -313,7 +313,7 @@ const render = ({ slug, title, description, updated, body }) => {
     <meta name="color-scheme" content="dark" />
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <meta property="og:type" content="article" />
+    <meta property="og:type" content="${type === 'Article' ? 'article' : 'website'}" />
     <meta property="og:site_name" content="Log" />
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
@@ -322,7 +322,7 @@ const render = ({ slug, title, description, updated, body }) => {
 ${JSON.stringify(
   {
     '@context': 'https://schema.org',
-    '@type': 'Article',
+    '@type': type,
     headline: title,
     description,
     url,
@@ -357,7 +357,7 @@ ${body}
 ${others.map(([href, label]) => `          <a href="${href}">${label}</a>`).join('\n')}
           <a href="/blog">The Log Blog</a>
           <a href="/sitemap">Sitemap</a>
-        </nav>
+${slug === '/privacy' ? '' : '          <a href="/privacy">Privacy</a>\n'}        </nav>
         ${HELPLINE}
       </footer>
     </div>
@@ -933,9 +933,233 @@ ${next({
 `,
 };
 
+/* ---------------------------------------------------------- the legal page */
+
+/**
+ * The privacy policy.
+ *
+ * Generated here rather than hand-written for the reason at the top of this
+ * file, plus one this page has of its own: **it is a submission requirement
+ * with a URL attached.** App Store Connect will not accept a build without a
+ * link to this page, and a reviewer follows the link. A document living
+ * anywhere other than the deploy is a document that can go missing without
+ * anybody noticing until the next review.
+ *
+ * It is not in the NAV list and not in either sitemap. The guides are there
+ * because each one answers a question somebody typed into a search box; this
+ * one is there because somebody went looking for it, which is what the footer
+ * link on every page is for. `public/sitemap.xml` explains the same rule for
+ * /chip and /apps, and `src/site/__tests__/content.test.ts` asserts the XML
+ * list exactly, so adding it to either sitemap is a failing test rather than a
+ * judgment call.
+ *
+ * ## The rule for editing it
+ *
+ * Every sentence below is a claim about what the code does, and each one is
+ * checked against the code in `src/site/__tests__/privacy.test.ts`. If the
+ * behavior changes, this page is wrong before it is out of date. That is the
+ * same tripwire reasoning the front page needed when sync shipped and its
+ * "no server to send anything to" line quietly became false.
+ */
+const privacy = {
+  slug: '/privacy',
+  title: 'Privacy policy for Log',
+  description:
+    'What Log stores, where it stores it, what leaves your device and when, who else can see it, and how to delete all of it. The short version is that almost nothing leaves.',
+  updated: '2026-09-19',
+  type: 'WebPage',
+  body: `      <header>
+        <p class="eyebrow">Legal</p>
+        <h1>Privacy policy for Log</h1>
+        <p class="lede">
+          Last updated 19 September 2026. Log is a session log for poker
+          players. This page says what it stores, what leaves your device, and
+          how to delete all of it.
+        </p>
+      </header>
+
+      <section>
+        <h2>The short version</h2>
+        <p>
+          Your log lives on your device. Nothing leaves it unless you sign in,
+          and signing in is optional: every feature of Log works without an
+          account. If you do sign in, Log carries your own log to your own
+          other devices and sends nothing else.
+        </p>
+        <div class="note">
+          <p>
+            There are no ads in Log, no analytics, no third party trackers and
+            no advertising identifiers. Nothing here is sold, rented or shared
+            with anybody for marketing, because there is no such arrangement to
+            share it under.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>What Log stores on your device</h2>
+        <p>
+          Everything you enter: your sessions, the hands you log, the mood
+          check-ins, and the venues you have played at. On a phone that is a
+          SQLite database inside the app. In a browser it is IndexedDB, which
+          belongs to the site and to that browser.
+        </p>
+        <p>
+          If you have signed in, the app also holds the sign-in token it was
+          issued. On a phone that goes in the system keychain by way of
+          <code>expo-secure-store</code>. In a browser it is in the site's own
+          local storage.
+        </p>
+        <p>
+          None of it is readable by us. It is on your device, and deleting the
+          app deletes it.
+        </p>
+      </section>
+
+      <section>
+        <h2>What leaves your device, and only if you sign in</h2>
+        <h3>Your email address, once</h3>
+        <p>
+          Signing in means typing an address and then the code mailed to it.
+          The address is sent to log.poker so the mail can be sent, and it is
+          not written down. The record that holds the code is keyed by a
+          one-way fingerprint of the address rather than by the address, and
+          what it holds is a fingerprint of the code rather than the code. It
+          is deleted fifteen minutes later, whether you used it or not.
+        </p>
+        <p>
+          The consequence is worth stating plainly, because it is unusual:
+          there is no list of who uses Log, and no way to produce one. Nobody
+          here can look up an address and find a log, or look at a log and find
+          an address.
+        </p>
+        <h3>Your log, while you stay signed in</h3>
+        <p>
+          Once signed in, Log sends the sessions, hands, mood entries and
+          venues you have recorded, so the same log is on your other devices.
+          It is stored on Netlify, in a bucket named by a fingerprint derived
+          the same one-way manner from your address. Nothing else about the
+          device, the network or the person is sent with it.
+        </p>
+        <p>
+          The sign-in token lasts thirty days and renews while you keep using
+          the app. Signing out forgets the token on that device and leaves both
+          copies where they are.
+        </p>
+      </section>
+
+      <section>
+        <h2>Who else touches it</h2>
+        <p>
+          Two companies, both because Log has to use somebody for these jobs
+          and neither for anything else:
+        </p>
+        <ul>
+          <li>
+            <strong>Netlify</strong> hosts log.poker and stores the synced log.
+            Like any web host it records ordinary server logs, including IP
+            addresses, for the requests your device makes.
+          </li>
+          <li>
+            <strong>Resend</strong> sends the one mail with your sign-in code
+            in it. Sending mail to an address means handing them the address.
+          </li>
+        </ul>
+        <p>
+          That is the whole list. There is no analytics vendor, no crash
+          reporter, no advertising network and no data broker, so there is
+          nothing further down the page about what they get.
+        </p>
+      </section>
+
+      <section>
+        <h2>Deleting it</h2>
+        <p>
+          <strong>On your device.</strong> Settings has a control that clears
+          every session, hand, mood entry and venue. Deleting the app does the
+          same thing on a phone; clearing site data does it in a browser.
+        </p>
+        <p>
+          <strong>On the server.</strong> Settings, under "Your other devices",
+          has a control called "Delete your account and its data". It deletes
+          the stored copy and signs that device out. It cannot be undone, and
+          no device will put it back.
+        </p>
+        <p>
+          There is no account record left behind, because there was never one
+          to begin with: no name, no profile and no stored address, only the
+          bucket that control deletes. That is the whole of what is held, so
+          deleting it is the whole of the deletion.
+        </p>
+      </section>
+
+      <section>
+        <h2>Moving between the three apps</h2>
+        <p>
+          Log is one of three apps that share a single pass, with
+          tiltproof.poker and untilt.poker. When you open one of them from a
+          link inside Log, the link can carry the hand you were looking at so
+          the other app opens on the right thing. It carries no address and no
+          part of your log. Those apps have their own policies and their own
+          storage; nothing here reads theirs and nothing there reads this.
+        </p>
+      </section>
+
+      <section>
+        <h2>Children</h2>
+        <p>
+          Log is a record keeping tool for adults who play poker for money. It
+          is not directed at children and is not intended for anybody under 18,
+          and nothing here is knowingly collected from them.
+        </p>
+      </section>
+
+      <section>
+        <h2>Your rights over it</h2>
+        <p>
+          Depending on where you live you may have a right to see what is held
+          about you, to correct it, to have it deleted, or to take it
+          elsewhere. All four are already controls in the app rather than
+          requests you have to make: your log is on your device to read, the
+          export in Settings writes it out as a spreadsheet, and the two
+          deletion controls above reach everything there is.
+        </p>
+        <p>
+          If you would rather ask a person, the address below works. Bear in
+          mind what the sign-in section says: an address on its own cannot be
+          connected to a log, so a request to see what is held will need the
+          app to be signed in on your device to answer at all.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes to this page</h2>
+        <p>
+          The date at the top is the date it last changed. A change that makes
+          a real difference to what leaves your device will be said in the app
+          as well, not left here to be discovered.
+        </p>
+      </section>
+
+      <section>
+        <h2>How to reach us</h2>
+        <p>
+          <a href="mailto:support@log.poker">support@log.poker</a>, which is
+          also where to write when the app is wrong about something.
+        </p>
+      </section>
+`,
+};
+
 /* ------------------------------------------------------------------ main */
 
-const PAGES = [runningBad, bankroll, potOdds, tilt];
+/**
+ * The four guides, then the legal page.
+ *
+ * `privacy` is last and is not in `NAV`, so it links out to the guides and
+ * they link to it from the footer without it joining their cross-link ring.
+ */
+const PAGES = [runningBad, bankroll, potOdds, tilt, privacy];
 
 const check = process.argv.includes('--check');
 let stale = 0;

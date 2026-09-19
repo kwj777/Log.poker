@@ -1064,8 +1064,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 54 passed
-Tests:       1536 passed
+Test Suites: 58 passed
+Tests:       1596 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1076,10 +1076,10 @@ Tests:       1536 passed
   sessionImport      52   reading a session-summary export
   verify             52   checking a token, and every way past it that must not work
   tournaments        51   ROI, its interval, cash rate, dry runs, finishes
+  copy               50   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   stats              45   P/L, rebuys, duration, win rate, groupings
-  copy               43   what the sign-in and the sync are allowed to say
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
@@ -1096,10 +1096,12 @@ Tests:       1536 passed
   handOffs           21   where a hand-off goes, and what the mid-session card says
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
+  privacy            20   the policy page, held to the code it describes
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
   money              18   cents arithmetic, parsing, formatting
+  release            18   app.json, eas.json and the icon a store refuses over
   seed               17   the demo dataset stays coherent
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
@@ -1110,6 +1112,7 @@ Tests:       1536 passed
   csvWriter          11   writing CSV, and reading back exactly what was written
   history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
+  liveTimer           9   the session clock, across a background and back
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
   sessionDetail       8   one session and the hands that belong to it
@@ -1120,6 +1123,7 @@ Tests:       1536 passed
   writeFailures       7   what the player sees when a write does not work
   readme              6   the test table adds up and says what each suite is for
   settingsExport      6   the export card, and what it refuses to write
+  settingsHelp        6   the privacy link, the support address, the build
   errorBoundary       5   a render that throws, and the way back from it
 ```
 

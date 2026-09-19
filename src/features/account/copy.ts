@@ -237,11 +237,43 @@ export const describeSession = (session: { claim: Claim; syncs: boolean }): stri
  * out and in again, which forgets its cursors the same way this does.
  */
 export const ERASE_EXPLAINS =
-  'You can also erase the copy on the server. That signs this device out, and leaves your log here.';
+  'Deleting your account deletes the copy on the server. That signs this device out, and leaves your log here.';
 
 /** The step between the button and the deletion. Says what it reaches. */
 export const ERASE_CONFIRM =
-  'This deletes the copy Log is holding for you and signs this device out. It cannot be undone, and no device will put it back. The log on this device is untouched, and so is the one on every other device you have signed in on.';
+  'This deletes your account and the copy Log is holding for you, and signs this device out. It cannot be undone, and no device will put it back. The log on this device is untouched, and so is the one on every other device you have signed in on.';
+
+/**
+ * The label on the button, which is a separate string for a separate reason.
+ *
+ * Everything above is written for the person holding the phone. This one is
+ * also written for somebody reviewing the app, and the two audiences want
+ * different words for the same act.
+ *
+ * App Review requires an in-app way to delete an account, and looks for it by
+ * reading the screen. The button used to say "Erase the copy on the server",
+ * which is precise and is not what a reviewer scanning Settings is looking
+ * for: the words are "delete" and "account", and a control that avoids both
+ * reads as an absent feature rather than a carefully named one. Log has
+ * nothing to gain from being the app that hid its delete button behind better
+ * vocabulary.
+ *
+ * It is also the more truthful of the two once you follow what is actually
+ * stored. There is no account record to delete separately: `signinEndpoint.ts`
+ * keeps no user table, an address is never written down, and the only thing
+ * the server holds for anybody is the bucket this deletes. So deleting the
+ * copy on the server *is* deleting the account, and the old label was
+ * describing the implementation where this describes the act.
+ */
+export const DELETE_ACCOUNT = 'Delete your account and its data';
+
+/**
+ * The one sentence that says there was never an account record in the first
+ * place, which is the part somebody reading a privacy policy wants and the
+ * part a reviewer asking "where did the account go" needs.
+ */
+export const NO_ACCOUNT_KEPT =
+  'Log keeps no account record beyond that copy. Your address is never stored, only a one-way fingerprint of it, so there is nothing else left to delete.';
 
 /**
  * What to say when it did not happen.

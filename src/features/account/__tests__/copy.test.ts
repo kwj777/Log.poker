@@ -22,10 +22,12 @@ import { SUBJECT_PASSCODE, type Claim } from '../../../auth/token';
 import type { HandoffFailure } from '../../../auth/handoff';
 import {
   CODE_SENT,
+  DELETE_ACCOUNT,
   ERASE_CONFIRM,
   ERASE_DONE,
   ERASE_EXPLAINS,
   ERASE_FAILED,
+  NO_ACCOUNT_KEPT,
   NOTHING_LEAVES,
   describeSession,
   describeSync,
@@ -385,6 +387,76 @@ describe('erasing the copy on the server', () => {
   it('asks first, rather than deleting on one tap', () => {
     expect(card).toContain('confirmingErase');
     expect(card).toContain("variant=\"danger\"");
+  });
+});
+
+/**
+ * The same control, named for the other person who has to find it.
+ *
+ * App Review requires an app that creates accounts to offer deleting one, and
+ * looks for it by reading the screen. This control has always done the work;
+ * it was called "Erase the copy on the server", which is precise, is what the
+ * code does, and is not what somebody scanning Settings for a delete button
+ * is reading for. The words are "delete" and "account".
+ *
+ * These are assertions about vocabulary, which is an odd thing to test until
+ * you notice that the vocabulary is the requirement. Nothing here constrains
+ * the sentences around it.
+ */
+describe('and calling that what it is', () => {
+  const card = read('src', 'features', 'account', 'SignInCard.tsx');
+
+  it('says both of the words a reviewer is looking for', () => {
+    expect(DELETE_ACCOUNT).toMatch(/\bdelete\b/i);
+    expect(DELETE_ACCOUNT).toMatch(/\baccount\b/i);
+  });
+
+  it('and the label is what the button actually renders', () => {
+    // A constant nothing reads is a constant that drifts. This is the whole
+    // reason the label is exported rather than written inline.
+    expect(card).toContain('label={DELETE_ACCOUNT}');
+  });
+
+  it('is not the quietest control on the card any more', () => {
+    // `ghost` is the faintest variant this app has, and the one control an
+    // app store requires you to find should not be wearing it.
+    const offer = card.slice(card.indexOf('{ERASE_EXPLAINS}'), card.indexOf('{problem ?'));
+    expect(offer).toContain('label={DELETE_ACCOUNT}');
+    expect(offer).not.toContain("variant=\"ghost\"");
+  });
+
+  it('and the confirmation says account too, since that is the word that was read', () => {
+    expect(ERASE_CONFIRM).toMatch(/\baccount\b/i);
+    expect(ERASE_EXPLAINS).toMatch(/\baccount\b/i);
+  });
+
+  it('while still saying what it actually reaches, which has not changed', () => {
+    // The relabel is not allowed to cost the precision that was there. These
+    // four are asserted above as well, deliberately: this describes the new
+    // name and those describe the old promises, and both have to hold.
+    expect(ERASE_CONFIRM).toMatch(/signs this device out/);
+    expect(ERASE_CONFIRM).toMatch(/cannot be undone/);
+    expect(ERASE_CONFIRM).toMatch(/untouched/);
+  });
+
+  it('explains why there is no second step, because a reviewer will ask', () => {
+    // "You deleted the data, now delete the account" is the obvious follow-up
+    // and there is nothing to do about it, so the screen says why rather than
+    // leaving somebody to guess that something was skipped.
+    expect(NO_ACCOUNT_KEPT).toMatch(/no account record/i);
+    expect(NO_ACCOUNT_KEPT).toMatch(/never stored/i);
+    expect(card).toContain('{NO_ACCOUNT_KEPT}');
+  });
+
+  it('and that claim is true of the endpoint that would have to store one', () => {
+    // The sentence above is a statement about `signinEndpoint.ts`. If a user
+    // table ever appears there, this is the thing that was already promising
+    // it did not exist.
+    const endpoint = read('src', 'auth', 'signinEndpoint.ts');
+    const code = endpoint.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).toContain('subjectForEmail');
+    // The store is keyed by a derived name, never by the address itself.
+    expect(code).not.toMatch(/store\.set(JSON)?\(\s*email/);
   });
 });
 

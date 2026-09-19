@@ -98,23 +98,54 @@ const chunk = (type, data) => {
   return Buffer.concat([length, body, crc]);
 };
 
-/** Encode RGBA pixel data (Uint8Array, 4 bytes per pixel) as a PNG. */
+/**
+ * Encode RGBA pixel data (Uint8Array, 4 bytes per pixel) as a PNG.
+ *
+ * **An image with nothing transparent in it is written without an alpha
+ * channel**, as color type 2 rather than 6. That is not a size optimization,
+ * although it is one. `assets/icon.png` is the App Store icon, and App Store
+ * Connect rejects an icon that has an alpha channel, whether or not anything
+ * in it is actually translucent. This encoder wrote type 6 for every output,
+ * so the one icon that may not have a channel had one.
+ *
+ * Detected rather than declared. `drawIcon` already knows which outputs stand
+ * on a background and which do not, and a second flag saying the same thing is
+ * a second thing to get wrong: the adaptive icons and the splash mark are
+ * genuinely transparent and must keep their channel, and a `noAlpha: true`
+ * pasted onto one of those would silently flatten it against black. Scanning
+ * the pixels cannot disagree with the pixels.
+ */
 const encodePng = (width, height, rgba) => {
-  const stride = width * 4;
+  const opaque = (() => {
+    for (let at = 3; at < rgba.length; at += 4) if (rgba[at] !== 255) return false;
+    return true;
+  })();
+
+  const channels = opaque ? 3 : 4;
+  const stride = width * channels;
   const raw = Buffer.alloc((stride + 1) * height);
   for (let y = 0; y < height; y += 1) {
     raw[y * (stride + 1)] = 0; // filter: none
-    Buffer.from(rgba.buffer, rgba.byteOffset + y * stride, stride).copy(
-      raw,
-      y * (stride + 1) + 1,
-    );
+    const row = y * (stride + 1) + 1;
+    if (opaque) {
+      // Copied a pixel at a time rather than a row at a time, because dropping
+      // the fourth byte is what this loop is for.
+      for (let x = 0; x < width; x += 1) {
+        const from = (y * width + x) * 4;
+        raw[row + x * 3] = rgba[from];
+        raw[row + x * 3 + 1] = rgba[from + 1];
+        raw[row + x * 3 + 2] = rgba[from + 2];
+      }
+    } else {
+      Buffer.from(rgba.buffer, rgba.byteOffset + y * stride, stride).copy(raw, row);
+    }
   }
 
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // color type: RGBA
+  ihdr[9] = opaque ? 2 : 6; // color type: RGB, or RGBA where a channel is used
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;

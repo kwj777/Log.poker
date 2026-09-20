@@ -287,6 +287,35 @@ describe('what it refuses to store', () => {
     expect(({} as Record<string, unknown>).record).toBeUndefined();
   });
 
+  it('keeps each record’s own heardAt across a version change', () => {
+    // The finding. Restamping every entry with `now` gave the whole bundle one
+    // stamp, and the cursor *is* a stamp: everything sharing one is handed over
+    // together or not at all, so `answerFrom`'s budget stopped applying to any
+    // of it. A migration is when a bundle is largest, so paging broke at
+    // precisely the moment it existed for.
+    const stored = {
+      version: BUNDLE_VERSION - 1,
+      heardThrough: T0 + 5,
+      records: {
+        venues: {
+          v1: { record: { id: 'v1', updatedAt: T0 }, deletedAt: null, heardAt: T0 + 1 },
+          v2: { record: { id: 'v2', updatedAt: T0 }, deletedAt: null, heardAt: T0 + 5 },
+        },
+      },
+    };
+    const bundle = readBundle(JSON.parse(JSON.stringify(stored)), NOW);
+    expect(bundle.records.venues.v1.heardAt).toBe(T0 + 1);
+    expect(bundle.records.venues.v2.heardAt).toBe(T0 + 5);
+  });
+
+  it('still stamps an entry that has no heardAt of its own', () => {
+    const bundle = readBundle(
+      { version: BUNDLE_VERSION, records: { venues: { v1: { record: { id: 'v1', updatedAt: T0 }, deletedAt: null } } } },
+      NOW,
+    );
+    expect(bundle.records.venues.v1.heardAt).toBe(NOW);
+  });
+
   it('drops a stored record filed under the wrong id', () => {
     const bundle = readBundle({
       version: 1,

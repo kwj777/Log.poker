@@ -1,4 +1,4 @@
-import { normalizeHeader, resolveColumns } from '../columns';
+import { ALIAS_COLLISIONS, normalizeHeader, resolveColumns } from '../columns';
 
 describe('normalizeHeader', () => {
   it('reduces a header to letters and digits', () => {
@@ -57,5 +57,28 @@ describe('resolveColumns', () => {
     const map = resolveColumns(['Date', 'Rebuys', 'Result']);
     expect(map.indexes.buyIn).toBeUndefined();
     expect(map.unmapped).toContain('Rebuys');
+  });
+});
+
+describe('the alias table itself', () => {
+  it('has no alias two fields both claim', () => {
+    // `finish` was claimed by `endedAt` and by `finishPosition`, and first-wins
+    // gave it to `endedAt`: a tournament export's finishing places were parsed
+    // as end times, came out null, and never appeared in `unmapped` or
+    // `duplicates`, so nothing anywhere said so. This assertion is the only
+    // thing that would have caught it.
+    expect(ALIAS_COLLISIONS).toEqual([]);
+  });
+
+  it('reads a tournament “Finish” column as a placing', () => {
+    const map = resolveColumns(['Date', 'Buy-in', 'Fee', 'Prize', 'Entrants', 'Finish']);
+    expect(map.indexes.finishPosition).toBe(5);
+    expect(map.indexes.endedAt).toBeUndefined();
+  });
+
+  it('still reads the compound end-time spellings as an end time', () => {
+    for (const header of ['Finished', 'Finish time', 'Finished at']) {
+      expect(resolveColumns(['Date', header]).indexes.endedAt).toBe(1);
+    }
   });
 });

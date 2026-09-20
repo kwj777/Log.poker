@@ -62,9 +62,15 @@ const ALIASES: Record<ImportField, readonly string[]> = {
     'startedat', 'sessionstart', 'sessiondate', 'begin', 'began', 'dateplayed',
     'playedon', 'datetimeplayed', 'localstarttime', 'startdatetime',
   ],
+  // Not a bare `finish`. A tournament export's "Finish" column is the place
+  // somebody came, and `finishPosition` claims the same word below: first-wins
+  // handed it to this field, so the position was read as an end time, parsed to
+  // nothing, and dropped without landing in `unmapped` or `duplicates` -- the
+  // preview showed "Finish -> End", which reads as plausible. The compound
+  // spellings stay, because none of them names a placing.
   endedAt: [
     'end', 'ended', 'endat', 'endedat', 'enddate', 'endtime', 'enddatetime',
-    'finish', 'finished', 'finishtime', 'sessionend', 'stoptime', 'stopped',
+    'finished', 'finishtime', 'finishedat', 'sessionend', 'stoptime', 'stopped',
   ],
   duration: [
     'duration', 'length', 'hours', 'hrs', 'hoursplayed', 'minutes', 'mins',
@@ -114,19 +120,35 @@ const ALIASES: Record<ImportField, readonly string[]> = {
 };
 
 /**
- * Reverse index, built once. Two fields claiming the same alias would be a bug
- * in the table above, so the first one in `IMPORT_FIELDS` order wins and the
- * collision stays invisible rather than becoming order-dependent at runtime.
+ * Reverse index, built once. Two fields claiming the same alias is a bug in the
+ * table above, so the first one in `IMPORT_FIELDS` order wins and nothing is
+ * order-dependent at runtime.
+ *
+ * That was the whole of the guarantee, and it was not one: first-wins makes a
+ * collision *stable*, not visible. `finish` was claimed by both `endedAt` and
+ * `finishPosition` for as long as the table has existed, and the losing field
+ * simply never matched -- silently, because a stolen header is neither
+ * `unmapped` nor a `duplicate`. So the collisions are collected here and
+ * asserted empty by the suite, which is the only thing that would have caught
+ * it.
  */
+const collisions: { alias: string; kept: ImportField; shadowed: ImportField }[] = [];
+
 const FIELD_BY_ALIAS = ((): Map<string, ImportField> => {
   const map = new Map<string, ImportField>();
   for (const field of IMPORT_FIELDS) {
     for (const alias of ALIASES[field]) {
-      if (!map.has(alias)) map.set(alias, field);
+      const kept = map.get(alias);
+      if (kept !== undefined) collisions.push({ alias, kept, shadowed: field });
+      else map.set(alias, field);
     }
   }
   return map;
 })();
+
+/** Aliases two fields both claim. Empty, and `columns.test.ts` keeps it so. */
+export const ALIAS_COLLISIONS: readonly { alias: string; kept: ImportField; shadowed: ImportField }[] =
+  collisions;
 
 export interface ColumnMap {
   /** Column index for each field the header row supplied. */

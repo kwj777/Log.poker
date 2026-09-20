@@ -43,7 +43,12 @@ export interface TournamentTotals {
   itmRate: number | null;
   /** Entry fees paid -- the rake, which never comes back. */
   fees: Cents;
-  biggestScore: Cents | null;
+  /**
+   * The best *net* result, not the biggest prize. Named for what it holds: it
+   * was `biggestScore` over a value computed from `netResult`, which is a
+   * different number the moment an entry fee or a re-entry is involved.
+   */
+  biggestNet: Cents | null;
   bestFinish: number | null;
   /**
    * Mean finishing position as a fraction of the field, over the entries where
@@ -67,7 +72,7 @@ const EMPTY: TournamentTotals = {
   cashes: 0,
   itmRate: null,
   fees: 0,
-  biggestScore: null,
+  biggestNet: null,
   bestFinish: null,
   averageFinishPercentile: null,
   finishesKnown: 0,
@@ -98,7 +103,7 @@ export const tournamentTotals = (
   let fees = 0;
   let cashes = 0;
   let hours = 0;
-  let biggestScore: Cents | null = null;
+  let biggestNet: Cents | null = null;
   let bestFinish: number | null = null;
   let percentileSum = 0;
   let finishesKnown = 0;
@@ -110,7 +115,7 @@ export const tournamentTotals = (
     fees += session.fee ?? 0;
     hours += durationHours(session);
     if ((session.cashOut ?? 0) > 0) cashes += 1;
-    if (biggestScore === null || net > biggestScore) biggestScore = net;
+    if (biggestNet === null || net > biggestNet) biggestNet = net;
 
     const { finishPosition, entrants } = session;
     if (finishPosition !== null && finishPosition > 0) {
@@ -138,7 +143,7 @@ export const tournamentTotals = (
     cashes,
     itmRate: cashes / entries.length,
     fees,
-    biggestScore,
+    biggestNet,
     bestFinish,
     averageFinishPercentile: finishesKnown > 0 ? percentileSum / finishesKnown : null,
     finishesKnown,
@@ -208,11 +213,21 @@ export const assessTournaments = (totals: TournamentTotals): TournamentAssessmen
       median === null
         ? ''
         : ` At that rate, half of all dry runs go at least ${Math.round(median)} deep.`;
+    // The reading has to change when the number does. This said "the ordinary
+    // shape of the game, not a sign anything has changed" whatever `odds` came
+    // out at -- including the runs rare enough that the same function turns
+    // round and offers Untilt over them. A run in the longest tenth is still
+    // not evidence the player has got worse, and saying so is different from
+    // calling it ordinary.
+    const reading =
+      odds < 0.1
+        ? 'that is a long one even for this game, and a long one is still variance rather than a sign your edge has gone'
+        : 'it is the ordinary shape of the game, not a sign anything has changed';
     return {
       headline: `${dry} without a cash`,
       body: `You cash ${percent(rate)} of the time, so missing ${dry} in a row comes up about ${percent(
         odds,
-      )} of the time -- it is the ordinary shape of the game, not a sign anything has changed.${typical}`,
+      )} of the time -- ${reading}.${typical}`,
       suggestsUntilt: odds < 0.1,
     };
   }
@@ -408,6 +423,16 @@ export const roiConcentration = (
 /** `+15%`, `-8%`, `0%`. */
 export const formatRoi = (roi: number): string => {
   const rounded = Math.round(roi * 100);
+  // A sign that survives the rounding. An upper bound of -0.4% rounds to zero
+  // and used to print a bare "0%", so an interval the code had just called
+  // *losing* read "between -12% and 0%" over a sentence asserting the whole
+  // range sat below break even. Zero keeps no sign; a number that is only zero
+  // because it was rounded keeps the one it had.
+  if (rounded === 0) {
+    if (roi > 0) return '+0%';
+    if (roi < 0) return '-0%';
+    return '0%';
+  }
   return `${rounded > 0 ? '+' : ''}${rounded}%`;
 };
 

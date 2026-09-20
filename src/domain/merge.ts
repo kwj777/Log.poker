@@ -85,8 +85,22 @@ export const resolve = <T extends Mergeable>(mine: Versioned<T>, theirs: Version
   const mineDeleted = mine.deletedAt !== null;
   const theirsDeleted = theirs.deletedAt !== null;
   if (mineDeleted !== theirsDeleted) return mineDeleted ? mine : theirs;
-  return JSON.stringify(mine.record) >= JSON.stringify(theirs.record) ? mine : theirs;
+  return canonical(mine.record) >= canonical(theirs.record) ? mine : theirs;
 };
+
+/**
+ * A record as one string, in an order neither engine chose.
+ *
+ * The last tiebreak has to agree on every device or two of them keep different
+ * rows under one id for good, and it used to be `JSON.stringify` -- whose key
+ * order is *insertion* order. The SQL and Dexie row builders happen to agree
+ * on that today, so nothing was wrong yet; the moment one of them adds a column
+ * in a different place, the same record serializes two ways and the two devices
+ * pick opposite winners. Sorting the keys costs a comparison nobody makes twice
+ * a second and removes the dependence entirely.
+ */
+const canonical = (record: Mergeable): string =>
+  JSON.stringify(record, Object.keys(record).sort());
 
 /* ------------------------------------------------------- one active session */
 

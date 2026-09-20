@@ -188,10 +188,18 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
   if (typeof heardThrough === 'number' && Number.isFinite(heardThrough)) {
     bundle.heardThrough = Math.max(0, heardThrough);
   }
-  // Dropped whole on the way across a version, because after the migration
-  // above nothing in the bundle is older than the retention window, so nothing
-  // is collectable for ninety days and there is nothing for a device to be
-  // waiting on. Every device records itself again on its next sync.
+  // Dropped whole on the way across a version. The marks are a claim about a
+  // conversation this build has not had -- what a device acknowledged was a
+  // cursor in the old bundle's terms -- and a wrong one holds a sweep up or
+  // lets it run early. Every device records itself again on its next sync, and
+  // until they do, `collect` falls back to the retention window alone, which is
+  // the bound that was always underneath it.
+  //
+  // This used to lean on the restamping below instead: with every entry
+  // stamped `now`, nothing was collectable for ninety days, so the marks had
+  // nothing to hold up. The restamping is gone -- it made the bundle
+  // unpageable, see below -- so the window is doing the work on its own, which
+  // is what it does for a device that has been away too long in any case.
   if (!migrating && typeof devices === 'object' && devices !== null) {
     for (const [id, mark] of Object.entries(devices as Record<string, unknown>)) {
       if (!namesADevice(id) || typeof mark !== 'object' || mark === null) continue;
@@ -223,8 +231,17 @@ export const readBundle = (stored: unknown, now: Timestamp = 0): Bundle => {
       // The server's own stamp, kept as written. An entry with none was stored
       // by a version that had none, and is stamped now: see above.
       const { heardAt, clamped: wasClamped } = change as { heardAt?: unknown; clamped?: unknown };
-      const at =
-        !migrating && typeof heardAt === 'number' && Number.isFinite(heardAt) ? heardAt : now;
+      // Kept whenever it is readable, **including across a version change**,
+      // which is the part that was wrong. Restamping every entry with `now` on
+      // a migration gave the whole bundle one stamp, and a bundle with one
+      // stamp cannot be paged: the cursor is a stamp, so everything sharing one
+      // is delivered together or not at all, and `answerFrom`'s budget stops
+      // applying to any of it. A migration is exactly when a bundle is
+      // largest, so the one moment paging mattered was the one it stopped
+      // working. Nothing about a version bump makes an old stamp wrong -- it is
+      // this server's own note of when it heard a record, in the same units --
+      // and the fields a migration really does drop are handled above.
+      const at = typeof heardAt === 'number' && Number.isFinite(heardAt) ? heardAt : now;
       const entry: StoredChange = { ...clean, heardAt: at };
       // What this server already decided about a stamp from the future, kept so
       // it is not decided again every time that record is re-sent.

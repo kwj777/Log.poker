@@ -299,6 +299,52 @@ describe('parseSessionCsv', () => {
       expect(parseSessionCsv(inferred).sessions[0].draft.format).toBe('tournament');
     });
 
+    it('leaves a cash export with a rake column as cash', () => {
+      // The finding. `rake` is one of the fee field's aliases and a rake column
+      // is ordinary in online cash exports, most of which carry no format
+      // column: every row read as a tournament, which threw away the stakes,
+      // took the whole history out of the variance view and booked the rake as
+      // an entry fee. A rake of $0.00 was enough to do it.
+      const cash = [
+        'Date,Stakes,Buy-in,Cash-out,Rake',
+        '2024-01-05 18:00,$1/$2,200,320,4.50',
+        '2024-01-06 18:00,$1/$2,200,140,0.00',
+      ].join('\n');
+      const result = parseSessionCsv(cash);
+      expect(result.sessions.map((session) => session.draft.format)).toEqual(['cash', 'cash']);
+      expect(result.sessions.map((session) => session.draft.stakes)).toEqual([
+        { smallBlind: 100, bigBlind: 200 },
+        { smallBlind: 100, bigBlind: 200 },
+      ]);
+      expect(result.warnings.map((warning) => warning.message).join(' ')).not.toMatch(
+        /read as a tournament/i,
+      );
+    });
+
+    it('says which column made it read a row as a tournament', () => {
+      // The other half of the finding: the old warning said tournaments had
+      // been inferred and never said what from, so a file that guessed wrong
+      // gave the player nothing to act on.
+      const inferred = 'Date,Buyin,Fee,Prize\n2024-01-15,$100,$10,$0\n';
+      const message = parseSessionCsv(inferred)
+        .warnings.map((warning) => warning.message)
+        .join(' ');
+      expect(message).toMatch(/read as a tournament/i);
+      expect(message).toMatch(/Prize/);
+      expect(message).toMatch(/add a column saying/i);
+    });
+
+    it('keeps a tournament finishing position instead of reading it as an end time', () => {
+      const tournaments = [
+        'Date,Buy-in,Fee,Prize,Entrants,Finish',
+        '2024-01-05,100,10,0,500,312',
+        '2024-01-06,100,10,900,480,7',
+      ].join('\n');
+      const result = parseSessionCsv(tournaments);
+      expect(result.sessions.map((session) => session.draft.finishPosition)).toEqual([312, 7]);
+      expect(result.sessions.map((session) => session.draft.entrants)).toEqual([500, 480]);
+    });
+
     it('infers one from an entry fee alone', () => {
       const inferred = 'Date,Buyin,Fee,Prize\n2024-01-15,$100,$10,$0\n';
       expect(parseSessionCsv(inferred).sessions[0].draft.format).toBe('tournament');

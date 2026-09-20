@@ -1067,28 +1067,28 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 63 passed
-Tests:       1695 passed
+Tests:       1718 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
-  bundle             66   what ships to each platform, against the real output
+  bundle             68   what ships to each platform, against the real output
   handOffs           61   where a hand-off goes, and what the four offer cards say
-  site               56   the marketing/app split, the PWA, the sitemap
+  site               61   the marketing/app split, the PWA, the sitemap
   content            55   every figure in the guides, re-derived and read back
+  sessionImport      55   reading a session-summary export
   signinEndpoint     55   the free door, and every bound on it
-  sessionImport      52   reading a session-summary export
+  tournaments        54   ROI, its interval, cash rate, dry runs, finishes
   verify             52   checking a token, and every way past it that must not work
-  tournaments        51   ROI, its interval, cash rate, dry runs, finishes
   copy               50   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   stats              45   P/L, rebuys, duration, win rate, groupings
+  variance           40   win rate, σ, confidence bands, verdicts
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
-  variance           35   win rate, σ, confidence bands, verdicts
+  merge              32   two devices disagreeing, and who wins
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
-  merge              30   two devices disagreeing, and who wins
   token              29   the family token grammar, against signed fixtures
   palette            27   the theme matches BRAND.md
   migrations         26   a filled v2 database walked forward, both engines
@@ -1115,6 +1115,7 @@ Tests:       1695 passed
   logHand            12   logging a hand, the optional board, and the reset after a bad one
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
+  columns            10   header matching
   history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
@@ -1124,7 +1125,6 @@ Tests:       1695 passed
   postSessionReset    8   the offer after cash-out, and who it is talking to
   sessionDetail       8   one session and the hands that belong to it
   tokenStore.web      8   the browser token store
-  columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   writeFailures       7   what the player sees when a write does not work

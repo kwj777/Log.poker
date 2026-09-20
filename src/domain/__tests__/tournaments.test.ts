@@ -190,6 +190,27 @@ describe('assessTournaments', () => {
     expect(ordinary.suggestsUntilt).toBe(false);
   });
 
+  it('stops calling a run ordinary at the point it starts offering Untilt over it', () => {
+    // The body said "the ordinary shape of the game, not a sign anything has
+    // changed" whatever the odds came out at, including runs rare enough that
+    // the same function turned round and offered Untilt. Both readings still
+    // refuse to blame the player; only one of them calls the run ordinary.
+    const ordinary = assessTournaments(tournamentTotals(many(8, 4)));
+    expect(ordinary.suggestsUntilt).toBe(false);
+    expect(ordinary.body).toContain('ordinary shape of the game');
+
+    // A quarter cash rate, then twenty-five straight blanks on the end of it:
+    // about a 1-in-65 run, which is where `suggestsUntilt` turns on.
+    const blanks = Array.from({ length: 25 }, (_, index) =>
+      entry({ prize: 0, endedAt: T0 + (40 + index) * HOUR }),
+    );
+    const long = assessTournaments(tournamentTotals([...many(40, 4), ...blanks]));
+    expect(long.suggestsUntilt).toBe(true);
+    expect(long.body).not.toContain('ordinary shape of the game');
+    expect(long.body).toContain('still variance');
+    expect(`${long.headline} ${long.body}`).not.toMatch(/tilt|bad player|due|owed/i);
+  });
+
   it('is calm about a player who has never cashed', () => {
     const never = [entry(), entry(), entry(), entry()];
     const assessment = assessTournaments(tournamentTotals(never));
@@ -362,6 +383,25 @@ describe('formatRoi', () => {
     expect(formatRoi(0.153)).toBe('+15%');
     expect(formatRoi(-0.08)).toBe('-8%');
     expect(formatRoi(0)).toBe('0%');
+  });
+
+  it('keeps the sign on a number that is only zero because it was rounded', () => {
+    // An upper bound of -0.4% printed a bare "0%", so an interval the code had
+    // just called losing read "between -12% and 0%" under a sentence asserting
+    // the whole range sat below break even.
+    expect(formatRoi(-0.004)).toBe('-0%');
+    expect(formatRoi(0.004)).toBe('+0%');
+    expect(formatRoi(0)).toBe('0%');
+  });
+
+  it('never prints a range that reads as straddling break even when it does not', () => {
+    const losing = assessRoi(
+      { roi: -0.06, lower: -0.12, upper: -0.004, level: 95, entries: 20, samples: 2_000, verdict: 'losing' },
+      null,
+      20,
+    );
+    expect(losing.headline).toContain('-0%');
+    expect(losing.headline).not.toMatch(/and 0%/);
   });
 });
 

@@ -172,7 +172,12 @@ export default function VarianceScreen() {
     />
   );
 
-  if (!estimate.reliable) {
+  // On the assessment rather than on `estimate.reliable`, because there are now
+  // two ways to have nothing honest to say and the estimate only knows about
+  // one of them. The other is a player whose recent stretch is their whole
+  // history: enough sessions to estimate from, nothing to measure against. See
+  // `assessRecentStretch`.
+  if (assessment.verdict === 'insufficient_data') {
     return (
       <Screen>
         <PageMeta title="Variance · Log" />
@@ -245,8 +250,11 @@ export default function VarianceScreen() {
           <LegendItem color="rgba(31, 169, 122, 0.5)" label="95% range" block />
         </View>
         <Text variant="caption" color={colors.textTertiary} style={styles.chartNote}>
-          Cumulative big blinds won over hours played. The shaded area is where 95 out of
-          100 runs like yours would land. Inside it is unremarkable, and that is the whole point.
+          Cumulative big blinds won over hours played, against your own average. The shaded
+          area is how far from that average a run like yours could reasonably have strayed.
+          It closes toward the right because the average is made of these very hours: by the
+          last one there is no room left to stray. Inside it is unremarkable, and that is the
+          whole point.
         </Text>
       </Card>
 

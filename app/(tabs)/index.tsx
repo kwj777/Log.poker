@@ -42,9 +42,11 @@ import {
   tournamentTotals,
 } from '../../src/domain/tournaments';
 import { openHandOff } from '../../src/features/family/hooks';
+import { ReviewFlagged } from '../../src/features/family/ReviewFlagged';
+import { reviewPrompt } from '../../src/features/family/reviewPrompt';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
-import { useLogStore } from '../../src/store/useLogStore';
+import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
 import { APP_DESCRIPTION, PageMeta } from '../../src/components/PageMeta';
 
@@ -174,6 +176,40 @@ export default function DashboardScreen() {
     [sessions],
   );
 
+  /**
+   * The last session actually finished, which is not always the last started.
+   *
+   * `sessions` is ordered by start, and a night begun at 9pm and left running
+   * until the next afternoon finishes after one begun at noon the day after.
+   * Rare, and cheap to be right about.
+   *
+   * Null while a session is live, which is what keeps the review card off the
+   * screen at a table: `HandRow` hides its drill link mid-session for the same
+   * reason, and the rule belongs in one place rather than in the card.
+   */
+  const lastFinished = useMemo(() => {
+    if (activeSession !== null) return null;
+    return sessions.reduce<(typeof sessions)[number] | null>(
+      (latest, session) =>
+        session.endedAt !== null && (latest === null || session.endedAt > (latest.endedAt ?? 0))
+          ? session
+          : latest,
+      null,
+    );
+  }, [sessions, activeSession]);
+
+  /**
+   * Read once on mount rather than during render, the way History reads its
+   * period window: a clock that moves every frame would re-derive the prompt
+   * constantly, and the one boundary it could cross is a week away.
+   */
+  const [openedAt] = useState(() => Date.now());
+  const lastFinishedHands = useHandsForSession(lastFinished?.id ?? null);
+  const prompt = useMemo(
+    () => reviewPrompt({ session: lastFinished, hands: lastFinishedHands, now: openedAt }),
+    [lastFinished, lastFinishedHands, openedAt],
+  );
+
   const chartSeries = useMemo(
     () => [
       {
@@ -231,6 +267,14 @@ export default function DashboardScreen() {
           {Math.round(summary.hours)} hours played
         </Text>
       </View>
+
+      {/*
+        Above the graph because it is the one thing on this screen with
+        something to do in it, and below the bankroll because that is what the
+        player opened the app for. Renders nothing at all in the ordinary case;
+        see `reviewPrompt` for what has to be true for it to appear.
+      */}
+      <ReviewFlagged prompt={prompt} />
 
       <Card style={styles.chartCard}>
         <LineChart series={chartSeries} height={170} />

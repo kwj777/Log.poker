@@ -1064,8 +1064,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 59 passed
-Tests:       1622 passed
+Test Suites: 61 passed
+Tests:       1643 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1107,6 +1107,7 @@ Tests:       1622 passed
   signin             16   the sign-in client, against a fake fetch
   client             15   the sync client, against a fake fetch
   observe            14   how big the bundle was, said without saying whose
+  reviewPrompt       14   which flagged hands still want a review, and what the offer says
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
   csvWriter          11   writing CSV, and reading back exactly what was written
@@ -1121,6 +1122,7 @@ Tests:       1622 passed
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   logHand             7   logging a hand, and the board that is optional on it
+  reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   writeFailures       7   what the player sees when a write does not work
   readme              6   the test table adds up and says what each suite is for
   settingsExport      6   the export card, and what it refuses to write

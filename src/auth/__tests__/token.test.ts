@@ -13,7 +13,10 @@
 
 import { createHmac } from 'node:crypto';
 
-import { RENEW_WITHIN_MS, dueForRenewal, paidForSync, SUBJECT_PASSCODE, SYNC_NEEDS_PASS, syncIsPaidFor, TIERS, hasOwnSubject, readClaim, type Claim, type Tier } from '../token';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { RENEW_WITHIN_MS, dueForRenewal, hasPass, paidForSync, SUBJECT_PASSCODE, SYNC_NEEDS_PASS, syncIsPaidFor, TIERS, hasOwnSubject, readClaim, type Claim, type Tier } from '../token';
 
 const NOW = 1_700_000_000_000;
 const SECRET = 'test-gate-secret';
@@ -221,5 +224,47 @@ describe('what sync costs', () => {
     for (const tier of TIERS) {
       expect(paidForSync(claimOf(tier))).toBe(syncIsPaidFor(SYNC_NEEDS_PASS, claimOf(tier)));
     }
+  });
+});
+
+describe('whether somebody has bought the pass', () => {
+  const claimOf = (tier: Tier): Claim => ({
+    expiresAt: 1_800_000_000_000,
+    tier,
+    subject: 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4',
+  });
+
+  it('is the tier, and nothing else', () => {
+    expect(hasPass(claimOf('full'))).toBe(true);
+    expect(hasPass(claimOf('free'))).toBe(false);
+  });
+
+  it('and is no, rather than a crash, for a device that never signed in', () => {
+    // Every screen that reads this is on the free path by default, so the
+    // signed-out answer is the one almost every caller actually gets.
+    expect(hasPass(null)).toBe(false);
+  });
+
+  it('is what the gate rule asks, so the two cannot drift apart', () => {
+    // `syncIsPaidFor` reads this rather than the tier directly. Without this
+    // assertion the two could be changed apart and only one of them would be
+    // what the word "paid" means in this app.
+    for (const tier of TIERS) {
+      expect(syncIsPaidFor(true, claimOf(tier))).toBe(hasPass(claimOf(tier)));
+    }
+    expect(syncIsPaidFor(true, null)).toBe(hasPass(null));
+  });
+
+  it('cannot be true for anybody this build can sign in, which is the point', () => {
+    /**
+     * Not a property of `hasPass` but of the door in front of it, and the
+     * thing to know before reading a branch that reads this: `signinEndpoint`
+     * mints `tier: 'free'` for every sign-in Log takes, and Log has never
+     * shipped a way to receive one of Untilt's tokens. So the paid branch of
+     * the after-session card is written, typed and tested, and no player can
+     * reach it until the shared entitlement exists.
+     */
+    const endpoint = readFileSync(join(__dirname, '..', 'signinEndpoint.ts'), 'utf8');
+    expect(endpoint).not.toMatch(/tier: 'full'/);
   });
 });

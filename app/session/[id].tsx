@@ -28,6 +28,7 @@ import {
 } from '../../src/domain/stats';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MoodTimeline } from '../../src/features/sessions/MoodTimeline';
+import { PostSessionReset } from '../../src/features/sessions/PostSessionReset';
 import { formatSessionDate, formatTimeOfDay } from '../../src/features/sessions/format';
 import {
   useHandsForSession,
@@ -39,7 +40,7 @@ import { colors, radius, resultColor, spacing } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
 
 export default function SessionDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, ended } = useLocalSearchParams<{ id: string; ended?: string }>();
   const session = useSessionById(id ?? null);
   const hands = useHandsForSession(id ?? null);
   const moods = useMoodForSession(id ?? null);
@@ -175,6 +176,14 @@ export default function SessionDetailScreen() {
           onPress={() => router.replace('/session/active')}
         />
       ) : null}
+
+      {/*
+        Only for the session that was just closed out, and only once it is
+        closed out. This screen is also where History lands, and an offer to
+        wind down from a night three weeks ago is noise. See the header of
+        `PostSessionReset`.
+      */}
+      {ended === '1' && !live ? <PostSessionReset /> : null}
 
       {moods.length > 0 ? (
         <>

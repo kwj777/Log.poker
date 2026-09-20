@@ -1368,6 +1368,43 @@ from the comparison rather than restating `[4, 5]`. A player who would land in
 that group at the end of the month is the one worth offering something to
 tonight, and two definitions of rattled in one app is one too many.
 
+### The after-session offer
+
+The other end of the same night, and deliberately a different offer. A player
+who has just counted their chips is away from the table, the session is
+written, and there is nothing left to interrupt -- which is where the
+mid-session card's own argument says the paid material belongs. So
+[`PostSessionReset`](src/features/sessions/PostSessionReset.tsx) appears after
+every session, win or lose, and says that Untilt has resets for the hour after
+one and that they are inside Untilt's pass.
+
+**It is keyed to the moment, not to the screen.** Session detail is also where
+History lands, and a wind-down offered for a night three weeks gone is noise.
+Cash-out navigates with `?ended=1` and nothing else sets it, so the card is
+rendered by the session that just finished and by no other.
+
+**It waits to know who it is talking to.** A player who has bought the pass is
+told their pass already covers it rather than being sold what they own, and the
+card renders nothing at all until that read lands. Showing one sentence and
+swapping it a frame later is the same failure the hands count guards against
+one section up. `hasPass` is the question, and it is false for everybody today:
+Log's own door mints the free tier and this app has never shipped a way to
+receive one of Untilt's tokens. The branch is written, typed and tested anyway,
+for the reason everything around `SYNC_NEEDS_PASS` is.
+
+**It names no price and links to no checkout**, which is the whole distance
+between this and a purchasing mechanism Apple would have something to say
+about. `SUBMISSION.md` records the reasoning; the tests assert the absence of a
+currency, a buy, a sign-up and an upgrade, the same way the mid-session card's
+do.
+
+The meditation a paid player would land in, `POST_SESSION_MEDITATION_ID`, is
+null until somebody checks the id against Untilt's source the way
+`RESET_MEDITATION_ID` was. An unknown id fails silently over there, resolving
+to null and opening the app normally, so a guess would not look like a bug from
+this side; it would look like a paid player being dropped on a home screen.
+Until it is pinned, both branches open untilt.poker and `lands` says so.
+
 The URL builders moved to [`src/features/family/links.ts`](src/features/family/links.ts)
 to make any of this testable. `hooks.ts` imports `Linking` from React Native,
 which this repository's Node test runner cannot load, so the builders had no

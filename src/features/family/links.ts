@@ -148,3 +148,61 @@ export const resetHandOff = (): { url: string; label: string } => ({
   url: `${FAMILY_LINKS.untilt}?source=log&play=${RESET_MEDITATION_ID}`,
   label: 'Take sixty seconds',
 });
+
+/**
+ * The meditation Untilt opens for somebody who has already paid, after a
+ * session. Null until it is verified, and read that way deliberately.
+ *
+ * `RESET_MEDITATION_ID` above is pinned because it was checked against
+ * Untilt's own source: its `#quick-reset` button opens that id and its
+ * `SAMPLE_IDS` lists it. Nothing here has been checked that way yet, and the
+ * far side fails silently -- `readArrival` resolves an id it does not know to
+ * null and opens the app normally -- so a guess would not look like a bug from
+ * this side. It would look like a paid player being dropped on a home screen.
+ *
+ * So the unverified state is null rather than a plausible string, and
+ * `postSessionHandOff` sends no `play` at all while it is. That is the same
+ * landing a player without the pass gets, which is the honest fallback: the
+ * library, rather than a promise of an exercise that does not open.
+ *
+ * Annotated `string | null` rather than left to infer `null`, so both branches
+ * stay code the compiler checks, the way `SYNC_NEEDS_PASS` does.
+ */
+export const POST_SESSION_MEDITATION_ID: string | null = null;
+
+/**
+ * What a player is offered when they close out a session, win or lose.
+ *
+ * Unlike `resetHandOff`, which is for somebody rattled at a table and points
+ * at the free sixty-second reset, this is the after-session offer and the
+ * material behind it is inside Untilt's pass. Two things follow from that.
+ *
+ * **It says nothing about price and links to no checkout.** `SUBMISSION.md`
+ * records why: App Store guideline 3.1.1 is about an app steering a customer
+ * to a purchase it does not take through Apple, and the distance between "this
+ * exists over there" and "buy it here" is the whole of what keeps an outbound
+ * link to a sister app an ordinary link. Nothing in Log is sold or unlocked
+ * either way, which stays true with this card on the screen.
+ *
+ * **Nothing about the session crosses.** Not the result, not the mood, not the
+ * venue. `context=post_session` says only which screen the tap came from, and
+ * it is a constant rather than anything about this player's night. Same call,
+ * for the same reason, as keeping the mood score out of `resetHandOff`: a
+ * query string lands in browser history and in every log that sees the URL.
+ *
+ * `lands` is whether the link opens an exercise rather than Untilt's library,
+ * which is what the card's copy has to agree with. It is false for everybody
+ * today, because the id above is not pinned yet.
+ */
+export const postSessionHandOff = (paid: boolean): { url: string; label: string; lands: boolean } => {
+  const play = paid ? POST_SESSION_MEDITATION_ID : null;
+
+  const params = new URLSearchParams({ source: 'log', context: 'post_session' });
+  if (play !== null) params.set('play', play);
+
+  return {
+    url: `${FAMILY_LINKS.untilt}?${params.toString()}`,
+    label: play === null ? 'Open Untilt.poker' : 'Open your reset',
+    lands: play !== null,
+  };
+};

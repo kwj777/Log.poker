@@ -24,9 +24,9 @@ import { join } from 'node:path';
 import { FAMILY_LINKS } from '../../../config';
 import { POSITIONS } from '../../../domain/types';
 import {
-  POST_SESSION_MEDITATION_ID,
   RESET_MEDITATION_ID,
   TILTPROOF_REVIEW,
+  UNTILT_POST_LANE,
   drillHandOff,
   postSessionHandOff,
   resetHandOff,
@@ -221,19 +221,39 @@ describe('what the mid-session card says', () => {
 });
 
 describe('the after-session offer', () => {
-  it('points at Untilt and says which screen sent the player', () => {
+  it('opens the lane that asks how the night went', () => {
+    // A lane rather than a meditation, because there are thirty-three
+    // wind-downs and which one fits depends on the answer to a question only
+    // Untilt asks. `after` is the id of its "I just finished" lane.
     for (const paid of [false, true]) {
       const url = new URL(postSessionHandOff(paid).url);
       expect(url.origin + url.pathname).toBe(new URL(FAMILY_LINKS.untilt).origin + '/');
+      expect(url.searchParams.get('lane')).toBe(UNTILT_POST_LANE);
       expect(url.searchParams.get('source')).toBe('log');
-      expect(url.searchParams.get('context')).toBe('post_session');
+    }
+  });
+
+  it('names the lane Untilt itself calls the after-session one', () => {
+    // Checked against that app rather than assumed, the way
+    // `RESET_MEDITATION_ID` is. A lane Untilt does not know is ignored over
+    // there and the app opens on its home screen, which is silent from here.
+    expect(UNTILT_POST_LANE).toBe('after');
+  });
+
+  it('sends no meditation id, because there is no right one to send', () => {
+    // Every after-session meditation is inside the pass and which of them
+    // fits is the question the lane exists to ask. A `play` here would answer
+    // it on the player's behalf and would be wrong most of the time.
+    for (const paid of [false, true]) {
+      expect(new URL(postSessionHandOff(paid).url).searchParams.get('play')).toBeNull();
     }
   });
 
   it('carries nothing about the night that was just logged', () => {
     // The same rule as the mid-session reset, for the same reason: a query
-    // string lands in an address bar and in every log that sees the URL, and
-    // nothing over there reads any of this anyway.
+    // string lands in an address bar and in every log that sees the URL. The
+    // mood is the tempting one, and Untilt is about to ask for it in its own
+    // vocabulary anyway.
     for (const paid of [false, true]) {
       const url = new URL(postSessionHandOff(paid).url);
       for (const leak of ['mood', 'result', 'net', 'stakes', 'venue', 'session']) {
@@ -242,33 +262,12 @@ describe('the after-session offer', () => {
     }
   });
 
-  it('opens Untilt rather than an exercise while the id is not pinned', () => {
-    // `POST_SESSION_MEDITATION_ID` is null because it has not been checked
-    // against Untilt's source the way `RESET_MEDITATION_ID` has. A guessed id
-    // fails silently over there, so the honest fallback is the library.
-    expect(POST_SESSION_MEDITATION_ID).toBeNull();
-    for (const paid of [false, true]) {
-      const offer = postSessionHandOff(paid);
-      expect(new URL(offer.url).searchParams.get('play')).toBeNull();
-      expect(offer.lands).toBe(false);
-    }
-  });
-
-  it('and `lands` never claims more than the address does', () => {
-    // The card's copy branches on this. If the two ever disagree a player is
-    // told they are opening their reset and arrives on a home screen.
-    for (const paid of [false, true]) {
-      const offer = postSessionHandOff(paid);
-      expect(offer.lands).toBe(new URL(offer.url).searchParams.has('play'));
-    }
-  });
-
-  it('only ever sends the exercise to somebody who has paid for it', () => {
-    // Read rather than exercised, because the constant is null today and the
-    // branch that matters cannot be reached. The day it is pinned, this is
-    // what stops an unpaid player being handed a locked meditation.
-    const links = source('src', 'features', 'family', 'links.ts');
-    expect(links).toContain('const play = paid ? POST_SESSION_MEDITATION_ID : null;');
+  it('is the same address for a player who has paid and one who has not', () => {
+    // The lane is right for both. Somebody without the pass arrives at
+    // Untilt's own account of what the wind-downs are, plus a free reset
+    // matched to the mood they just picked, which is better than anything
+    // this app could write and is written where the library is known.
+    expect(postSessionHandOff(true).url).toBe(postSessionHandOff(false).url);
   });
 
   it('names no price and no verb about buying, on either branch', () => {
@@ -306,6 +305,13 @@ describe('what the after-session card says', () => {
 
   it('does not sell the pass to somebody who already has it', () => {
     expect(copy).toContain('Your pass');
+  });
+
+  it('warns that Untilt asks its own question, so the second one is not a repeat', () => {
+    // This card follows the cash-out sheet's "how are you leaving?", and the
+    // lane opens on "how are you feeling?". Two moods in a row reads as a bug
+    // unless the first screen says the second one is coming.
+    expect(copy).toMatch(/will ask how it went/);
   });
 
   it('and leaves as easily as it arrived', () => {

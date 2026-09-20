@@ -1065,7 +1065,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 59 passed
-Tests:       1621 passed
+Tests:       1622 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1082,8 +1082,8 @@ Tests:       1621 passed
   stats              45   P/L, rebuys, duration, win rate, groupings
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
+  handOffs           35   where a hand-off goes, and what the two offer cards say
   variance           35   win rate, σ, confidence bands, verdicts
-  handOffs           34   where a hand-off goes, and what the two offer cards say
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
@@ -1399,12 +1399,24 @@ about. `SUBMISSION.md` records the reasoning; the tests assert the absence of a
 currency, a buy, a sign-up and an upgrade, the same way the mid-session card's
 do.
 
-The meditation a paid player would land in, `POST_SESSION_MEDITATION_ID`, is
-null until somebody checks the id against Untilt's source the way
-`RESET_MEDITATION_ID` was. An unknown id fails silently over there, resolving
-to null and opening the app normally, so a guess would not look like a bug from
-this side; it would look like a paid player being dropped on a home screen.
-Until it is pinned, both branches open untilt.poker and `lands` says so.
+**It hands off to a lane, not a meditation**, and that is the difference
+between the two cards. The mid-session reset points at one exercise because
+there is one right answer at a table: sixty seconds, free. After a session
+there are thirty-three wind-downs, every one of them inside the pass, and
+which one fits depends on how the night went. Untilt asks that itself, in its
+own ten words for it, on the screen `?lane=after` opens. Log knows a number
+from 1 to 5 and could not pick between "self-critical" and "drained" from it,
+so it does not try and does not send the number either.
+
+Both branches follow the same link, and only the sentence differs. Somebody
+without the pass reaches Untilt's own account of what the wind-downs are and a
+free reset matched to the mood they just picked, which is a better landing
+than anything written here and is written where the library is known.
+
+That means two moods in a row, Log's at cash-out and Untilt's on arrival, so
+the card says the second one is coming. They are different questions: this app
+wants a number for the tilt meter, that one wants which of ten states in order
+to choose, and it is the only one of the two that can.
 
 The URL builders moved to [`src/features/family/links.ts`](src/features/family/links.ts)
 to make any of this testable. `hooks.ts` imports `Linking` from React Native,

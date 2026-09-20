@@ -150,32 +150,35 @@ export const resetHandOff = (): { url: string; label: string } => ({
 });
 
 /**
- * The meditation Untilt opens for somebody who has already paid, after a
- * session. Null until it is verified, and read that way deliberately.
+ * The Untilt lane a player is sent to once they have closed out a session.
  *
- * `RESET_MEDITATION_ID` above is pinned because it was checked against
- * Untilt's own source: its `#quick-reset` button opens that id and its
- * `SAMPLE_IDS` lists it. Nothing here has been checked that way yet, and the
- * far side fails silently -- `readArrival` resolves an id it does not know to
- * null and opens the app normally -- so a guess would not look like a bug from
- * this side. It would look like a paid player being dropped on a home screen.
+ * A lane rather than a meditation, and that is the whole design. `play=<id>`
+ * lands in one exercise, which is right for the mid-session reset because
+ * there is exactly one right answer there: sixty seconds, free, at a table.
+ * After a session there are thirty-three wind-downs and which one fits
+ * depends on how the night went -- and Untilt asks that itself, on the screen
+ * this lane opens, in its own ten words for it. Log knows a number from 1 to
+ * 5 and could not pick between "self-critical" and "drained" from it.
  *
- * So the unverified state is null rather than a plausible string, and
- * `postSessionHandOff` sends no `play` at all while it is. That is the same
- * landing a player without the pass gets, which is the honest fallback: the
- * library, rather than a promise of an exercise that does not open.
+ * So there is no id to pin here, which is the second reason. An id Untilt
+ * does not recognize resolves to null over there and opens the app normally,
+ * so a guess fails silently and costs a player the whole feature.
  *
- * Annotated `string | null` rather than left to infer `null`, so both branches
- * stay code the compiler checks, the way `SYNC_NEEDS_PASS` does.
+ * `after` is the id of Untilt's "I just finished" lane, in its own `LANES`.
+ * An unknown lane is ignored over there and the app opens on its home screen,
+ * where that lane is the third card, so this degrades to the landing it had
+ * before rather than to nothing.
  */
-export const POST_SESSION_MEDITATION_ID: string | null = null;
+export const UNTILT_POST_LANE = 'after';
 
 /**
  * What a player is offered when they close out a session, win or lose.
  *
  * Unlike `resetHandOff`, which is for somebody rattled at a table and points
  * at the free sixty-second reset, this is the after-session offer and the
- * material behind it is inside Untilt's pass. Two things follow from that.
+ * material behind it is inside Untilt's pass. Every one of the wind-downs is,
+ * with no free exception, which is why the copy says so rather than leaving
+ * anybody to find out on arrival. Two more things follow.
  *
  * **It says nothing about price and links to no checkout.** `SUBMISSION.md`
  * records why: App Store guideline 3.1.1 is about an app steering a customer
@@ -185,24 +188,17 @@ export const POST_SESSION_MEDITATION_ID: string | null = null;
  * either way, which stays true with this card on the screen.
  *
  * **Nothing about the session crosses.** Not the result, not the mood, not the
- * venue. `context=post_session` says only which screen the tap came from, and
- * it is a constant rather than anything about this player's night. Same call,
- * for the same reason, as keeping the mood score out of `resetHandOff`: a
- * query string lands in browser history and in every log that sees the URL.
- *
- * `lands` is whether the link opens an exercise rather than Untilt's library,
- * which is what the card's copy has to agree with. It is false for everybody
- * today, because the id above is not pinned yet.
+ * venue. `lane` names a screen and `source` names this app; neither says
+ * anything about this player's night. The mood is the tempting one and it
+ * stays out for the same reason it stays out of `resetHandOff`: a query
+ * string lands in browser history and in every log that sees the URL, and
+ * Untilt is about to ask the question in its own vocabulary anyway.
  */
-export const postSessionHandOff = (paid: boolean): { url: string; label: string; lands: boolean } => {
-  const play = paid ? POST_SESSION_MEDITATION_ID : null;
-
-  const params = new URLSearchParams({ source: 'log', context: 'post_session' });
-  if (play !== null) params.set('play', play);
+export const postSessionHandOff = (paid: boolean): { url: string; label: string } => {
+  const params = new URLSearchParams({ source: 'log', lane: UNTILT_POST_LANE });
 
   return {
     url: `${FAMILY_LINKS.untilt}?${params.toString()}`,
-    label: play === null ? 'Open Untilt.poker' : 'Open your reset',
-    lands: play !== null,
+    label: paid ? 'Open your wind-down' : 'Find a wind-down',
   };
 };

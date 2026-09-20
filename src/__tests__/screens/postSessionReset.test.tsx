@@ -74,8 +74,8 @@ const load = (over: { ended?: string; tier?: 'full' | 'free' | null } = {}) => {
   });
 };
 
-const PASS_LINE = /Your pass/;
-const OFFER_LINE = /inside its pass/;
+const PASS_LINE = /Your pass covers them/;
+const OFFER_LINE = /They are inside its pass/;
 
 describe('after a session is closed out', () => {
   it('offers the after-session reset', async () => {
@@ -94,10 +94,10 @@ describe('after a session is closed out', () => {
 
     load({ ended: '1' });
     await renderScreen(<SessionDetailScreen />);
-    await userEvent.press(await screen.findByText('Open Untilt.poker'));
+    await userEvent.press(await screen.findByText('Find a wind-down'));
 
     expect(opened).toHaveLength(1);
-    expect(opened[0]).toContain('context=post_session');
+    expect(opened[0]).toContain('lane=after');
   });
 
   it('and goes away when the player says not now', async () => {
@@ -131,6 +131,7 @@ describe('a player who has already bought the pass', () => {
     await renderScreen(<SessionDetailScreen />);
     expect(await screen.findByText(PASS_LINE)).toBeTruthy();
     expect(screen.queryByText(OFFER_LINE)).toBeNull();
+    expect(screen.getByText('Open your wind-down')).toBeTruthy();
   });
 
   it('while everybody else is told where the resets live', async () => {

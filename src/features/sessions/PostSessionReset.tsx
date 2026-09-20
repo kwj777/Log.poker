@@ -38,6 +38,16 @@
  * an entitlement here is built, wired and tested against both answers, so that
  * the day the shared entitlement exists this is a constant changing rather
  * than a feature being written.
+ *
+ * ## Both branches follow the same link
+ *
+ * Only the sentence differs, and that is deliberate rather than unfinished.
+ * The link opens Untilt's after-session lane, which asks how the night went
+ * and then shows what fits. A player with the pass gets the wind-downs. A
+ * player without gets Untilt's own account of what they are and a free reset
+ * matched to the mood they just picked, which is a better landing than
+ * anything this app could write, and it is written over there, where the
+ * library is known.
  */
 
 import { useEffect, useState } from 'react';
@@ -52,21 +62,26 @@ import { openHandOff } from '../family/hooks';
 import { postSessionHandOff } from '../family/links';
 
 /**
- * What the card says, given what is known about the player and the link.
+ * What the card says, given what is known about the player.
  *
  * Pulled out of the component and exported so the wording can be tested
  * without rendering anything, the way `features/account/copy.ts` is. The
  * wording is the load bearing part of this card: see the note in
  * `postSessionHandOff` about the distance App Store guideline 3.1.1 draws
  * between naming something that exists elsewhere and selling it here.
+ *
+ * Both sentences say Untilt will ask how it went, because it will, on the
+ * screen this link opens. That is not padding. A player who has just answered
+ * "how are you leaving?" here and is then asked again over there has been
+ * asked the same thing twice unless somebody says why, and the two questions
+ * are different ones: Log wants a number for the tilt meter, Untilt wants
+ * which of ten states in order to choose the wind-down, and it is the only
+ * one of the two that can.
  */
-export const offerCopy = (paid: boolean, lands: boolean): string => {
-  if (!paid) {
-    return 'Win or lose, the hour after a session is the one that sticks. Untilt has resets for exactly that, inside its pass.';
-  }
-  return lands
-    ? 'Win or lose, the hour after a session is the one that sticks. Your pass covers this one.'
-    : 'Win or lose, the hour after a session is the one that sticks. Your pass already covers Untilt’s after-session resets.';
+export const offerCopy = (paid: boolean): string => {
+  const opening =
+    'Win or lose, the hour after a session is the one that sticks. Untilt will ask how it went and pick a wind-down to match.';
+  return paid ? `${opening} Your pass covers them.` : `${opening} They are inside its pass.`;
 };
 
 export const PostSessionReset = () => {
@@ -94,7 +109,7 @@ export const PostSessionReset = () => {
     <Card style={styles.card}>
       <Text variant="bodyStrong">That one is logged.</Text>
       <Text variant="caption" color={colors.textTertiary} style={styles.hint}>
-        {offerCopy(paid, offer.lands)}
+        {offerCopy(paid)}
       </Text>
       <View style={styles.offerRow}>
         <Button

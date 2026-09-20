@@ -72,9 +72,8 @@ The card's paid branch reads `hasPass`, which is `claim.tier === 'full'` and
 cannot be true for anybody yet: Log's own door mints the free tier and this
 app has never shipped a way to receive one of Untilt's tokens. It is written
 against both answers for the same reason everything around `SYNC_NEEDS_PASS`
-is. The meditation it would open, `POST_SESSION_MEDITATION_ID` in
-`src/features/family/links.ts`, is null until somebody checks the id against
-Untilt's source; until then both branches land on untilt.poker.
+is. Both branches follow the same link either way, `untilt.poker?source=log&lane=after`,
+which opens that app's after-session lane; only the sentence differs.
 
 Related, and worth knowing before somebody reports it as a bug: `/claim` is
 web-only. `takeCode()` in `app/claim.tsx` returns null when the platform is not

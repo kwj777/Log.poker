@@ -236,6 +236,14 @@ answers a question this app reliably raises.
 > untilt.poker, the same outbound link Settings carries. Nothing in Log is
 > unlocked by anything bought there, and nothing here changes if the player
 > ignores it.
+>
+> On the dashboard, for the week after a session in which the user tagged a
+> hand "misplayed?", Log lists those hands and says that TiltProof can review
+> one, that the first review there is free and that the rest are part of the
+> same pass. The same three facts and the same shape as the paragraph above:
+> no price, no purchase, no checkout, and the row opens tiltproof.poker. The
+> card appears only when the user tagged a hand themselves, never during a
+> session, and it goes away on its own.
 
 ---
 

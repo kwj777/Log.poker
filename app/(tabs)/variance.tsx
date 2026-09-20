@@ -294,10 +294,10 @@ export default function VarianceScreen() {
               problems. Untilt.poker is the one we built for the second.
             </Text>
             <Button
-              label={untiltHandOff(assessment.verdict).label}
+              label={untiltHandOff().label}
               variant="secondary"
               size="medium"
-              onPress={() => openHandOff(untiltHandOff(assessment.verdict).url)}
+              onPress={() => openHandOff(untiltHandOff().url)}
             />
           </Card>
         </>

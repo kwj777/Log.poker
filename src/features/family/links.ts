@@ -110,13 +110,95 @@ export const drillHandOff = (hand: Pick<Hand, 'holeCards' | 'board' | 'position'
 
 /**
  * The Untilt suggestion shown when the variance view finds a rough stretch.
- * Post-MVP this passes the stretch itself so Untilt can open on the right
- * exercise instead of the front page.
+ *
+ * The only hand-off in this file that names no destination, and that is the
+ * honest answer rather than a gap. Untilt's lanes are the three phases of a
+ * session plus the library; a player reading their own variance at home is in
+ * none of them, so this lands on "What are you here for?", which is the
+ * question they are actually at. A lane invented to avoid an unparameterized
+ * link would be a worse screen chosen to look like a better link.
+ *
+ * **It used to carry `context=<verdict>` and that parameter was never read.**
+ * Untilt's `readArrival` speaks `welcome`, `play` and `lane`, and strips the
+ * whole query on arrival; the verdict reached nothing over there for the whole
+ * time it shipped. What it did do was put the state of somebody's downswing in
+ * an address bar and a browser history, which is the thing `resetHandOff` and
+ * `postSessionHandOff` each go out of their way not to do. So it is gone, and
+ * this takes no argument, because there is nothing left for one to say.
  */
-export const untiltHandOff = (verdict: string): { url: string; label: string } => ({
-  url: `${FAMILY_LINKS.untilt}?source=log&context=${encodeURIComponent(verdict)}`,
+export const untiltHandOff = (): { url: string; label: string } => ({
+  url: `${FAMILY_LINKS.untilt}?source=log`,
   label: 'Open Untilt.poker',
 });
+
+/**
+ * The Untilt lane for the minutes before a player sits down.
+ *
+ * `preflight` is the id of Untilt's "I am about to play" lane, in its own
+ * `LANES`, and the screen it opens says "Set it up now, while deciding
+ * anything is still cheap." That sentence is why this hand-off exists: it is
+ * the only moment in a session where the useful advice is still a decision
+ * rather than a consolation, which is the same argument `mood.ts` makes for
+ * grouping on the start score and not the end one.
+ *
+ * A lane rather than a meditation, for `postSessionHandOff`'s reason and one
+ * more of its own. Every one of Untilt's thirty-five before-the-session
+ * meditations is premium, so there is no free id to pin even if pinning one
+ * were right -- and a player who has not bought the library still gets a
+ * playable row, because `preflightFallback` over there puts the free
+ * between-hands reset under the suggestions rather than leaving them a screen
+ * they can only look at. So this degrades to something usable rather than to a
+ * wall, and the copy at the call site says which is which.
+ *
+ * Nothing about the session crosses, the same as every other hand-off here.
+ * The mood that summoned this is a 4 or a 5 on Log's own scale and it stays on
+ * Log's side of the link.
+ */
+export const UNTILT_PRE_LANE = 'preflight';
+
+export const preSessionHandOff = (paid: boolean): { url: string; label: string } => {
+  const params = new URLSearchParams({ source: 'log', lane: UNTILT_PRE_LANE });
+
+  return {
+    url: `${FAMILY_LINKS.untilt}?${params.toString()}`,
+    label: paid ? 'Open your warm-up' : 'Find a warm-up',
+  };
+};
+
+/**
+ * The Untilt lane for a player still in their seat.
+ *
+ * `table` is the id of Untilt's "I am at the table" lane, whose own blurb is
+ * "A reset between hands. You never have to leave your seat." Offered after a
+ * hand is logged as a bad beat or a cooler, which is the app's most reliable
+ * signal that the game has just done something to somebody -- earlier and
+ * sharper than the two-hour timer `MidSessionCheckIn` waits on.
+ *
+ * **There is no paid branch and no sentence about a pass, because there is
+ * nothing here that is not free.** All seventy-nine of Untilt's between-hands
+ * meditations are, with no exception, which makes this the one hand-off in the
+ * family that needs no care about what it is promising. `postSessionHandOff`
+ * carries "inside its pass" because every wind-down is premium; the mirror of
+ * that fact is that this one may say free and mean it.
+ *
+ * **A lane and not `RESET_MEDITATION_ID`, which is the harder call**, since
+ * that id is free, sixty seconds, and already pointed at from this app. The
+ * difference is what Log has already asked. `resetHandOff` follows a check-in
+ * where the player has just answered a 1-to-5, so sending them to a screen
+ * that asks how they feel would be asking the same thing twice and the pinned
+ * exercise is right. Here Log has asked nothing about how they feel -- only
+ * what happened at the table -- so Untilt's mood screen is the first time
+ * anybody asks, and it can tell "just took a brutal one" from "beating
+ * yourself up" in its own ten words where a tag cannot. Same call, for the
+ * same reason, as `UNTILT_POST_LANE`.
+ */
+export const UNTILT_TABLE_LANE = 'table';
+
+export const tableHandOff = (): { url: string; label: string } => {
+  const params = new URLSearchParams({ source: 'log', lane: UNTILT_TABLE_LANE });
+
+  return { url: `${FAMILY_LINKS.untilt}?${params.toString()}`, label: 'Pick a reset' };
+};
 
 /**
  * The meditation Untilt opens for a mid-session reset.

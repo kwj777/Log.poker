@@ -114,6 +114,18 @@ interface LogState {
   /** Timestamp of the last mid-session mood prompt, so it is not repeated. */
   lastMidSessionPromptAt: number | null;
 
+  /**
+   * Whether the reset offered after a rattling hand has already been made this
+   * session, so it is made once rather than on every bad beat.
+   *
+   * In memory and not on a record, exactly like the field above, and cleared
+   * by the same two writes. See `features/family/tableOffer.ts` for why the
+   * bound is a session rather than a dismissal: this app has no key-value
+   * store to remember one in, and an offer that outlives the night is the
+   * standing furniture `FamilyCrossPromo` rules out.
+   */
+  tableOfferMadeAt: number | null;
+
   hydrate: () => Promise<void>;
   /** Defaults to every slice; a write names only what it could have changed. */
   refresh: (parts?: readonly Slice[]) => Promise<void>;
@@ -142,6 +154,7 @@ interface LogState {
 
   logMood: (sessionId: string, phase: MoodPhase, score: MoodScore) => Promise<void>;
   dismissMidSessionPrompt: () => void;
+  markTableOffer: () => void;
 
   clearAll: () => Promise<void>;
 }
@@ -281,6 +294,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   handCount: 0,
   handsVersion: 0,
   lastMidSessionPromptAt: null,
+  tableOfferMadeAt: null,
 
   hydrate: async () => {
     if (get().status === 'loading') return;
@@ -355,7 +369,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     if (mood != null) {
       await repository.createMoodEntry({ sessionId: session.id, phase: 'start', score: mood, at });
     }
-    set({ lastMidSessionPromptAt: null });
+    set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
     // Venues, because `sessionCount` is derived at read time and this changed it.
     await get().refresh(mood == null ? ['sessions', 'venues'] : ['sessions', 'venues', 'moodEntries']);
     return session;
@@ -390,7 +404,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     if (mood != null) {
       await repository.createMoodEntry({ sessionId, phase: 'end', score: mood, at: endedAt });
     }
-    set({ lastMidSessionPromptAt: null });
+    set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
     await get().refresh(mood == null ? ['sessions'] : ['sessions', 'moodEntries']);
   },
 
@@ -506,6 +520,8 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   dismissMidSessionPrompt: () => set({ lastMidSessionPromptAt: Date.now() }),
+
+  markTableOffer: () => set({ tableOfferMadeAt: Date.now() }),
 
   clearAll: async () => {
     const repository = await getRepository();

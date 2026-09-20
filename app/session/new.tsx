@@ -30,6 +30,7 @@ import {
   type SessionFormat,
   type Stakes,
 } from '../../src/domain/types';
+import { PreSessionWarmUp } from '../../src/features/sessions/PreSessionWarmUp';
 import { StakesPicker } from '../../src/features/sessions/StakesPicker';
 import { VenuePicker } from '../../src/features/sessions/VenuePicker';
 import {
@@ -207,6 +208,14 @@ export default function NewSessionScreen() {
       <Text variant="caption" color={colors.textTertiary} style={styles.moodHint}>
         Logged alongside your result. Skip it. It’s never required.
       </Text>
+
+      {/*
+        Below the picker and above nothing that matters. It draws only on a 4
+        or a 5, it has no dismiss control, and Start is in the footer where
+        this cannot reach it -- see the header over there for why an offer on
+        this screen must never make one score costlier to tap than another.
+      */}
+      <PreSessionWarmUp mood={mood} />
 
       <ErrorNote message={failed} />
     </Screen>

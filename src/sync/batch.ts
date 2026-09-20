@@ -153,6 +153,16 @@ const pageOf = <T>(items: Item<T>[], floor: Timestamp, cap: number): Page<T> => 
     // at the same place forever. The mark stayed where it was, the next round
     // rebuilt the identical page, and nothing ever moved again.
     //
+    // **So a single stamp is atomic, and the budget cannot cut inside one.**
+    // The mark is a stamp, so records sharing one cannot be told apart by it:
+    // every record at the floor goes in one answer or the loop cannot advance.
+    // When a block at one stamp is itself over the cap it goes anyway, and the
+    // answer is that much bigger than the budget. That is a property of a
+    // timestamp cursor rather than a bug here, and it is bounded by how much
+    // one merge can write at one stamp -- which is why `readBundle` no longer
+    // restamps a whole bundle on a version change, and why a push is capped
+    // before it arrives.
+    //
     // Measured against the mark instead, a page always contains at least one
     // record the mark can move past, so every round makes progress. The cost is
     // that a single record bigger than the budget goes anyway rather than

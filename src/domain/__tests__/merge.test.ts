@@ -299,3 +299,27 @@ describe('a venue deleted on one device and used on the other', () => {
     expect(venueTombstoneApplies('venue-1', [])).toBe(true);
   });
 });
+
+describe('the last tiebreak', () => {
+  it('does not depend on the order a device happened to build its fields in', () => {
+    // It was `JSON.stringify`, whose key order is insertion order. The two
+    // engines agree on that today, so nothing was broken yet -- but a column
+    // added in a different place in one of them would serialize the same
+    // record two ways, and the two devices would pick opposite winners and
+    // never converge.
+    const fields = { id: 'v1', updatedAt: T0, name: 'The Vic', isHomeGame: false };
+    const oneOrder = { record: { ...fields }, deletedAt: null };
+    const another = {
+      record: { isHomeGame: false, name: 'The Vic', updatedAt: T0, id: 'v1' },
+      deletedAt: null,
+    };
+    expect(resolve(oneOrder, another).record).toEqual(oneOrder.record);
+    expect(resolve(another, oneOrder).record).toEqual(another.record);
+  });
+
+  it('still separates two records that really differ, the same way both ways round', () => {
+    const mine = { record: { id: 'v1', updatedAt: T0, name: 'Aces' }, deletedAt: null };
+    const theirs = { record: { id: 'v1', updatedAt: T0, name: 'Binions' }, deletedAt: null };
+    expect(resolve(mine, theirs).record.name).toBe(resolve(theirs, mine).record.name);
+  });
+});

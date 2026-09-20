@@ -189,9 +189,28 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# The family access token lives in `localStorage` on the web (the phones use the
+# keychain; see `src/auth/tokenStore.web.ts`), it is good for thirty days, and
+# all three family apps accept it. So one injected script here is not a bad day
+# on log.poker -- it is thirty days of somebody's account across three domains.
+# There was no CSP at all in front of that.
+#
+# `connect-src` is the line that matters most, and it is the one doing real work
+# below: script-src has to allow inline, because the service-worker registration
+# in `app/+html.tsx` and Expo's own bootstrap are inline and a static header file
+# cannot mint a per-request nonce. That leaves an injected inline script able to
+# run -- but not able to *send* anything, because the only origins it may open a
+# connection to are this one and the sign-in hand-off at untilt.poker. Everything
+# the app loads is self-hosted (no CDN, no analytics, no web fonts), which is
+# what makes a list this short possible.
+#
+# `frame-ancestors 'self'` says the same thing as the X-Frame-Options line below
+# it, which stays for the browsers that read only that one.
 [[headers]]
   for = "/*"
   [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://untilt.poker; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
+    Permissions-Policy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "SAMEORIGIN"
     Referrer-Policy = "strict-origin-when-cross-origin"

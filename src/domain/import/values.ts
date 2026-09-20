@@ -284,6 +284,43 @@ export const durationUnitFromHeader = (header: string): DurationUnit => {
   return 'hours';
 };
 
+/**
+ * Whether a fee column names a tournament entry fee rather than cash-game rake.
+ *
+ * The `fee` field claims `rake`, `totalrake` and `juice` alongside `entryfee`
+ * and `tournamentfee`, because they are all money the house took and they all
+ * belong in the same column. But the importer used a non-null fee as proof of a
+ * tournament, and a rake column is routine in online *cash* exports -- most of
+ * which carry no format column at all. So every session in such a file read as
+ * a tournament, which threw the stakes away (a tournament has no blinds), took
+ * the whole history out of the variance view, and booked the rake as an entry
+ * fee. A rake of `$0.00` was enough, because `parseMoney` reads it as zero
+ * rather than as nothing.
+ *
+ * Only the spellings that cannot mean rake vote. A bare "Fee" is left out on
+ * purpose: it is genuinely either, and being wrong toward cash costs a fee
+ * column, where being wrong toward tournament costs the stakes, the variance
+ * view and the shape of the whole import. A file whose fee column is a bare
+ * "Fee" is usually still recognisable from `cashOutNamesAPrize` beside it.
+ */
+export const feeNamesAnEntry = (header: string): boolean => {
+  const text = header.toLowerCase().replace(/[^a-z]/g, '');
+  if (text.includes('rake') || text.includes('juice') || text.includes('vig')) return false;
+  return /entryfee|buyinfee|tournamentfee|entrycost|tourneyfee/.test(text);
+};
+
+/**
+ * Whether a cash-out column is a tournament prize.
+ *
+ * The counterpart of the rule above and the reason it can afford to be strict.
+ * `cashOut` claims `prize`, `prizewon` and `payout`, and nobody calls a cash
+ * game's final stack a prize: a file with that column is a tournament file
+ * whatever its fee column is called, which is what lets a bare "Fee" stop
+ * voting without taking honest tournament exports down with it.
+ */
+export const cashOutNamesAPrize = (header: string): boolean =>
+  /prize|payout|winnings/.test(header.toLowerCase().replace(/[^a-z]/g, ''));
+
 // ------------------------------------------------------------------- stakes
 
 const STAKES_PAIR = /(\d[\d.,]*)\s*\/\s*[$€£¥₹\s]*(\d[\d.,]*)/;

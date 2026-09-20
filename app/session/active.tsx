@@ -25,7 +25,7 @@ import { Text } from '../../src/components/Text';
 import { successFeedback, warningFeedback } from '../../src/components/haptics';
 import { formatEntry, formatMoney, formatStakes, parseAmount } from '../../src/domain/money';
 import { parseCount } from '../../src/domain/import/values';
-import { formatDuration, totalInvested } from '../../src/domain/stats';
+import { formatDuration, rebuyTotal, totalInvested } from '../../src/domain/stats';
 import type { MoodScore } from '../../src/domain/types';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn';
@@ -169,7 +169,10 @@ export default function ActiveSessionScreen() {
             value={String(session.rebuys.length)}
             hint={
               session.rebuys.length > 0
-                ? formatMoney(invested - session.buyIn, { currency })
+                ? // The rebuys themselves. `invested` is buy-in *plus the entry
+                  // fee* plus rebuys, so subtracting the buy-in alone put a
+                  // tournament's fee under a label that says "Re-entries".
+                  formatMoney(rebuyTotal(session.rebuys), { currency })
                 : 'None yet'
             }
           />

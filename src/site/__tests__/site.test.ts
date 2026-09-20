@@ -512,3 +512,43 @@ describe('the family links', () => {
     expect(FAMILY_LINKS.tiltproof).toBe('https://tiltproof.poker');
   });
 });
+
+describe('the security headers', () => {
+  const csp = /Content-Security-Policy = "([^"]+)"/.exec(netlify)?.[1] ?? '';
+
+  it('sends a Content-Security-Policy at all', () => {
+    // There was none, in front of a thirty-day family token kept in
+    // `localStorage` and accepted by all three apps in the family.
+    expect(csp).not.toBe('');
+  });
+
+  it('allows a connection only to this origin and the sign-in hand-off', () => {
+    // The load-bearing directive: script-src has to allow inline, so what stops
+    // an injected script is that it has nowhere to send the token.
+    expect(csp).toContain("connect-src 'self' https://untilt.poker");
+  });
+
+  it('closes the directives an injected script would otherwise reach for', () => {
+    for (const directive of [
+      "default-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+    ]) {
+      expect(csp).toContain(directive);
+    }
+  });
+
+  it('names no origin the app does not actually talk to', () => {
+    // Everything is self-hosted: no CDN, no analytics, no web fonts. If that
+    // stops being true this assertion is the thing that says so.
+    const origins = csp.match(/https?:\/\/[^\s;]+/g) ?? [];
+    expect(origins).toEqual(['https://untilt.poker']);
+  });
+
+  it('keeps the headers that were already there', () => {
+    expect(netlify).toContain('X-Content-Type-Options = "nosniff"');
+    expect(netlify).toContain('Referrer-Policy = "strict-origin-when-cross-origin"');
+  });
+});

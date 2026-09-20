@@ -159,13 +159,49 @@ describe('confidenceBand', () => {
     expect(confidenceBand(estimatePlayer(noisy), noisy)).toHaveLength(noisy.length + 1);
   });
 
-  it('widens with the square root of hours, not linearly', () => {
+  it('widens with the square root of hours, discounted for the hours the fit has spent', () => {
     const estimate = estimatePlayer(noisy);
     const band = confidenceBand(estimate, noisy);
     const quarter = band[5];
-    const full = band[20];
-    const widthRatio = (full.upper - full.expected) / (quarter.upper - quarter.expected);
-    expect(widthRatio).toBeCloseTo(Math.sqrt(full.hours / quarter.hours), 10);
+    const half = band[10];
+    const total = estimate.totalHours;
+    const width = (point: (typeof band)[number]) => point.upper - point.expected;
+    // σ√(h(1 − h/H)) rather than σ√h: the same square root, against the hours
+    // the fitted average has not already used up.
+    const ratio = (h: number) => Math.sqrt(h * (1 - h / total));
+    expect(width(half) / width(quarter)).toBeCloseTo(ratio(half.hours) / ratio(quarter.hours), 10);
+  });
+
+  it('still widens over the stretch a player actually reads', () => {
+    const band = confidenceBand(estimatePlayer(noisy), noisy);
+    expect(band[10].upper - band[10].expected).toBeGreaterThan(band[5].upper - band[5].expected);
+  });
+
+  it('closes at the final point, because the curve lands there by construction', () => {
+    // The whole finding. `w` is totalBb/totalHours, so `w·totalHours` is
+    // totalBb: the actual curve meets the expected line at the right-hand edge
+    // on every chart, and an envelope that stayed open there was promising a
+    // comparison it could not lose.
+    const band = confidenceBand(estimatePlayer(noisy), noisy);
+    const last = band[band.length - 1];
+    expect(last.actual).toBeCloseTo(last.expected, 10);
+    expect(last.upper - last.lower).toBeCloseTo(0, 10);
+  });
+
+  it('barely corrects a band drawn from a much longer history', () => {
+    // An estimate fitted to far more hours than these never had the problem,
+    // and the correction has to get out of its way.
+    const long = observations(
+      Array.from({ length: 400 }, (_, i) => ({ resultBb: i % 2 === 0 ? 40 : -20, hours: 2 })),
+    );
+    const estimate = estimatePlayer(long);
+    const band = confidenceBand(estimate, noisy);
+    const point = band[5];
+    const uncorrected = 1.96 * estimate.stdDevBbPerHour * Math.sqrt(point.hours);
+    // Ten hours against a fit of eight hundred: the band gives up well under a
+    // percent of its width, where fitting to these ten alone would close it.
+    expect((point.upper - point.expected) / uncorrected).toBeGreaterThan(0.99);
+    expect((point.upper - point.expected) / uncorrected).toBeLessThanOrEqual(1);
   });
 
   it('tracks the player’s actual cumulative result alongside the band', () => {
@@ -196,6 +232,48 @@ describe('assessRecentStretch', () => {
     expect(assessment.verdict).toBe('insufficient_data');
     expect(assessment.headline).toMatch(/not enough/i);
     expect(assessment.suggestsUntilt).toBe(false);
+  });
+
+  it('refuses a verdict when the stretch is the player’s whole history', () => {
+    // The finding this guard exists for. `w` is fitted to these ten sessions,
+    // so `actual − w·hours` is zero however they went, and every one of these
+    // runs used to come back "Right where you should be" with z exactly 0.
+    const threeHourSessions = (results: number[]) =>
+      observations(results.map((resultBb) => ({ resultBb, hours: 3 })));
+    for (const run of [
+      threeHourSessions([-200, -180, -160, -150, -140, -130, -120, -110]),
+      threeHourSessions([300, 280, 260, 240, 220, 200, 180, 160, 140]),
+      threeHourSessions([-90, 120, -300, 40, -60, 250, -110, 30, -70, 10]),
+    ]) {
+      const estimate = estimatePlayer(run);
+      expect(estimate.reliable).toBe(true);
+      const assessment = assessRecentStretch(run, estimate, 10);
+      expect(assessment.verdict).toBe('insufficient_data');
+      expect(assessment.headline).toMatch(/outside this stretch/i);
+      expect(assessment.suggestsUntilt).toBe(false);
+    }
+  });
+
+  it('measures a stretch against the sessions before it, not against itself', () => {
+    // Four terrible nights on the end of a modest winner. Fitted to everything,
+    // the old spread damped this to z = −0.36; the stretch is a quarter of the
+    // sample, so the fit has already swallowed a quarter of the deviation.
+    const run = observations(
+      [-90, 120, -300, 40, -60, 250, -110, 30, -70, 10, -400, -380, -350, -300].map(
+        (resultBb) => ({ resultBb, hours: 3 }),
+      ),
+    );
+    const estimate = estimatePlayer(run);
+    const assessment = assessRecentStretch(run, estimate, 4);
+    const hours = 12;
+    const naive =
+      (assessment.actualBb - assessment.expectedBb) /
+      (estimate.stdDevBbPerHour * Math.sqrt(hours));
+    expect(assessment.z).toBeLessThan(naive);
+    expect(assessment.z / naive).toBeCloseTo(
+      1 / Math.sqrt(1 - hours / estimate.totalHours),
+      6,
+    );
   });
 
   it('calls a middling stretch normal', () => {

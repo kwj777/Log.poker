@@ -218,6 +218,13 @@ export const handleSync = async (
     // argument is retired rather than won, because there is no purchase in
     // front of any of this any more.
     //
+    // Unmetered, deliberately. The rate counter lives inside the bundle, so
+    // checking it here means a strong read in front of every erase -- the round
+    // trip this branch is shaped to avoid -- and it would buy very little: the
+    // counter goes with the bundle on the first delete, so every repeat after
+    // it is unmetered anyway, and a repeat is a delete of a key that is already
+    // gone. See `endpoint.test.ts`.
+    //
     // Guarded, because 204 on an erasure is a promise: this said it whether or
     // not the store had answered, and erasure is the one thing a person is
     // entitled to be told the truth about.

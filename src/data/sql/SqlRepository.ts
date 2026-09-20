@@ -673,7 +673,13 @@ export class SqlRepository implements Repository {
     clauses.push('deleted_at IS NULL');
 
     const where = `WHERE ${clauses.join(' AND ')}`;
-    const limit = filter.limit !== undefined ? `LIMIT ${Math.max(0, Math.floor(filter.limit))}` : '';
+    // `Math.floor(NaN)` is NaN, which interpolates as the literal `LIMIT NaN`
+    // and fails in the driver rather than in the caller. A limit that is not a
+    // number is no limit, which is what a missing one already means.
+    const capped = Number.isFinite(filter.limit as number)
+      ? Math.max(0, Math.floor(filter.limit as number))
+      : null;
+    const limit = capped === null ? '' : `LIMIT ${capped}`;
     const rows = await this.driver.all<SessionRow>(
       `SELECT * FROM sessions ${where} ORDER BY started_at DESC ${limit}`,
       params,

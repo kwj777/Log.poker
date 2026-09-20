@@ -37,6 +37,8 @@ import { resolveColumns, type ColumnMap } from './columns';
 import {
   detectDateOrder,
   durationUnitFromHeader,
+  cashOutNamesAPrize,
+  feeNamesAnEntry,
   hasAmbiguousDateShape,
   parseCount,
   parseCurrency,
@@ -232,6 +234,8 @@ export const parseSessionCsv = (
   }
 
   const durationUnit = durationUnitFromHeader(columns.matched.duration ?? '');
+  const feeIsAnEntry = feeNamesAnEntry(columns.matched.fee ?? '');
+  const cashOutIsAPrize = cashOutNamesAPrize(columns.matched.cashOut ?? '');
 
   const sessions: ImportedSession[] = [];
   let skipped = 0;
@@ -239,6 +243,9 @@ export const parseSessionCsv = (
   let noDuration = 0;
   let missingBuyIn = 0;
   let tournaments = 0;
+  // Split by what gave them away, so the warning can say which column did it.
+  let inferredFromField = 0;
+  let inferredFromFee = 0;
 
   for (const row of table.rows) {
     if (isBlankRow(row)) continue;
@@ -268,12 +275,22 @@ export const parseSessionCsv = (
     const entrants = parseCount(cellAt(row, indexes.entrants));
     const finishPosition = parseCount(cellAt(row, indexes.finishPosition));
 
-    // What the file says, and failing that what it implies: an entry fee, a
-    // field size or a finishing position only mean anything in a tournament.
-    const format: SessionFormat =
-      parseSessionFormat(cellAt(row, indexes.format)) ??
-      (feeCell !== null || entrants !== null || finishPosition !== null ? 'tournament' : 'cash');
+    // What the file says, and failing that what it implies: a field size or a
+    // finishing position only mean anything in a tournament, and so does a fee
+    // column that names an *entry* fee.
+    //
+    // A fee alone used to be enough, and it was the wrong signal: `rake` is one
+    // of this field's aliases and a rake column is ordinary in online cash
+    // exports, which mostly carry no format column. See `feeNamesAnEntry`.
+    const impliedByFee = (feeCell !== null && feeIsAnEntry) || cashOutIsAPrize;
+    const impliedByField = entrants !== null || finishPosition !== null;
+    const stated = parseSessionFormat(cellAt(row, indexes.format));
+    const format: SessionFormat = stated ?? (impliedByField || impliedByFee ? 'tournament' : 'cash');
     const tournament = format === 'tournament';
+    if (tournament && stated === null) {
+      if (impliedByField) inferredFromField += 1;
+      else inferredFromFee += 1;
+    }
 
     // A cash-out column is the direct measurement; a result column is derived
     // from one, so it only fills in where the first is absent.
@@ -372,10 +389,31 @@ export const parseSessionCsv = (
     );
   }
   if (tournaments > 0) {
-    warn(
-      null,
-      `${plural(tournaments, 'row')} read as a tournament. Tournaments land in your bankroll and in the tournament figures, and stay out of the cash-game variance view: their results are the wrong shape for it.`,
-    );
+    // Named, not just counted. A row read as a tournament loses its stakes and
+    // drops out of the variance view, and the old warning said that had
+    // happened without ever saying which column decided it -- so a file that
+    // guessed wrong gave the player nothing to act on.
+    const sentences = [
+      `${plural(tournaments, 'row')} read as a tournament.`,
+      'Tournaments land in your bankroll and in the tournament figures, and stay out of the cash-game variance view: their results are the wrong shape for it.',
+    ];
+    if (inferredFromField > 0) {
+      sentences.push(
+        `${plural(inferredFromField, 'row')} gave itself away with a field size or a finishing position.`,
+      );
+    } else if (inferredFromFee > 0) {
+      sentences.push(
+        `Nothing in the file says so outright: ${plural(inferredFromFee, 'row')} was read that way because “${
+          cashOutIsAPrize ? columns.matched.cashOut : (columns.matched.fee ?? 'fee')
+        }” is a tournament column.`,
+      );
+    }
+    if (inferredFromField + inferredFromFee > 0) {
+      sentences.push(
+        'If that is wrong, add a column saying “Cash” or “Tournament” and import again.',
+      );
+    }
+    warn(null, sentences.join(' '));
   }
   if (noDuration > 0) {
     warn(

@@ -247,19 +247,42 @@ export interface Caller {
  * Anything that is not is treated as absent, here and by the sweep, which is
  * why both of these are exported rather than inlined: the sweep's license to
  * collect a record is precisely that this file would ignore it.
+ *
+ * **Every field, and every one a real number.** This checked three of the six
+ * and the two it let through were `attempts` and `sent` -- which are the
+ * brute-force ceiling and the mail budget. A record reaching `redeem` without a
+ * numeric `attempts` makes `attempts >= MAX_ATTEMPTS` false and `attempts + 1`
+ * NaN, and NaN is below every cap forever: unlimited guesses at a live
+ * six-digit code, and the same shape on `sent` is unlimited mail to one
+ * address. Nothing writes such a record today -- `undone` and `spent` both
+ * carry the fields through -- but "today" is the whole of the guarantee, and
+ * `signinSweep.ts` names this predicate as the schema contract for a record
+ * format that is meant to be able to change.
+ *
+ * `Number.isFinite` rather than `typeof`, because NaN and Infinity are numbers
+ * and it is exactly NaN that the counters have to be kept clear of.
  */
-export const isPending = (value: unknown): value is Pending =>
-  typeof value === 'object' &&
-  value !== null &&
-  typeof (value as Pending).hash === 'string' &&
-  typeof (value as Pending).expiresAt === 'number' &&
-  typeof (value as Pending).windowStartedAt === 'number';
+const isCount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
 
-export const isCaller = (value: unknown): value is Caller =>
-  typeof value === 'object' &&
-  value !== null &&
-  typeof (value as Caller).count === 'number' &&
-  typeof (value as Caller).resetAt === 'number';
+export const isPending = (value: unknown): value is Pending => {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Pending;
+  return (
+    typeof record.hash === 'string' &&
+    isCount(record.issuedAt) &&
+    isCount(record.expiresAt) &&
+    isCount(record.attempts) &&
+    isCount(record.sent) &&
+    isCount(record.windowStartedAt)
+  );
+};
+
+export const isCaller = (value: unknown): value is Caller => {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Caller;
+  return isCount(record.count) && isCount(record.resetAt);
+};
 
 /**
  * Whether the day this record counts mail in has run out.
@@ -775,6 +798,14 @@ const renew = async (
   { secret, now: clock }: Surroundings,
 ): Promise<Response> => {
   const now = clock();
+
+  // Outside `overCallerLimit` on purpose, and it is worth saying why rather
+  // than leaving it looking like an omission. That counter's budget is the
+  // mail budget, and renewals are launches: a few devices behind one office
+  // network would spend it and refuse a colleague's sign-in. A renewal costs
+  // one HMAC and, for a valid token, one mint -- the same as the 401 any
+  // unauthenticated request to this family already buys. See
+  // `signinEndpoint.test.ts`.
   const checked = await checkToken(
     secret,
     bearerFrom(request.headers.get('authorization')),

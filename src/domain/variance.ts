@@ -137,6 +137,72 @@ export const normalCdf = (z: number): number => {
 export const Z_SCORES = { 70: 1.036, 90: 1.645, 95: 1.96 } as const;
 export type ConfidenceLevel = keyof typeof Z_SCORES;
 
+/**
+ * How far a stretch can stray from a win rate **that was fitted to it**.
+ *
+ * This is the correction the whole page turned on and did not have. Every
+ * number here is measured against `w = totalBb / totalHours`, and `w` is
+ * estimated from the same sessions being measured. A residual taken against a
+ * mean fitted to it is not free to be large: the fit has already absorbed part
+ * of it, and dividing by `σ√h` -- the spread of a residual against a mean that
+ * knew nothing about it -- understates every deviation by exactly that much.
+ *
+ * At the limit the understatement is total. If the stretch *is* the whole
+ * sample then `actual == w·h` identically, the residual is zero whatever
+ * happened, and `σ√h` cheerfully reports it as a player running dead on
+ * expectation. That is not a rounding error; it is the verdict being
+ * arithmetically pinned to "normal" for anybody whose recent stretch is most of
+ * their history, which is everybody who has just qualified for this page.
+ *
+ * Writing `S` for the stretch's result, `ŵ = T/F` for the fitted rate over the
+ * fit's `F` hours, and `k` for how many of the stretch's `h` hours are inside
+ * that fit:
+ *
+ *     S − ŵh = S_in·(1 − h/F) + S_out − (h/F)·(the fit's other hours)
+ *     Var     = σ²·[ k·(1 − h/F)² + (h − k) + (h/F)²·(F − k) ]
+ *
+ * which collapses to the two readings worth naming:
+ *
+ *     k = h (fitted to the stretch)      σ²·h·(1 − h/F)   → 0 as h → F
+ *     k = 0 (fitted to other sessions)   σ²·(h + h²/F)    → σ²h as F → ∞
+ *
+ * The second is the honest out-of-sample answer and is slightly *wider* than
+ * `σ√h`, because `ŵ` is itself estimated and carries its own error. Both were
+ * `σ√h` before.
+ */
+export const stretchSpread = (
+  sd: number,
+  hours: number,
+  fittedHours: number,
+  sharedHours: number,
+): number => {
+  if (sd <= 0 || hours <= 0) return 0;
+  if (fittedHours <= 0) return sd * Math.sqrt(hours);
+  const share = hours / fittedHours;
+  const shared = Math.min(Math.max(sharedHours, 0), hours);
+  const variance =
+    shared * (1 - share) ** 2 + (hours - shared) + share ** 2 * Math.max(0, fittedHours - shared);
+  return sd * Math.sqrt(Math.max(0, variance));
+};
+
+/**
+ * How many of a stretch's hours the estimate was fitted to.
+ *
+ * The two callers sit at opposite ends -- the screen fits to everything and so
+ * shares the whole stretch, a test fits to a baseline and shares none of it --
+ * and neither passes the fit itself, only its summary. `fittedHours` minus the
+ * hours outside the stretch is what is left over for the stretch, floored at
+ * nothing and capped at the stretch: exact at both ends, monotone between them.
+ */
+const sharedWith = (
+  estimate: PlayerEstimate,
+  observations: readonly SessionObservation[],
+  stretchHours: number,
+): number => {
+  const total = observations.reduce((sum, o) => sum + o.hours, 0);
+  return Math.min(stretchHours, Math.max(0, estimate.totalHours - (total - stretchHours)));
+};
+
 export interface BandPoint {
   hours: number;
   expected: number;
@@ -147,8 +213,27 @@ export interface BandPoint {
 }
 
 /**
- * The confidence-band series: expected result and the ±z·σ·√h envelope over
+ * The confidence-band series: expected result and the envelope around it over
  * cumulative hours, with the player's real curve overlaid on the same axis.
+ *
+ * **The envelope narrows toward the right-hand edge, and that is the fix
+ * rather than a defect in it.** The dashed line is `w·hours` and `w` is the
+ * player's own average over exactly these sessions, so at the final point
+ * `w·totalHours` is `totalBb` -- the curve landed on the line by construction,
+ * on every chart this has ever drawn. Against a `±z·σ·√h` envelope, which is
+ * the spread of a run measured against a rate that did not come from it, the
+ * curve could not leave the band at the end however the player had run.
+ *
+ * So the envelope is the one belonging to the quantity actually plotted: the
+ * deviation from a mean fitted to the same hours, which really does have less
+ * and less room as the hours it was fitted to are used up. See `stretchSpread`.
+ * Over the bulk of the curve the change is small -- at the halfway point the
+ * band is 29% narrower -- and it closes over the last session or two, which is
+ * where the old picture was making a promise it had already spent.
+ *
+ * An estimate fitted to a longer history than these observations (`fittedHours`
+ * well past their total) gets almost no correction, which is right: it never
+ * had this problem.
  */
 export const confidenceBand = (
   estimate: PlayerEstimate,
@@ -165,7 +250,10 @@ export const confidenceBand = (
   for (const observation of observations) {
     cumulativeHours += observation.hours;
     cumulativeBb += observation.resultBb;
-    const spread = z * sd * Math.sqrt(cumulativeHours);
+    // Every hour up to here is one the fit saw, capped at the fit's own length
+    // so an out-of-sample estimate is not credited with hours it never had.
+    const shared = Math.min(cumulativeHours, estimate.totalHours);
+    const spread = z * stretchSpread(sd, cumulativeHours, estimate.totalHours, shared);
     const expected = w * cumulativeHours;
     points.push({
       hours: cumulativeHours,
@@ -257,7 +345,30 @@ export const assessRecentStretch = (
     };
   }
 
-  const spread = estimate.stdDevBbPerHour * Math.sqrt(hours);
+  // Against a rate fitted to these very sessions, which `σ√h` silently assumed
+  // it was not. See `stretchSpread` for the arithmetic and for what it cost.
+  const spread = stretchSpread(
+    estimate.stdDevBbPerHour,
+    hours,
+    estimate.totalHours,
+    sharedWith(estimate, observations, hours),
+  );
+
+  // Nothing left to measure against: this stretch is the whole of what the rate
+  // was fitted to, so the residual is zero by arithmetic rather than by the
+  // player having run at expectation. Said plainly, because the alternative --
+  // what this did before -- is "Right where you should be" to somebody eight
+  // sessions into the worst run of their life.
+  if (spread <= 0) {
+    return {
+      ...base,
+      verdict: 'insufficient_data',
+      headline: 'Not enough history outside this stretch',
+      body: `These ${recent.length} sessions are your whole cash history, so there is nothing to compare them against but themselves -- and measured against their own average every stretch looks perfectly ordinary, which is worth exactly nothing to you. Log a few more and this page starts weighing your recent run against the sessions that came before it.`,
+      suggestsUntilt: false,
+    };
+  }
+
   const expectedBb = estimate.winRateBbPerHour * hours;
   const z = (actualBb - expectedBb) / spread;
   const percentile = normalCdf(z);

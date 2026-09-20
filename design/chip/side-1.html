@@ -2,9 +2,10 @@
 <meta charset="utf-8">
 <title>Log chip -- side 1</title>
 
-<!-- The identity face: the family mark over log.poker, and nothing else on it.
-     This is the side somebody turns over in their fingers while they decide
-     whether to ask what it is. Side 2 is the side that answers.
+<!-- The identity face: the family mark over log.poker, and the one line saying
+     what kind of poker this is about. This is the side somebody turns over in
+     their fingers while they decide whether to ask what it is. Side 2 is the
+     side that answers.
 
      Rasterized by `npm run chip`.
 
@@ -45,8 +46,10 @@
   h1 {
     /* The bottom margin is not space under the word. Flex centers the column
        and a line box carries its ink high inside itself, so the pair sat below
-       the middle of the disc; growing the column downward lifts it back. */
-    margin: 54px 0 96px;
+       the middle of the disc; growing the column downward lifts it back. The
+       lift now belongs to the line under it, which is the bottom of the
+       column. */
+    margin: 54px 0 46px;
     font-family: var(--sans);
     font-weight: 500;
     font-size: 208px;
@@ -61,6 +64,51 @@
   /* The extension, quieter than the name. Same trick as the site's app cards,
      where the host sits under the app's name in the dim. */
   h1 .tld { color: var(--gold); }
+
+  /* Who the object is for.
+
+     This is the one thing neither face carried. The back spells the acronym
+     and this face spells it out, but nothing on the disc said what kind of
+     poker it is about, and the landing the code opens does not say it either:
+     somebody who scans it cold could read Log as an online tracker.
+
+     It is not the `Be the LOG` line coming back. That one pointed at the
+     acronym the two faces already spell, which is the disc explaining itself
+     to itself. This one carries something the object does not otherwise say.
+
+     **The wording has to be true of all three apps**, because the mark above
+     it lights no ring and the back names all three. `Built for live poker
+     players` is Log's own claim and would be a promise on behalf of two apps
+     that do not quite keep it, the same reason the landing qualifies its free
+     claim as Log's. The live game is where all three sit: the drills are for
+     the table, the log is of a session at one, and the meditations are for
+     before and after it.
+
+     **The size is a floor, not a preference.** The vendor's art guide asks for
+     1.5mm of cap on the finished chip, and GROUND on the back measures 1.72mm
+     of ink in the render. 80px lands at 1.57mm, and anything quiet enough to
+     sit comfortably under the wordmark is under the floor: at 48px this line
+     would be 0.94mm and would fire as a smudge. So the line is wider than the
+     name above it. The name still leads on weight, with two and a half times
+     the cap height, which is the relationship that survives a matte fire.
+
+     Sage rather than gold, matching the verbs on the back. Gold here would
+     compete with `.poker` directly above it, and the gold on this face is
+     already spent on the trunk and the extension. */
+  .live {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 80px;
+    line-height: 1;
+    /* Tighter than the back's 0.2em. The verbs there stand alone in their own
+       bands; this one is a caption under a word and reads as one line rather
+       than as separated letters. */
+    letter-spacing: 0.14em;
+    color: var(--canopy-outer);
+    white-space: nowrap;
+    /* The column's lift, moved down off the wordmark. */
+    margin-bottom: 96px;
+  }
 </style>
 
 <div class="face">
@@ -77,4 +125,6 @@
   </svg>
 
   <h1>log<span class="tld">.poker</span></h1>
+
+  <div class="live">FOR THE LIVE GAME</div>
 </div>

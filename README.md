@@ -1064,8 +1064,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 58 passed
-Tests:       1596 passed
+Test Suites: 59 passed
+Tests:       1621 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1083,17 +1083,17 @@ Tests:       1596 passed
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
   variance           35   win rate, σ, confidence bands, verdicts
+  handOffs           34   where a hand-off goes, and what the two offer cards say
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
+  token              29   the family token grammar, against signed fixtures
   palette            27   the theme matches BRAND.md
   migrations         26   a filled v2 database walked forward, both engines
-  token              25   the family token grammar, against signed fixtures
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
   sessionExport      22   the log written out, and read back by the importer
-  handOffs           21   where a hand-off goes, and what the mid-session card says
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1115,6 +1115,7 @@ Tests:       1596 passed
   liveTimer           9   the session clock, across a background and back
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
+  postSessionReset    8   the offer after cash-out, and who it is talking to
   sessionDetail       8   one session and the hands that belong to it
   tokenStore.web      8   the browser token store
   columns             7   header matching

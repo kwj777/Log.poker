@@ -6,6 +6,12 @@
  * all taps; the note is one line by default. Save is enabled from the moment
  * anything at all has been entered -- a hand logged as "cooler, no cards" is a
  * far better outcome than a hand not logged because the form demanded more.
+ *
+ * One hand in a session leaves on a different screen. A hand tagged as a bad
+ * beat or a cooler is the app's sharpest live signal that the game has just
+ * done something to somebody, so the save is followed by an offer of a reset
+ * rather than by the way out -- once per session, and never in front of the
+ * write. See `features/family/tableOffer.ts` for which tags and why those.
  */
 
 import { useState } from 'react';
@@ -15,6 +21,7 @@ import { router } from 'expo-router';
 import { AmountInput } from '../../src/components/AmountInput';
 import { Button } from '../../src/components/Button';
 import { ChipGroup, ChipMultiGroup } from '../../src/components/Chip';
+import { Card } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Explain } from '../../src/components/Explain';
@@ -32,6 +39,9 @@ import {
 import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { CardPicker } from '../../src/features/hands/CardPicker';
 import { MAX_BOARD, isBoard } from '../../src/domain/handNotation';
+import { openHandOff } from '../../src/features/family/hooks';
+import { tableHandOff } from '../../src/features/family/links';
+import { tableOfferCopy, wantsTableReset } from '../../src/features/family/tableOffer';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
@@ -42,6 +52,8 @@ const TAG_OPTIONS = HAND_TAGS.map((value) => ({ value, label: HAND_TAG_LABELS[va
 export default function LogHandScreen() {
   const session = useLogStore((state) => state.activeSession);
   const logHand = useLogStore((state) => state.logHand);
+  const tableOfferMadeAt = useLogStore((state) => state.tableOfferMadeAt);
+  const markTableOffer = useLogStore((state) => state.markTableOffer);
 
   const [holeCards, setHoleCards] = useState<string | null>(null);
   const [board, setBoard] = useState<string | null>(null);
@@ -53,6 +65,15 @@ export default function LogHandScreen() {
   const [showAmount, setShowAmount] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /**
+   * Whether the hand that was just written is one worth offering a reset for.
+   *
+   * Local, and held rather than derived from the store, for `MidSessionCheckIn`'s
+   * reason: `tableOfferMadeAt` flips the instant the offer is made and would
+   * take the card away with it. It lives for this mounting only, which is
+   * right -- it is a moment, not a fixture.
+   */
+  const [offered, setOffered] = useState(false);
 
   if (!session) {
     return (
@@ -102,6 +123,19 @@ export default function LogHandScreen() {
         amount: showAmount ? parseAmount(amount) : null,
       });
       successFeedback();
+      /*
+        The write is done and nothing below may undo it or stand in front of
+        it, which is the rule `MidSessionCheckIn` states about `logMood` and
+        the same rule here: a hand this screen made harder to save is a hand
+        that does not get logged. So the offer is decided after the await, off
+        the tags that were actually written, and the worst it can do is leave
+        somebody on a screen with a way out on it.
+      */
+      if (wantsTableReset(tags) && tableOfferMadeAt === null) {
+        markTableOffer();
+        setOffered(true);
+        return;
+      }
       router.back();
     } catch (error) {
       // Said rather than swallowed. A spinner that stops and a screen that does
@@ -111,6 +145,35 @@ export default function LogHandScreen() {
       setSaving(false);
     }
   };
+
+  if (offered) {
+    const offer = tableHandOff();
+    return (
+      <Screen>
+        <PageMeta title="Log a hand · Log" />
+        <Card style={styles.offer}>
+          <Text variant="bodyStrong">That one is logged.</Text>
+          <Text variant="caption" color={colors.textTertiary} style={styles.offerHint}>
+            {tableOfferCopy()}
+          </Text>
+          <View style={styles.offerRow}>
+            <Button
+              label={offer.label}
+              variant="secondary"
+              size="small"
+              onPress={() => openHandOff(offer.url)}
+            />
+            <Button
+              label="Back to the game"
+              variant="ghost"
+              size="small"
+              onPress={() => router.back()}
+            />
+          </View>
+        </Card>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -246,6 +309,19 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: spacing.xs,
     lineHeight: 22,
+  },
+  offer: {
+    marginTop: spacing.xl,
+    borderColor: colors.accentDim,
+  },
+  offerHint: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  offerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   note: {
     backgroundColor: colors.surfaceRaised,

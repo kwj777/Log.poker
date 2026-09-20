@@ -56,24 +56,30 @@ and they should be chosen between deliberately:
 - **Apply for the External Purchase Link Entitlement.** US storefront only,
   still 27% commission, and a meaningful amount of paperwork.
 
-The after-session card added in `src/features/sessions/PostSessionReset.tsx`
-sits near this line without crossing it, and the distinction is worth writing
-down because the next change to that copy is where it would be lost. The card
-says Untilt has after-session resets and that they are inside Untilt's pass.
-It names no price, shows no purchase and links to no checkout, and nothing in
-Log unlocks either way, so it is a statement about a sister app rather than a
-purchasing mechanism. What would cross the line is a price, a buy button, or
+The cards in `src/features/sessions/PostSessionReset.tsx` and
+`src/features/sessions/PreSessionWarmUp.tsx` sit near this line without
+crossing it, and the distinction is worth writing down because the next change
+to that copy is where it would be lost. They say Untilt has after-session
+resets, and material for the minutes before you sit down, and that both are
+inside Untilt's pass.
+Neither names a price, shows a purchase or links to a checkout, and nothing in
+Log unlocks either way, so both are statements about a sister app rather than a
+purchasing mechanism. The third card of this kind, offered after a hand tagged
+as a bad beat or a cooler, mentions no pass at all: every one of Untilt's
+between-hands resets is free, so there is nothing there to be careful about. What would cross the line is a price, a buy button, or
 any Log feature that turns on because somebody paid at untilt.poker. The
 wording is pinned by tests in
 `src/features/family/__tests__/handOffs.test.ts`, which fail on a dollar sign
 or a verb about buying.
 
-The card's paid branch reads `hasPass`, which is `claim.tier === 'full'` and
+Each card's paid branch reads `hasPass`, which is `claim.tier === 'full'` and
 cannot be true for anybody yet: Log's own door mints the free tier and this
 app has never shipped a way to receive one of Untilt's tokens. It is written
 against both answers for the same reason everything around `SYNC_NEEDS_PASS`
-is. Both branches follow the same link either way, `untilt.poker?source=log&lane=after`,
-which opens that app's after-session lane; only the sentence differs.
+is. Both branches follow the same link either way -- `untilt.poker?source=log&lane=after`
+for the after-session card and `?source=log&lane=preflight` for the other,
+which open that app's after-session and before-the-session lanes; only the
+sentence differs.
 
 Related, and worth knowing before somebody reports it as a bug: `/claim` is
 web-only. `takeCode()` in `app/claim.tsx` returns null when the platform is not
@@ -239,11 +245,19 @@ answers a question this app reliably raises.
 >
 > On the dashboard, for the week after a session in which the user tagged a
 > hand "misplayed?", Log lists those hands and says that TiltProof can review
-> one, that the first review there is free and that the rest are part of the
-> same pass. The same three facts and the same shape as the paragraph above:
-> no price, no purchase, no checkout, and the row opens tiltproof.poker. The
-> card appears only when the user tagged a hand themselves, never during a
-> session, and it goes away on its own.
+> one and that reviewing a hand you played is free there. The same shape as
+> the paragraph above: no price, no purchase, no checkout, and the row opens
+> tiltproof.poker. The card appears only when the user tagged a hand
+> themselves, never during a session, and it goes away on its own.
+>
+> Two more cards name Untilt in the same way. If the user picks a 4 or a 5 on
+> the optional mood scale on the start-a-session screen, Log says Untilt has
+> material for the minutes before you sit down, that it is inside Untilt's
+> pass, and that a free reset is on the same screen. And after the user logs a
+> hand tagged "bad beat" or "cooler", once per session, Log offers Untilt's
+> between-hands resets, which are free. Both are statements about the other
+> app: no price, no purchase, no checkout, and the button opens untilt.poker.
+> Neither changes anything in Log, and ignoring either costs the user nothing.
 
 ---
 

@@ -147,12 +147,25 @@ describe('what the review card says', () => {
     expect(promptTitle(3)).toBe('You flagged 3 hands');
   });
 
-  it('says which side of TiltProof’s line a review falls on', () => {
-    // So nobody taps through and finds out on arrival. TiltProof's
-    // `FREE_REVIEWS` is 1 and the rest are inside the same pass Untilt's
-    // wind-downs are, which is the wording `postSessionHandOff` settled on.
+  it('says a review is free, because over there every one of them is', () => {
+    // Read off TiltProof rather than remembered. `canReview` and
+    // `FREE_REVIEWS` are gone from that app's `entitlement.ts` and its
+    // `PRICING.md` lists the review of a hand you played as free on both sides
+    // of its table. What the pass sells there is levels 3, 4 and 5 and an
+    // uncapped drill queue, neither of which this card is about.
     expect(promptCopy()).toMatch(/\bfree\b/i);
-    expect(promptCopy()).toMatch(/\bpass\b/i);
+  });
+
+  it('and does not tell anybody their second flagged hand costs money', () => {
+    // The wording this replaced, which was true when it was written and false
+    // within a day of shipping. It is the worse direction to be wrong in: the
+    // card's whole job is getting a player to tap more than one hand, and it
+    // was quietly charging them for the second. A claim about the far side's
+    // pricing raises nothing on this side when it goes stale, so it is pinned
+    // here.
+    expect(promptCopy()).not.toMatch(/\bfirst\b/i);
+    expect(promptCopy()).not.toMatch(/\bthe rest\b/i);
+    expect(promptCopy()).not.toMatch(/\bpass\b/i);
   });
 
   it('and names no price, no purchase and no checkout', () => {

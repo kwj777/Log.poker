@@ -164,10 +164,10 @@ export const MoodCost = ({ comparison }: { comparison: MoodComparison }) => {
               down is the other.
             </Text>
             <Button
-              label={untiltHandOff('start_mood').label}
+              label={untiltHandOff().label}
               variant="secondary"
               size="medium"
-              onPress={() => openHandOff(untiltHandOff('start_mood').url)}
+              onPress={() => openHandOff(untiltHandOff().url)}
             />
           </View>
         ) : null}

@@ -13,6 +13,8 @@
 
 import { screen, userEvent } from '@testing-library/react-native';
 
+import { router } from 'expo-router';
+
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
 import LogHandScreen from '../../../app/session/hand';
@@ -47,7 +49,9 @@ beforeEach(() => {
       mockLogged.push(input);
       return { id: 'h1' };
     }) as never,
+    tableOfferMadeAt: null,
   });
+  (router.back as jest.Mock).mockClear();
 });
 
 describe('the board is optional', () => {
@@ -138,5 +142,68 @@ describe('what the board refuses', () => {
 
     await userEvent.press(screen.getByText('Save hand'));
     expect(mockLogged[0]).toMatchObject({ board: null });
+  });
+});
+
+/**
+ * The one hand in a session that does not leave on the way it arrived.
+ *
+ * Rendered rather than read, because what matters here is the order of two
+ * things that happen inside one tap: the hand is written, and only then is
+ * anybody offered anything. `handOffs.test.ts` pins that order in the source;
+ * this pins that it is what the screen actually does, with a real store and a
+ * real renderer in front of it.
+ */
+describe('the reset offered after a hand the game did to you', () => {
+  const tagAndSave = async (label: string) => {
+    await renderScreen(<LogHandScreen />);
+    await userEvent.press(screen.getByText(label));
+    await userEvent.press(screen.getByText('Save hand'));
+  };
+
+  it('writes the hand first, and only then offers anything', async () => {
+    await tagAndSave('bad beat');
+    // The hand is in the log whatever happens next, which is the whole safety
+    // of putting a card in this path at all.
+    expect(mockLogged).toHaveLength(1);
+    expect(mockLogged[0]).toMatchObject({ tags: ['bad_beat'] });
+    expect(screen.getByText('That one is logged.')).toBeTruthy();
+    expect(screen.getByText('Pick a reset')).toBeTruthy();
+  });
+
+  it('and holds the screen rather than navigating out from under it', async () => {
+    await tagAndSave('cooler');
+    expect(router.back).not.toHaveBeenCalled();
+    // The way out is on the card, one tap, no different from Cancel.
+    await userEvent.press(screen.getByText('Back to the game'));
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('says nothing after a hand the player thinks they misplayed', async () => {
+    // That tag is about their own decision and the dashboard already keeps the
+    // app's promise about it, by handing the hand to TiltProof a day later.
+    await tagAndSave('misplayed?');
+    expect(mockLogged).toHaveLength(1);
+    expect(screen.queryByText('That one is logged.')).toBeNull();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('nor after an ordinary hand, which is most of them', async () => {
+    await renderScreen(<LogHandScreen />);
+    await pickCard('A', 'spades');
+    await pickCard('K', 'diamonds');
+    await userEvent.press(screen.getByText('Save hand'));
+    expect(screen.queryByText('That one is logged.')).toBeNull();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('and only once, however the rest of the night goes', async () => {
+    // A player taking three bad beats in an hour is who this is for and who a
+    // repeat would drive away.
+    useLogStore.setState({ tableOfferMadeAt: Date.now() });
+    await tagAndSave('bad beat');
+    expect(mockLogged).toHaveLength(1);
+    expect(screen.queryByText('That one is logged.')).toBeNull();
+    expect(router.back).toHaveBeenCalled();
   });
 });

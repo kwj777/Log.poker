@@ -27,9 +27,14 @@ import {
   RESET_MEDITATION_ID,
   TILTPROOF_REVIEW,
   UNTILT_POST_LANE,
+  UNTILT_PRE_LANE,
+  UNTILT_TABLE_LANE,
   drillHandOff,
   postSessionHandOff,
+  preSessionHandOff,
   resetHandOff,
+  tableHandOff,
+  untiltHandOff,
 } from '../links';
 
 const source = (...parts: string[]): string =>
@@ -331,5 +336,223 @@ describe('when the after-session card is allowed on screen', () => {
 
   it('and cash-out is the only thing that says so', () => {
     expect(active).toContain('router.replace(`/session/${session.id}?ended=1`);');
+  });
+});
+
+describe('the variance-screen link, which names no destination', () => {
+  it('carries nothing about the stretch that summoned it', () => {
+    // It used to send `context=running_bad`. Untilt's `readArrival` speaks
+    // `welcome`, `play` and `lane` and strips the whole query on arrival, so
+    // the verdict reached nothing over there for the whole time it shipped --
+    // while sitting in an address bar and a browser history saying how badly
+    // this player is doing. The same call `resetHandOff` makes about a mood.
+    const url = new URL(untiltHandOff().url);
+    expect(url.searchParams.get('context')).toBeNull();
+    expect([...url.searchParams.keys()]).toEqual(['source']);
+  });
+
+  it('takes no argument, because there is nothing left for one to say', () => {
+    // Pinned so a caller cannot quietly start passing the verdict again.
+    expect(untiltHandOff).toHaveLength(0);
+  });
+
+  it('and still says where it came from', () => {
+    expect(new URL(untiltHandOff().url).searchParams.get('source')).toBe('log');
+  });
+});
+
+describe('the before-the-session offer', () => {
+  it('opens the lane for somebody who has not sat down yet', () => {
+    const url = new URL(preSessionHandOff(false).url);
+    expect(url.origin + url.pathname).toBe(new URL(FAMILY_LINKS.untilt).origin + '/');
+    expect(url.searchParams.get('lane')).toBe(UNTILT_PRE_LANE);
+  });
+
+  it('names the lane Untilt itself calls the before-the-session one', () => {
+    // Read off that app's `LANES`, where `preflight` is "I am about to play".
+    // An unknown lane is ignored over there and the app opens on its home
+    // screen, so a guess costs the player the feature and costs this app no
+    // error at all -- the same silent failure `RESET_MEDITATION_ID` is pinned
+    // against.
+    expect(UNTILT_PRE_LANE).toBe('preflight');
+  });
+
+  it('sends no meditation id, because every one of them is premium', () => {
+    // All thirty-five of Untilt's before-the-session meditations are inside
+    // the pass, so there is no free id to pin even if pinning one were right.
+    // What that screen does have is `preflightFallback`, which puts the free
+    // between-hands reset under the suggestions -- so the landing is Untilt's
+    // to choose and it is never a screen with nothing playable on it.
+    expect(new URL(preSessionHandOff(false).url).searchParams.get('play')).toBeNull();
+  });
+
+  it('carries nothing about the night that has not happened yet', () => {
+    // The mood that summoned this is a 4 or a 5 on Log's own scale, and it
+    // stays here. Same rule as `resetHandOff` and `postSessionHandOff`.
+    for (const paid of [true, false]) {
+      const params = new URL(preSessionHandOff(paid).url).searchParams;
+      expect([...params.keys()].sort()).toEqual(['lane', 'source']);
+    }
+  });
+
+  it('is the same address for a player who has paid and one who has not', () => {
+    expect(preSessionHandOff(true).url).toBe(preSessionHandOff(false).url);
+    expect(preSessionHandOff(true).label).not.toBe(preSessionHandOff(false).label);
+  });
+
+  it('names no price and no verb about buying, on either branch', () => {
+    for (const paid of [true, false]) {
+      expect(preSessionHandOff(paid).label).not.toMatch(
+        /\$|\b(buy|purchase|upgrade|subscribe|trial|unlock)\b/i,
+      );
+    }
+  });
+});
+
+describe('what the before-the-session card says', () => {
+  const card = source('src', 'features', 'sessions', 'PreSessionWarmUp.tsx');
+  const copy = card.slice(card.indexOf('export const warmUpCopy'), card.indexOf('interface PreSessionWarmUpProps'));
+
+  it('says the material is inside the pass rather than pretending it is free', () => {
+    expect(copy).toMatch(/\bpass\b/);
+  });
+
+  it('and still tells an unpaid player what they can actually play there', () => {
+    // The one way this differs from the after-session card, and it is a fact
+    // about Untilt rather than a softener: `preflightFallback` puts the free
+    // between-hands reset on that screen for somebody without the pass. A card
+    // that implied a wall would be talking them out of a tap that works.
+    expect(copy).toMatch(/free between-hands reset/);
+  });
+
+  it('and names no price, no checkout and no purchase', () => {
+    expect(copy).not.toMatch(/\$\s*\d/);
+    expect(copy).not.toMatch(/\b(buy|purchase|upgrade|subscribe|trial|checkout|sign up)\b/i);
+  });
+
+  it('does not sell the pass to somebody who already has it', () => {
+    expect(copy).toContain('Your pass');
+  });
+});
+
+describe('when the before-the-session card is allowed on screen', () => {
+  const card = source('src', 'features', 'sessions', 'PreSessionWarmUp.tsx');
+  const screen = source('app', 'session', 'new.tsx');
+
+  it('only behind the shared definition of rattled', () => {
+    // `wantsReset` rather than a literal, so the score that opens this is the
+    // same one that opens the mid-session reset and the same one that groups a
+    // session as rattled in the month-end comparison.
+    expect(card).toContain('!wantsReset(mood)');
+    expect(card).not.toMatch(/mood >= 4|mood === 4|\[4, 5\]/);
+  });
+
+  it('and it cannot make a 5 costlier to tap than a 3', () => {
+    // The failure this card could cause is silent and permanent: the start
+    // scores are what `mood.ts` computes the whole tilt-cost comparison from,
+    // and an offer with a dismiss control on it teaches players to answer the
+    // picker with a 3 to be left alone. So it has no way to be tapped past,
+    // and the Start button is in the screen's footer where this cannot move
+    // it.
+    expect(card).not.toMatch(/Not now|Dismiss|setDismissed/);
+    expect(screen).toContain('<PreSessionWarmUp mood={mood} />');
+    expect(screen).toMatch(/footer=\{/);
+  });
+
+  it('and draws nothing until it knows which sentence is true', () => {
+    // `PostSessionReset`'s call, for its reason: null is "not read yet", not
+    // "has not paid", and a wrong sentence for one frame is the failure that
+    // card's tests already exist to prevent.
+    expect(card).toContain('paid === null) return null');
+  });
+});
+
+describe('the at-the-table offer', () => {
+  it('opens the lane for somebody still in their seat', () => {
+    const url = new URL(tableHandOff().url);
+    expect(url.origin + url.pathname).toBe(new URL(FAMILY_LINKS.untilt).origin + '/');
+    expect(url.searchParams.get('lane')).toBe(UNTILT_TABLE_LANE);
+  });
+
+  it('names the lane Untilt itself calls the at-the-table one', () => {
+    // `table` is "I am at the table" in that app's `LANES`, whose own blurb is
+    // "A reset between hands. You never have to leave your seat."
+    expect(UNTILT_TABLE_LANE).toBe('table');
+  });
+
+  it('sends a lane and not the sixty-second reset, which is the harder call', () => {
+    // That id is free, sixty seconds and already pointed at from this app, so
+    // it is the tempting answer. The difference is what Log has already asked.
+    // `resetHandOff` follows a check-in where the player has just answered a
+    // 1-to-5, so a second mood question would be a repeat. Here Log has asked
+    // only what happened at the table, so Untilt's mood screen is the first
+    // time anybody asks -- and it can tell "just took a brutal one" from
+    // "beating yourself up" where a tag cannot.
+    expect(new URL(tableHandOff().url).searchParams.get('play')).toBeNull();
+  });
+
+  it('carries nothing about the hand that was just tagged', () => {
+    expect([...new URL(tableHandOff().url).searchParams.keys()].sort()).toEqual([
+      'lane',
+      'source',
+    ]);
+  });
+
+  it('and has no paid branch, because there is nothing here that is not free', () => {
+    // All seventy-nine of Untilt's between-hands meditations are free, with no
+    // exception. `postSessionHandOff` takes a `paid` because every wind-down is
+    // premium; the mirror of that fact is that this one needs no such argument
+    // and no sentence about a pass.
+    expect(tableHandOff).toHaveLength(0);
+    expect(tableHandOff().label).not.toMatch(
+      /\$|\b(buy|purchase|upgrade|subscribe|trial|unlock|pass)\b/i,
+    );
+  });
+});
+
+describe('when the at-the-table offer is allowed on screen', () => {
+  const screen = source('app', 'session', 'hand.tsx');
+  const save = screen.slice(screen.indexOf('const save ='), screen.indexOf('if (offered)'));
+  const store = source('src', 'store', 'useLogStore.ts');
+
+  it('decides only after the hand is written', () => {
+    // `MidSessionCheckIn`'s rule, applied to the other write a player makes at
+    // a table. A hand this screen made harder to save is a hand that does not
+    // get logged, and the whole brief for this form is fifteen seconds.
+    const written = save.indexOf('logHand(');
+    const decided = save.indexOf('wantsTableReset(');
+    expect(written).toBeGreaterThan(-1);
+    expect(decided).toBeGreaterThan(written);
+    expect(save.slice(0, written)).not.toContain('wantsTableReset');
+  });
+
+  it('behind the shared definition of which tags mean the game did it to you', () => {
+    // Not a literal, so the two tags that summon this are readable in one
+    // place. `misplayed?` is deliberately not among them: that one is a claim
+    // about the player's own decision and `reviewPrompt.ts` already keeps the
+    // app's promise about it, by handing the hand to TiltProof.
+    expect(save).toContain('wantsTableReset(tags)');
+    expect(screen).not.toMatch(/tags\.includes\('bad_beat'\)|tags\.includes\('cooler'\)/);
+  });
+
+  it('once in a session, and never twice on a bad run', () => {
+    // A player taking three bad beats in an hour is exactly who this is for
+    // and exactly who a repeat would drive away. `FamilyCrossPromo` rules out
+    // standing furniture and this app has no key-value store to remember a
+    // dismissal in, so the bound is the session.
+    expect(save).toContain('tableOfferMadeAt === null');
+    expect(save).toContain('markTableOffer()');
+  });
+
+  it('and the session is what forgets it, at both ends', () => {
+    // Cleared by the same two writes that clear the mid-session prompt, so a
+    // player who starts a second session tonight is offered it again and one
+    // who reopens the app tomorrow is not carrying anything.
+    expect(store).toContain('set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });');
+    expect(store.match(/tableOfferMadeAt: null \}\);/g) ?? []).toHaveLength(2);
+  });
+
+  it('and leaves as easily as it arrived', () => {
+    expect(screen).toContain('Back to the game');
   });
 });

@@ -140,13 +140,31 @@ export const promptTitle = (count: number): string =>
  * inside Log, and this card does not change that.
  *
  * What it does do is say which side of that app's line a review falls on, so
- * nobody taps through and finds out on arrival. TiltProof's `FREE_REVIEWS` is
- * 1 and its pass is the same pass Untilt's wind-downs are inside, which is why
- * this reads as the family's rather than as a second thing. It is deliberately
- * a fact about that app and not a promise to this player: Log cannot read
- * TiltProof's entitlement across a registrable domain (see `auth/handoff.ts`),
- * so "your first" would be a claim this app has no way to stand behind.
+ * nobody taps through and finds out on arrival. There is no such side any
+ * more: reviewing a hand you played is free over there, every hand, and this
+ * sentence is the second attempt at saying so.
+ *
+ * **The first attempt shipped wrong and is worth recording.** It read "The
+ * first review there is free, and the rest are inside the family pass",
+ * against a `FREE_REVIEWS` of 1 and a `canReview` that spent it. TiltProof
+ * deleted both, and `PRICING.md` over there now lists the review of a hand you
+ * played as free on both sides of its table -- the argument being that the
+ * wall landed on the least invested person in that product, who is usually
+ * somebody Log had just handed over. So the copy was true when it was written
+ * and false within a day of shipping, in the worse of the two directions: it
+ * told a player their second flagged hand costs money, on a card whose whole
+ * job is a second tap.
+ *
+ * The lesson is the one `TILTPROOF_REVIEW` already carries about addresses. A
+ * claim about the far side's pricing fails silently here -- nothing renders an
+ * error, nothing 404s, the player simply does not tap -- so it has to be read
+ * off that repository rather than remembered.
+ *
+ * It stays a fact about that app and not a promise to this player: Log cannot
+ * read TiltProof's entitlement across a registrable domain (see
+ * `auth/handoff.ts`), and it does not need to for a sentence that is true
+ * whoever is holding the phone.
  */
 export const promptCopy = (): string =>
   'TiltProof walks one hand back four steps: the tell, the range, the equity, the exploit. ' +
-  'The first review there is free, and the rest are inside the family pass.';
+  'Reviewing a hand you played is free there, however many you bring.';

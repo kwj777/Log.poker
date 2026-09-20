@@ -50,9 +50,11 @@ for this repo: **Log is free in its entirety and has no standalone price.** See
 - **Session-summary import** -- bring an online history in from a CSV your site
   or your tracker exported, rather than typing out a year of sessions. See
   [Importing an online history](#importing-an-online-history).
-- **Family cross-promo** -- a shared "More from the family" card, plus two
-  contextual hand-offs: a rough stretch on the variance view offers Untilt, and
-  a hand tagged *misplayed?* offers to drill the spot in TiltProof.
+- **Family cross-promo** -- a shared "More from the family" card, plus
+  contextual hand-offs at the moments Log already knows something: sitting down
+  rattled, a hand tagged as a bad beat or a cooler, two hours into a session, a
+  rough stretch on the variance view and the night just closed out all offer
+  Untilt, and a hand tagged *misplayed?* offers to drill the spot in TiltProof.
 
 Offline throughout, and that is the default rather than the limit: no account,
 no network call, nothing leaving the device. Signing in is optional and is the
@@ -1064,12 +1066,13 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 61 passed
-Tests:       1643 passed
+Test Suites: 63 passed
+Tests:       1695 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
   bundle             66   what ships to each platform, against the real output
+  handOffs           61   where a hand-off goes, and what the four offer cards say
   site               56   the marketing/app split, the PWA, the sitemap
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
@@ -1082,7 +1085,6 @@ Tests:       1643 passed
   stats              45   P/L, rebuys, duration, win rate, groupings
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
-  handOffs           35   where a hand-off goes, and what the two offer cards say
   variance           35   win rate, σ, confidence bands, verdicts
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
@@ -1106,14 +1108,17 @@ Tests:       1643 passed
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
   client             15   the sync client, against a fake fetch
+  reviewPrompt       15   which flagged hands still want a review, and what the offer says
   observe            14   how big the bundle was, said without saying whose
-  reviewPrompt       14   which flagged hands still want a review, and what the offer says
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
+  logHand            12   logging a hand, the optional board, and the reset after a bad one
   csvWriter          11   writing CSV, and reading back exactly what was written
+  tableOffer         11   which tags mean the game did it to you, and what to say about it
   history             9   the session list, its filters, and how much of it mounts
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
+  preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
@@ -1121,7 +1126,6 @@ Tests:       1643 passed
   tokenStore.web      8   the browser token store
   columns             7   header matching
   cursorStore         7   which cursors survive a launch, and what a lost one costs
-  logHand             7   logging a hand, and the board that is optional on it
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   writeFailures       7   what the player sees when a write does not work
   readme              6   the test table adds up and says what each suite is for

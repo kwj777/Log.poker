@@ -1064,8 +1064,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 58 passed
-Tests:       1596 passed
+Test Suites: 59 passed
+Tests:       1622 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1082,18 +1082,18 @@ Tests:       1596 passed
   stats              45   P/L, rebuys, duration, win rate, groupings
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
+  handOffs           35   where a hand-off goes, and what the two offer cards say
   variance           35   win rate, σ, confidence bands, verdicts
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   merge              30   two devices disagreeing, and who wins
+  token              29   the family token grammar, against signed fixtures
   palette            27   the theme matches BRAND.md
   migrations         26   a filled v2 database walked forward, both engines
-  token              25   the family token grammar, against signed fixtures
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
   sessionExport      22   the log written out, and read back by the importer
-  handOffs           21   where a hand-off goes, and what the mid-session card says
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1115,6 +1115,7 @@ Tests:       1596 passed
   liveTimer           9   the session clock, across a background and back
   selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
+  postSessionReset    8   the offer after cash-out, and who it is talking to
   sessionDetail       8   one session and the hands that belong to it
   tokenStore.web      8   the browser token store
   columns             7   header matching
@@ -1367,6 +1368,55 @@ Which scores count as rattled is `wantsReset`, and it reuses `RATTLED_SCORES`
 from the comparison rather than restating `[4, 5]`. A player who would land in
 that group at the end of the month is the one worth offering something to
 tonight, and two definitions of rattled in one app is one too many.
+
+### The after-session offer
+
+The other end of the same night, and deliberately a different offer. A player
+who has just counted their chips is away from the table, the session is
+written, and there is nothing left to interrupt -- which is where the
+mid-session card's own argument says the paid material belongs. So
+[`PostSessionReset`](src/features/sessions/PostSessionReset.tsx) appears after
+every session, win or lose, and says that Untilt has resets for the hour after
+one and that they are inside Untilt's pass.
+
+**It is keyed to the moment, not to the screen.** Session detail is also where
+History lands, and a wind-down offered for a night three weeks gone is noise.
+Cash-out navigates with `?ended=1` and nothing else sets it, so the card is
+rendered by the session that just finished and by no other.
+
+**It waits to know who it is talking to.** A player who has bought the pass is
+told their pass already covers it rather than being sold what they own, and the
+card renders nothing at all until that read lands. Showing one sentence and
+swapping it a frame later is the same failure the hands count guards against
+one section up. `hasPass` is the question, and it is false for everybody today:
+Log's own door mints the free tier and this app has never shipped a way to
+receive one of Untilt's tokens. The branch is written, typed and tested anyway,
+for the reason everything around `SYNC_NEEDS_PASS` is.
+
+**It names no price and links to no checkout**, which is the whole distance
+between this and a purchasing mechanism Apple would have something to say
+about. `SUBMISSION.md` records the reasoning; the tests assert the absence of a
+currency, a buy, a sign-up and an upgrade, the same way the mid-session card's
+do.
+
+**It hands off to a lane, not a meditation**, and that is the difference
+between the two cards. The mid-session reset points at one exercise because
+there is one right answer at a table: sixty seconds, free. After a session
+there are thirty-three wind-downs, every one of them inside the pass, and
+which one fits depends on how the night went. Untilt asks that itself, in its
+own ten words for it, on the screen `?lane=after` opens. Log knows a number
+from 1 to 5 and could not pick between "self-critical" and "drained" from it,
+so it does not try and does not send the number either.
+
+Both branches follow the same link, and only the sentence differs. Somebody
+without the pass reaches Untilt's own account of what the wind-downs are and a
+free reset matched to the mood they just picked, which is a better landing
+than anything written here and is written where the library is known.
+
+That means two moods in a row, Log's at cash-out and Untilt's on arrival, so
+the card says the second one is coming. They are different questions: this app
+wants a number for the tilt meter, that one wants which of ten states in order
+to choose, and it is the only one of the two that can.
 
 The URL builders moved to [`src/features/family/links.ts`](src/features/family/links.ts)
 to make any of this testable. `hooks.ts` imports `Linking` from React Native,

@@ -23,7 +23,14 @@ import { join } from 'node:path';
 
 import { FAMILY_LINKS } from '../../../config';
 import { POSITIONS } from '../../../domain/types';
-import { RESET_MEDITATION_ID, TILTPROOF_REVIEW, drillHandOff, resetHandOff } from '../links';
+import {
+  RESET_MEDITATION_ID,
+  TILTPROOF_REVIEW,
+  UNTILT_POST_LANE,
+  drillHandOff,
+  postSessionHandOff,
+  resetHandOff,
+} from '../links';
 
 const source = (...parts: string[]): string =>
   readFileSync(join(__dirname, '..', '..', '..', '..', ...parts), 'utf8');
@@ -210,5 +217,119 @@ describe('what the mid-session card says', () => {
 
   it('and leaves as easily as it arrived', () => {
     expect(offer).toContain('Back to the game');
+  });
+});
+
+describe('the after-session offer', () => {
+  it('opens the lane that asks how the night went', () => {
+    // A lane rather than a meditation, because there are thirty-three
+    // wind-downs and which one fits depends on the answer to a question only
+    // Untilt asks. `after` is the id of its "I just finished" lane.
+    for (const paid of [false, true]) {
+      const url = new URL(postSessionHandOff(paid).url);
+      expect(url.origin + url.pathname).toBe(new URL(FAMILY_LINKS.untilt).origin + '/');
+      expect(url.searchParams.get('lane')).toBe(UNTILT_POST_LANE);
+      expect(url.searchParams.get('source')).toBe('log');
+    }
+  });
+
+  it('names the lane Untilt itself calls the after-session one', () => {
+    // Checked against that app rather than assumed, the way
+    // `RESET_MEDITATION_ID` is. A lane Untilt does not know is ignored over
+    // there and the app opens on its home screen, which is silent from here.
+    expect(UNTILT_POST_LANE).toBe('after');
+  });
+
+  it('sends no meditation id, because there is no right one to send', () => {
+    // Every after-session meditation is inside the pass and which of them
+    // fits is the question the lane exists to ask. A `play` here would answer
+    // it on the player's behalf and would be wrong most of the time.
+    for (const paid of [false, true]) {
+      expect(new URL(postSessionHandOff(paid).url).searchParams.get('play')).toBeNull();
+    }
+  });
+
+  it('carries nothing about the night that was just logged', () => {
+    // The same rule as the mid-session reset, for the same reason: a query
+    // string lands in an address bar and in every log that sees the URL. The
+    // mood is the tempting one, and Untilt is about to ask for it in its own
+    // vocabulary anyway.
+    for (const paid of [false, true]) {
+      const url = new URL(postSessionHandOff(paid).url);
+      for (const leak of ['mood', 'result', 'net', 'stakes', 'venue', 'session']) {
+        expect(url.searchParams.get(leak)).toBeNull();
+      }
+    }
+  });
+
+  it('is the same address for a player who has paid and one who has not', () => {
+    // The lane is right for both. Somebody without the pass arrives at
+    // Untilt's own account of what the wind-downs are, plus a free reset
+    // matched to the mood they just picked, which is better than anything
+    // this app could write and is written where the library is known.
+    expect(postSessionHandOff(true).url).toBe(postSessionHandOff(false).url);
+  });
+
+  it('names no price and no verb about buying, on either branch', () => {
+    for (const paid of [false, true]) {
+      expect(postSessionHandOff(paid).label).not.toMatch(
+        /\$|\b(buy|purchase|upgrade|subscribe|trial|unlock)\b/i,
+      );
+    }
+  });
+});
+
+describe('what the after-session card says', () => {
+  const card = source('src', 'features', 'sessions', 'PostSessionReset.tsx');
+  const copy = card.slice(card.indexOf('export const offerCopy'), card.indexOf('export const PostSessionReset'));
+
+  it('offers the same thing after a win as after a loss', () => {
+    // The brief is "after a session, good or bad". A card that only appears
+    // after a losing night is a card that tells somebody they lost.
+    expect(copy).toMatch(/win or lose/i);
+    expect(card).not.toMatch(/\bnet\b|\bwon\b|cashOut|resultColor/);
+  });
+
+  it('says the material is inside the pass rather than pretending it is free', () => {
+    expect(copy).toMatch(/\bpass\b/);
+    expect(copy).not.toMatch(/\bfree\b/i);
+  });
+
+  it('and still names no price, no checkout and no purchase', () => {
+    // `SUBMISSION.md` records why the distance matters: App Store guideline
+    // 3.1.1 is about steering a customer to a purchase Apple does not take.
+    // Saying a sister app has something is not that. Selling it here is.
+    expect(copy).not.toMatch(/\$\s*\d/);
+    expect(copy).not.toMatch(/\b(buy|purchase|upgrade|subscribe|trial|checkout|sign up)\b/i);
+  });
+
+  it('does not sell the pass to somebody who already has it', () => {
+    expect(copy).toContain('Your pass');
+  });
+
+  it('warns that Untilt asks its own question, so the second one is not a repeat', () => {
+    // This card follows the cash-out sheet's "how are you leaving?", and the
+    // lane opens on "how are you feeling?". Two moods in a row reads as a bug
+    // unless the first screen says the second one is coming.
+    expect(copy).toMatch(/will ask how it went/);
+  });
+
+  it('and leaves as easily as it arrived', () => {
+    expect(card).toContain('Not now');
+  });
+});
+
+describe('when the after-session card is allowed on screen', () => {
+  const detail = source('app', 'session', '[id].tsx');
+  const active = source('app', 'session', 'active.tsx');
+
+  it('only for the session that was just closed out', () => {
+    // The detail screen is also where History lands. Without the guard this
+    // offers a wind-down for a night three weeks gone, every time.
+    expect(detail).toContain("{ended === '1' && !live ? <PostSessionReset /> : null}");
+  });
+
+  it('and cash-out is the only thing that says so', () => {
+    expect(active).toContain('router.replace(`/session/${session.id}?ended=1`);');
   });
 });

@@ -148,3 +148,57 @@ export const resetHandOff = (): { url: string; label: string } => ({
   url: `${FAMILY_LINKS.untilt}?source=log&play=${RESET_MEDITATION_ID}`,
   label: 'Take sixty seconds',
 });
+
+/**
+ * The Untilt lane a player is sent to once they have closed out a session.
+ *
+ * A lane rather than a meditation, and that is the whole design. `play=<id>`
+ * lands in one exercise, which is right for the mid-session reset because
+ * there is exactly one right answer there: sixty seconds, free, at a table.
+ * After a session there are thirty-three wind-downs and which one fits
+ * depends on how the night went -- and Untilt asks that itself, on the screen
+ * this lane opens, in its own ten words for it. Log knows a number from 1 to
+ * 5 and could not pick between "self-critical" and "drained" from it.
+ *
+ * So there is no id to pin here, which is the second reason. An id Untilt
+ * does not recognize resolves to null over there and opens the app normally,
+ * so a guess fails silently and costs a player the whole feature.
+ *
+ * `after` is the id of Untilt's "I just finished" lane, in its own `LANES`.
+ * An unknown lane is ignored over there and the app opens on its home screen,
+ * where that lane is the third card, so this degrades to the landing it had
+ * before rather than to nothing.
+ */
+export const UNTILT_POST_LANE = 'after';
+
+/**
+ * What a player is offered when they close out a session, win or lose.
+ *
+ * Unlike `resetHandOff`, which is for somebody rattled at a table and points
+ * at the free sixty-second reset, this is the after-session offer and the
+ * material behind it is inside Untilt's pass. Every one of the wind-downs is,
+ * with no free exception, which is why the copy says so rather than leaving
+ * anybody to find out on arrival. Two more things follow.
+ *
+ * **It says nothing about price and links to no checkout.** `SUBMISSION.md`
+ * records why: App Store guideline 3.1.1 is about an app steering a customer
+ * to a purchase it does not take through Apple, and the distance between "this
+ * exists over there" and "buy it here" is the whole of what keeps an outbound
+ * link to a sister app an ordinary link. Nothing in Log is sold or unlocked
+ * either way, which stays true with this card on the screen.
+ *
+ * **Nothing about the session crosses.** Not the result, not the mood, not the
+ * venue. `lane` names a screen and `source` names this app; neither says
+ * anything about this player's night. The mood is the tempting one and it
+ * stays out for the same reason it stays out of `resetHandOff`: a query
+ * string lands in browser history and in every log that sees the URL, and
+ * Untilt is about to ask the question in its own vocabulary anyway.
+ */
+export const postSessionHandOff = (paid: boolean): { url: string; label: string } => {
+  const params = new URLSearchParams({ source: 'log', lane: UNTILT_POST_LANE });
+
+  return {
+    url: `${FAMILY_LINKS.untilt}?${params.toString()}`,
+    label: paid ? 'Open your wind-down' : 'Find a wind-down',
+  };
+};

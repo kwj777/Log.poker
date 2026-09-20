@@ -115,7 +115,10 @@ export default function ActiveSessionScreen() {
       });
       warningFeedback();
       setCashOutOpen(false);
-      router.replace(`/session/${session.id}`);
+      // `ended` is what tells the detail screen this is the session that just
+      // finished rather than one opened from History, which is the whole of
+      // when `PostSessionReset` is allowed to appear. Nothing else sets it.
+      router.replace(`/session/${session.id}?ended=1`);
     } catch (error) {
       // The worst one to lose silently: this is the moment the result is
       // written, and the sheet closing is the only thing that ever said so.

@@ -56,6 +56,25 @@ and they should be chosen between deliberately:
 - **Apply for the External Purchase Link Entitlement.** US storefront only,
   still 27% commission, and a meaningful amount of paperwork.
 
+The after-session card added in `src/features/sessions/PostSessionReset.tsx`
+sits near this line without crossing it, and the distinction is worth writing
+down because the next change to that copy is where it would be lost. The card
+says Untilt has after-session resets and that they are inside Untilt's pass.
+It names no price, shows no purchase and links to no checkout, and nothing in
+Log unlocks either way, so it is a statement about a sister app rather than a
+purchasing mechanism. What would cross the line is a price, a buy button, or
+any Log feature that turns on because somebody paid at untilt.poker. The
+wording is pinned by tests in
+`src/features/family/__tests__/handOffs.test.ts`, which fail on a dollar sign
+or a verb about buying.
+
+The card's paid branch reads `hasPass`, which is `claim.tier === 'full'` and
+cannot be true for anybody yet: Log's own door mints the free tier and this
+app has never shipped a way to receive one of Untilt's tokens. It is written
+against both answers for the same reason everything around `SYNC_NEEDS_PASS`
+is. Both branches follow the same link either way, `untilt.poker?source=log&lane=after`,
+which opens that app's after-session lane; only the sentence differs.
+
 Related, and worth knowing before somebody reports it as a bug: `/claim` is
 web-only. `takeCode()` in `app/claim.tsx` returns null when the platform is not
 web, so a pass bought at Untilt cannot be claimed on a phone at all. Nothing on
@@ -210,6 +229,13 @@ answers a question this app reliably raises.
 > **Links to other apps.** Settings links to tiltproof.poker and
 > untilt.poker, which are two other apps by the same developer. Nothing in
 > Log is locked, gated or sold; every feature here is free.
+>
+> After a session is closed out, Log shows a card saying that Untilt has
+> after-session resets and that they are part of Untilt's pass. It names no
+> price, offers no purchase and links to no checkout: the button opens
+> untilt.poker, the same outbound link Settings carries. Nothing in Log is
+> unlocked by anything bought there, and nothing here changes if the player
+> ignores it.
 
 ---
 

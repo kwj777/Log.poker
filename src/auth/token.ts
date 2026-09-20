@@ -228,6 +228,32 @@ export const hasOwnSubject = (claim: Claim | null): boolean =>
 export const SYNC_NEEDS_PASS: boolean = false;
 
 /**
+ * Whether the person behind this claim has bought the family pass.
+ *
+ * The tier, asked as a question, so that the one place the word `full` appears
+ * is here. Two callers now read it and they are asking different things:
+ * `syncIsPaidFor` asks whether to open a feature, and the after-session card
+ * asks which of two sentences to put on the screen. Neither should have to
+ * know the grammar.
+ *
+ * **It is false for everybody today, and not because nobody has paid.**
+ * `signinEndpoint` mints `tier: 'free'` for every sign-in made at Log's own
+ * door, and Log has never shipped a way to receive one of Untilt's tokens, so
+ * a `full` claim cannot reach this app at all yet. What makes it true is the
+ * shared entitlement the family brief makes step 4 and `SYNC_NEEDS_PASS`
+ * describes: a way for this app to learn, for an address that just signed in
+ * here, that somebody bought. Until that exists, everything reading this is
+ * built, wired and tested against both answers, and the answer is no.
+ *
+ * Nothing here is a gate, and nothing here may become one. See the top of this
+ * file: a claim read on the client proves only that somebody typed something
+ * shaped like a token. Deciding which sentence to show is exactly the kind of
+ * courtesy this side is allowed to decide.
+ */
+export const hasPass = (claim: Claim | null): boolean =>
+  claim !== null && claim.tier === 'full';
+
+/**
  * The rule, given whether sync is gated. One rule, one place.
  *
  * One place because two sides read it and they are not allowed to disagree:
@@ -238,7 +264,7 @@ export const SYNC_NEEDS_PASS: boolean = false;
  * is no gap between what the app promises and what the server answers.
  */
 export const syncIsPaidFor = (gated: boolean, claim: Claim | null): boolean =>
-  !gated || (claim !== null && claim.tier === 'full');
+  !gated || hasPass(claim);
 
 /**
  * The same rule with the switch applied, which is what both sides call.

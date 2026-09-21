@@ -318,14 +318,24 @@ describe('when it does speak', () => {
 
 describe('what it says instead of a number', () => {
   it('offers the hours that would settle the gap it can see', () => {
+    // Both guards are gone, and with them the reason this test passed without
+    // checking the thing it is named for. The old fixture came back with
+    // `hoursNeeded: null` -- five rattled sessions is under the floor the
+    // denominator needs -- so the conditional on the last line never ran and
+    // the only live assertion was about the blocker. A test that returns early
+    // and expects conditionally is a test that cannot fail.
+    //
+    // This fixture produces a real number at the default level, so the
+    // assertions can be flat.
     const { sessions, moods } = merge(
-      run('a', { score: 1, count: 30, resultBb: 60, hours: 5, spreadBb: 120 }),
-      run('c', { score: 5, count: 5, resultBb: -10, hours: 3, spreadBb: 120 }),
+      run('a', { score: 1, count: 30, resultBb: 60, hours: 4, spreadBb: 120 }),
+      run('c', { score: 5, count: 10, resultBb: -10, hours: 4, spreadBb: 120 }),
     );
     const result = startMoodComparison(sessions, moods);
-    if (result.settled) return; // the fixture is only useful while it is not
+    expect(result.settled).toBe(false);
     expect(result.blocker).toBe('inside-the-noise');
-    if (result.hoursNeeded !== null) expect(result.hoursNeeded).toBeGreaterThan(0);
+    expect(result.hoursNeeded).not.toBeNull();
+    expect(result.hoursNeeded as number).toBeGreaterThan(0);
   });
 
   it('offers hours to add, not the total to end up with', () => {

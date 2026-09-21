@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 87 passed
-Tests:       2062 passed
+Tests:       2064 passed
 
   dexieRepository   137   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
@@ -1132,10 +1132,10 @@ Tests:       2062 passed
   client             17   the sync client, against a fake fetch
   handoff            17   taking delivery of a purchase made at another app's door
   pastSession        17   logging a night that was played before it was logged
+  settingsExport     17   the export card, and what it refuses to write
   useLogStore        16   what a write reads back, and what it leaves alone
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
-  settingsExport     15   the export card, and what it refuses to write
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   bankrollHeadline   13   the word over the headline figure, and what it has to be true of

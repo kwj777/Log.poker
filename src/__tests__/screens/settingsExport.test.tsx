@@ -25,10 +25,13 @@ import SettingsScreen from '../../../app/(tabs)/settings';
 import { useLogStore } from '../../store/useLogStore';
 
 const mockSaved: { name: string; text: string }[] = [];
+/** False for the one device that has nowhere to send a file. */
+const mockShareable = { yes: true };
 
 jest.mock('../../features/export/saveCsv', () => ({
   CAN_SAVE_FILE: true,
   saveCsv: async (name: string, text: string) => {
+    if (!mockShareable.yes) return { saved: false };
     mockSaved.push({ name, text });
     return { saved: true };
   },
@@ -74,6 +77,7 @@ const load = (over: Partial<ReturnType<typeof useLogStore.getState>> = {}) =>
 
 beforeEach(() => {
   mockSaved.length = 0;
+  mockShareable.yes = true;
   jest.clearAllMocks();
   mockRepository.listSessions.mockImplementation(async () => [session('s1'), session('s2')]);
   mockRepository.listHands.mockImplementation(async () => [
@@ -137,6 +141,34 @@ describe('exporting the log', () => {
     // Both refused: a header row with nothing under it is a file this app's
     // own importer rejects.
     expect(mockSaved).toHaveLength(0);
+  });
+
+  it('says so when there is nowhere on the device to send it', async () => {
+    // The one thing `saved: false` reports. It used to be read as somebody
+    // backing out of the share sheet, which `shareAsync` cannot tell anyone
+    // about, so the branch that exists for a device with no way to share a
+    // file gave it the same silence as success: a button that did nothing, on
+    // the card whose whole promise is that the log is the player's to take
+    // away.
+    mockShareable.yes = false;
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Sessions'));
+
+    expect(
+      await screen.findByText(
+        'This device has nowhere to send a file. Open Log in a browser to download one.',
+      ),
+    ).toBeTruthy();
+    expect(mockSaved).toHaveLength(0);
+  });
+
+  it('and does not also say it exported anything', async () => {
+    mockShareable.yes = false;
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Sessions'));
+
+    await waitFor(() => expect(screen.queryByText(/nowhere to send/)).toBeTruthy());
+    expect(screen.queryByText(/^Exported /)).toBeNull();
   });
 
   it('says so when the save fails rather than looking like it worked', async () => {

@@ -32,6 +32,26 @@ const dead = (): Fetch =>
     throw new TypeError('Network request failed');
   }) as unknown as Fetch;
 
+/**
+ * Headers, and then a body that never arrives.
+ *
+ * A half-open connection or an edge node dropping mid-stream. `fetch` settles
+ * on the headers, so only the body read is left hanging, and the only thing
+ * that can end it is the abort signal.
+ */
+const stallingBody = (): Fetch =>
+  (async (_url: string, init: RequestInit) => {
+    const signal = init.signal as AbortSignal;
+    return {
+      ok: true,
+      status: 200,
+      json: () =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        }),
+    } as unknown as Response;
+  }) as unknown as Fetch;
+
 const request = { since: 0, changes: emptyChangeSet(), device: 'device-00000001' };
 
 describe('one round trip', () => {
@@ -157,5 +177,30 @@ describe('how long to wait after a failure', () => {
 
   it('never returns nothing, which would be a loop with no gap in it', () => {
     for (const attempt of [0, -1, 1]) expect(backoffMs(attempt)).toBeGreaterThanOrEqual(10_000);
+  });
+});
+
+
+describe('a body that never finishes', () => {
+  it('gives up rather than hanging on forever', async () => {
+    // The timeout used to be cleared the moment `fetch` settled, which is when
+    // the headers arrive and before a single byte of the body has been read.
+    // Nothing was left to cancel the read, so this promise never settled.
+    //
+    // It is not one lost sync either. `SyncingRepository.push` keeps the run
+    // in `inFlight` and every later call awaits it, so a request that never
+    // comes back stops every write, every foreground resume and every retry
+    // for the rest of the process's life, with nothing announced and the card
+    // still reporting the last success.
+    const outcome = await sync(request, 'a.b.c.d', { fetch: stallingBody(), timeoutMs: 20 });
+    expect(outcome).toEqual({ ok: false, reason: 'unreachable' });
+  });
+
+  it('and the loop above it can tell, because it is the ordinary failure', async () => {
+    // `unreachable` is what backs off and comes again, rather than `refused`,
+    // which is this device's fault, or `unauthorized`, which stops for good.
+    const outcome = await sync(request, 'a.b.c.d', { fetch: stallingBody(), timeoutMs: 20 });
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(backoffMs(1)).toBeGreaterThan(0);
   });
 });

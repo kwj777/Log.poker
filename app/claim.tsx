@@ -42,20 +42,31 @@ import { router } from 'expo-router';
 
 import { getSession, signIn } from '../src/auth';
 import { claimHandoff, codeFromFragment } from '../src/auth/handoff';
-import { recomposeRepository } from '../src/data';
+import { getRepository, recomposeRepository } from '../src/data';
 import { Button } from '../src/components/Button';
 import { Card } from '../src/components/Card';
 import { PageMeta } from '../src/components/PageMeta';
 import { Screen } from '../src/components/Screen';
 import { Text } from '../src/components/Text';
-import { handoffFailed, handoffWouldSwitch } from '../src/features/account/copy';
+import {
+  handoffFailed,
+  handoffWouldAdopt,
+  handoffWouldSwitch,
+} from '../src/features/account/copy';
 import { spacing } from '../src/theme';
 
 type Stage =
   /** Reading the fragment and trading it. Nothing has changed yet. */
   | { kind: 'working' }
-  /** A hand-off for somebody else. Held in memory, not stored, until asked. */
-  | { kind: 'asking'; token: string }
+  /**
+   * A hand-off this device should not take without being asked. Held in
+   * memory, not stored, until it is.
+   *
+   * `switch` is a device already signed in as somebody else. `adopt` is one
+   * signed in as nobody with a log of its own, which is the same question
+   * pointing the other way: see the effect below.
+   */
+  | { kind: 'asking'; token: string; because: 'switch' | 'adopt' }
   | { kind: 'done' }
   | { kind: 'failed'; message: string };
 
@@ -150,7 +161,28 @@ export default function ClaimScreen() {
       // was offered and declined is one that happened.
       const held = await getSession();
       if (held !== null) {
-        setStage({ kind: 'asking', token: traded.token });
+        setStage({ kind: 'asking', token: traded.token, because: 'switch' });
+        return;
+      }
+
+      // **And a device signed in as nobody, with a log already on it.**
+      //
+      // The same question pointing the other way, and it was not being asked.
+      // A first sign-in is `cursors.subject === null`, which `settle` answers
+      // with `pushed: 0`: send everything, from the beginning. That is right
+      // for a sign-in somebody chose, where the log on this device is theirs
+      // and joining their account is the point. It is exactly wrong for a link
+      // somebody else sent, because the account at the other end is theirs,
+      // and what goes up is every session on this device.
+      //
+      // Nothing here can tell those apart, so the log is what decides. An
+      // empty device has nothing to lose and takes the link silently, which is
+      // the ordinary way in and the whole point of this screen. A device with
+      // sessions on it gets asked first, because a push into somebody else's
+      // bucket is not something this side can take back.
+      const repository = await getRepository();
+      if ((await repository.listSessions({ limit: 1 })).length > 0) {
+        setStage({ kind: 'asking', token: traded.token, because: 'adopt' });
         return;
       }
 
@@ -170,10 +202,17 @@ export default function ClaimScreen() {
 
         {stage.kind === 'asking' ? (
           <View style={styles.stack}>
-            <Text>{handoffWouldSwitch}</Text>
-            <Button label="Switch to that account" onPress={() => void keep(stage.token)} />
+            <Text>
+              {stage.because === 'switch' ? handoffWouldSwitch : handoffWouldAdopt}
+            </Text>
             <Button
-              label="Keep this one"
+              label={
+                stage.because === 'switch' ? 'Switch to that account' : 'Sign in to that account'
+              }
+              onPress={() => void keep(stage.token)}
+            />
+            <Button
+              label={stage.because === 'switch' ? 'Keep this one' : 'Leave this device as it is'}
               variant="ghost"
               onPress={() => router.replace('/')}
             />

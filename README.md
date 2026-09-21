@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 86 passed
-Tests:       2050 passed
+Test Suites: 87 passed
+Tests:       2055 passed
 
   dexieRepository   137   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
@@ -1098,8 +1098,8 @@ Tests:       2050 passed
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   stats              55   P/L, rebuys, duration, win rate, groupings
+  copy               52   what the sign-in and the sync are allowed to say
   verify             52   checking a token, and every way past it that must not work
-  copy               51   what the sign-in and the sync are allowed to say
   syncingRepository  49   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   variance           41   win rate, σ, confidence bands, verdicts
@@ -1171,6 +1171,7 @@ Tests:       2050 passed
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars
+  claimHandoff        4   what a hand-off link may do without asking
   midSessionCheckIn   3   whether a check-in that failed says it was logged
   notFound            3   where a link that names nothing lands
   allHands            2   who pays for a read of the whole journal

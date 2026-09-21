@@ -7,6 +7,7 @@ import {
   stakesKey,
   toCents,
 } from '../money';
+import { parseMoney } from '../import/values';
 import { STAKES_1_2, STAKES_2_5 } from './support';
 
 describe('cents conversion', () => {
@@ -34,6 +35,42 @@ describe('parseAmount', () => {
     expect(parseAmount('$300')).toBe(30_000);
     expect(parseAmount('1,200.50')).toBe(120_050);
     expect(parseAmount('-75')).toBe(-7_500);
+  });
+
+  it('reads a comma as a decimal where a decimal is what it is', () => {
+    // It stripped everything outside `[0-9.-]`, so the comma vanished and
+    // `1,50` came back as a hundred and fifty rather than one fifty. Not a
+    // corner: the currency picker offers EUR, GBP, CAD and AUD, and
+    // `AmountInput` opens a decimal pad, which on a device set to a
+    // comma-decimal locale draws a comma as its decimal key.
+    expect(parseAmount('1,50')).toBe(150);
+    expect(parseAmount('12,5')).toBe(1_250);
+    expect(parseAmount('-1,50')).toBe(-150);
+    // And the European grouping the other way round.
+    expect(parseAmount('1.200,50')).toBe(120_050);
+  });
+
+  it('and as a thousands separator where that is what it is', () => {
+    expect(parseAmount('1,000')).toBe(100_000);
+    expect(parseAmount('1,234,567')).toBe(123_456_700);
+    expect(parseAmount('1.234.567')).toBe(123_456_700);
+  });
+
+  it('refuses a separator with no number against it', () => {
+    // `toNumeric` reads a bare comma as an empty string, which `Number` calls
+    // zero, and a buy-in of nothing is not what somebody typing meant.
+    expect(parseAmount(',')).toBeNull();
+    expect(parseAmount('.')).toBeNull();
+    expect(parseAmount('-')).toBeNull();
+    expect(parseAmount('')).toBeNull();
+  });
+
+  it('reads a file and a text field the same way round', () => {
+    // The two used to disagree about what a comma is, which is the whole
+    // reason `toNumeric` now lives beside this rather than in the importer.
+    for (const written of ['1,50', '1.50', '1,200.50', '1.200,50', '40']) {
+      expect(parseAmount(written)).toBe(parseMoney(written)?.cents ?? null);
+    }
   });
 
   it('returns null for input that is not yet a number', () => {

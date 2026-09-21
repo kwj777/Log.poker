@@ -48,18 +48,72 @@ export const currencySymbol = (currency: string): string =>
 
 export const toCents = (amount: number): Cents => Math.round(amount * 100);
 
+/**
+ * Work out which of `.` and `,` is the decimal separator, then strip the other.
+ *
+ * With both present the last one wins -- `1.234,50` is European, `1,234.50` is
+ * not. With only commas, one comma trailed by one or two digits is a decimal
+ * (`1,50`); anything else is a thousands separator (`1,234` and `1,234,567`).
+ * With only dots, more than one means thousands (`1.234.567`).
+ *
+ * Here rather than in `import/values.ts`, where it was written, because the
+ * importer is not the only thing that reads a number somebody wrote: it is the
+ * rule `parseAmount` below needs too, and the two disagreeing is what made a
+ * comma mean one thing in a file and another in a text field.
+ */
+export const toNumeric = (digits: string): number | null => {
+  const lastDot = digits.lastIndexOf('.');
+  const lastComma = digits.lastIndexOf(',');
+
+  let cleaned: string;
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimalAt = Math.max(lastDot, lastComma);
+    cleaned = `${digits.slice(0, decimalAt).replace(/[.,]/g, '')}.${digits.slice(decimalAt + 1)}`;
+  } else if (lastComma >= 0) {
+    const commas = (digits.match(/,/g) ?? []).length;
+    const decimals = digits.length - lastComma - 1;
+    cleaned =
+      commas === 1 && decimals >= 1 && decimals <= 2
+        ? digits.replace(',', '.')
+        : digits.replace(/,/g, '');
+  } else if (lastDot >= 0) {
+    const dots = (digits.match(/\./g) ?? []).length;
+    cleaned = dots > 1 ? digits.replace(/\./g, '') : digits;
+  } else {
+    cleaned = digits;
+  }
+
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+};
+
 export const fromCents = (cents: Cents): number => cents / 100;
 
 /**
  * Parse user input from a numeric text field. Accepts "12", "12.5", "1,200.50",
- * "$40" and returns null for anything it cannot read, so callers can keep the
- * field in an invalid-but-editable state rather than silently coercing to 0.
+ * "1,50", "$40" and returns null for anything it cannot read, so callers can
+ * keep the field in an invalid-but-editable state rather than silently coercing
+ * to 0.
+ *
+ * **The comma is read rather than deleted**, which is a hundredfold difference
+ * and was the wrong way round. This stripped everything outside `[0-9.-]`, so
+ * a comma vanished and `1,50` became `150`, which is a buy-in of a hundred and
+ * fifty rather than one fifty. Not a corner: the currency picker offers EUR,
+ * GBP, CAD and AUD, and `AmountInput` opens a `decimal-pad`, which on a device
+ * set to a comma-decimal locale draws a comma as its decimal key. Every money
+ * field in the app comes through here -- buy-in, entry fee, cash-out, rebuy,
+ * pot swing, starting balance and both blinds.
+ *
+ * `toNumeric` is the rule the importer has always used on the same shapes, so
+ * a number typed in and the same number in a file now read alike.
  */
 export const parseAmount = (input: string): Cents | null => {
-  const cleaned = input.replace(/[^0-9.-]/g, '');
-  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
-  const value = Number(cleaned);
-  if (!Number.isFinite(value)) return null;
+  const cleaned = input.replace(/[^0-9.,-]/g, '');
+  // A separator on its own is not a number, and `toNumeric` would answer 0 for
+  // some of them: `,` strips to an empty string, which `Number` reads as zero.
+  if (!/[0-9]/.test(cleaned)) return null;
+  const value = toNumeric(cleaned);
+  if (value === null) return null;
   return toCents(value);
 };
 

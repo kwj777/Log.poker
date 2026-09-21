@@ -14,7 +14,7 @@
  * one engine and another way somewhere else.
  */
 
-import { toCents } from '../money';
+import { toCents, toNumeric } from '../money';
 import type { Cents, GameType, SessionFormat, Stakes } from '../types';
 
 // ------------------------------------------------------------------- money
@@ -51,39 +51,6 @@ export interface ParsedMoney {
   currency: string | null;
 }
 
-/**
- * Work out which of `.` and `,` is the decimal separator, then strip the other.
- *
- * With both present the last one wins -- `1.234,50` is European, `1,234.50` is
- * not. With only commas, one comma trailed by one or two digits is a decimal
- * (`1,50`); anything else is a thousands separator (`1,234` and `1,234,567`).
- * With only dots, more than one means thousands (`1.234.567`).
- */
-const toNumeric = (digits: string): number | null => {
-  const lastDot = digits.lastIndexOf('.');
-  const lastComma = digits.lastIndexOf(',');
-
-  let cleaned: string;
-  if (lastDot >= 0 && lastComma >= 0) {
-    const decimalAt = Math.max(lastDot, lastComma);
-    cleaned = `${digits.slice(0, decimalAt).replace(/[.,]/g, '')}.${digits.slice(decimalAt + 1)}`;
-  } else if (lastComma >= 0) {
-    const commas = (digits.match(/,/g) ?? []).length;
-    const decimals = digits.length - lastComma - 1;
-    cleaned =
-      commas === 1 && decimals >= 1 && decimals <= 2
-        ? digits.replace(',', '.')
-        : digits.replace(/,/g, '');
-  } else if (lastDot >= 0) {
-    const dots = (digits.match(/\./g) ?? []).length;
-    cleaned = dots > 1 ? digits.replace(/\./g, '') : digits;
-  } else {
-    cleaned = digits;
-  }
-
-  const value = Number(cleaned);
-  return Number.isFinite(value) ? value : null;
-};
 
 /**
  * Read a money cell.

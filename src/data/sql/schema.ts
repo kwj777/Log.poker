@@ -178,11 +178,34 @@ export const migrate = async (driver: SqlDriver): Promise<void> => {
 
   for (const migration of MIGRATIONS) {
     if (migration.version <= current) continue;
-    for (const statement of migration.statements) {
-      await driver.execute(statement);
-    }
-    // PRAGMA does not accept bound parameters; the value is an integer literal
-    // from this file, never user input.
-    await driver.execute(`PRAGMA user_version = ${migration.version}`);
+    // One transaction per migration, statements and version bump together.
+    //
+    // Without it a migration is neither atomic nor replayable, and those two
+    // are the same problem: the version is only bumped after the last
+    // statement, and `ALTER TABLE ... ADD COLUMN` has no `IF NOT EXISTS` form,
+    // so an upgrade that stops halfway through leaves the pragma on the old
+    // version and the columns half added. The next launch starts that
+    // migration again from the top and throws `duplicate column name` on the
+    // first column that did land. `init` rejects, so `getRepository` rejects,
+    // so the app cannot open its database -- on that launch and on every
+    // launch after it, with the player's whole history sitting intact and
+    // unreachable in the file. Migration 4 is five `ALTER`s and migration 3 is
+    // four, and the window between any two of them is an app being backgrounded
+    // during a cold start upgrade.
+    //
+    // Both are transactional in SQLite: DDL rolls back like anything else, and
+    // `user_version` lives in the database header and moves with the
+    // transaction. So a killed upgrade leaves the database exactly as it was
+    // and the next launch simply runs the migration again. `PRAGMA
+    // foreign_keys` is the one that could not live in here, and it is already
+    // set above, outside.
+    await driver.transaction(async () => {
+      for (const statement of migration.statements) {
+        await driver.execute(statement);
+      }
+      // PRAGMA does not accept bound parameters; the value is an integer literal
+      // from this file, never user input.
+      await driver.execute(`PRAGMA user_version = ${migration.version}`);
+    });
   }
 };

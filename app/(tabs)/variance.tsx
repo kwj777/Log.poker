@@ -12,11 +12,12 @@
  * see that, and pretending otherwise would make the reassurance worthless.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
+import { ChipGroup } from '../../src/components/Chip';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
@@ -31,7 +32,8 @@ import {
   probabilityOfLoss,
   toObservations,
 } from '../../src/domain/variance';
-import { formatMoney } from '../../src/domain/money';
+import { currencyLabel, formatMoney } from '../../src/domain/money';
+import { currenciesUsed, inCurrency } from '../../src/domain/stats';
 import {
   assessRoi,
   assessTournaments,
@@ -86,8 +88,31 @@ const VERDICT_COLORS: Record<StretchVerdict, string> = {
 };
 
 export default function VarianceScreen() {
-  const sessions = useLogStore((state) => state.sessions);
+  const all = useLogStore((state) => state.sessions);
   const moodEntries = useLogStore((state) => state.moodEntries);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  /**
+   * One currency at a time, exactly as the dashboard and Sessions do it.
+   *
+   * This screen was the one that did not, which was worse than the uniform
+   * dollars it replaced: the other two tabs started telling the truth about a
+   * player with two currencies and this one went on adding them, so the app
+   * contradicted itself on the screen whose whole job is to be believed.
+   *
+   * It matters differently in the two halves below. The cash estimate is in
+   * big blinds, so the units at least divide out -- but a euro big blind and
+   * a dollar big blind are not the same money, and a standard deviation over
+   * the mixture is a number about nothing. The tournament totals are raw
+   * cents, so mixing them produced a sum that was simply wrong and an ROI
+   * that was a ratio of two wrong sums.
+   */
+  const currencies = useMemo(() => currenciesUsed(all), [all]);
+  const currency = picked !== null && currencies.includes(picked) ? picked : currencies[0] ?? 'USD';
+  const sessions = useMemo(
+    () => (currencies.length > 1 ? inCurrency(all, currency) : all),
+    [all, currencies.length, currency],
+  );
 
   const observations = useMemo(() => toObservations(sessions), [sessions]);
   const moodComparison = useMemo(
@@ -180,6 +205,24 @@ export default function VarianceScreen() {
    * and with one, because the loss chance printed above it is a number people
    * want to see the working for.
    */
+  /**
+   * Offered only when there is a choice, and in both branches below, because
+   * the empty one is reachable per currency: a player with a season in
+   * dollars and three sessions in euros gets the real screen for one and
+   * "not enough yet" for the other, and needs the way back.
+   */
+  const currencyChips =
+    currencies.length > 1 ? (
+      <View style={styles.currencyRow}>
+        <ChipGroup
+          options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
+          value={currency}
+          onChange={setPicked}
+          scroll
+        />
+      </View>
+    ) : null;
+
   const guide = (
     <Button
       label="Running bad, or playing bad?"
@@ -200,6 +243,7 @@ export default function VarianceScreen() {
     return (
       <Screen>
         <PageMeta title="Variance · Log" />
+        {currencyChips}
         <View style={styles.header}>
           <Text variant="title">Variance</Text>
         </View>
@@ -210,6 +254,7 @@ export default function VarianceScreen() {
             assessment={tournamentAssessment}
             interval={roiInterval}
             roi={roiAssessment}
+            currency={currency}
           />
         ) : null}
         <Card style={styles.explainer}>
@@ -229,6 +274,7 @@ export default function VarianceScreen() {
   return (
     <Screen>
       <PageMeta title="Variance · Log" />
+      {currencyChips}
       <View style={styles.header}>
         <Text variant="title">Variance</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>
@@ -252,6 +298,7 @@ export default function VarianceScreen() {
             assessment={tournamentAssessment}
             interval={roiInterval}
             roi={roiAssessment}
+            currency={currency}
           />
       ) : null}
 
@@ -380,11 +427,14 @@ const TournamentCard = ({
   assessment,
   interval,
   roi,
+  currency,
 }: {
   totals: TournamentTotals;
   assessment: TournamentAssessment;
   interval: RoiInterval | null;
   roi: RoiAssessment;
+  /** The money these entries were played for, since the totals are raw cents. */
+  currency: string;
 }) => (
   <>
     <SectionHeader title="Tournaments" />
@@ -422,7 +472,7 @@ const TournamentCard = ({
         />
         <StatTile
           label="Fees paid"
-          value={formatMoney(totals.fees)}
+          value={formatMoney(totals.fees, { currency })}
           hint="never coming back"
         />
       </View>
@@ -446,6 +496,11 @@ const TournamentCard = ({
 );
 
 const styles = StyleSheet.create({
+  currencyRow: {
+    paddingTop: spacing.xl,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
   header: {
     paddingTop: spacing.xl,
   },

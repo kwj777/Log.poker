@@ -34,6 +34,7 @@ jest.mock('../../features/family/FamilyCrossPromo', () => ({ FamilyCrossPromo: (
 const mockRepository = {
   listSessions: jest.fn(),
   listHands: jest.fn(),
+  listMoodEntries: jest.fn(),
 };
 
 jest.mock('../../data', () => ({
@@ -59,6 +60,10 @@ beforeEach(() => {
   mockRepository.listSessions.mockImplementation(async () => [session('s1'), session('s2')]);
   mockRepository.listHands.mockImplementation(async () => [
     { id: 'h1', sessionId: 's1', holeCards: 'AsKd', board: '7c2sKh', position: 'BTN', note: null, tags: [], amount: null, at: 1, createdAt: 1, updatedAt: 1 },
+  ]);
+  mockRepository.listMoodEntries.mockImplementation(async () => [
+    { id: 'm1', sessionId: 's1', phase: 'start', score: 4, at: 1, createdAt: 1, updatedAt: 1 },
+    { id: 'm2', sessionId: 's1', phase: 'end', score: 2, at: 2, createdAt: 1, updatedAt: 1 },
   ]);
   load();
 });
@@ -120,5 +125,53 @@ describe('exporting the log', () => {
     await renderScreen(<SettingsScreen />);
     await userEvent.press(screen.getByText('Sessions'));
     expect(await screen.findByText('the database is gone')).toBeTruthy();
+  });
+});
+
+/**
+ * How somebody felt, which the export did not carry until now.
+ *
+ * Log asks for a score at the start of a session, two hours in and at
+ * cash-out, and the mood cost on the Variance tab is built on the answers.
+ * None of it was in either file, so somebody who exported, cleared the app and
+ * re-imported got their sessions back and lost every mood they had logged
+ * without being told.
+ */
+describe('exporting how the sessions felt', () => {
+  it('writes a dated file of them', async () => {
+    load({ moodEntries: [{ id: 'm1', sessionId: 's1', phase: 'start', score: 4, at: 1, createdAt: 1, updatedAt: 1 }] });
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Moods'));
+
+    await waitFor(() => expect(mockSaved).toHaveLength(1));
+    expect(mockSaved[0].name).toMatch(/^log-moods-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(mockSaved[0].text).toContain('Phase');
+  });
+
+  it('reads the whole log rather than what the store holds, like the other two', async () => {
+    load({ moodEntries: [{ id: 'm1', sessionId: 's1', phase: 'start', score: 4, at: 1, createdAt: 1, updatedAt: 1 }] });
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Moods'));
+
+    await waitFor(() => expect(mockSaved).toHaveLength(1));
+    expect(mockRepository.listMoodEntries).toHaveBeenCalled();
+    // A header and the two the database holds, not the one in the store.
+    expect(mockSaved[0].text.trim().split('\r\n')).toHaveLength(3);
+  });
+
+  it('carries the score and which part of the session it is about', async () => {
+    load({ moodEntries: [{ id: 'm1', sessionId: 's1', phase: 'start', score: 4, at: 1, createdAt: 1, updatedAt: 1 }] });
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Moods'));
+
+    await waitFor(() => expect(mockSaved).toHaveLength(1));
+    expect(mockSaved[0].text).toContain('start');
+    expect(mockSaved[0].text).toContain('end');
+  });
+
+  it('and is not offered to somebody who has never answered one', async () => {
+    load({ moodEntries: [] });
+    await renderScreen(<SettingsScreen />);
+    expect(screen.getByText('Moods')).toBeDisabled();
   });
 });

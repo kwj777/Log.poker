@@ -25,7 +25,7 @@
  */
 
 import { fromCents } from '../money';
-import type { Hand, SessionWithChildren } from '../types';
+import type { Hand, MoodEntry, SessionWithChildren } from '../types';
 
 /** `12.5` for 1250 cents, and an empty cell for nothing at all. */
 const money = (cents: number | null | undefined): string =>
@@ -165,6 +165,56 @@ export const handRows = (
 };
 
 /**
+ * How somebody felt, which was the one thing the export did not carry.
+ *
+ * Log asks for a score at the start of a session, two hours in and at
+ * cash-out, and the mood-cost comparison on the Variance tab is built on the
+ * answers -- one of the two things that make this a tilt app rather than a
+ * spreadsheet. None of it was in either file, so somebody who exported,
+ * cleared the app and re-imported got their sessions back and lost every mood
+ * they had ever logged, silently.
+ *
+ * A third file rather than columns on the sessions one, because a session has
+ * up to three of these and a row has one of each column. The session is named
+ * the same way the hands file names it, by its start and its room, so the two
+ * can be lined up in a spreadsheet by somebody who wants to.
+ *
+ * It is written and not read back, like the hands file. That is worth stating
+ * rather than leaving implied: what makes the sessions file a backup is that
+ * the importer reads its headers, and neither of the other two has an importer
+ * to match. See the Settings copy, which now says so.
+ */
+export const MOOD_HEADERS = [
+  'At',
+  'Session',
+  'Venue',
+  'Phase',
+  'Score',
+] as const;
+
+export const moodRows = (
+  entries: readonly MoodEntry[],
+  sessions: readonly SessionWithChildren[],
+): string[][] => {
+  const byId = new Map(sessions.map((session) => [session.id, session]));
+  return [...entries]
+    .sort((a, b) => a.at - b.at)
+    .map((entry) => {
+      const session = byId.get(entry.sessionId);
+      return [
+        stamp(entry.at),
+        stamp(session?.startedAt ?? null),
+        session?.venue?.name ?? '',
+        entry.phase,
+        String(entry.score),
+      ];
+    });
+};
+
+/** The three files the log exports as. */
+export type ExportKind = 'sessions' | 'hands' | 'moods';
+
+/**
  * What the file is called when it lands in somebody's downloads.
  *
  * Dated, because the second thing anybody does after exporting twice is try to
@@ -172,7 +222,7 @@ export const handRows = (
  * saves the next one as `log-sessions (1).csv`. Named for the app first so the
  * two sort together next to whatever else is in there.
  */
-export const exportFileName = (kind: 'sessions' | 'hands', at: number = Date.now()): string => {
+export const exportFileName = (kind: ExportKind, at: number = Date.now()): string => {
   const date = new Date(at);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `log-${kind}-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.csv`;

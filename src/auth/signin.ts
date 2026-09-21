@@ -93,6 +93,21 @@ interface Options {
  * do anything different about DNS than about a socket closing, and the screen
  * that reads this has one sentence to spend.
  */
+const initFor = (body: unknown, signal: AbortSignal, bearer?: string): RequestInit => ({
+  method: 'POST',
+  // Accept is what the endpoint keys on. Without it the server answers the
+  // way it answers a browser, with a page and a cookie that cannot cross a
+  // registrable domain, and every call here would fail on a 200.
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    ...(bearer === undefined ? {} : { Authorization: `Bearer ${bearer}` }),
+  },
+  body: JSON.stringify(body),
+  signal,
+});
+
+/** A request whose answer is a status and nothing else. */
 const post = async (
   path: string,
   body: unknown,
@@ -102,21 +117,49 @@ const post = async (
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(`${origin}${path}`, {
-      method: 'POST',
-      // Accept is what the endpoint keys on. Without it the server answers the
-      // way it answers a browser, with a page and a cookie that cannot cross a
-      // registrable domain, and every call here would fail on a 200.
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(bearer === undefined ? {} : { Authorization: `Bearer ${bearer}` }),
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+    return await fetch(`${origin}${path}`, initFor(body, controller.signal, bearer));
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * A request whose answer is a token, with the timeout over the body as well.
+ *
+ * `post` hands a `Response` back and clears its timer on the way, which is
+ * right for a caller that reads a status and wrong for one that reads a body.
+ * `fetch` settles when the headers arrive, so the abort was disarmed before
+ * the part that can stall, and a server, proxy or captive portal that answered
+ * 200 and then stopped sending left the read pending with nothing to cancel
+ * it.
+ *
+ * Both callers here are awaited by something that matters. `redeemCode` is
+ * what the sign-in card waits on, so the button spins forever. `renewToken` is
+ * awaited by `renewIfDue` at launch, so the renewal never finishes and never
+ * fails, and the token quietly runs out thirty days later. The same shape was
+ * already fixed once in `src/sync/client.ts`; this is the other two.
+ */
+const postForToken = async (
+  path: string,
+  body: unknown,
+  { fetch = globalThis.fetch, origin = SIGNIN_ORIGIN, timeoutMs = REQUEST_TIMEOUT_MS }: Options,
+  bearer?: string,
+): Promise<Redemption> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${origin}${path}`, initFor(body, controller.signal, bearer));
+    if (!response.ok) return { ok: false, reason: failureFor(response.status) };
+    // A 200 carrying something else is a server that changed under us, and it
+    // is safer to read as unreachable than to hand a non-token onward as one.
+    const parsed: unknown = await response.json();
+    const token = (parsed as { token?: unknown } | null)?.token;
+    if (typeof token !== 'string' || token === '') return { ok: false, reason: 'unreachable' };
+    return { ok: true, token };
+  } catch {
+    return { ok: false, reason: 'unreachable' };
   } finally {
     clearTimeout(timer);
   }
@@ -153,24 +196,7 @@ export const redeemCode = async (
   code: string,
   options: Options = {},
 ): Promise<Redemption> => {
-  const response = await post(
-    '/api/signin/code',
-    { email: email.trim(), code: code.trim() },
-    options,
-  );
-  if (response === null) return { ok: false, reason: 'unreachable' };
-  if (!response.ok) return { ok: false, reason: failureFor(response.status) };
-
-  // A 200 carrying something else is a server that changed under us, and it is
-  // safer to read as unreachable than to hand a non-token onward as a token.
-  try {
-    const body: unknown = await response.json();
-    const token = (body as { token?: unknown } | null)?.token;
-    if (typeof token !== 'string' || token === '') return { ok: false, reason: 'unreachable' };
-    return { ok: true, token };
-  } catch {
-    return { ok: false, reason: 'unreachable' };
-  }
+  return postForToken('/api/signin/code', { email: email.trim(), code: code.trim() }, options);
 };
 
 /**
@@ -188,16 +214,5 @@ export const redeemCode = async (
  * launch is another try.
  */
 export const renewToken = async (token: string, options: Options = {}): Promise<Redemption> => {
-  const response = await post('/api/signin/renew', {}, options, token);
-  if (response === null) return { ok: false, reason: 'unreachable' };
-  if (!response.ok) return { ok: false, reason: failureFor(response.status) };
-
-  try {
-    const body: unknown = await response.json();
-    const fresh = (body as { token?: unknown } | null)?.token;
-    if (typeof fresh !== 'string' || fresh === '') return { ok: false, reason: 'unreachable' };
-    return { ok: true, token: fresh };
-  } catch {
-    return { ok: false, reason: 'unreachable' };
-  }
+  return postForToken('/api/signin/renew', {}, options, token);
 };

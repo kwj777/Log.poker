@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 86 passed
-Tests:       2047 passed
+Tests:       2050 passed
 
   dexieRepository   137   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
@@ -1128,10 +1128,10 @@ Tests:       2047 passed
   editSession        18   correcting a session, including the one nobody cashed out
   history            18   the session list, its filters, and how much of it mounts
   seed               18   the demo dataset stays coherent
+  signin             18   the sign-in client, against a fake fetch
   client             17   the sync client, against a fake fetch
+  handoff            17   taking delivery of a purchase made at another app's door
   pastSession        17   logging a night that was played before it was logged
-  handoff            16   taking delivery of a purchase made at another app's door
-  signin             16   the sign-in client, against a fake fetch
   useLogStore        16   what a write reads back, and what it leaves alone
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says

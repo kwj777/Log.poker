@@ -177,3 +177,28 @@ describe('what a refusal means, and what it must never mean', () => {
     }
   });
 });
+
+describe('an answer whose body never finishes', () => {
+  it('gives up rather than leaving the hand-off screen waiting for good', async () => {
+    // The timeout covered the fetch and not the body, and `fetch` settles on
+    // the headers. A server that answered 200 and then stopped sending left
+    // this read pending with nothing to cancel it, and `app/claim.tsx` awaits
+    // it: the link a player followed from another app simply never finishes.
+    const fetch = jest.fn(async (_url: string, init: RequestInit) => {
+      const signal = init.signal as AbortSignal;
+      return {
+        ok: true,
+        status: 200,
+        json: () =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () =>
+              reject(new DOMException('Aborted', 'AbortError')),
+            );
+          }),
+      } as unknown as Response;
+    });
+
+    const answer = await claimHandoff(CODE, { fetch: fetch as never, timeoutMs: 20 });
+    expect(answer).toEqual({ ok: false, reason: 'unreachable' });
+  });
+});

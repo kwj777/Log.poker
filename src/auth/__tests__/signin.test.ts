@@ -30,6 +30,26 @@ const dead = (): Fetch =>
     throw new TypeError('Network request failed');
   }) as unknown as Fetch;
 
+/**
+ * Headers, and then a body that never arrives.
+ *
+ * A captive portal or a proxy that answers 200 and stops sending. `fetch`
+ * settles on the headers, so only the body read is left hanging and the abort
+ * signal is the one thing that can end it.
+ */
+const stallingBody = (): Fetch =>
+  (async (_url: string, init: RequestInit) => {
+    const signal = init.signal as AbortSignal;
+    return {
+      ok: true,
+      status: 200,
+      json: () =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        }),
+    } as unknown as Response;
+  }) as unknown as Fetch;
+
 describe('asking for a code', () => {
   it('posts the address to the family sign-in', async () => {
     const { fetch, calls } = answering(202);
@@ -195,5 +215,27 @@ describe('renewing a token', () => {
       ok: false,
       reason: 'unreachable',
     });
+  });
+});
+
+describe('an answer whose body never finishes', () => {
+  it('gives up on a redemption rather than spinning the button for good', async () => {
+    // The timeout used to be cleared the moment `fetch` settled, which is when
+    // the headers arrive and before a byte of the body has been read. Nothing
+    // was left to cancel the read, so this promise never settled and the
+    // sign-in card sat on its spinner for the rest of the session.
+    const outcome = await redeemCode('a@b.com', '123456', {
+      fetch: stallingBody(),
+      timeoutMs: 20,
+    });
+    expect(outcome).toEqual({ ok: false, reason: 'unreachable' });
+  });
+
+  it('and on a renewal, which is awaited at launch', async () => {
+    // Worse than the one above, because nobody is watching it: `renewIfDue`
+    // awaits this on every launch, so the renewal never finished and never
+    // failed, and the token quietly ran out thirty days later.
+    const outcome = await renewToken('a.b.c.d', { fetch: stallingBody(), timeoutMs: 20 });
+    expect(outcome).toEqual({ ok: false, reason: 'unreachable' });
   });
 });

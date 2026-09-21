@@ -145,31 +145,38 @@ export const claimHandoff = async (code: string, options: Options = {}): Promise
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  let response: Response;
+  // The timeout covers the body as well as the headers. `fetch` settles when
+  // the headers arrive, so clearing the timer there disarmed the abort before
+  // the part that can stall, and a server that answered 200 and then stopped
+  // sending left this read pending with nothing left to cancel it. The screen
+  // that awaits it is `app/claim.tsx`, which is the whole of what a hand-off
+  // link does, so the link simply never finishes. The same shape was fixed in
+  // `src/sync/client.ts` and in `signin.ts` beside this.
   try {
-    response = await fetch(`${origin}${HANDOFF_PATH}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      credentials: 'omit',
-      body: JSON.stringify({ code }),
-      signal: controller.signal,
-    });
-  } catch {
-    return { ok: false, reason: 'unreachable' };
-  } finally {
-    clearTimeout(timer);
-  }
+    let response: Response;
+    try {
+      response = await fetch(`${origin}${HANDOFF_PATH}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'omit',
+        body: JSON.stringify({ code }),
+        signal: controller.signal,
+      });
+    } catch {
+      return { ok: false, reason: 'unreachable' };
+    }
 
-  if (!response.ok) return { ok: false, reason: failureFor(response.status) };
+    if (!response.ok) return { ok: false, reason: failureFor(response.status) };
 
-  // A 200 carrying something else is a server that changed under us, and it is
-  // safer to read as unreachable than to hand a non-token onward as a token.
-  try {
+    // A 200 carrying something else is a server that changed under us, and it
+    // is safer to read as unreachable than to hand a non-token onward as one.
     const body: unknown = await response.json();
     const token = (body as { token?: unknown } | null)?.token;
     if (typeof token !== 'string' || token === '') return { ok: false, reason: 'unreachable' };
     return { ok: true, token };
   } catch {
     return { ok: false, reason: 'unreachable' };
+  } finally {
+    clearTimeout(timer);
   }
 };

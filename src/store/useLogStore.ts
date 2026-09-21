@@ -343,6 +343,17 @@ const owner: Record<Slice, number> = {
   preferences: 0,
 };
 
+/**
+ * Take a slice, so anything already reading it loses.
+ *
+ * `read` does this for itself, and a write that sets a slice straight into the
+ * store rather than re-reading it has to do the same or the guard has a hole
+ * exactly the width of that write. See `setStartingBalance`, which had one.
+ */
+const claim = (slice: Slice): void => {
+  owner[slice] += 1;
+};
+
 /** Claim the slices, read them, and keep whichever are still this read's to set. */
 const read = async (parts: readonly Slice[]): Promise<Partial<LogState>> => {
   // Claimed before the read starts, so a reload that overtakes this one owns
@@ -428,6 +439,16 @@ export const useLogStore = create<LogState>((set, get) => ({
   setStartingBalance: async (balance) => {
     const repository = await getRepository();
     const { startingBalance } = await repository.setPreferences({ startingBalance: balance });
+    // Claimed, because this is the one write that sets a slice into the store
+    // without going through `read`, and so the one that was outside the guard
+    // `read` exists to provide. A `refresh()` over everything is what
+    // `onSyncApplied` fires, so a pull landing while somebody is on Settings
+    // had a preferences read already in the air: it still believed it owned
+    // the slice, and it assigned its pre-write answer over this one. The
+    // number the player had just typed reverted on screen, the dashboard
+    // headline flipped from Bankroll back to Profit, and the right value was
+    // in the database the whole time.
+    claim('preferences');
     // Set from the answer rather than from the argument, so the screen shows
     // what was stored rather than what was asked for.
     set({ startingBalance });

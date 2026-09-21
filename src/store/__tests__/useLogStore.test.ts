@@ -25,6 +25,7 @@ const repository = {
   listMoodEntries: jest.fn(),
   getActiveSession: jest.fn(),
   getPreferences: jest.fn(),
+  setPreferences: jest.fn(),
   createVenue: jest.fn(),
   updateVenue: jest.fn(),
   createSession: jest.fn(),
@@ -52,6 +53,7 @@ const stubReads = () => {
   repository.listMoodEntries.mockImplementation(async () => [{ id: 'm1', sessionId: 's1' }]);
   repository.getActiveSession.mockImplementation(async () => null);
   repository.getPreferences.mockImplementation(async () => ({ startingBalance: null }));
+  repository.setPreferences.mockImplementation(async (patch) => patch);
 };
 
 const readCounts = () => ({
@@ -243,5 +245,38 @@ describe('a write that lands and then a second one that does not', () => {
     ).rejects.toThrow('out of space');
 
     expect(readCounts().sessions).toBeGreaterThan(before);
+  });
+});
+
+describe('a preference written while a reload is in the air', () => {
+  it('is not overwritten by the read that started before it', async () => {
+    // `read` claims every slice before it starts and drops any another read has
+    // claimed since, which is what stops a slow reload landing on top of a fast
+    // one. `setStartingBalance` set its slice straight into the store without
+    // going through `read`, so it was outside that guard: the reload still
+    // believed it owned `preferences` and assigned its pre-write answer over
+    // the new one. The number the player had just typed reverted on screen and
+    // the dashboard headline flipped from Bankroll back to Profit, with the
+    // right value in the database the whole time.
+    //
+    // `onSyncApplied` fires `refresh()` over everything, so the reload here is
+    // the ordinary one a pull produces while somebody is on Settings.
+    let releaseRead: () => void = () => undefined;
+    const slow = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    repository.getPreferences.mockImplementationOnce(async () => {
+      await slow;
+      return { startingBalance: null };
+    });
+
+    const reload = useLogStore.getState().refresh();
+    await useLogStore.getState().setStartingBalance({ cents: 500_000, currency: 'USD' });
+    expect(useLogStore.getState().startingBalance).toEqual({ cents: 500_000, currency: 'USD' });
+
+    releaseRead();
+    await reload;
+
+    expect(useLogStore.getState().startingBalance).toEqual({ cents: 500_000, currency: 'USD' });
   });
 });

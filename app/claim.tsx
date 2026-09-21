@@ -180,14 +180,40 @@ export default function ClaimScreen() {
       // the ordinary way in and the whole point of this screen. A device with
       // sessions on it gets asked first, because a push into somebody else's
       // bucket is not something this side can take back.
-      const repository = await getRepository();
-      if ((await repository.listSessions({ limit: 1 })).length > 0) {
+      // A read that cannot answer is not a reason to guess. Opening the local
+      // database is the first thing on this screen that can genuinely throw --
+      // IndexedDB is refused outright in some private windows, and an upgrade
+      // blocked by another tab is a real state -- and the question here is
+      // whether this device has a log to lose. "Cannot tell" has to count as
+      // yes, because adopting silently is the direction nothing on this side
+      // can take back, and asking is a question rather than a loss.
+      let mayHaveALog = true;
+      try {
+        const repository = await getRepository();
+        mayHaveALog = (await repository.listSessions({ limit: 1 })).length > 0;
+      } catch {
+        /* Asked below, which is the safe half of not knowing. */
+      }
+      if (mayHaveALog) {
         setStage({ kind: 'asking', token: traded.token, because: 'adopt' });
         return;
       }
 
       await keep(traded.token);
-    })();
+    })().catch(() => {
+      // Nothing above is expected to throw and the screen cannot afford to be
+      // wrong about that. `void` discards the value and not the rejection, so
+      // without this a throw left the stage on `working` -- "Signing you in"
+      // and a spinner, for as long as the tab is open, with the one-use code
+      // already spent and no way forward on the screen. A sentence somebody
+      // can act on instead.
+      setStage({
+        kind: 'failed',
+        message:
+          'Something went wrong finishing the sign-in on this device. The link is used up now, ' +
+          'so sign in below and this device picks up where your account left off.',
+      });
+    });
   }, [keep]);
 
   return (

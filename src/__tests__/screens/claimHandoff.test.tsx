@@ -117,3 +117,36 @@ describe('a link that arrives at an empty device', () => {
     expect(screen.queryByText(/sessions already on this device/i)).toBeNull();
   });
 });
+
+describe('a local read that cannot answer', () => {
+  it('asks rather than guessing, because not knowing is the safe half of yes', async () => {
+    // Opening the local database is the first thing on this screen that can
+    // genuinely throw: IndexedDB is refused outright in some private windows,
+    // and an upgrade blocked by another tab is a real state. The question the
+    // read answers is whether this device has a log to lose, and adopting
+    // silently is the direction nothing on this side can take back.
+    mockListSessions.mockImplementation(async () => {
+      throw new Error('DatabaseClosedError');
+    });
+    await renderScreen(<ClaimScreen />);
+
+    expect(await screen.findByText(/sessions already on this device/i)).toBeTruthy();
+    expect(mockSignIn).not.toHaveBeenCalled();
+  });
+
+  it('and the screen never stays on the spinner when something else throws', async () => {
+    // `void` discards the value and not the rejection, so a throw anywhere in
+    // this effect left the stage on `working` -- "Signing you in" and a
+    // spinner, for as long as the tab is open, with the one-use code already
+    // spent and nothing on screen to act on. Jest fails a test on an unhandled
+    // rejection, which is half of what this holds; the other half is that the
+    // player is told something.
+    mockClaim.mockImplementation(async () => {
+      throw new Error('the fetch layer gave up');
+    });
+    await renderScreen(<ClaimScreen />);
+
+    expect(await screen.findByText(/Something went wrong finishing the sign-in/)).toBeTruthy();
+    expect(screen.queryByText(/Signing you in/)).toBeNull();
+  });
+});

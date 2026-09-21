@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 88 passed
-Tests:       2094 passed
+Tests:       2096 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1164,6 +1164,7 @@ Tests:       2094 passed
   settingsHelp        7   the privacy link, the support address, the build
   settingsVenues      7   renaming a venue, and merging two that are one room
   venues              7   which spellings of a room name are the same room
+  claimHandoff        6   what a hand-off link may do without asking
   readme              6   the test table adds up and says what each suite is for
   scale               6   how much of the plot the data actually gets
   crossPromo          5   the family card as drawn, and the link a refusing device gives back
@@ -1172,7 +1173,6 @@ Tests:       2094 passed
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars
-  claimHandoff        4   what a hand-off link may do without asking
   midSessionCheckIn   3   whether a check-in that failed says it was logged
   notFound            3   where a link that names nothing lands
   allHands            2   who pays for a read of the whole journal

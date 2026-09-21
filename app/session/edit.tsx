@@ -183,13 +183,28 @@ export default function EditSessionScreen() {
         ? 'How long you played, rather than when the app stopped counting.'
         : `Finishing ${formatSessionDate(endsAt)} at ${formatTimeOfDay(endsAt)}.`;
 
+  /**
+   * Zero is a buy-in. Nothing is not.
+   *
+   * This asked for more than zero, and the app writes sessions with zero
+   * itself: a result-only import has no buy-in column, so `sessionImport`
+   * stores `0` for every row that won or broke even -- it can only infer a
+   * buy-in from a loss, where the loss entails one. Those sessions opened here
+   * with "Save changes" dead from arrival and nothing saying why, so the room,
+   * the date and the stakes could not be corrected either. Within one imported
+   * file the losing nights were editable and the winning ones were not.
+   *
+   * A freeroll is the same shape and is a real thing, which `new.tsx` already
+   * says about its fee. An empty or unreadable field is still refused, because
+   * that is a question nobody has answered rather than an answer of zero.
+   */
   const canSave =
     !startInvalid &&
     !lengthInvalid &&
     !startAhead &&
     !endAhead &&
     buyIn !== null &&
-    buyIn > 0 &&
+    buyIn >= 0 &&
     !saving;
 
   const save = async () => {

@@ -375,3 +375,41 @@ describe('a session that was never finished', () => {
     expect(edits[0].patch.endedAt).toBeNull();
   });
 });
+
+/**
+ * A night the app itself wrote with no buy-in.
+ *
+ * A result-only import has no buy-in column, so `sessionImport` can only infer
+ * one from a loss, where the loss entails it. Every row that won or broke even
+ * is stored with zero -- and this screen asked for more than zero, so those
+ * sessions opened with "Save changes" dead from arrival and nothing saying
+ * why. Within one imported file the losing nights were editable and the
+ * winning ones were not, and it was not only the buy-in that could not be
+ * corrected: the room, the date and the stakes went with it.
+ */
+describe('a session with no buy-in on it', () => {
+  it('can still be corrected, because zero is an answer', async () => {
+    load({ buyIn: 0, cashOut: 4_000 });
+    await renderScreen(<EditSessionScreen />);
+
+    const venue = screen.getByLabelText('Start time');
+    await userEvent.clear(venue);
+    await userEvent.type(venue, '20:15');
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits).toHaveLength(1);
+    expect(edits[0].patch.buyIn).toBe(0);
+    expect(edits[0].patch.startedAt).toBe(new Date(2026, 8, 19, 20, 15).getTime());
+  });
+
+  it('but a buy-in nobody has answered is still refused', async () => {
+    // Empty is a question with no answer, which is not the same as zero.
+    load({ buyIn: 0, cashOut: 4_000 });
+    await renderScreen(<EditSessionScreen />);
+
+    await userEvent.clear(screen.getByLabelText('Buy-in amount'));
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits).toEqual([]);
+  });
+});

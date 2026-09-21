@@ -168,6 +168,69 @@ describe('a cash-out whose night closed and whose extras did not', () => {
   });
 });
 
+describe('re-entering a tournament', () => {
+  const TOURNAMENT = session('t1', {
+    format: 'tournament',
+    stakes: null,
+    buyIn: 10_000,
+    fee: 1_000,
+    cashOut: null,
+    endedAt: null,
+  });
+
+  it('offers what an entry actually costs, fee and all', async () => {
+    // The presets were the cash-game three off the buy-in alone, so the middle
+    // one, the one that matches a re-entry, was short by exactly the fee, and
+    // the other two were amounts no tournament sells. `totalInvested` counts
+    // the fee and the Variance tab gives it a tile labeled "never coming
+    // back"; the sheet that spends it did not.
+    ready({ activeSession: TOURNAMENT, sessions: [TOURNAMENT] });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Re-enter'));
+
+    // The field opens on one entry rather than on the bare buy-in.
+    expect(screen.getByLabelText('Re-entry amount').props.value).toBe('110');
+    // Two entries is a chip; twice the buy-in alone is not, and neither is
+    // half an entry, which is a cash-game top-up rather than anything a
+    // tournament sells.
+    expect(screen.getByText('$220')).toBeTruthy();
+    expect(screen.queryByText('$200')).toBeNull();
+    expect(screen.queryByText('$50')).toBeNull();
+  });
+
+  it('and a cash game keeps the three it had', async () => {
+    ready();
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Rebuy'));
+
+    expect(screen.getByLabelText('Rebuy amount').props.value).toBe('300');
+    expect(screen.getByText('$150')).toBeTruthy();
+    expect(screen.getByText('$600')).toBeTruthy();
+  });
+});
+
+describe('a note about one action, inside another', () => {
+  it('does not follow the player into the cash-out sheet', async () => {
+    // One `failed` string drives three notes on this screen: the rebuys card,
+    // the rebuy sheet and the cash-out sheet. Nothing cleared it when a sheet
+    // opened, only when an action was attempted, so a rebuy that would not
+    // save presented itself again as a cash-out failure before the cash-out
+    // had been tried.
+    ready({ addRebuy: (async () => { throw full(); }) as never });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Rebuy'));
+    await userEvent.press(screen.getByText('Add rebuy'));
+    await screen.findByText('The database is full.');
+    await userEvent.press(screen.getByLabelText('Close'));
+
+    await userEvent.press(screen.getByText('Cash out & end session'));
+    expect(screen.queryByText('The database is full.')).toBeNull();
+  });
+});
+
 describe('session notes that will not save', () => {
   it('says so, rather than leaving the text on screen looking saved', async () => {
     ready({ updateSessionNotes: (async () => { throw full(); }) as never });

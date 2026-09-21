@@ -195,6 +195,47 @@ describe('a device whose clock was wrong once', () => {
       .toBe(renamed.bundle.records.venues.v1.heardAt);
   });
 
+  it('and not once the clock has caught up with the stamp it sent', () => {
+    // The case the test above cannot reach, and the reason it cannot: its
+    // re-sync is three hours into a one-year skew, so the request is still
+    // clamping and the memory is read on the way past. Real time passes any
+    // skew eventually. Then the request clamps nothing -- and the memory, which
+    // this server keeps on the record for exactly this, was being ignored,
+    // because the replay asked whether it was clamping now rather than whether
+    // it had clamped this write before.
+    //
+    // A row above its own device's clock stays above that device's push mark,
+    // so it is re-sent on every sync, and `resume()` fires one on every
+    // foreground of the app. What came back was a stamp later than anything
+    // anybody else had written, a day after somebody had deleted it.
+    const MINUTE = 60_000;
+    const ahead = changeSet({ venues: [venue('v1', NOW + 10 * MINUTE, { name: 'Aria' })] });
+
+    const first = mergeIntoBundle(null, ahead, 0, NOW, 'phone0001');
+    expect(first.bundle.records.venues.v1.record.updatedAt).toBe(NOW);
+
+    // Somebody on a correct clock deletes it two minutes later.
+    const gone = mergeIntoBundle(
+      first.bundle,
+      changeSet({
+        venues: [{ ...venue('v1', NOW + 2 * MINUTE), deletedAt: NOW + 2 * MINUTE }],
+      }),
+      0, NOW + 2 * MINUTE, 'laptop001',
+    );
+    expect(gone.bundle.records.venues.v1.deletedAt).toBe(NOW + 2 * MINUTE);
+
+    // A day later the phone foregrounds and re-sends the identical row. It is
+    // no longer in the future, so nothing about this request clamps.
+    const again = mergeIntoBundle(gone.bundle, ahead, 0, NOW + 24 * HOUR, 'phone0001');
+
+    expect(again.bundle.records.venues.v1.deletedAt).toBe(NOW + 2 * MINUTE);
+    expect(again.bundle.records.venues.v1.record.updatedAt).toBe(NOW + 2 * MINUTE);
+    // And nothing moved, so nobody is told about it either.
+    expect(again.bundle.records.venues.v1.heardAt).toBe(
+      gone.bundle.records.venues.v1.heardAt,
+    );
+  });
+
   it('but a real edit from that device still lands', () => {
     // Not a blanket refusal of a device with a bad clock: what is refused is
     // re-sending the same row, not changing it.

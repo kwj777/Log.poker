@@ -1086,11 +1086,11 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 90 passed
-Tests:       2106 passed
+Tests:       2107 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
-  bundle             71   what ships to each platform, against the real output
+  bundle             72   what ships to each platform, against the real output
   sessionImport      63   reading a session-summary export
   site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes

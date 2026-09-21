@@ -15,13 +15,17 @@
 import { Platform } from 'react-native';
 import { screen, userEvent } from '@testing-library/react-native';
 
+import type { Handoff } from '../../auth/handoff';
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
 import ClaimScreen from '../../../app/claim';
 
 const mockSignIn = jest.fn(async (_token: string) => ({ subject: 'them', tier: 'free' }));
 const mockGetSession = jest.fn(async (): Promise<unknown> => null);
-const mockClaim = jest.fn(async (_code: string) => ({ ok: true, token: 'a.b.c.d' }));
+const mockClaim = jest.fn(async (_code: string): Promise<Handoff> => ({
+  ok: true,
+  token: 'a.b.c.d',
+}));
 const mockListSessions = jest.fn(async () => [] as unknown[]);
 const mockRecompose = jest.fn();
 const mockReplace = jest.fn();
@@ -70,6 +74,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetSession.mockImplementation(async () => null);
   mockListSessions.mockImplementation(async () => []);
+  // Reset here too, because two tests below replace it and `clearAllMocks`
+  // clears calls rather than implementations.
+  mockClaim.mockImplementation(async () => ({ ok: true, token: 'a.b.c.d' }));
 });
 
 describe('a link that arrives at a device with a log on it', () => {
@@ -148,5 +155,29 @@ describe('a local read that cannot answer', () => {
 
     expect(await screen.findByText(/Something went wrong finishing the sign-in/)).toBeTruthy();
     expect(screen.queryByText(/Signing you in/)).toBeNull();
+  });
+});
+
+describe('a link that cannot be finished', () => {
+  it('sends the player to the screen the sign-in is actually on', async () => {
+    // Every message on the failed branch ends by naming the sign-in, and all
+    // of them used to name it as "below". `SignInCard` is mounted in
+    // `app/(tabs)/settings.tsx` and in no other file, so there was nothing
+    // below: one sentence, and one button back to the dashboard.
+    //
+    // It was never a dead end -- Settings is a tab, two taps away -- which is
+    // what makes it worth fixing rather than shrugging at. The player is being
+    // told to look down, on the one screen they only ever read because
+    // something already failed.
+    mockClaim.mockImplementation(async () => ({ ok: false, reason: 'unreachable' }));
+    await renderScreen(<ClaimScreen />);
+
+    const message = await screen.findByText(/Could not finish signing you in/);
+    expect(message).toHaveTextContent(/sign in from Settings/i);
+
+    await userEvent.press(screen.getByText('Sign in from Settings'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/settings');
+    expect(mockSignIn).not.toHaveBeenCalled();
   });
 });

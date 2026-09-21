@@ -98,6 +98,13 @@ export const messageFor = (failure: SignInFailure, stage: Stage): string => {
  * careless line. So every one of these says what happened to the link and
  * offers the ordinary way in, which is always available and costs one screen.
  *
+ * **And they name the screen it is on.** All four used to say "sign in below",
+ * and they are read on `app/claim.tsx`, which renders no sign-in: `SignInCard`
+ * is mounted in `app/(tabs)/settings.tsx` and nowhere else. So the one
+ * instruction a stranded player got pointed at a control that was not there.
+ * Settings is named here and the claim screen carries a button to it, which is
+ * the pair that has to stay together.
+ *
  * **And none of them says anything was bought at all**, which is the rule the
  * rest of this file already keeps: Log is free in its entirety, and what
  * arrives through a hand-off is an identity rather than an entitlement. From
@@ -110,18 +117,18 @@ export const handoffFailed = (failure: HandoffFailure): string => {
       // Unknown, expired, already spent, or meant for another app. Untilt says
       // one thing for all of them on purpose, so this does too. Ninety seconds
       // is short, and the honest guess is that they took a while.
-      return 'That link has already been used, or it has run out. Sign in below and this ' +
-        'device picks up where your account left off.';
+      return 'That link has already been used, or it has run out. Sign in from Settings and ' +
+        'this device picks up where your account left off.';
     case 'refused':
-      return 'There was nothing to carry across on that account. Sign in below with the ' +
-        'address you use for the other apps.';
+      return 'There was nothing to carry across on that account. Sign in from Settings with ' +
+        'the address you use for the other apps.';
     case 'throttled':
-      return 'That is a lot of tries. Give it a minute, or sign in below.';
+      return 'That is a lot of tries. Give it a minute, or sign in from Settings.';
     case 'unreachable':
       // The one somebody may well be reading in the middle of an outage they
       // are on the wrong side of. Carefully vague, and never a refusal.
       return 'Could not finish signing you in just now. Nothing is lost -- try the link ' +
-        'again, or sign in below.';
+        'again, or sign in from Settings.';
   }
 };
 

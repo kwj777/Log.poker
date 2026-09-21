@@ -41,6 +41,16 @@ import {
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
 
+/**
+ * A source file with its comments taken out.
+ *
+ * So a comment quoting copy that was wrong is not itself read as copy. The
+ * question these tests ask is what a screen says, and a note explaining why it
+ * no longer says it is not part of the answer.
+ */
+const spoken = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
 /** Every `.ts`/`.tsx` file under a directory, as paths relative to the root. */
 const sourcesUnder = (...parts: string[]): string[] => {
   const walk = (dir: string): string[] =>
@@ -536,6 +546,28 @@ describe('carrying a purchase over from another app', () => {
     for (const failure of FAILURES) {
       expect(handoffFailed(failure)).toMatch(/sign in|try the link/i);
     }
+  });
+
+  it('and names the screen that way in is on, since it is not this one', () => {
+    // All four of these said "sign in below", and so did the three messages
+    // the claim screen writes itself. There is no sign-in below: `SignInCard`
+    // is mounted in `app/(tabs)/settings.tsx` and in no other file, so the
+    // failed branch was one sentence and one button back to the dashboard.
+    //
+    // Never a dead end -- Settings is a tab, two taps away -- which is what
+    // makes it worth the change rather than a shrug. A player reads this
+    // screen only because something has already gone wrong, and the one
+    // instruction on it told them to look down.
+    //
+    // The pair is what is asserted, because the sentence and the control are
+    // only any use together: nothing the screen says points below, and the
+    // branch carries a way to Settings.
+    for (const failure of FAILURES) {
+      expect(handoffFailed(failure)).not.toMatch(/\bbelow\b/i);
+      expect(handoffFailed(failure)).toMatch(/Settings/);
+    }
+    expect(spoken(claim)).not.toMatch(/\bbelow\b/i);
+    expect(claim).toContain("router.replace('/settings')");
   });
 
   it('says nothing is lost when it could not finish', () => {

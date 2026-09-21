@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 96 passed
-Tests:       2147 passed
+Tests:       2149 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1098,7 +1098,7 @@ Tests:       2147 passed
   stats              56   P/L, rebuys, duration, win rate, groupings
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
-  copy               52   what the sign-in and the sync are allowed to say
+  copy               53   what the sign-in and the sync are allowed to say
   verify             52   checking a token, and every way past it that must not work
   syncingRepository  49   two devices and one server, no fakes in between
   endpoint           47   the sync endpoint, end to end
@@ -1158,13 +1158,13 @@ Tests:       2147 passed
   postSessionReset    8   the offer after cash-out, and who it is talking to
   tokenStore.web      8   the browser token store
   venuePicker         8   typing a room you already have, rather than adding a second
+  claimHandoff        7   what a hand-off link may do without asking
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   mergeVenues         7   folding one room into another, and the order it does it in
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   settingsBankroll    7   entering what you had behind you before the log started
   settingsHelp        7   the privacy link, the support address, the build
   venues              7   which spellings of a room name are the same room
-  claimHandoff        6   what a hand-off link may do without asking
   readme              6   the test table adds up and says what each suite is for
   rowLabels           6   what a screen reader is told a row in a list is
   scale               6   how much of the plot the data actually gets

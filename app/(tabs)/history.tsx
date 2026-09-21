@@ -148,15 +148,25 @@ export default function HistoryScreen() {
       <View style={styles.header}>
         <Text variant="title">Sessions</Text>
         {/*
-          Where somebody notices a night is missing, which is why the way to
-          add one belongs here rather than only behind "Start a session".
+          The two other things somebody browsing their log wants: the night
+          that is missing, which is why the way to add one belongs here rather
+          than only behind "Start a session", and the hands, which until now
+          could only be reached one session at a time.
         */}
-        <Button
-          label="Add a past session"
-          variant="ghost"
-          size="small"
-          onPress={() => router.push('/session/past')}
-        />
+        <View style={styles.headerActions}>
+          <Button
+            label="Hands"
+            variant="ghost"
+            size="small"
+            onPress={() => router.push('/hands')}
+          />
+          <Button
+            label="Add a past session"
+            variant="ghost"
+            size="small"
+            onPress={() => router.push('/session/past')}
+          />
+        </View>
       </View>
 
       <View style={styles.filters}>
@@ -293,6 +303,12 @@ const styles = StyleSheet.create({
   emptyActions: {
     alignSelf: 'stretch',
     gap: spacing.sm,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   header: {
     flexDirection: 'row',

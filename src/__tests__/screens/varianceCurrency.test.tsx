@@ -24,8 +24,10 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn() },
 }));
 
+const mockRepository = { listHands: jest.fn(async () => []) };
+
 jest.mock('../../data', () => ({
-  getRepository: async () => ({}),
+  getRepository: async () => mockRepository,
   onSyncApplied: () => () => undefined,
 }));
 

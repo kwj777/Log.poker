@@ -1086,9 +1086,9 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 88 passed
-Tests:       2077 passed
+Tests:       2078 passed
 
-  dexieRepository   138   the IndexedDB path, against real IndexedDB
+  dexieRepository   139   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
   bundle             71   what ships to each platform, against the real output
   sessionImport      63   reading a session-summary export

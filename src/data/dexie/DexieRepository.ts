@@ -501,6 +501,31 @@ export class DexieRepository implements Repository {
 
   // ---------------------------------------------------------------- venues
 
+  /**
+   * Session counts for a named set of venues, off the `venueId` index.
+   *
+   * `sessionCounts` below is the whole-log version and is right for `listVenues`,
+   * which needs a count for every venue there is. `attachChildren` needs counts
+   * for the venues of the sessions in its hand, which for `getSession` and
+   * `getActiveSession` is exactly one -- and it was calling the whole-log
+   * version, so reading one session walked every session in the log to fill in
+   * one number on its venue. `getActiveSession` runs on every `refresh`, which
+   * is after every write and every sync pull.
+   *
+   * The SQLite side has always counted only the venues it was asked about, with
+   * a subquery per venue row over `idx_sessions_venue`. This is the same shape:
+   * one index query for the venues in hand rather than a pass over everything.
+   */
+  private async countsForVenues(venueIds: readonly string[]): Promise<Map<string, number>> {
+    const counts = new Map(venueIds.map((id) => [id, 0]));
+    const records = await this.db.sessions.where('venueId').anyOf([...venueIds]).toArray();
+    for (const record of records) {
+      if (!isLive(record)) continue;
+      counts.set(record.venueId, (counts.get(record.venueId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   /** Session counts come from one grouped pass rather than a query per venue. */
   private async sessionCounts(): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
@@ -637,7 +662,7 @@ export class DexieRepository implements Repository {
     const [rebuyRecords, venueRecords, counts] = await Promise.all([
       this.db.rebuys.where('sessionId').anyOf(sessionIds).toArray(),
       this.db.venues.where('id').anyOf(venueIds).toArray(),
-      this.sessionCounts(),
+      this.countsForVenues(venueIds),
     ]);
 
     const rebuysBySession = new Map<string, Rebuy[]>();

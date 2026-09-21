@@ -38,6 +38,66 @@ runRepositoryContract('IndexedDB', {
   },
 });
 
+describe('what reading one session reads', () => {
+  it('counts the venues in hand rather than walking every session in the log', async () => {
+    // `attachChildren` fills in each session's venue, and a venue carries how
+    // many sessions are at it. It got that from the whole-log count, so reading
+    // ONE session -- which `getActiveSession` does on every refresh, after every
+    // write and every sync pull -- walked every session there is to fill in one
+    // number. The SQLite side has always counted only the venues it was asked
+    // about.
+    const db = createDatabase(`log-poker-test-counts-${++counter}`);
+    const repository = new DexieRepository(db, {
+      clock: { now: () => T0 },
+      ids: { next: () => `id-${++ids}` },
+    });
+    await repository.init();
+
+    const here = await repository.createVenue({ name: 'Aria', isHomeGame: false });
+    const elsewhere = await repository.createVenue({ name: 'Bellagio', isHomeGame: false });
+    const at = async (venueId: string) =>
+      repository.createSession({
+        venueId,
+        format: 'cash',
+        gameType: 'NLHE',
+        stakes: { smallBlind: 100, bigBlind: 200 },
+        currency: 'USD',
+        buyIn: 30_000,
+        startedAt: T0,
+      });
+    const mine = await at(here.id);
+    await at(here.id);
+    for (let other = 0; other < 6; other += 1) await at(elsewhere.id);
+
+    // Both ways the table can be read end to end: `toArray` materializes it and
+    // `each` cursors it, and the whole-log count used the second.
+    let whole = 0;
+    const readAll = db.sessions.toArray.bind(db.sessions);
+    const cursorAll = db.sessions.each.bind(db.sessions);
+    jest.spyOn(db.sessions, 'toArray').mockImplementation(() => {
+      whole += 1;
+      return readAll();
+    });
+    jest.spyOn(db.sessions, 'each').mockImplementation((callback) => {
+      whole += 1;
+      return cursorAll(callback);
+    });
+
+    const read = await repository.getSession(mine.id);
+
+    // The number is still right, which is what stops this passing by not
+    // counting at all: two sessions at Aria, and the six at Bellagio are
+    // nobody's business here.
+    expect(read?.venue?.name).toBe('Aria');
+    expect(read?.venue?.sessionCount).toBe(2);
+    expect(whole).toBe(0);
+
+    jest.restoreAllMocks();
+    db.close();
+    await db.delete();
+  });
+});
+
 describe('what a sync push reads', () => {
   it('goes to the index rather than pulling every table into memory', async () => {
     // `listChangedSince` runs after every write and answers with nothing

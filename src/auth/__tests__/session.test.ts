@@ -117,17 +117,83 @@ describe('signing out', () => {
   });
 });
 
+/**
+ * The case where the platform will not keep it: a private window, a browser
+ * set to block site data, a phone booted and not yet unlocked.
+ *
+ * Signing in has to go on working there, for the process, rather than being
+ * refused. What it must not do is *look* like it worked: a `TokenStore` cannot
+ * report a failed write, so a sign-in that only read its own return value said
+ * yes while every other part of the app -- the repository it composes, the
+ * token it sends, the launch after it -- said no.
+ *
+ * So each test here asks what the app can do next, rather than what `signIn`
+ * answered. That distinction is the bug.
+ */
 describe('a store with nowhere to write', () => {
   it('reads as signed out rather than throwing', async () => {
     const manager = new SessionManager(deadStore(), () => NOW);
     expect(await manager.current()).toBeNull();
   });
 
-  it('lets a sign-in appear to work for as long as the process lasts', async () => {
-    // The claim is real and the app can use it now; the next launch will ask
-    // again. Better than refusing to sign in at all in a private window.
+  it('keeps a sign-in for as long as the process lasts', async () => {
     const manager = new SessionManager(deadStore(), () => NOW);
+
     expect((await manager.signIn(live))?.syncs).toBe(true);
+    // What `recomposeRepository` asks, and what the sync client sends. Both
+    // answered null while the card said signed in.
+    expect((await manager.current())?.syncs).toBe(true);
+    expect(await manager.token()).toBe(live);
+  });
+
+  it('and asks again on the next launch, because that is all it promised', async () => {
+    const store = deadStore();
+    await new SessionManager(store, () => NOW).signIn(live);
+    expect(await new SessionManager(store, () => NOW).current()).toBeNull();
+  });
+
+  it('forgets it on the way out, with nowhere to clear', async () => {
+    const manager = new SessionManager(deadStore(), () => NOW);
+    await manager.signIn(live);
+    await manager.signOut();
+    expect(await manager.current()).toBeNull();
+    expect(await manager.token()).toBeNull();
+  });
+
+  it('stops serving it the moment it runs out', async () => {
+    let now = NOW;
+    const manager = new SessionManager(deadStore(), () => now);
+    await manager.signIn(live);
+
+    now = NOW + 31 * 24 * HOUR;
+    expect(await manager.current()).toBeNull();
+    // And is gone rather than merely refused, the same as a stored one.
+    now = NOW;
+    expect(await manager.current()).toBeNull();
+  });
+
+  it('renews into it as well, so a long session does not end on a timer', async () => {
+    const DAY = 24 * HOUR;
+    const nearlyOut = token(NOW + 3 * DAY, 'free');
+    const fresh = token(NOW + 30 * DAY, 'free');
+    const manager = new SessionManager(deadStore(), () => NOW);
+    await manager.signIn(nearlyOut);
+
+    expect(await manager.renewIfDue(async () => fresh)).toBe(true);
+    expect(await manager.token()).toBe(fresh);
+  });
+
+  it('is not reached at all by a store that works', async () => {
+    // The tripwire against holding every token in memory regardless. A store
+    // that kept it is the only thing holding it, so emptying the store behind
+    // this class's back is a device that is signed out -- which is what
+    // clearing the site data in another tab really is.
+    const store = memoryTokenStore();
+    const manager = new SessionManager(store, () => NOW);
+    await manager.signIn(live);
+
+    await store.clear();
+    expect(await manager.current()).toBeNull();
   });
 });
 

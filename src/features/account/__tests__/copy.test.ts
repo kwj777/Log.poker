@@ -285,6 +285,18 @@ describe('what it says about the sync itself', () => {
     expect(state({ problem: 'unreachable', pending: 1 })).toMatch(/1 change is waiting/);
   });
 
+  it('and counts none as none, which is the commonest way to reach this line', () => {
+    // A signed-in device coming to the front offline, with nothing written
+    // since its last sync: `run()` announces `pending` before the request and
+    // records the failure after, so this is what an ordinary foreground on a
+    // train produces. It said "0 changes are waiting" -- a backlog of zero
+    // reported as a backlog, on the one line here whose job is to stop
+    // somebody wondering what is stuck.
+    const said = state({ problem: 'unreachable', pending: 0 });
+    expect(said).not.toMatch(/0 changes?/);
+    expect(said).toMatch(/nothing is lost/);
+  });
+
   it('asks for a sign-in when that is what is wrong, and does not blame the network', () => {
     const said = state({ problem: 'unauthorized' });
     expect(said).toMatch(/sign in again/);

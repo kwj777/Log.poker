@@ -191,6 +191,17 @@ export const describeSync = (state: {
     return 'Carrying your history between devices is part of the pass. Everything you have logged is still on this device.';
   }
   if (state.problem !== null) {
+    // Zero is not a small backlog, and it is the ordinary state of the device
+    // this branch exists for: signed in, nothing written since the last sync,
+    // network gone. `run()` announces `pending` before the request and records
+    // the failure after, so a foreground with nothing to send reaches here
+    // with zero. It read "0 changes are waiting, and nothing is lost", which
+    // is a sentence describing a queue that is not there, on the one line
+    // whose job is to keep somebody from wondering what is stuck.
+    if (state.pending === 0) {
+      return 'Could not reach the sync. Nothing on this device is waiting to go up, and ' +
+        'nothing is lost.';
+    }
     const waiting = state.pending === 1 ? '1 change is' : `${state.pending} changes are`;
     return `Could not reach the sync. ${waiting} waiting, and nothing is lost.`;
   }

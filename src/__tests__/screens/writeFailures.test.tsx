@@ -124,7 +124,12 @@ describe('a cash-out that will not save', () => {
     await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
     await userEvent.press(screen.getByText('End session'));
 
-    expect(await screen.findByText('The database is full.')).toBeTruthy();
+    // The sentence first and the detail after, which is the other way round
+    // from how they used to arrive: both of these were passed to
+    // `describeFailure` as its *fallback*, and that returns `error.message`
+    // whenever the thrown value carries one.
+    const said = await screen.findByText(/could not be closed out/);
+    expect(said).toHaveTextContent(/The database is full\./);
   });
 
   it('and keeps the sheet open, so the number is not retyped from memory', async () => {
@@ -136,7 +141,7 @@ describe('a cash-out that will not save', () => {
     await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
     await userEvent.press(screen.getByText('End session'));
 
-    await screen.findByText('The database is full.');
+    await screen.findByText(/could not be closed out/);
     expect(screen.getByText('End session')).toBeTruthy();
   });
 });
@@ -164,7 +169,17 @@ describe('a cash-out whose night closed and whose extras did not', () => {
     await userEvent.press(screen.getByText('End session'));
 
     expect(await screen.findByText('No session running')).toBeTruthy();
-    expect(screen.getByText('The database is full.')).toBeTruthy();
+
+    // And says which of the two failures this was. Everything that reaches
+    // this catch is an `Error` with a message -- a Dexie or SQLite quota or
+    // constraint error, or the repository's own, which build theirs in the
+    // constructor -- so as a fallback the chosen sentence was never once
+    // reached. Ten lines of reasoning about telling these apart, resolving
+    // always to a raw storage error: the player was not told the night did
+    // close, or that what is missing is fixable in Edit.
+    const said = screen.getByText(/fix it in Edit/);
+    expect(said).toHaveTextContent(/The session was closed/);
+    expect(said).toHaveTextContent(/The database is full\./);
   });
 });
 

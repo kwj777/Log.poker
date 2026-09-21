@@ -220,15 +220,26 @@ export default function ActiveSessionScreen() {
       // finish, which Edit can still fix, and telling the player their night
       // could not be closed out would send them back for something they
       // already have.
+      //
+      // **Said in front of the detail rather than behind it.** Both sentences
+      // used to be handed to `describeFailure` as its *fallback*, and that
+      // returns `error.message` whenever the thrown value is an `Error`
+      // carrying one. Everything that realistically throws here does: a Dexie
+      // or SQLite quota or constraint error, and the repository's own
+      // `NotFoundError` and `ConstraintError`, which build their message in
+      // the constructor. So the branch resolved to the chosen words only for
+      // an `Error` whose message is literally empty, which nothing in this
+      // codebase constructs, and the reasoning above it had never once
+      // reached a screen.
+      //
+      // The detail still goes on the line, after. "The database is full" is
+      // the difference between trying again and going and clearing space.
       const closed = useLogStore.getState().activeSession === null;
-      setFailed(
-        describeFailure(
-          error,
-          closed
-            ? 'The session was closed, but not everything was saved. You can fix it in Edit.'
-            : 'That session could not be closed out.',
-        ),
-      );
+      const said = closed
+        ? 'The session was closed, but not everything was saved. You can fix it in Edit.'
+        : 'That session could not be closed out.';
+      const detail = describeFailure(error, '');
+      setFailed(detail === '' ? said : `${said} (${detail})`);
     } finally {
       setBusy(false);
     }

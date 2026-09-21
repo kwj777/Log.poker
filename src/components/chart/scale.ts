@@ -39,15 +39,24 @@ export const boundsOf = (series: readonly (readonly Point[])[]): Bounds => {
 };
 
 /**
- * Pad the vertical range by 10% and always include zero.
+ * Pad the vertical range by 10% and always include the baseline.
  *
- * Including zero is not cosmetic: a bankroll chart that crops the axis to the
- * data makes a $40 downswing look like a catastrophe, which is precisely the
- * misreading this app exists to prevent.
+ * Including it is not cosmetic: a chart that crops the axis to the data makes
+ * a $40 downswing look like a catastrophe, which is precisely the misreading
+ * this app exists to prevent.
+ *
+ * **The baseline is a parameter because it is not always zero.** Zero is where
+ * a profit curve starts and it is what break even means, so it is the default
+ * and every caller plotting a movement gets exactly the range this returned
+ * before. A bankroll curve starts at whatever the player had behind them, and
+ * forcing zero into the range of a balance spends the entire plot on the space
+ * under it: a $20,000 roll swinging between $19,900 and $20,500 drew four
+ * points inside four pixels of a 146 pixel plot, a flat line over a solid
+ * block of fill, on the one chart whose whole job is to show a shape.
  */
-export const padBounds = (bounds: Bounds): Bounds => {
-  const minY = Math.min(0, bounds.minY);
-  const maxY = Math.max(0, bounds.maxY);
+export const padBounds = (bounds: Bounds, baseline = 0): Bounds => {
+  const minY = Math.min(baseline, bounds.minY);
+  const maxY = Math.max(baseline, bounds.maxY);
   const span = maxY - minY;
   // A perfectly flat series still needs a non-zero range to divide by.
   const margin = span === 0 ? 1 : span * 0.1;

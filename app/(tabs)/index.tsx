@@ -412,6 +412,14 @@ export default function DashboardScreen() {
         <LineChart
           series={chartSeries}
           height={170}
+          // The curve is a balance once there is a starting one, so the axis
+          // is anchored where the money starts rather than at zero. Anchored
+          // at zero, a $20,000 roll swinging a few hundred drew as a flat line
+          // over a solid block of fill: the whole plot spent on the space
+          // underneath. Zero when there is no balance, which is every reading
+          // this chart gave before.
+          baseline={balance ?? 0}
+          showZeroLine={balance === null}
           // Read instead of the drawing. The figure is the one above it; what
           // this adds is the shape, which is the only thing a curve says that
           // the headline does not.

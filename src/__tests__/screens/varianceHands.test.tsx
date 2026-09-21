@@ -24,6 +24,9 @@ const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockPush(...args) },
+  // The screen reads the journal only while it is the tab in front, because a
+  // bottom tab stays mounted once visited. Under test it always is.
+  useIsFocused: () => true,
 }));
 
 const mockRepository = { listHands: jest.fn() };

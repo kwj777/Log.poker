@@ -31,6 +31,7 @@ import {
   type SessionPatch,
   type VenuePatch,
 } from '../repository';
+import { DEFAULT_CURRENCY } from '../../domain/money';
 import { patchedKeys, toPreferences } from '../preferences';
 import {
   applyPatch,
@@ -166,6 +167,28 @@ const toRebuy = (record: RebuyRecord): Rebuy => ({
 const incomingTags = (tags: Hand['tags'] | undefined): Hand['tags'] =>
   Array.isArray(tags) ? [...tags] : [];
 
+/**
+ * The rest of an incoming record's fields, coerced to what the column promises.
+ *
+ * The two guards above cover the fields that made this side *throw*. These
+ * cover the ones that made the two engines disagree: SQLite binds a record's
+ * fields straight into a statement and cannot bind `undefined` at all, so it
+ * now defaults every one of them, and a row that lands there as an empty name
+ * has to land here the same way rather than as a venue with no name property
+ * at all.
+ */
+const incomingText = (value: unknown, fallback: string): string =>
+  typeof value === 'string' ? value : fallback;
+
+const incomingMaybeText = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+const incomingNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const incomingMaybeNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
 const incomingStakes = (stakes: Session['stakes'] | undefined): Session['stakes'] => {
   if (stakes === null || stakes === undefined) return null;
   const { smallBlind, bigBlind, ante } = stakes;
@@ -218,24 +241,45 @@ export class DexieRepository implements Repository {
 
   // ------------------------------------------------------------------ sync
 
+  /**
+   * What has moved since the cursor, off the index rather than out of the whole
+   * table.
+   *
+   * This is the read that runs after every write, and it used to pull every
+   * venue, session, rebuy, hand and mood entry into memory and filter them in
+   * JavaScript -- a structured clone per record, to answer with nothing nearly
+   * every time. `updatedAt` has been an index since v5 and `above` walks it
+   * from the cursor forward, so the cost is the size of the answer rather than
+   * the size of the log.
+   *
+   * The order is the index's, which is `updatedAt` ascending, and that is the
+   * order the sync layer needs: a batch cut short has to leave a cursor that
+   * nothing before it is still waiting behind.
+   */
   async listChangedSince(since: Timestamp): Promise<ChangeSet> {
-    const counts = await this.sessionCounts();
     const changed = <Record extends { updatedAt: number; deletedAt?: DeletedAt }, T>(
       records: readonly Record[],
       map: (record: Record) => T,
     ): Change<T>[] =>
-      records
-        .filter((record) => record.updatedAt > since)
-        .sort((a, b) => a.updatedAt - b.updatedAt)
-        .map((record) => ({ record: map(record), deletedAt: deletedAt(record) }));
+      records.map((record) => ({ record: map(record), deletedAt: deletedAt(record) }));
+
+    const from = <Record>(table: {
+      where(index: string): { above(key: number): { toArray(): Promise<Record[]> } };
+    }): Promise<Record[]> => table.where('updatedAt').above(since).toArray();
 
     const [venues, sessions, rebuys, hands, moodEntries] = await Promise.all([
-      this.db.venues.toArray(),
-      this.db.sessions.toArray(),
-      this.db.rebuys.toArray(),
-      this.db.hands.toArray(),
-      this.db.moodEntries.toArray(),
+      from<VenueRecord>(this.db.venues),
+      from<SessionRecord>(this.db.sessions),
+      from<RebuyRecord>(this.db.rebuys),
+      from<HandRecord>(this.db.hands),
+      from<MoodRecord>(this.db.moodEntries),
     ]);
+
+    // Only when a venue is in the answer. The count is a pass over every
+    // session, and the sync layer reads it off the record it is sending rather
+    // than asking for it, so paying for it on a push that carries no venue --
+    // which is nearly all of them -- was a scan for a number nobody read.
+    const counts = venues.length === 0 ? new Map<string, number>() : await this.sessionCounts();
 
     return {
       venues: changed(venues, (record) => toVenue(record, counts.get(record.id) ?? 0)),
@@ -290,7 +334,15 @@ export class DexieRepository implements Repository {
         const staleVenues = await newerHere(this.db.venues, changes.venues);
         for (const { record, deletedAt } of changes.venues) {
           if (staleVenues.has(record.id)) continue;
-          await this.db.venues.put({ ...fromVenue(record), deletedAt });
+          await this.db.venues.put({
+            ...fromVenue({
+              ...record,
+              name: incomingText(record.name, ''),
+              isHomeGame: record.isHomeGame === true,
+              createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            }),
+            deletedAt,
+          });
         }
 
         // No foreign keys here to throw, but the same skip: a session whose
@@ -336,7 +388,17 @@ export class DexieRepository implements Repository {
           // has to be absent from the record, not null, or every loser lands in
           // the unique index under the same key. See `SessionRecord.importKey`.
           await this.db.sessions.put({
-            ...fromSession({ ...record, stakes: incomingStakes(record.stakes), importKey: key }),
+            ...fromSession({
+              ...record,
+              gameType: incomingText(record.gameType, 'NLHE') as Session['gameType'],
+              currency: incomingText(record.currency, DEFAULT_CURRENCY),
+              buyIn: incomingNumber(record.buyIn, 0),
+              startedAt: incomingNumber(record.startedAt, record.updatedAt),
+              createdAt: incomingNumber(record.createdAt, record.updatedAt),
+              notes: incomingMaybeText(record.notes),
+              stakes: incomingStakes(record.stakes),
+              importKey: key,
+            }),
             deletedAt,
           });
           stored.add(record.id);
@@ -350,17 +412,41 @@ export class DexieRepository implements Repository {
         const staleRebuys = await newerHere(this.db.rebuys, changes.rebuys);
         for (const { record, deletedAt } of changes.rebuys) {
           if (!sessions.has(record.sessionId) || staleRebuys.has(record.id)) continue;
-          await this.db.rebuys.put({ ...record, deletedAt });
+          await this.db.rebuys.put({
+            ...record,
+            amount: incomingNumber(record.amount, 0),
+            at: incomingNumber(record.at, record.updatedAt),
+            createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            deletedAt,
+          });
         }
         const staleHands = await newerHere(this.db.hands, changes.hands);
         for (const { record, deletedAt } of changes.hands) {
           if (!sessions.has(record.sessionId) || staleHands.has(record.id)) continue;
-          await this.db.hands.put({ ...record, tags: incomingTags(record.tags), deletedAt });
+          await this.db.hands.put({
+            ...record,
+            holeCards: incomingMaybeText(record.holeCards),
+            board: incomingMaybeText(record.board),
+            position: incomingMaybeText(record.position) as Hand['position'],
+            note: incomingMaybeText(record.note),
+            amount: incomingMaybeNumber(record.amount),
+            at: incomingNumber(record.at, record.updatedAt),
+            createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            tags: incomingTags(record.tags),
+            deletedAt,
+          });
         }
         const staleMoods = await newerHere(this.db.moodEntries, changes.moodEntries);
         for (const { record, deletedAt } of changes.moodEntries) {
           if (!sessions.has(record.sessionId) || staleMoods.has(record.id)) continue;
-          await this.db.moodEntries.put({ ...record, deletedAt });
+          await this.db.moodEntries.put({
+            ...record,
+            phase: incomingText(record.phase, 'start') as MoodEntry['phase'],
+            score: incomingNumber(record.score, 3) as MoodEntry['score'],
+            at: incomingNumber(record.at, record.updatedAt),
+            createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            deletedAt,
+          });
         }
       },
     );
@@ -414,6 +500,31 @@ export class DexieRepository implements Repository {
   }
 
   // ---------------------------------------------------------------- venues
+
+  /**
+   * Session counts for a named set of venues, off the `venueId` index.
+   *
+   * `sessionCounts` below is the whole-log version and is right for `listVenues`,
+   * which needs a count for every venue there is. `attachChildren` needs counts
+   * for the venues of the sessions in its hand, which for `getSession` and
+   * `getActiveSession` is exactly one -- and it was calling the whole-log
+   * version, so reading one session walked every session in the log to fill in
+   * one number on its venue. `getActiveSession` runs on every `refresh`, which
+   * is after every write and every sync pull.
+   *
+   * The SQLite side has always counted only the venues it was asked about, with
+   * a subquery per venue row over `idx_sessions_venue`. This is the same shape:
+   * one index query for the venues in hand rather than a pass over everything.
+   */
+  private async countsForVenues(venueIds: readonly string[]): Promise<Map<string, number>> {
+    const counts = new Map(venueIds.map((id) => [id, 0]));
+    const records = await this.db.sessions.where('venueId').anyOf([...venueIds]).toArray();
+    for (const record of records) {
+      if (!isLive(record)) continue;
+      counts.set(record.venueId, (counts.get(record.venueId) ?? 0) + 1);
+    }
+    return counts;
+  }
 
   /** Session counts come from one grouped pass rather than a query per venue. */
   private async sessionCounts(): Promise<Map<string, number>> {
@@ -492,33 +603,43 @@ export class DexieRepository implements Repository {
 
   // -------------------------------------------------------------- sessions
 
+  /**
+   * Sessions newest first, filtered, and no more of them than were asked for.
+   *
+   * Every clause is a predicate on the cursor rather than a pass over an array
+   * that has already been read. This used to pull the whole table, deserialize
+   * every session, and then narrow -- so `limit` bounded what came back and not
+   * what it cost, while the SQLite side has always pushed both the clauses and
+   * the `LIMIT` into the statement. The caller that most wants the difference
+   * is `app/claim.tsx`, asking for one session to find out whether this device
+   * has a log at all, and the hand-off is web only, so the one caller with a
+   * limit ran exclusively on the engine that ignored it.
+   *
+   * `capped` is the SQLite side's rule, moved here rather than reinvented: a
+   * limit that is not a number is no limit, which is what a missing one already
+   * means. This read it as `Math.floor(NaN)` and sliced to it, and
+   * `slice(0, NaN)` is empty -- so the two engines answered the same call with
+   * the whole log and with nothing.
+   */
   async listSessions(filter: SessionFilter = {}): Promise<SessionWithChildren[]> {
-    let records = (await this.db.sessions.orderBy('startedAt').reverse().toArray()).filter(isLive);
+    const wanted = (record: SessionRecord): boolean => {
+      if (!isLive(record)) return false;
+      if (filter.venueId !== undefined && record.venueId !== filter.venueId) return false;
+      if (filter.format !== undefined && record.format !== filter.format) return false;
+      if (filter.gameType !== undefined && record.gameType !== filter.gameType) return false;
+      if (filter.from !== undefined && record.startedAt < filter.from) return false;
+      if (filter.to !== undefined && record.startedAt >= filter.to) return false;
+      if (filter.status === 'active' && record.endedAt !== OPEN_SESSION_ENDED_AT) return false;
+      if (filter.status === 'completed' && record.endedAt === OPEN_SESSION_ENDED_AT) return false;
+      return true;
+    };
 
-    if (filter.venueId !== undefined) {
-      records = records.filter((record) => record.venueId === filter.venueId);
-    }
-    if (filter.format !== undefined) {
-      records = records.filter((record) => record.format === filter.format);
-    }
-    if (filter.gameType !== undefined) {
-      records = records.filter((record) => record.gameType === filter.gameType);
-    }
-    if (filter.from !== undefined) {
-      records = records.filter((record) => record.startedAt >= filter.from!);
-    }
-    if (filter.to !== undefined) {
-      records = records.filter((record) => record.startedAt < filter.to!);
-    }
-    if (filter.status === 'active') {
-      records = records.filter((record) => record.endedAt === OPEN_SESSION_ENDED_AT);
-    }
-    if (filter.status === 'completed') {
-      records = records.filter((record) => record.endedAt !== OPEN_SESSION_ENDED_AT);
-    }
-    if (filter.limit !== undefined) {
-      records = records.slice(0, Math.max(0, Math.floor(filter.limit)));
-    }
+    const capped = Number.isFinite(filter.limit as number)
+      ? Math.max(0, Math.floor(filter.limit as number))
+      : null;
+
+    const matching = this.db.sessions.orderBy('startedAt').reverse().filter(wanted);
+    const records = await (capped === null ? matching : matching.limit(capped)).toArray();
 
     return this.attachChildren(records.map(toSession));
   }
@@ -551,7 +672,7 @@ export class DexieRepository implements Repository {
     const [rebuyRecords, venueRecords, counts] = await Promise.all([
       this.db.rebuys.where('sessionId').anyOf(sessionIds).toArray(),
       this.db.venues.where('id').anyOf(venueIds).toArray(),
-      this.sessionCounts(),
+      this.countsForVenues(venueIds),
     ]);
 
     const rebuysBySession = new Map<string, Rebuy[]>();
@@ -697,15 +818,28 @@ export class DexieRepository implements Repository {
     return records.filter(isLive).map(toHand).sort((a, b) => b.at - a.at);
   }
 
+  /**
+   * How many hands are in the log, without reading any of them.
+   *
+   * This used to cursor the table and count what survived `isLive`, under a
+   * comment claiming it was "one pass over keys instead of reading and mapping
+   * every row". `Table.each` cursors *values*: every hand came back out of
+   * IndexedDB as a structured clone, for a number. Measured against
+   * fake-indexeddb: 2000 hands 67ms, 8000 hands 237ms, 20000 hands 616ms, and
+   * this runs on every `refresh` -- after every hand written at the table and
+   * after every sync pull, on the thread that draws.
+   *
+   * Two counts of keys instead, which IndexedDB answers without materializing
+   * anything: 0.1ms at every size above. It works because nulls are not
+   * indexable, so the `deletedAt` index added in v6 holds the tombstones and
+   * nothing else. SQLite has always answered this with one `COUNT(*)`.
+   */
   async countHands(): Promise<number> {
-    // `deletedAt` is not indexed -- see the tombstone note in the README -- so
-    // this counts what survives the filter rather than asking the index. Still
-    // one pass over keys instead of reading and mapping every row.
-    let live = 0;
-    await this.db.hands.each((record) => {
-      if (isLive(record)) live += 1;
-    });
-    return live;
+    const [all, tombstoned] = await Promise.all([
+      this.db.hands.count(),
+      this.db.hands.where('deletedAt').above(0).count(),
+    ]);
+    return all - tombstoned;
   }
 
   async getHand(id: string): Promise<Hand | null> {

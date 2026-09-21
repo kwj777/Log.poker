@@ -20,6 +20,7 @@ import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { formatEntry, formatMoney, formatStakes } from '../../src/domain/money';
 import { formatFinish } from '../../src/domain/tournaments';
+import { GAME_TYPE_LABELS } from '../../src/domain/types';
 import {
   durationMs,
   formatDuration,
@@ -179,8 +180,8 @@ export default function SessionDetailScreen() {
           {tournament
             ? formatEntry(session.buyIn, session.fee, currency)
             : session.stakes === null
-              ? session.gameType
-              : `${formatStakes(session.stakes, currency)} · ${session.gameType}`}
+              ? GAME_TYPE_LABELS[session.gameType]
+              : `${formatStakes(session.stakes, currency)} · ${GAME_TYPE_LABELS[session.gameType]}`}
         </Text>
       </View>
 

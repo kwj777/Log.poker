@@ -73,9 +73,14 @@ import {
 } from '../../src/domain/types';
 import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { CardPicker } from '../../src/features/hands/CardPicker';
-import { MAX_BOARD, isBoard } from '../../src/domain/handNotation';
+import {
+  MAX_BOARD,
+  cardToString,
+  clashingCards,
+  isBoard,
+} from '../../src/domain/handNotation';
 import { formatSessionDate } from '../../src/features/sessions/format';
-import { openHandOff } from '../../src/features/family/hooks';
+import { openLink } from '../../src/features/family/hooks';
 import { tableHandOff } from '../../src/features/family/links';
 import { tableOfferCopy, wantsTableReset } from '../../src/features/family/tableOffer';
 import { useHandById, useLogStore, useSessionById } from '../../src/store/useLogStore';
@@ -254,6 +259,14 @@ export default function LogHandScreen() {
    * the line below says why.
    */
   const partialBoard = showBoard && board !== null && !isBoard(board);
+  /**
+   * A card in both halves of the hand, which one deck does not allow.
+   *
+   * The picker now refuses to deal one twice, so this can only be a hand
+   * stored before it did. `clashingCards` was written for exactly this and had
+   * no caller anywhere in the app, which is why nothing ever said so.
+   */
+  const clash = showBoard ? clashingCards(holeCards, board) : [];
 
   /** What the form says, in the shape both writes take. */
   const entered = () => ({
@@ -340,7 +353,7 @@ export default function LogHandScreen() {
               label={offer.label}
               variant="secondary"
               size="small"
-              onPress={() => openHandOff(offer.url)}
+              onPress={() => openLink(offer.url)}
             />
             <Button
               label="Back to the game"
@@ -383,11 +396,25 @@ export default function LogHandScreen() {
       </View>
 
       <SectionHeader title="Your cards" />
+      {/*
+        Told the board, for the same reason the board is told these: one deck.
+        The guard was wired one way only, so a player who set the runout first
+        and their own cards second could deal the same card twice, and the
+        hand stored a board and a holding that cannot both be true.
+      */}
       <CardPicker
         value={holeCards}
         onChange={setHoleCards}
         cardCount={session.gameType === 'PLO' ? 4 : 2}
+        exclude={showBoard ? board : null}
       />
+      {clash.length > 0 ? (
+        <Text variant="caption" color={colors.loss} style={styles.amountHint}>
+          {clash.length === 1
+            ? `${cardToString(clash[0])} is on the board as well. One of the two is wrong.`
+            : `${clash.map(cardToString).join(' and ')} are on the board as well.`}
+        </Text>
+      ) : null}
 
       <SectionHeader
         title="Position"

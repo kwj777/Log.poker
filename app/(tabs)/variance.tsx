@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -31,6 +31,7 @@ import {
   assessRecentStretch,
   confidenceBand,
   estimatePlayer,
+  oddsInWords,
   probabilityOfLoss,
   toObservations,
 } from '../../src/domain/variance';
@@ -54,7 +55,7 @@ import { useEntryResults, useRoiInterval } from '../../src/features/sessions/use
 import { Explain } from '../../src/components/Explain';
 import { STAT_HELP } from '../../src/domain/glossary';
 import { startMoodComparison } from '../../src/domain/mood';
-import { openHandOff } from '../../src/features/family/hooks';
+import { openLink } from '../../src/features/family/hooks';
 import { untiltHandOff } from '../../src/features/family/links';
 import { useAllHands, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
@@ -93,7 +94,12 @@ const VERDICT_COLORS: Record<StretchVerdict, string> = {
 export default function VarianceScreen() {
   const all = useLogStore((state) => state.sessions);
   const moodEntries = useLogStore((state) => state.moodEntries);
-  const allHands = useAllHands();
+  // A bottom tab stays mounted once it has been visited, so this hook would
+  // otherwise re-read the whole journal on every hand written at the table,
+  // for a screen nobody is looking at. Focus is what "while this screen is
+  // open" actually means here.
+  const focused = useIsFocused();
+  const allHands = useAllHands(focused);
   const [picked, setPicked] = useState<string | null>(null);
 
   /**
@@ -209,14 +215,29 @@ export default function VarianceScreen() {
     if (last === null || last.actual === null) {
       return 'Cumulative big blinds against your expected range.';
     }
-    const inside = last.actual >= last.lower && last.actual <= last.upper;
+    // Off the verdict, which is what the note above already claims this does.
+    //
+    // It used to re-derive the answer from the band, and the band is zero-wide
+    // at its final point by construction: `confidenceBand` shares the whole of
+    // the fitted hours there, so `upper === lower === expected` and the only
+    // thing left between `actual` and `expected` is floating-point dust. The
+    // comparison was decided by that dust, so roughly one player in ten heard
+    // "you are at -365 big blinds against an expected -365, which is outside
+    // the 95% range" -- a sentence that contradicts itself and the headline
+    // above the chart, and the only description of the drawing a screen reader
+    // ever gives.
+    //
+    // `running_bad` and `running_hot` are the two verdicts defined as outside
+    // the 95% range, which is the same question asked where it has an answer.
+    const inside =
+      assessment.verdict !== 'running_bad' && assessment.verdict !== 'running_hot';
     return (
       `Cumulative big blinds over ${Math.round(last.hours)} hours. ` +
       `You are at ${Math.round(last.actual)} big blinds against an expected ` +
       `${Math.round(last.expected)}, which is ${inside ? 'inside' : 'outside'} ` +
       'the 95% range.'
     );
-  }, [band]);
+  }, [band, assessment]);
 
   /**
    * The long version of what this screen is doing, on the marketing site.
@@ -250,7 +271,7 @@ export default function VarianceScreen() {
       variant="secondary"
       size="small"
       href={GUIDES.runningBad}
-      onPress={() => openHandOff(GUIDES.runningBad)}
+      onPress={() => openLink(GUIDES.runningBad)}
       style={styles.guide}
     />
   );
@@ -372,9 +393,9 @@ export default function VarianceScreen() {
           <Text variant="bodyStrong">The part nobody tells you</Text>
           <Text color={colors.textSecondary} style={styles.reassuranceBody}>
             At your win rate and your swings, a stretch of{' '}
-            {Math.round(assessment.hours)} hours finishes in the red about{' '}
+            {Math.round(assessment.hours)} hours finishes in the red{' '}
             <Text variant="bodyStrong" color={colors.text}>
-              {Math.round(lossChance * 100)}% of the time
+              {oddsInWords(lossChance)} of the time
             </Text>
             . Not because of anything you did: that is simply what this much variance
             looks like over this few hours. Losing stretches are part of a winning
@@ -396,7 +417,7 @@ export default function VarianceScreen() {
               label={untiltHandOff().label}
               variant="secondary"
               size="medium"
-              onPress={() => openHandOff(untiltHandOff().url)}
+              onPress={() => openLink(untiltHandOff().url)}
             />
           </Card>
         </>

@@ -33,6 +33,7 @@ import {
   describeSession,
   describeSync,
   handoffFailed,
+  handoffWouldAdopt,
   handoffWouldSwitch,
   messageFor,
 } from '../copy';
@@ -523,6 +524,22 @@ describe('carrying a purchase over from another app', () => {
     // moves somebody's history out from under them.
     expect(handoffWouldSwitch).toMatch(/already signed in/i);
     expect(handoffWouldSwitch).toMatch(/nothing is deleted/i);
+  });
+
+  it('and warns a signed-out device with a log, which is the same question', () => {
+    // The half that was not asked. A first sign-in is `cursors.subject ===
+    // null`, which `settle` answers with `pushed: 0`: send everything from the
+    // beginning. Right for a sign-in somebody chose and wrong for a link
+    // somebody else sent, because what goes up is every session on this device
+    // and it lands in the sender's bucket.
+    //
+    // So it has to say where the sessions go, which is the part this side
+    // cannot take back, and it must not say anything is deleted, because
+    // nothing is.
+    expect(handoffWouldAdopt).toMatch(/sessions already on this device/i);
+    expect(handoffWouldAdopt).toMatch(/that account/i);
+    expect(handoffWouldAdopt).toMatch(/nothing is deleted/i);
+    expect(handoffWouldAdopt).not.toMatch(/purchase|bought|paid/i);
   });
 
   it('takes the code out of the URL before it trades it', () => {

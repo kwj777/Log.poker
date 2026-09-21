@@ -261,6 +261,40 @@ describe('parseStakes', () => {
     expect(parseStakes('')).toBeNull();
     expect(parseStakes('0/0')).toBeNull();
   });
+
+  it('reads a blind that opens on its own decimal point', () => {
+    // Half a dollar is written this way on half the sites there are, and a
+    // pattern that has to start on a digit steps over the point: `$.50` was
+    // read as fifty dollars, stored, shown as "$50/$1" and keyed that way, and
+    // nothing warned, because the importer only complains about a cell it
+    // could not read and this one read.
+    expect(parseStakes('$.50/$1')).toEqual({ smallBlind: 50, bigBlind: 100 });
+    expect(parseStakes('.5/1')).toEqual({ smallBlind: 50, bigBlind: 100 });
+    expect(parseStakes(',25/,50')).toEqual({ smallBlind: 25, bigBlind: 50 });
+    // Both blinds dotted used to fail the second group as well and come back
+    // null, which is why the mixed form was the one that got through.
+    expect(parseStakes('$.25/$.50')).toEqual({ smallBlind: 25, bigBlind: 50 });
+  });
+
+  it('and an ante that opens on one, rather than reading the cents as dollars', () => {
+    expect(parseStakes('1/2 ante .25')).toEqual({
+      smallBlind: 100,
+      bigBlind: 200,
+      ante: 25,
+    });
+  });
+
+  it('refuses a small blind above the big one, whatever produced it', () => {
+    // Not a game anybody plays, so it is a misread rather than a stake, and
+    // refusing the pair sends it down the same path as a cell with no blinds
+    // in it -- which the importer already warns about. The guard is on the
+    // answer rather than the pattern, so a later hole in the pattern lands
+    // here too.
+    expect(parseStakes('$2/$1')).toBeNull();
+    expect(parseStakes('100/2')).toBeNull();
+    // Equal is left alone: unusual, and a real table.
+    expect(parseStakes('1/1')).toEqual({ smallBlind: 100, bigBlind: 100 });
+  });
 });
 
 describe('parseGameType', () => {

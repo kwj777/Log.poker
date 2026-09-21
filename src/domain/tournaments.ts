@@ -22,7 +22,7 @@
 
 import { makeRandom } from './random';
 import { isComplete, netResult, durationHours, totalInvested } from './stats';
-import type { ConfidenceLevel } from './variance';
+import { oddsInWords, type ConfidenceLevel } from './variance';
 import type { Cents, SessionWithChildren } from './types';
 
 export const isTournament = (session: { format: string }): boolean =>
@@ -192,12 +192,12 @@ const percent = (fraction: number): string => `${Math.round(fraction * 100)}%`;
  * move for an ROI that is only zero because it was rounded; the odds never got
  * it.
  *
- * Under half a percent the exact figure is not the point, so it says which side
- * of the line the run is on instead, and takes the qualifier with it: "about"
- * belongs to a rounded number and not to a bound.
+ * The rule moved to `oddsInWords` so the cash side could have it too, where the
+ * loss-chance card was printing the same lie. It gained the upper bound on the
+ * way: a long enough drought is near certain, and "about 100% of the time" is
+ * the same sentence pointing the other way.
  */
-const dryRunOdds = (fraction: number): string =>
-  fraction > 0 && fraction < 0.005 ? 'less than 1%' : `about ${percent(fraction)}`;
+const dryRunOdds = oddsInWords;
 
 /**
  * What to say to a tournament player about their own numbers.

@@ -619,6 +619,44 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         const sessions = await repository.listSessions({ limit: 1 });
         expect(sessions.map((session) => session.id)).toEqual([c.id]);
       });
+
+      it('and after the filters, not before them', async () => {
+        // A limit narrows what the filters left, rather than cutting the table
+        // down first and filtering the piece. One completed NLHE session at the
+        // room, and it is not the newest session in the log.
+        const { room, c } = await seedFiltered();
+        const sessions = await repository.listSessions({
+          venueId: room.id,
+          status: 'completed',
+          gameType: 'NLHE',
+          limit: 1,
+        });
+        expect(sessions.map((session) => session.id)).toEqual([c.id]);
+      });
+
+      it('treats a limit that is not a number as no limit at all', async () => {
+        // Which is what a missing one already means. The two engines disagreed
+        // here: SQLite refuses to interpolate a non-number and drops the LIMIT,
+        // while the other read it as a slice length and `slice(0, NaN)` is
+        // empty -- so the same call answered with the whole log on one and with
+        // nothing on the other.
+        await seedFiltered();
+        const whole = await repository.listSessions();
+        expect(whole.length).toBeGreaterThan(1);
+
+        for (const limit of [Number.NaN, Number.POSITIVE_INFINITY]) {
+          const sessions = await repository.listSessions({ limit });
+          expect(sessions.map((session) => session.id)).toEqual(
+            whole.map((session) => session.id),
+          );
+        }
+      });
+
+      it('and a limit of zero as none of them, which is a number', async () => {
+        await seedFiltered();
+        expect(await repository.listSessions({ limit: 0 })).toEqual([]);
+        expect(await repository.listSessions({ limit: -5 })).toEqual([]);
+      });
     });
 
     describe('rebuys', () => {
@@ -1240,6 +1278,47 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect((await repository.listVenues()).map((venue) => venue.id)).toEqual(['v-remote']);
       });
 
+      it('takes a venue with no name, rather than failing the whole answer', async () => {
+        // The other half of the guard the two cases below already cover. The
+        // server validates an id and a stamp and carries every other field
+        // through untouched, and SQLite binds a record's fields straight into
+        // a statement: `undefined` is not a value it takes at all, whether or
+        // not the column is nullable, so it answered "Provided value cannot be
+        // bound to SQLite parameter 2" and rolled back every table in the same
+        // response. The cursor was never written, so the identical batch came
+        // down and failed again on every sync after it, which ended sync on
+        // iOS and Android for good while the browser absorbed it.
+        const { name: _dropped, ...noName } = foreignVenue('v-remote', T0);
+        await repository.applyChanges(set({
+          venues: [change(noName)],
+          sessions: [change(foreignSession('s-remote', 'v-remote'))],
+        }));
+
+        // The row lands, with an empty name rather than no name, and both
+        // engines say the same thing about it.
+        expect((await repository.getVenue('v-remote'))?.name).toBe('');
+        // And the rest of the answer landed with it, which is the point.
+        expect((await repository.listSessions()).map((session) => session.id))
+          .toEqual(['s-remote']);
+      });
+
+      it('and a session missing the fields a column insists on', async () => {
+        const { currency: _c, buyIn: _b, startedAt: _s, gameType: _g, ...thin } =
+          foreignSession('s-remote', 'v-remote');
+        await repository.applyChanges(set({
+          venues: [change(foreignVenue('v-remote', T0))],
+          sessions: [change(thin)],
+        }));
+
+        const session = await repository.getSession('s-remote');
+        expect(session).not.toBeNull();
+        expect(session?.currency).toBe('USD');
+        expect(session?.buyIn).toBe(0);
+        expect(session?.gameType).toBe('NLHE');
+        // The stamp it does have, rather than the start of the epoch.
+        expect(session?.startedAt).toBe(T0);
+      });
+
       it('takes a session with no stakes at all, and reads it back as having none', async () => {
         // The same hole, one table up: `{ ...undefined }` does not throw, it
         // quietly writes a stakes object with no blinds in it, and every
@@ -1387,6 +1466,40 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect((await repository.getSession('first'))?.importKey).toBe('csv|9');
         expect((await repository.getSession('later'))?.importKey).toBeNull();
         expect(await repository.listImportKeys()).toEqual(['csv|9']);
+      });
+
+      it('keeps the hand count true when a tombstone arrives from somewhere else', async () => {
+        // A delete made here and a delete arriving from a sync are the same
+        // state and are written by different code: `deleteHand` modifies the
+        // row in place, `applyChanges` puts a whole record with the server's
+        // `deletedAt` on it. The count has to see both, and on the IndexedDB
+        // side it now reads an index rather than the rows, which is exactly the
+        // kind of difference a count answered from one write path and not the
+        // other would hide.
+        const session = await newSession();
+        const here = await repository.createHand({ sessionId: session.id, at: T0 });
+        const there = {
+          id: 'h-elsewhere', sessionId: session.id, holeCards: null, board: null,
+          position: null, note: null, tags: [], amount: null,
+          at: T0, createdAt: T0, updatedAt: T0 + HOUR,
+        };
+        await repository.applyChanges(set({ hands: [change(there)] }));
+        expect(await repository.countHands()).toBe(2);
+
+        // Tombstoned over there, and the count follows.
+        await repository.applyChanges(
+          set({ hands: [change({ ...there, updatedAt: T0 + 2 * HOUR }, T0 + 2 * HOUR)] }),
+        );
+        expect(await repository.countHands()).toBe(1);
+        expect((await repository.listHands()).map((hand) => hand.id)).toEqual([here.id]);
+
+        // And back, which a later edit on a device that never saw the delete
+        // really does produce. A count that read a stale tombstone would be
+        // one short for good.
+        await repository.applyChanges(
+          set({ hands: [change({ ...there, updatedAt: T0 + 3 * HOUR })] }),
+        );
+        expect(await repository.countHands()).toBe(2);
       });
 
       it('is safe to apply the same change twice', async () => {

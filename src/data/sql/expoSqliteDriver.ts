@@ -8,12 +8,19 @@
 
 import * as SQLite from 'expo-sqlite';
 
-import type { SqlDriver, SqlValue } from './driver';
+import { oneAtATime, type SqlDriver, type SqlValue } from './driver';
 
 export const DATABASE_NAME = 'log.db';
 
 class ExpoSqliteDriver implements SqlDriver {
   private readonly db: SQLite.SQLiteDatabase;
+
+  /**
+   * One transaction at a time. See `oneAtATime`, which is where the reasoning
+   * is: this driver is the one that ships, and the database under it has no
+   * such queue of its own.
+   */
+  private readonly queue = oneAtATime();
 
   constructor(db: SQLite.SQLiteDatabase) {
     this.db = db;
@@ -32,13 +39,15 @@ class ExpoSqliteDriver implements SqlDriver {
   }
 
   async transaction<T>(fn: () => Promise<T>): Promise<T> {
-    let result: T;
-    await this.db.withTransactionAsync(async () => {
-      result = await fn();
+    return this.queue(async () => {
+      let result: T;
+      await this.db.withTransactionAsync(async () => {
+        result = await fn();
+      });
+      // `withTransactionAsync` rejects if `fn` throws, so reaching here means
+      // the assignment above ran.
+      return result!;
     });
-    // `withTransactionAsync` rejects if `fn` throws, so reaching here means the
-    // assignment above ran.
-    return result!;
   }
 
   async close(): Promise<void> {

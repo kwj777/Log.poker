@@ -176,6 +176,34 @@ describe('which sessions count', () => {
     const observations = toMoodObservations([played('a', 25, 4)], [mood('a', 'start', 2)]);
     expect(observations[0].resultBb).toBeCloseTo(25, 6);
   });
+
+  it('reads the journal of moods once, not once per session', () => {
+    // The join used to ask `startScoreOf` per session, and that walks every
+    // entry, so the cost went up with the square of the log -- on the JS
+    // thread, memoized on an array the store replaces every time anybody logs
+    // a hand. A count of walks rather than a stopwatch: this is about the
+    // shape of the work, and a stopwatch on a shared machine says nothing
+    // about that.
+    const sessions = Array.from({ length: 50 }, (_, i) =>
+      played(`s${i}`, 10, 4, T0 + i * 24 * HOUR),
+    );
+    const entries = sessions.flatMap((_, i) => [
+      mood(`s${i}`, 'start', 2, T0 + i * 24 * HOUR),
+      mood(`s${i}`, 'end', 4, T0 + i * 24 * HOUR + HOUR),
+    ]);
+
+    let walks = 0;
+    const iterate = entries[Symbol.iterator].bind(entries);
+    Object.defineProperty(entries, Symbol.iterator, {
+      value: () => {
+        walks += 1;
+        return iterate();
+      },
+    });
+
+    expect(toMoodObservations(sessions, entries)).toHaveLength(50);
+    expect(walks).toBe(1);
+  });
 });
 
 /* ------------------------------------------------------------- the grouping */
@@ -318,14 +346,24 @@ describe('when it does speak', () => {
 
 describe('what it says instead of a number', () => {
   it('offers the hours that would settle the gap it can see', () => {
+    // Both guards are gone, and with them the reason this test passed without
+    // checking the thing it is named for. The old fixture came back with
+    // `hoursNeeded: null` -- five rattled sessions is under the floor the
+    // denominator needs -- so the conditional on the last line never ran and
+    // the only live assertion was about the blocker. A test that returns early
+    // and expects conditionally is a test that cannot fail.
+    //
+    // This fixture produces a real number at the default level, so the
+    // assertions can be flat.
     const { sessions, moods } = merge(
-      run('a', { score: 1, count: 30, resultBb: 60, hours: 5, spreadBb: 120 }),
-      run('c', { score: 5, count: 5, resultBb: -10, hours: 3, spreadBb: 120 }),
+      run('a', { score: 1, count: 30, resultBb: 60, hours: 4, spreadBb: 120 }),
+      run('c', { score: 5, count: 10, resultBb: -10, hours: 4, spreadBb: 120 }),
     );
     const result = startMoodComparison(sessions, moods);
-    if (result.settled) return; // the fixture is only useful while it is not
+    expect(result.settled).toBe(false);
     expect(result.blocker).toBe('inside-the-noise');
-    if (result.hoursNeeded !== null) expect(result.hoursNeeded).toBeGreaterThan(0);
+    expect(result.hoursNeeded).not.toBeNull();
+    expect(result.hoursNeeded as number).toBeGreaterThan(0);
   });
 
   it('offers hours to add, not the total to end up with', () => {

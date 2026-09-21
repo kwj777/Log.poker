@@ -217,13 +217,20 @@ export const verifyToken = async (
  * the exception.
  *
  * Nothing is exempted, and erasing was the tempting one: refusing it leaves a
- * bucket somebody can no longer read or delete. It is exempted anyway, because
+ * bucket somebody can no longer read or delete. It is refused anyway, because
  * the exemption would be dead the moment it was needed. A foreign token cannot
  * be renewed here, so it expires; `SessionManager.current` clears an expired
  * token, which destroys the only string in the world naming that subject; and
  * the erase control lives inside the signed-in branch of the card. So the
- * exemption is reachable only by somebody who is not yet stranded and has no
- * reason to use it, and unreachable by everybody it was written for.
+ * exemption would be reachable only by somebody who is not yet stranded and
+ * has no reason to use it, and unreachable by everybody it was written for.
+ *
+ * **The tier gate is a different gate and does exempt erasing**, which is why
+ * this paragraph is worth keeping straight: `paidForSync` lets a DELETE
+ * through where it would refuse a read or a write, because a purchase that has
+ * lapsed does not make the history behind it less theirs to remove. Identity
+ * is not like that. A subject that is not this person's is not this person's
+ * on the way out either.
  *
  * **This is the whole of who this bucket belongs to, and nothing about what
  * they have paid.** The tier question came back, and it is deliberately not

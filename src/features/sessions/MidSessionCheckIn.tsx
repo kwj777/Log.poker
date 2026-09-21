@@ -40,7 +40,7 @@ import { wantsReset } from '../../domain/mood';
 import type { MoodScore, SessionWithChildren } from '../../domain/types';
 import { colors, spacing } from '../../theme';
 import { useLogStore } from '../../store/useLogStore';
-import { openHandOff } from '../family/hooks';
+import { openLink } from '../family/hooks';
 import { resetHandOff } from '../family/links';
 
 /** How long into a session before the check-in appears. */
@@ -105,7 +105,7 @@ export const MidSessionCheckIn = ({ session, elapsedMs }: MidSessionCheckInProps
             label={reset.label}
             variant="secondary"
             size="small"
-            onPress={() => openHandOff(reset.url)}
+            onPress={() => openLink(reset.url)}
           />
           <Button
             label="Back to the game"

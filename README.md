@@ -1085,12 +1085,12 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 84 passed
-Tests:       2031 passed
+Test Suites: 94 passed
+Tests:       2127 passed
 
-  dexieRepository   135   the IndexedDB path, against real IndexedDB
-  sqlRepository     135   the SQLite path, against real SQLite
-  bundle             71   what ships to each platform, against the real output
+  dexieRepository   145   the IndexedDB path, against real IndexedDB
+  sqlRepository     142   the SQLite path, against real SQLite
+  bundle             72   what ships to each platform, against the real output
   sessionImport      63   reading a session-summary export
   site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes
@@ -1098,24 +1098,25 @@ Tests:       2031 passed
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   stats              55   P/L, rebuys, duration, win rate, groupings
+  copy               52   what the sign-in and the sync are allowed to say
   verify             52   checking a token, and every way past it that must not work
-  copy               51   what the sign-in and the sync are allowed to say
-  syncingRepository  48   two devices and one server, no fakes in between
-  endpoint           46   the sync endpoint, end to end
+  syncingRepository  49   two devices and one server, no fakes in between
+  endpoint           47   the sync endpoint, end to end
+  values             42   money, dates, durations, stakes, formats, counts
   variance           41   win rate, σ, confidence bands, verdicts
-  values             39   money, dates, durations, stakes, formats, counts
-  blog               38   the post grammar, the share cards, and what it refuses
+  blog               39   the post grammar, the share cards, and what it refuses
+  mood               34   what tilt costs, and when to say nothing
   merge              33   two devices disagreeing, and who wins
-  mood               33   what tilt costs, and when to say nothing
+  migrations         32   a filled v2 database walked forward, both engines
   signinSweep        31   what the sign-in store may collect, and what it must not
-  migrations         29   a filled v2 database walked forward, both engines
+  session            30   holding a token, and stores that fail as real ones do
   token              29   the family token grammar, against signed fixtures
   palette            27   the theme matches BRAND.md
   sessionExport      27   the log written out, and read back by the importer
-  session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
   money              22   cents arithmetic, parsing, formatting
+  writeFailures      21   what the player sees when a write does not work
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1123,33 +1124,32 @@ Tests:       2031 passed
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
+  history            19   the session list, its filters, and how much of it mounts
   clock              18   a typed date, a typed length, and what neither will accept
   editSession        18   correcting a session, including the one nobody cashed out
-  history            18   the session list, its filters, and how much of it mounts
   seed               18   the demo dataset stays coherent
-  writeFailures      18   what the player sees when a write does not work
+  signin             18   the sign-in client, against a fake fetch
   client             17   the sync client, against a fake fetch
+  handoff            17   taking delivery of a purchase made at another app's door
   pastSession        17   logging a night that was played before it was logged
-  handoff            16   taking delivery of a purchase made at another app's door
-  signin             16   the sign-in client, against a fake fetch
+  settingsExport     17   the export card, and what it refuses to write
+  useLogStore        16   what a write reads back, and what it leaves alone
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
-  settingsExport     15   the export card, and what it refuses to write
-  useLogStore        15   what a write reads back, and what it leaves alone
+  sessionDetail      15   one session and the hands that belong to it
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   bankrollHeadline   13   the word over the headline figure, and what it has to be true of
   editHand           13   fixing or deleting a hand that was logged wrong
+  logHand            13   logging a hand, the optional board, and the reset after a bad one
   rateLimit          13   how often one person may ask, and what a refusal costs
-  sessionDetail      13   one session and the hands that belong to it
-  logHand            12   logging a hand, the optional board, and the reset after a bad one
   csvWriter          11   writing CSV, and reading back exactly what was written
+  importIntegration  11   parse → store → read back, against real SQLite
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching
   pastHand           10   adding a hand to a session that is not running
   search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
-  importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
   varianceHands       9   the hand breakdown, and the sentence that must precede it
@@ -1161,17 +1161,27 @@ Tests:       2031 passed
   mergeVenues         7   folding one room into another, and the order it does it in
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   settingsBankroll    7   entering what you had behind you before the log started
+  settingsHelp        7   the privacy link, the support address, the build
   settingsVenues      7   renaming a venue, and merging two that are one room
   venues              7   which spellings of a room name are the same room
+  claimHandoff        6   what a hand-off link may do without asking
   readme              6   the test table adds up and says what each suite is for
+  rowLabels           6   what a screen reader is told a row in a list is
   scale               6   how much of the plot the data actually gets
-  settingsHelp        6   the privacy link, the support address, the build
+  serviceWorker       6   what the worker answers a navigation with, run rather than read
+  crossPromo          5   the family card as drawn, and the link a refusing device gives back
   errorBoundary       5   a render that throws, and the way back from it
+  lineChart           5   what a chart says before it has been measured
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
+  staleData           5   a read that failed after the app was already open
   varianceCurrency    5   the variance page stops adding euros to dollars
+  transactionQueue    4   two writes at once, on a database with no queue of its own
+  lintReach           3   which files npm run lint actually looks at
   midSessionCheckIn   3   whether a check-in that failed says it was logged
   notFound            3   where a link that names nothing lands
+  varianceHonesty     3   the two sentences on the Variance tab that could deny themselves
+  allHands            2   who pays for a read of the whole journal
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

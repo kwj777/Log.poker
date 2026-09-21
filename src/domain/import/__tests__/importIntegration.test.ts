@@ -7,6 +7,21 @@
  * particular that running the same export twice does not double a bankroll,
  * which is the one failure mode a player would not notice until it had
  * compounded for months.
+ *
+ * ## It drives the store rather than a copy of it
+ *
+ * This used to call a local `applyImport` that did what the store does --
+ * plan, create the venues, create the sessions -- under a comment saying so.
+ * A test that reimplements the code it covers passes whatever the code does,
+ * and the two had already parted company: the store wraps the writes in a
+ * `try` and deletes the venues it invented when the session batch fails, so a
+ * file that cannot land does not leave rooms in the picker for sessions that
+ * never arrived. The copy had no such thing, and `importSessions` had no test
+ * anywhere.
+ *
+ * So the repository goes in behind `getRepository` and the store's own action
+ * is what runs. The last case here is the one the copy could never have
+ * reached.
  */
 
 import { SqlRepository } from '../../../data/sql/SqlRepository';
@@ -14,8 +29,18 @@ import { NodeSqliteDriver } from '../../../data/__tests__/support/nodeSqliteDriv
 import type { Repository } from '../../../data/repository';
 import { netResult, totalInvested } from '../../stats';
 import { toObservations } from '../../variance';
-import { planImport, venueNameKey } from '../plan';
 import { parseSessionCsv, type ImportedSession } from '../sessionImport';
+
+/** What `getRepository` hands back, swapped per test. */
+const live: { repository: Repository | null } = { repository: null };
+
+jest.mock('../../../data', () => ({
+  getRepository: async () => live.repository as Repository,
+  onSyncApplied: () => () => undefined,
+}));
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { useLogStore } = require('../../../store/useLogStore') as typeof import('../../../store/useLogStore');
 
 const CSV = [
   'Date,Site,Game,Limit,Total Buyin,Total Cashout,Duration',
@@ -24,34 +49,11 @@ const CSV = [
   '2024-01-17 19:00,GGPoker,PLO,$1/$2,$200.00,$310.00,4:00',
 ].join('\n');
 
-/** The store's write path, minus Zustand: plan, create venues, create sessions. */
+/** The shipping write path: the store's own action, over the repository below. */
 const applyImport = async (
-  repository: Repository,
+  _repository: Repository,
   sessions: readonly ImportedSession[],
-): Promise<number> => {
-  const venues = await repository.listVenues();
-  const plan = planImport(
-    sessions,
-    new Set(await repository.listImportKeys()),
-    venues.map((venue) => venue.name),
-  );
-  if (plan.writes.length === 0) return 0;
-
-  const byName = new Map(venues.map((venue) => [venueNameKey(venue.name), venue.id]));
-  for (const name of plan.venuesToCreate) {
-    const venue = await repository.createVenue({ name, isHomeGame: false });
-    byName.set(venueNameKey(venue.name), venue.id);
-  }
-
-  await repository.createSessions(
-    plan.writes.map((session) => ({
-      ...session.draft,
-      venueId: byName.get(venueNameKey(session.venueName)) as string,
-      importKey: session.importKey,
-    })),
-  );
-  return plan.writes.length;
-};
+): Promise<number> => (await useLogStore.getState().importSessions(sessions)).imported;
 
 describe('importing a session summary end to end', () => {
   let driver: NodeSqliteDriver;
@@ -61,6 +63,8 @@ describe('importing a session summary end to end', () => {
     driver = new NodeSqliteDriver(':memory:');
     repository = new SqlRepository(driver);
     await repository.init();
+    live.repository = repository;
+    useLogStore.setState({ status: 'ready', sessions: [], venues: [], moodEntries: [] });
   });
 
   afterEach(async () => {
@@ -133,5 +137,41 @@ describe('importing a session summary end to end', () => {
     expect(session.venue?.name).toBe('Online');
     // No stakes and no duration, so it stays out of the win-rate estimate.
     expect(toObservations([session])).toEqual([]);
+  });
+
+  it('reports the rooms it invented, which is what the screen tells the player', async () => {
+    const answer = await useLogStore.getState().importSessions(parseSessionCsv(CSV).sessions);
+    expect(answer.imported).toBe(3);
+    expect(answer.duplicates).toBe(0);
+    expect([...answer.venuesCreated].sort()).toEqual(['GGPoker', 'PokerStars']);
+  });
+
+  it('takes back the rooms it invented when the sessions do not land', async () => {
+    // The venues cannot go in the same all-or-nothing batch as the sessions,
+    // because creating one is its own write. So the store catches and deletes
+    // them, and without that a file that failed to import left rooms in the
+    // picker for sessions that never arrived -- on the screen where a venue is
+    // picked from a list, for a room the player has never played in.
+    const room = 'PokerStars';
+    live.repository = new Proxy(repository, {
+      get: (target, key, receiver) =>
+        key === 'createSessions'
+          ? async () => {
+              throw new Error('The database is full.');
+            }
+          : Reflect.get(target, key, receiver),
+    }) as Repository;
+
+    await expect(
+      useLogStore.getState().importSessions(parseSessionCsv(CSV).sessions),
+    ).rejects.toThrow('The database is full.');
+
+    live.repository = repository;
+    expect(await repository.listVenues()).toEqual([]);
+    expect(await repository.listSessions()).toEqual([]);
+    // And the keys are free, so the same file imports cleanly on the next try.
+    expect(await repository.listImportKeys()).toEqual([]);
+    expect(await applyImport(repository, parseSessionCsv(CSV).sessions)).toBe(3);
+    expect((await repository.listVenues()).map((venue) => venue.name)).toContain(room);
   });
 });

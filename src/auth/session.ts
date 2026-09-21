@@ -34,7 +34,13 @@ export interface TokenStore {
   clear(): Promise<void>;
 }
 
-/** For tests, and the fallback when a platform has nowhere durable to write. */
+/**
+ * For tests, and the fallback when a platform has nowhere durable to write.
+ *
+ * The second half of that is `SessionManager`'s, below: a store that cannot
+ * keep the token is not a sign-in that failed, it is a sign-in that lasts as
+ * long as the process.
+ */
 export const memoryTokenStore = (): TokenStore => {
   let held: string | null = null;
   return {
@@ -79,9 +85,68 @@ export class SessionManager {
    */
   private generation = 0;
 
+  /**
+   * The token, when the platform's store would not keep it.
+   *
+   * Both adapters swallow a write they cannot do, because storage that is
+   * missing or locked is ordinary here and an app that threw on launch for a
+   * feature it is not using would be worse. What that leaves is a `write` that
+   * answers the same whether or not anything was stored, and a sign-in on top
+   * of it that reported a session nothing could then find: `current()` read the
+   * store and got null, so the card said signed in, `recomposeRepository` built
+   * the plain local repository, `token()` had nothing to send, and the one-time
+   * code was already spent. A private window, a browser set to block site data,
+   * a phone booted and not yet unlocked -- in all three, signing in did nothing
+   * and said it had worked.
+   *
+   * So the write is read back, and what the store would not keep is kept here
+   * instead. That is what the rest of this class already claims: a sign-in
+   * lasts as long as the process, and the next launch asks again.
+   */
+  private readonly fallback = memoryTokenStore();
+
   constructor(store: TokenStore, clock: () => Timestamp = Date.now) {
     this.store = store;
     this.clock = clock;
+  }
+
+  /**
+   * The token this device is holding, from wherever it is being held.
+   *
+   * The fallback first: it is only ever set by a write the store refused, so
+   * when it holds anything it holds something newer than whatever the store
+   * kept instead.
+   */
+  private async stored(): Promise<string | null> {
+    return (await this.fallback.read()) ?? (await this.store.read());
+  }
+
+  /**
+   * Keep a token, durably if the platform will and in memory if it will not.
+   *
+   * The read-back is the whole of the test, because a `TokenStore` cannot say
+   * no: `write` resolves either way by design. Reading it back is the only
+   * question that has a different answer.
+   *
+   * **The fallback is never emptied on the way through.** It is set or cleared
+   * once the durable store has answered, so at every await in here one of the
+   * two is holding a token. Clearing it first read cleanly and left a window
+   * -- three awaits wide, and `renewIfDue` runs at launch without being
+   * awaited -- where a device with no durable store had nothing anywhere, and
+   * a `current()` landing in it reported signed out. That is not a cosmetic
+   * answer: `data/index.ts` composes the plain local repository on it and
+   * nothing syncs for the rest of the process.
+   */
+  private async keep(token: string): Promise<void> {
+    await this.store.write(token);
+    if ((await this.store.read()) === token) await this.fallback.clear();
+    else await this.fallback.write(token);
+  }
+
+  /** Forget it in both places, so neither can put back what the other dropped. */
+  private async forget(): Promise<void> {
+    await this.fallback.clear();
+    await this.store.clear();
   }
 
   /**
@@ -93,13 +158,13 @@ export class SessionManager {
    * a credential still sitting on a phone that gets sold.
    */
   async current(): Promise<Session | null> {
-    const token = await this.store.read();
+    const token = await this.stored();
     if (token === null) return null;
 
     const claim = readClaim(token, this.clock());
     if (claim === null) {
       this.generation += 1;
-      await this.store.clear();
+      await this.forget();
       return null;
     }
     return { claim, syncs: hasOwnSubject(claim) && paidForSync(claim) };
@@ -116,7 +181,7 @@ export class SessionManager {
     const claim = readClaim(token, this.clock());
     if (claim === null) return null;
     this.generation += 1;
-    await this.store.write(token);
+    await this.keep(token);
     return { claim, syncs: hasOwnSubject(claim) && paidForSync(claim) };
   }
 
@@ -128,7 +193,7 @@ export class SessionManager {
    * be refused for carrying it.
    */
   async token(): Promise<string | null> {
-    return (await this.current()) === null ? null : this.store.read();
+    return (await this.current()) === null ? null : this.stored();
   }
 
   /**
@@ -158,7 +223,7 @@ export class SessionManager {
     // bucket that had just been deleted.
     const generation = this.generation;
     const now = this.clock();
-    const token = await this.store.read();
+    const token = await this.stored();
     if (token === null) return false;
 
     const claim = readClaim(token, now);
@@ -181,7 +246,7 @@ export class SessionManager {
     // signing out.
     if (generation !== this.generation) return false;
 
-    await this.store.write(next);
+    await this.keep(next);
     return true;
   }
 
@@ -198,6 +263,6 @@ export class SessionManager {
     // renewal is fenced from the moment somebody asks to sign out, not from
     // the moment the keychain finishes obliging.
     this.generation += 1;
-    await this.store.clear();
+    await this.forget();
   }
 }

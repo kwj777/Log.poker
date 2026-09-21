@@ -28,6 +28,7 @@ import { formatSessionDate, formatTimeOfDay } from '../../src/features/sessions/
 import { parseCount } from '../../src/domain/import/values';
 import { formatDuration, rebuyTotal, totalInvested } from '../../src/domain/stats';
 import { fromHoursAndMinutes, isAhead } from '../../src/domain/clock';
+import { GAME_TYPE_LABELS } from '../../src/domain/types';
 import type { MoodScore } from '../../src/domain/types';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn';
@@ -108,6 +109,8 @@ export default function ActiveSessionScreen() {
 
   const { currency } = session;
   const tournament = session.format === 'tournament';
+  /** What one entry costs, which is what a re-entry costs again. */
+  const entryCost = session.buyIn + (session.fee ?? 0);
   // A tournament is re-entered, not rebought. The word on the button is the
   // whole difference between the two screens, so it is worth getting right.
   const rebuyWord = tournament ? 'Re-entry' : 'Rebuy';
@@ -238,6 +241,13 @@ export default function ActiveSessionScreen() {
           <Button
             label="Cash out & end session"
             onPress={() => {
+              // One `failed` string drives the note in three places: the
+              // rebuys card, the rebuy sheet and this one. Nothing cleared it
+              // when a sheet opened, only when an action was attempted, so a
+              // rebuy that would not save presented itself again inside the
+              // cash-out sheet as though the cash-out had failed, before it
+              // had been tried.
+              setFailed(null);
               setCashOutAmount('');
               setEndMood(null);
               // Left empty, always. Empty means "the clock is right", which
@@ -265,8 +275,8 @@ export default function ActiveSessionScreen() {
             {tournament
               ? formatEntry(session.buyIn, session.fee, currency)
               : session.stakes === null
-                ? session.gameType
-                : `${formatStakes(session.stakes, currency)} · ${session.gameType}`}
+                ? GAME_TYPE_LABELS[session.gameType]
+                : `${formatStakes(session.stakes, currency)} · ${GAME_TYPE_LABELS[session.gameType]}`}
           </Text>
         </View>
 
@@ -301,7 +311,13 @@ export default function ActiveSessionScreen() {
             style={styles.action}
             leading={<Ionicons name="add-circle-outline" size={18} color={colors.text} />}
             onPress={() => {
-              setRebuyAmount(String(session.buyIn / 100));
+              setFailed(null);
+              // A re-entry costs what the tournament advertises, which is the
+              // buy-in and the fee: `totalInvested` counts both, and the
+              // Variance tab gives the fee a tile of its own. Seeded with the
+              // buy-in alone this opened on a number no tournament sells, and
+              // short by exactly the part that is never coming back.
+              setRebuyAmount(String(entryCost / 100));
               setRebuyOpen(true);
             }}
           />
@@ -416,7 +432,14 @@ export default function ActiveSessionScreen() {
           value={rebuyAmount}
           onChangeText={setRebuyAmount}
           currency={currency}
-          presets={[session.buyIn / 2, session.buyIn, session.buyIn * 2].map(Math.round)}
+          presets={
+            // A tournament re-entry is the advertised entry or two of them.
+            // Half a buy-in is a cash-game top-up and not a thing a
+            // tournament sells, and the entry is the buy-in plus the fee.
+            tournament
+              ? [entryCost, entryCost * 2].map(Math.round)
+              : [session.buyIn / 2, session.buyIn, session.buyIn * 2].map(Math.round)
+          }
           autoFocus
           accessibilityLabel={`${rebuyWord} amount`}
         />

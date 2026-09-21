@@ -555,6 +555,22 @@ ${HELPLINE}
  * builds of the same posts produce the same bytes and nobody's reader is told
  * something changed when nothing did.
  */
+/**
+ * The same HTML, with its links pointing somewhere a reader can follow.
+ *
+ * The page pipeline keeps hrefs exactly as the Markdown wrote them, which for
+ * these posts means root-relative: `/app`, `/running-bad`, `/blog/<slug>`.
+ * That is right on the site and wrong in a feed. RSS has no base URL and
+ * `content:encoded` carries no `xml:base`, so a reader resolves them against
+ * its own origin or against nothing at all, and the call to action every post
+ * ends on is dead in every reader that renders full content.
+ *
+ * Only on the way into the feed. The HTML the site serves is untouched, and
+ * `<link>` and `<guid>` beside this were already absolute, so the generator
+ * had the absolute form to hand the whole time.
+ */
+const absolute = (html) => html.replace(/(href|src)="\/(?!\/)/g, `$1="${SITE}/`);
+
 const feed = (posts) => `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
@@ -570,7 +586,7 @@ ${posts.map((post) => `    <item>
       <guid isPermaLink="true">${post.url}</guid>
       <pubDate>${feedDate(post.date)}</pubDate>
       <description>${escapeHtml(post.description)}</description>
-      <content:encoded><![CDATA[${post.body.replace(/]]>/g, ']]]]><![CDATA[>')}]]></content:encoded>
+      <content:encoded><![CDATA[${absolute(post.body).replace(/]]>/g, ']]]]><![CDATA[>')}]]></content:encoded>
     </item>`).join('\n')}
   </channel>
 </rss>

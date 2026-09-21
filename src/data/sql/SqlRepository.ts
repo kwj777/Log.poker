@@ -42,6 +42,7 @@ import {
   type SessionPatch,
   type VenuePatch,
 } from '../repository';
+import { DEFAULT_CURRENCY } from '../../domain/money';
 import { patchedKeys, toPreferences } from '../preferences';
 import {
   applyPatch,
@@ -238,6 +239,83 @@ const toMoodEntry = (row: MoodRow): MoodEntry => ({
 
 const bool = (value: boolean): number => (value ? 1 : 0);
 
+/**
+ * An incoming field, coerced to something this driver can actually bind.
+ *
+ * `applyChanges` binds the fields of a record straight into a statement, and
+ * the only thing that has vouched for that record is `sanitize` in
+ * `src/sync/bundle.ts`, which validates an id and a stamp and carries
+ * everything else through untouched. So a field can arrive missing, and
+ * `undefined` is not a value SQLite takes at all: node:sqlite answers
+ * "Provided value cannot be bound to SQLite parameter 2" and expo-sqlite
+ * refuses it too, whether or not the column is nullable.
+ *
+ * That throw lands inside the transaction below, which rolls back every venue,
+ * session, rebuy, hand and mood entry in the same answer, and it escapes
+ * before the cursor is written, so the identical batch comes down and fails
+ * again on every sync after it. One record nobody could see would end sync on
+ * iOS and Android for good.
+ *
+ * The web build was given this guard a while ago, in `incomingTags` and
+ * `incomingStakes`, and only two fields of it reached here: `record.tags ?? []`
+ * and `record.stakes?.bigBlind ?? 0`. These are the rest of it, on this side,
+ * so a malformed row costs that row and nothing else -- which is what the
+ * contract promises and what every skip in this method is written for.
+ */
+const text = (value: unknown, fallback: string): string =>
+  typeof value === 'string' ? value : fallback;
+
+const maybeText = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+const number = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const maybeNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/**
+ * How many ids one `IN (...)` may carry.
+ *
+ * SQLite refuses a statement with more host parameters than
+ * `SQLITE_MAX_VARIABLE_NUMBER` and says "too many SQL variables". The builds
+ * this app runs against set it to 32766; older ones, which is what an old
+ * Android system library or an older expo-sqlite can be, set it to 999. So the
+ * chunk is under the smaller number rather than under the one that happens to
+ * be true here, because the device that hits this is the device that cannot be
+ * tested from here.
+ *
+ * It was reachable. `attachChildren` builds one placeholder per session it was
+ * handed, and `listSessions()` hands it the whole log, so a log past the limit
+ * made the sessions list throw -- every session on the device intact and the
+ * screen that shows them permanently empty. Reproduced at exactly 32767
+ * sessions against node:sqlite. Nobody plays that many live sessions; an
+ * imported tracker history is another matter, and this is the kind of ceiling
+ * that is only ever met by the person with the most to lose behind it.
+ */
+const MAX_IDS_PER_STATEMENT = 900;
+
+/**
+ * Run an id query in as many statements as the ids need, and join the answers.
+ *
+ * Ordering within one id is preserved because every row belonging to an id
+ * comes from the chunk that id is in. Ordering *across* ids is not, so callers
+ * that need it sort after grouping rather than leaning on the query.
+ */
+const inChunks = async <Row>(
+  driver: SqlDriver,
+  ids: readonly string[],
+  sql: (placeholders: string) => string,
+): Promise<Row[]> => {
+  const rows: Row[] = [];
+  for (let from = 0; from < ids.length; from += MAX_IDS_PER_STATEMENT) {
+    const slice = ids.slice(from, from + MAX_IDS_PER_STATEMENT);
+    const got = await driver.all<Row>(sql(slice.map(() => '?').join(',')), [...slice]);
+    for (const row of got) rows.push(row);
+  }
+  return rows;
+};
+
 export class SqlRepository implements Repository {
   private readonly driver: SqlDriver;
   private readonly ctx: RepositoryContext;
@@ -342,7 +420,10 @@ export class SqlRepository implements Repository {
              updated_at = excluded.updated_at,
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= venues.updated_at`,
-          [record.id, record.name, bool(record.isHomeGame), record.createdAt, record.updatedAt, deletedAt],
+          [
+            record.id, text(record.name, ''), bool(record.isHomeGame === true),
+            number(record.createdAt, record.updatedAt), record.updatedAt, deletedAt,
+          ],
         );
       }
 
@@ -432,11 +513,15 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= sessions.updated_at`,
           [
-            record.id, record.venueId, record.format, record.gameType,
-            record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
-            record.stakes?.ante ?? null, record.currency, record.buyIn, record.fee,
-            record.cashOut, record.entrants, record.finishPosition, record.startedAt,
-            record.endedAt, record.notes, importKeyFor(record, owners), record.createdAt,
+            record.id, record.venueId, text(record.format, 'cash'),
+            text(record.gameType, 'NLHE'),
+            number(record.stakes?.smallBlind, 0), number(record.stakes?.bigBlind, 0),
+            maybeNumber(record.stakes?.ante), text(record.currency, DEFAULT_CURRENCY),
+            number(record.buyIn, 0), maybeNumber(record.fee),
+            maybeNumber(record.cashOut), maybeNumber(record.entrants),
+            maybeNumber(record.finishPosition), number(record.startedAt, record.updatedAt),
+            maybeNumber(record.endedAt), maybeText(record.notes),
+            importKeyFor(record, owners), number(record.createdAt, record.updatedAt),
             record.updatedAt, deletedAt,
           ],
         );
@@ -461,7 +546,11 @@ export class SqlRepository implements Repository {
              updated_at = excluded.updated_at,
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= rebuys.updated_at`,
-          [record.id, record.sessionId, record.amount, record.at, record.createdAt, record.updatedAt, deletedAt],
+          [
+            record.id, record.sessionId, number(record.amount, 0),
+            number(record.at, record.updatedAt), number(record.createdAt, record.updatedAt),
+            record.updatedAt, deletedAt,
+          ],
         );
       }
 
@@ -486,10 +575,11 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= hands.updated_at`,
           [
-            record.id, record.sessionId, record.holeCards, record.board ?? null,
-            record.position, record.note,
-            JSON.stringify(record.tags ?? []), record.amount, record.at,
-            record.createdAt, record.updatedAt, deletedAt,
+            record.id, record.sessionId, maybeText(record.holeCards),
+            maybeText(record.board), maybeText(record.position), maybeText(record.note),
+            JSON.stringify(Array.isArray(record.tags) ? record.tags : []),
+            maybeNumber(record.amount), number(record.at, record.updatedAt),
+            number(record.createdAt, record.updatedAt), record.updatedAt, deletedAt,
           ],
         );
       }
@@ -510,8 +600,9 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= mood_entries.updated_at`,
           [
-            record.id, record.sessionId, record.phase, record.score, record.at,
-            record.createdAt, record.updatedAt, deletedAt,
+            record.id, record.sessionId, text(record.phase, 'start'),
+            number(record.score, 3), number(record.at, record.updatedAt),
+            number(record.createdAt, record.updatedAt), record.updatedAt, deletedAt,
           ],
         );
       }
@@ -723,18 +814,20 @@ export class SqlRepository implements Repository {
     const sessionIds = sessions.map((session) => session.id);
     const venueIds = Array.from(new Set(sessions.map((session) => session.venueId)));
 
-    const rebuyRows = await this.driver.all<RebuyRow>(
-      `SELECT * FROM rebuys
-       WHERE session_id IN (${sessionIds.map(() => '?').join(',')}) AND deleted_at IS NULL
-       ORDER BY at ASC`,
+    const rebuyRows = await inChunks<RebuyRow>(
+      this.driver,
       sessionIds,
+      (placeholders) => `SELECT * FROM rebuys
+       WHERE session_id IN (${placeholders}) AND deleted_at IS NULL
+       ORDER BY at ASC`,
     );
-    const venueRows = await this.driver.all<VenueRow>(
-      `SELECT v.*, (SELECT COUNT(*) FROM sessions s
+    const venueRows = await inChunks<VenueRow>(
+      this.driver,
+      venueIds,
+      (placeholders) => `SELECT v.*, (SELECT COUNT(*) FROM sessions s
                      WHERE s.venue_id = v.id AND s.deleted_at IS NULL) AS session_count
        FROM venues v
-       WHERE v.id IN (${venueIds.map(() => '?').join(',')}) AND v.deleted_at IS NULL`,
-      venueIds,
+       WHERE v.id IN (${placeholders}) AND v.deleted_at IS NULL`,
     );
 
     const rebuysBySession = new Map<string, Rebuy[]>();
@@ -743,6 +836,11 @@ export class SqlRepository implements Repository {
       if (list) list.push(toRebuy(row));
       else rebuysBySession.set(row.session_id, [toRebuy(row)]);
     }
+    // After grouping rather than off the query, the same way the IndexedDB
+    // repository does it. The `ORDER BY` above holds inside one statement and
+    // there can be several now, so the sort is what makes the order a property
+    // of this method rather than of how many sessions it was handed.
+    for (const list of rebuysBySession.values()) list.sort((a, b) => a.at - b.at);
     const venuesById = new Map(venueRows.map((row) => [row.id, toVenue(row)]));
 
     return sessions.map((session) => ({
@@ -770,10 +868,11 @@ export class SqlRepository implements Repository {
     const venueIds = Array.from(new Set(inputs.map((input) => input.venueId)));
     const known = new Set(
       (
-        await this.driver.all<{ id: string }>(
-          `SELECT id FROM venues
-           WHERE id IN (${venueIds.map(() => '?').join(',')}) AND deleted_at IS NULL`,
+        await inChunks<{ id: string }>(
+          this.driver,
           venueIds,
+          (placeholders) => `SELECT id FROM venues
+           WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
         )
       ).map((row) => row.id),
     );

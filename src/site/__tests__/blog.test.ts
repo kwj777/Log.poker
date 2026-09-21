@@ -316,6 +316,19 @@ describe('the blog is findable', () => {
     }
   });
 
+  it('and every link in it points somewhere a reader can follow', () => {
+    // The page pipeline keeps hrefs as the Markdown wrote them, which for
+    // these posts is root-relative, and that is right on the site. RSS has no
+    // base URL and `content:encoded` carries no `xml:base`, so a reader
+    // resolves them against its own origin or against nothing: the call to
+    // action every post ends on was dead in every reader that renders full
+    // content, and so was every cross-link between the posts.
+    expect(feed).not.toMatch(/(href|src)="\/(?!\/)/);
+    // And the ones that matter are really there, absolutely, rather than the
+    // assertion above passing because nothing links anywhere.
+    expect(feed).toContain('href="https://log.poker/app"');
+  });
+
   it('rebuilds to the same bytes, so nobody is told a post changed when it did not', () => {
     expect(readFileSync(join(build(), 'blog', 'feed.xml'), 'utf8')).toBe(feed);
   });

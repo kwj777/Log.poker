@@ -41,9 +41,16 @@ export const OPEN_SESSION_ENDED_AT = 0;
  * 3 that tournaments needed, because that one changed indexed keys and this
  * does not.
  *
- * It stays out of the indexes on purpose. Every query that filters on it is
- * already ordered by an indexed key, and indexing a property that is absent on
- * almost every record buys nothing. See SYNC.md.
+ * It stays out of the indexes almost everywhere, on purpose. Every query that
+ * filters *to* live records is already ordered by an indexed key, and an index
+ * cannot help those: what they need is the records that are **not** in it.
+ *
+ * `hands` is the exception, and it is the same fact read the other way round.
+ * Nulls are not indexable, so an index on `deletedAt` holds the tombstones and
+ * nothing else -- on a table where almost every record is live, that is a very
+ * short list. Counting the live hands is then two counts of keys rather than a
+ * cursor over every hand in the log. See the note at `countHands`, and v6
+ * below. See SYNC.md.
  */
 export type DeletedAt = number | null | undefined;
 
@@ -223,6 +230,48 @@ export const createDatabase = (name: string = DATABASE_NAME): LogDatabase => {
     rebuys: 'id, sessionId, at',
     hands: 'id, sessionId, at',
     moodEntries: 'id, sessionId, phase, at',
+    preferences: 'key',
+  });
+  // v5 indexes the column every sync reads on. `listChangedSince` runs after
+  // every write and asks one question of five tables -- `updatedAt > since`,
+  // in that order -- and without an index the only way to answer it was to
+  // read every row of every table into memory and filter in JavaScript. On
+  // this engine that is a structured clone per record, to answer with nothing
+  // nearly every time.
+  //
+  // Nothing to upgrade: Dexie builds the index from the rows already there,
+  // and `updatedAt` is on every record of every syncing table by construction.
+  // `preferences` gains nothing because it has no `updatedAt` and does not
+  // sync; `deletedAt` stays out for the reason `schema.ts` gives at its
+  // version 4, which is that it is null on almost every row.
+  db.version(5).stores({
+    venues: 'id, name, createdAt, updatedAt',
+    sessions: 'id, venueId, format, gameType, startedAt, endedAt, updatedAt, &importKey',
+    rebuys: 'id, sessionId, at, updatedAt',
+    hands: 'id, sessionId, at, updatedAt',
+    moodEntries: 'id, sessionId, phase, at, updatedAt',
+    preferences: 'key',
+  });
+  // v6 indexes `deletedAt` on the hands, and on nothing else.
+  //
+  // Not the reasoning at the top of this file reversed, but that reasoning
+  // applied where it points the other way. An index on a property that is null
+  // on almost every record is useless for finding the records where it *is*
+  // null, which is what every live-record query wants. It is exactly right for
+  // finding the handful where it is not -- and the count of live hands is the
+  // total minus that handful, which is two counts of keys instead of a cursor
+  // over every hand in the log. `countHands` runs on every refresh, after every
+  // hand written at the table and after every sync pull.
+  //
+  // Hands only, because hands are the one table with a count. Adding it to the
+  // other four would cost a write per tombstone to answer a question nobody
+  // asks.
+  db.version(6).stores({
+    venues: 'id, name, createdAt, updatedAt',
+    sessions: 'id, venueId, format, gameType, startedAt, endedAt, updatedAt, &importKey',
+    rebuys: 'id, sessionId, at, updatedAt',
+    hands: 'id, sessionId, at, updatedAt, deletedAt',
+    moodEntries: 'id, sessionId, phase, at, updatedAt',
     preferences: 'key',
   });
   return db;

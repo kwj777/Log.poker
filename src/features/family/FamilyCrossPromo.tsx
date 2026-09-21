@@ -8,12 +8,13 @@
  * cluttered thing this category is already full of.
  */
 
-import { Linking, StyleSheet, View, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '../../components/Card';
 import { Text } from '../../components/Text';
 import { FAMILY_LINKS } from '../../config';
+import { openLink } from './hooks';
 import { colors, radius, spacing } from '../../theme';
 
 export type FamilyApp = 'log' | 'untilt' | 'tiltproof';
@@ -69,7 +70,7 @@ export const FamilyCrossPromo = ({ exclude = [], style }: FamilyCrossPromoProps)
         {entries.map((entry, index) => (
           <Card
             key={entry.key}
-            onPress={() => void Linking.openURL(entry.url)}
+            onPress={() => openLink(entry.url)}
             accessibilityLabel={`Open ${entry.name}`}
             style={[
               styles.row,

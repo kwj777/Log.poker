@@ -109,6 +109,18 @@ describe('the session list', () => {
     expect(screen.queryByText('Aria')).toBeNull();
   });
 
+  it('spells the odd one out the way the rest of the app does', async () => {
+    // The chips were already right and got there by carrying their own copy of
+    // the rule, one per screen. They read from the shared map now, and OTHER
+    // is the only value in it that is not its own label, so it is the one
+    // worth holding: the PLO test above covers the other two.
+    load({ sessions: [session('a', { gameType: 'OTHER', venue: venue('v1', 'Aria') })] });
+    await renderScreen(<HistoryScreen />);
+
+    expect(screen.getByText('Other')).toBeTruthy();
+    expect(screen.queryByText('OTHER')).toBeNull();
+  });
+
   it('and to the format, which is the bigger of the two divisions', async () => {
     // Cash and tournament are different games everywhere else in the app --
     // different money, different math, a different screen. The totals strip

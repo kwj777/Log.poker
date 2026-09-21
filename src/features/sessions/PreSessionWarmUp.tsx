@@ -74,7 +74,7 @@ import { getSession, hasPass } from '../../auth';
 import { wantsReset } from '../../domain/mood';
 import type { MoodScore } from '../../domain/types';
 import { colors, spacing } from '../../theme';
-import { openHandOff } from '../family/hooks';
+import { openLink } from '../family/hooks';
 import { preSessionHandOff } from '../family/links';
 
 /**
@@ -130,7 +130,7 @@ export const PreSessionWarmUp = ({ mood }: PreSessionWarmUpProps) => {
           label={offer.label}
           variant="secondary"
           size="small"
-          onPress={() => openHandOff(offer.url)}
+          onPress={() => openLink(offer.url)}
         />
       </View>
     </Card>

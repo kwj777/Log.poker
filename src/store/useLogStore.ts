@@ -343,6 +343,17 @@ const owner: Record<Slice, number> = {
   preferences: 0,
 };
 
+/**
+ * Take a slice, so anything already reading it loses.
+ *
+ * `read` does this for itself, and a write that sets a slice straight into the
+ * store rather than re-reading it has to do the same or the guard has a hole
+ * exactly the width of that write. See `setStartingBalance`, which had one.
+ */
+const claim = (slice: Slice): void => {
+  owner[slice] += 1;
+};
+
 /** Claim the slices, read them, and keep whichever are still this read's to set. */
 const read = async (parts: readonly Slice[]): Promise<Partial<LogState>> => {
   // Claimed before the read starts, so a reload that overtakes this one owns
@@ -428,6 +439,16 @@ export const useLogStore = create<LogState>((set, get) => ({
   setStartingBalance: async (balance) => {
     const repository = await getRepository();
     const { startingBalance } = await repository.setPreferences({ startingBalance: balance });
+    // Claimed, because this is the one write that sets a slice into the store
+    // without going through `read`, and so the one that was outside the guard
+    // `read` exists to provide. A `refresh()` over everything is what
+    // `onSyncApplied` fires, so a pull landing while somebody is on Settings
+    // had a preferences read already in the air: it still believed it owned
+    // the slice, and it assigned its pre-write answer over this one. The
+    // number the player had just typed reverted on screen, the dashboard
+    // headline flipped from Bankroll back to Profit, and the right value was
+    // in the database the whole time.
+    claim('preferences');
     // Set from the answer rather than from the argument, so the screen shows
     // what was stored rather than what was asked for.
     set({ startingBalance });
@@ -826,12 +847,28 @@ export const useHandsForSession = (sessionId: string | null): Hand[] | null => {
  * `null` while the first read is outstanding, so a screen can tell "no hands
  * logged" from "not yet known" -- an empty list drawn during the read is an
  * empty state that flashes and then fills, which reads as a bug.
+ *
+ * ## `enabled`, and why the paragraph above needed it
+ *
+ * "While it is open" was true of the screen this was written for, which is
+ * pushed and popped, and not of the other caller. The Variance tab is a bottom
+ * tab: react-navigation mounts it on first focus and keeps it mounted, so from
+ * a player's first visit onward this hook was subscribed for the rest of the
+ * session. `handsVersion` moves on every `logHand`, `updateHand` and
+ * `deleteHand`, so every hand written at the table paid for a full read of the
+ * journal on a screen nobody was looking at -- the most expensive read in the
+ * app, at the one moment the app should be doing least.
+ *
+ * A caller that can be off screen passes whether it is on it. Going from false
+ * back to true re-runs the effect, so a screen that was away while hands moved
+ * reads once when it comes back rather than not at all.
  */
-export const useAllHands = (): Hand[] | null => {
+export const useAllHands = (enabled = true): Hand[] | null => {
   const version = useLogStore((state) => state.handsVersion);
   const [hands, setHands] = useState<Hand[] | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let live = true;
     void (async () => {
       try {
@@ -847,7 +884,7 @@ export const useAllHands = (): Hand[] | null => {
     return () => {
       live = false;
     };
-  }, [version]);
+  }, [version, enabled]);
 
   return hands;
 };

@@ -222,6 +222,26 @@ describe('what has to be true before a byte is stored', () => {
     expect(store.writes).toHaveLength(0);
   });
 
+  it('and on the way out too, which is the one gate erasing is not exempt from', async () => {
+    // Two gates, and only one of them lets a DELETE through. The tier gate
+    // does, deliberately: a purchase that has lapsed does not make the history
+    // behind it less theirs to remove. Identity does not, and the docstring
+    // over `hasOwnBucket` is about exactly this distinction -- so it is worth a
+    // test rather than a sentence, because the sentence is the thing somebody
+    // reads before adding an exemption.
+    const store = fakeStore({ held: { version: BUNDLE_VERSION } });
+    const answer = await handleSync(
+      new Request('https://log.poker/api/sync', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${await mint({ subject: 'passcode' })}` },
+      }),
+      world(store),
+    );
+
+    expect(answer.status).toBe(403);
+    expect(store.erased).toBe(0);
+  });
+
   it('takes a write from the free tier, because sync is free', async () => {
     // This asserted 403 until sync stopped being sold. Asserted on the store
     // rather than on the status, because a 200 that stored nothing is exactly

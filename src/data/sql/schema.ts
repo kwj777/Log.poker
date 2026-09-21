@@ -167,6 +167,29 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // The column every sync reads on, indexed at last.
+    //
+    // `listChangedSince` is the read that runs after every write, and it asks
+    // one question of five tables: `updated_at > ?`, ordered by the same
+    // column. Nothing indexed it, so each one was a scan of the whole table
+    // and a sort of everything in it -- to answer, almost always, with
+    // nothing. Version 4 said a composite index on `deleted_at` "is not worth
+    // carrying before there is a sync to profile it against". There is a sync
+    // now, and this is the column it profiles badly on; `deleted_at` stays
+    // unindexed for the reason given there, which has not changed.
+    //
+    // No index on `preferences`: it has no `updated_at`, because it does not
+    // sync. See the entry above.
+    version: 7,
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_venues_updated_at ON venues(updated_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_rebuys_updated_at ON rebuys(updated_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_hands_updated_at ON hands(updated_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_mood_updated_at ON mood_entries(updated_at)`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

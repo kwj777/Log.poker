@@ -101,6 +101,22 @@ describe('help and legal', () => {
     await renderScreen(<SettingsScreen />);
     expect(screen.getByText(SUPPORT_EMAIL)).toBeTruthy();
   });
+
+  it('survives that phone refusing the link, rather than rejecting into nothing', async () => {
+    // `openURL` rejects when nothing handles the scheme, which is exactly the
+    // phone the test above is written for. Both buttons called it bare, so the
+    // rejection had nowhere to go: a red box in development and silence in a
+    // shipped build. Jest fails this test on an unhandled rejection, which is
+    // what makes it a tripwire rather than a wish.
+    jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no handler'));
+    await renderScreen(<SettingsScreen />);
+
+    await userEvent.press(screen.getByText('Contact support'));
+    await userEvent.press(screen.getByText('Privacy policy'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(screen.getByText(SUPPORT_EMAIL)).toBeTruthy();
+  });
 });
 
 describe('the build this is', () => {

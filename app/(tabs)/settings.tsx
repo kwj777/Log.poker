@@ -27,7 +27,7 @@
  */
 
 import { useState } from 'react';
-import { Linking, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { AmountInput } from '../../src/components/AmountInput';
@@ -57,6 +57,7 @@ import { DEMO_SESSION_COUNT, seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
 import { VenueRow } from '../../src/features/venues/VenueRow';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
+import { openLink } from '../../src/features/family/hooks';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { releaseLabel } from '../../src/version';
@@ -192,12 +193,21 @@ export default function SettingsScreen() {
             : [MOOD_HEADERS, moodRows(await repository.listMoodEntries(), all)];
 
       const result = await saveCsv(exportFileName(kind), toCsvFile(headers, rows));
-      // Backing out of a share sheet is not a failure and gets no message.
-      if (result.saved) {
-        const noun = kind === 'sessions' ? 'session' : kind === 'hands' ? 'hand' : 'mood entry';
-        const plural = kind === 'moods' ? 'mood entries' : `${noun}s`;
-        say('export', `Exported ${rows.length} ${rows.length === 1 ? noun : plural}.`);
+      // Not a back-out: nothing downstream of here can see one. A false answer
+      // is a device with nowhere to send a file, and it used to get the same
+      // silence as success -- a button that did nothing, on the screen whose
+      // whole promise is that the log is the player's to take away.
+      if (!result.saved) {
+        say(
+          'export',
+          'This device has nowhere to send a file. Open Log in a browser to download one.',
+          true,
+        );
+        return;
       }
+      const noun = kind === 'sessions' ? 'session' : kind === 'hands' ? 'hand' : 'mood entry';
+      const plural = kind === 'moods' ? 'mood entries' : `${noun}s`;
+      say('export', `Exported ${rows.length} ${rows.length === 1 ? noun : plural}.`);
     } catch (error) {
       say('export', describeFailure(error, 'Export failed'), true);
     } finally {
@@ -514,14 +524,14 @@ export default function SettingsScreen() {
             variant="secondary"
             size="medium"
             style={styles.exportButton}
-            onPress={() => void Linking.openURL(PRIVACY_POLICY)}
+            onPress={() => openLink(PRIVACY_POLICY)}
           />
           <Button
             label="Contact support"
             variant="secondary"
             size="medium"
             style={styles.exportButton}
-            onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            onPress={() => openLink(`mailto:${SUPPORT_EMAIL}`)}
           />
         </View>
         <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>

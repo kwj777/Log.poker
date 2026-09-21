@@ -84,6 +84,26 @@ const load = (
   });
 };
 
+describe('what the header calls the game', () => {
+  it('says what the picker said, rather than shouting the stored value back', async () => {
+    // The picker offers "Other" and the header printed the record: a player
+    // who chose Other was answered with OTHER. Four screens each wrote their
+    // own version of that one rule and these two wrote none, while the map
+    // naming all three sat in `types.ts` with no caller at all.
+    load([], { sessions: [session('s1', { gameType: 'OTHER' })] });
+    await renderScreen(<SessionDetailScreen />);
+
+    expect(screen.getByText(/\$1\/\$2 · Other$/)).toBeTruthy();
+    expect(screen.queryByText(/OTHER/)).toBeNull();
+  });
+
+  it('and leaves the abbreviations alone, because that is what they are called', async () => {
+    load([], { sessions: [session('s1', { gameType: 'PLO' })] });
+    await renderScreen(<SessionDetailScreen />);
+    expect(screen.getByText(/\$1\/\$2 · PLO$/)).toBeTruthy();
+  });
+});
+
 describe('a session and its hands', () => {
   it('counts the hands belonging to this session', async () => {
     load([hand('h1'), hand('h2')]);

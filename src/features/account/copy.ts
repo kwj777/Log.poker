@@ -143,6 +143,24 @@ export const handoffWouldSwitch =
   'signing back in brings this log back.';
 
 /**
+ * The same question, for a device signed in as nobody that has a log anyway.
+ *
+ * A first sign-in sends everything on the device up, from the beginning, which
+ * is the point of signing in and wrong for a link somebody else sent: the
+ * account at the far end is theirs. Nothing on this side can tell a link a
+ * player followed from their own other app from one a friend pasted, so the
+ * log is what decides, and this is what a device with something to lose is
+ * asked.
+ *
+ * It says what goes where, because that is the part that cannot be taken back
+ * from here. It does not say anything is deleted, because nothing is.
+ */
+export const handoffWouldAdopt =
+  'This link signs this device in to the account that sent it. The sessions already on ' +
+  'this device would start syncing into that account, which is worth being sure about if ' +
+  'it is not yours. Nothing is deleted either way, and everything here stays here.';
+
+/**
  * What the sync is doing, in one line and without a spinner.
  *
  * A sync that fails silently is worse than no sync, because the player goes on

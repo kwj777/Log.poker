@@ -1630,6 +1630,31 @@ describe('the device that only reads', () => {
     expect(held.calls).toBeGreaterThan(spent);
   });
 
+  it('and leaves it alone when the window closed while it was waiting to ask', async () => {
+    // `resume` checks the backoff before it calls, and that is not the same
+    // moment as the request. A forced push that finds a run already in flight
+    // waits for it; when that run is the one that fails, it arms the window
+    // while the joiner is still suspended, and the joiner used to fall
+    // straight through and open a second request into a window that had just
+    // closed. On a server that is down that is a request per app switch from
+    // every device pointed at it, which is the traffic the backoff exists to
+    // shed.
+    const { held, fetch } = server();
+    const laptop = await device(fetch, 'laptop');
+    held.offline = true;
+
+    // A write's own push is in flight and has not answered yet, so there is no
+    // backoff armed for `resume` to see.
+    const inFlight = laptop.push(true);
+    const joined = laptop.resume();
+    await Promise.all([inFlight, joined]);
+
+    // One request between them, not two: the resume joined the failing run and
+    // then respected the window that run had just armed.
+    expect(held.calls).toBe(1);
+    expect(laptop.current().problem).toBe('unreachable');
+  });
+
   it('does not ask at all once the token has stopped meaning anything', async () => {
     const { held, fetch } = server();
     const laptop = await device(fetch, 'laptop');

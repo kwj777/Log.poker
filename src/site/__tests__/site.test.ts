@@ -99,6 +99,15 @@ describe('the front door', () => {
     expect(home).not.toMatch(/no server to send anything to/i);
     expect(home).not.toMatch(/never leaves your device/i);
     expect(home).toMatch(/[Nn]othing leaves your device unless you sign in/);
+
+    // And does not say the feature that server is for is still coming. The
+    // page carried "It is not built yet, and when it is, it arrives free" two
+    // paragraphs under a sentence that only makes sense because there is a
+    // server, so it contradicted itself about its own main feature. Anchored
+    // to the same file for the same reason: the words move and the file is
+    // what makes them false.
+    expect(home).not.toMatch(/not built yet/i);
+    expect(home).not.toMatch(/when it is,? it arrives free/i);
   });
 
   it('and neither does any other page that carries the same line', () => {

@@ -874,7 +874,17 @@ export const mergeIntoBundle = (
       // has clamped before is answered with the stamp it gave that write the
       // first time. A genuinely new edit from the same wrong clock carries a
       // different raw stamp and is clamped fresh, so it still lands.
-      if (clamped && held?.clamped?.from === raw) {
+      //
+      // **Whether this request would clamp it again is not the question.** It
+      // used to be asked, and the memory below outlives the condition on
+      // purpose -- so once real time caught up with a stamp ten minutes in the
+      // future, `clampStamp` stopped firing, the memory sitting on the record
+      // was ignored, and the raw stamp went in verbatim. A row a device
+      // re-sends on every foreground, with a stamp larger than anything anybody
+      // else has written, came back a day later and beat the edit or the
+      // tombstone that had corrected it. The server had recorded what it
+      // decided about that write and then declined to read it.
+      if (held?.clamped?.from === raw) {
         change.record.updatedAt = held.clamped.to;
       }
 

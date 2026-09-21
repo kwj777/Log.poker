@@ -36,9 +36,23 @@ export const SESSION_FORMAT_LABELS: Record<SessionFormat, string> = {
 export const GAME_TYPES = ['NLHE', 'PLO', 'OTHER'] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 
+/**
+ * What each game is called on screen.
+ *
+ * Two of the three are their own label, and that is the point rather than an
+ * oversight: NLHE and PLO are what the games are called at a table and on
+ * every site, and "No-Limit Hold'em" spelled out is a chip nobody can fit next
+ * to a stake. OTHER is the one that needs saying differently, because a player
+ * who picked "Other" should not be shouted at afterwards.
+ *
+ * This held the spelled-out names and had no caller anywhere. Four screens
+ * wrote `value === 'OTHER' ? 'Other' : value` instead, which is this map in
+ * four places, and the two session headers wrote neither and showed OTHER in
+ * capitals. One map now, and it is this one.
+ */
 export const GAME_TYPE_LABELS: Record<GameType, string> = {
-  NLHE: 'No-Limit Hold’em',
-  PLO: 'Pot-Limit Omaha',
+  NLHE: 'NLHE',
+  PLO: 'PLO',
   OTHER: 'Other',
 };
 

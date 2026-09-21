@@ -12,6 +12,7 @@
  */
 
 export interface SaveResult {
+  /** Always true here: a click on an anchor is a download, and it cannot fail. */
   saved: boolean;
 }
 

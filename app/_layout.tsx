@@ -12,6 +12,7 @@ import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ErrorNote } from '../src/components/ErrorNote';
 import { ErrorScreen } from '../src/components/ErrorScreen';
 import { APP_DESCRIPTION, PageMeta } from '../src/components/PageMeta';
 import { syncOnResume } from '../src/data';
@@ -47,6 +48,42 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       detail={error.message || 'This screen stopped working.'}
       onRetry={() => void retry()}
     />
+  );
+}
+
+/**
+ * A read that failed after the app was already open.
+ *
+ * `refresh` catches every read failure, records it on the store and leaves
+ * `status` at `ready`. The root layout was the only reader of that field and
+ * drew it inside the `status === 'error'` branch below -- which only `hydrate`
+ * can enter. So once the app was up, the catch wrote a value nothing could
+ * read back: the rows on screen quietly stopped matching the database, and the
+ * write that triggered the re-read still reported success. Three store actions
+ * carry a comment saying "a failed read here is the local database being
+ * unavailable, which the root layout already reports", and that was true only
+ * before this existed.
+ *
+ * `ErrorNote` rather than `ErrorScreen`, which is the distinction that
+ * component is for: nothing is broken and every screen still works, the data on
+ * them is just older than it should be. `status === 'error'` is the database
+ * failing to open at all and takes the whole screen, so this stays out of its
+ * way -- two notices about one problem is worse than one.
+ *
+ * It clears itself, because the next read that lands sets `error` back to null.
+ *
+ * Exported so it can be rendered on its own, the way `ErrorBoundary` above is:
+ * the layout it sits in hydrates in an effect and brings its own
+ * `SafeAreaProvider`, and a test of this would spend all of itself on neither.
+ */
+export function StaleDataNote() {
+  const status = useLogStore((state) => state.status);
+  const error = useLogStore((state) => state.error);
+  if (status !== 'ready' || error === null) return null;
+  return (
+    <View style={styles.stale}>
+      <ErrorNote message={`What is on screen may be out of date. ${error}`} />
+    </View>
   );
 }
 
@@ -96,6 +133,7 @@ export default function RootLayout() {
       */}
       <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
       <StatusBar style="light" />
+      <StaleDataNote />
       {status === 'ready' ? (
         <Stack
           screenOptions={{
@@ -163,6 +201,11 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  stale: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.background,
+  },
   center: {
     flex: 1,
     alignItems: 'center',

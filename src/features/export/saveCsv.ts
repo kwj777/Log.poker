@@ -29,7 +29,18 @@ import { File, Paths } from 'expo-file-system';
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 
 export interface SaveResult {
-  /** False when the player backed out, which is not a failure. */
+  /**
+   * Whether the file reached the share sheet at all.
+   *
+   * Not whether the player kept it, which this side cannot know: `shareAsync`
+   * resolves when the sheet closes and says nothing about what was chosen, so
+   * backing out and saving into Files are the same answer here. This said it
+   * was false when somebody backed out, and it never is.
+   *
+   * What it does report is the one thing that can go wrong before the sheet
+   * ever opens: a device with nothing to share to. That is rare and it is not
+   * nothing, and reading it as a back-out is what made it silent.
+   */
   saved: boolean;
 }
 

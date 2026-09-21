@@ -67,6 +67,7 @@ import {
 } from '../../src/domain/money';
 import {
   GAME_TYPES,
+  GAME_TYPE_LABELS,
   SESSION_FORMATS,
   SESSION_FORMAT_LABELS,
   type GameType,
@@ -86,10 +87,7 @@ import { useLogStore } from '../../src/store/useLogStore';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
 
-const GAME_OPTIONS = GAME_TYPES.map((value) => ({
-  value,
-  label: value === 'OTHER' ? 'Other' : value,
-}));
+const GAME_OPTIONS = GAME_TYPES.map((value) => ({ value, label: GAME_TYPE_LABELS[value] }));
 
 const FORMAT_OPTIONS = SESSION_FORMATS.map((value) => ({
   value,

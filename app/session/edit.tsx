@@ -71,7 +71,12 @@ import {
   parseAmount,
 } from '../../src/domain/money';
 import { durationMs } from '../../src/domain/stats';
-import { GAME_TYPES, type GameType, type Stakes } from '../../src/domain/types';
+import {
+  GAME_TYPES,
+  GAME_TYPE_LABELS,
+  type GameType,
+  type Stakes,
+} from '../../src/domain/types';
 import { StakesPicker } from '../../src/features/sessions/StakesPicker';
 import { VenuePicker } from '../../src/features/sessions/VenuePicker';
 import { DurationInput, StartedAtInput } from '../../src/features/sessions/WhenInput';
@@ -80,10 +85,7 @@ import { useLogStore, useSessionById } from '../../src/store/useLogStore';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
 
-const GAME_OPTIONS = GAME_TYPES.map((value) => ({
-  value,
-  label: value === 'OTHER' ? 'Other' : value,
-}));
+const GAME_OPTIONS = GAME_TYPES.map((value) => ({ value, label: GAME_TYPE_LABELS[value] }));
 
 const CURRENCY_OPTIONS = CURRENCIES.map((value) => ({ value, label: currencyLabel(value) }));
 

@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 92 passed
-Tests:       2118 passed
+Test Suites: 93 passed
+Tests:       2124 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1168,6 +1168,7 @@ Tests:       2118 passed
   readme              6   the test table adds up and says what each suite is for
   rowLabels           6   what a screen reader is told a row in a list is
   scale               6   how much of the plot the data actually gets
+  serviceWorker       6   what the worker answers a navigation with, run rather than read
   crossPromo          5   the family card as drawn, and the link a refusing device gives back
   errorBoundary       5   a render that throws, and the way back from it
   lineChart           5   what a chart says before it has been measured

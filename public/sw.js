@@ -118,14 +118,31 @@ self.addEventListener('activate', (event) => {
 
 const networkFirstShell = async (request) => {
   const cache = await caches.open(SHELL_CACHE);
+  const held = async () => (await cache.match(SHELL_URL)) ?? (await cache.match('/app/'));
   try {
     const response = await fetch(request);
-    if (response.ok) cache.put(SHELL_URL, response.clone());
-    return response;
+    if (response.ok) {
+      cache.put(SHELL_URL, response.clone());
+      return response;
+    }
+    // An answer that arrived and said no.
+    //
+    // Only a throw used to reach the shell, so a 502 from the origin or an
+    // intermediary was handed to the player verbatim -- "502 Bad Gateway",
+    // for the length of the incident, on an app that needs no network at all
+    // and had a working shell in this cache the whole time. A refused
+    // connection and a bad minute at the origin are the same thing from here:
+    // the app is not what is broken. Both other strategies in this file
+    // already answer `cached ?? network`; this was the one that preferred the
+    // error.
+    //
+    // The error is still returned when there is nothing cached, because then
+    // it is the only account of itself anybody can get.
+    return (await held()) ?? response;
   } catch {
     // Offline: serve the shell. The app boots from IndexedDB and the player
     // never sees a difference.
-    const cached = (await cache.match(SHELL_URL)) ?? (await cache.match('/app/'));
+    const cached = await held();
     if (cached) return cached;
     return new Response(
       '<!doctype html><meta charset="utf-8"><title>Log</title><body style="background:#1c211f;color:#e8e4da;font-family:system-ui;padding:2rem"><h1>Log</h1><p>Open Log once while online and it will work offline from then on.</p></body>',

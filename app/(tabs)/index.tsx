@@ -500,13 +500,34 @@ export default function DashboardScreen() {
 
       <SectionHeader title="Recent sessions" />
       <Card style={styles.listCard}>
-        {recent.map((session) => (
-          <SessionRow
-            key={session.id}
-            session={session}
-            onPress={() => router.push(`/session/${session.id}`)}
-          />
-        ))}
+        {/*
+          `recent` is the sessions that have *ended*, while the empty state
+          above this whole branch is gated on there being any session at all.
+          So a log holding nothing but a session still running takes the full
+          dashboard with `recent` empty, and the page ended on an overline with
+          nothing under it -- `listCard` is `paddingVertical: 0`, so the card
+          collapses to about a hairline and the heading is left labelling the
+          bottom of the screen.
+
+          It speaks rather than hides, which is what every section beside it
+          does: `BarBreakdown` answers the same state with "Nothing to break
+          down yet." And this is a first run, where the reason is worth a line
+          -- the night they are in the middle of is not missing, it is not
+          finished.
+        */}
+        {recent.length === 0 ? (
+          <Text variant="caption" color={colors.textTertiary} style={styles.emptyList}>
+            Nothing finished yet. A session lands here once you close it out.
+          </Text>
+        ) : (
+          recent.map((session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              onPress={() => router.push(`/session/${session.id}`)}
+            />
+          ))
+        )}
       </Card>
     </Screen>
   );
@@ -554,6 +575,10 @@ const styles = StyleSheet.create({
   },
   listCard: {
     paddingVertical: 0,
+  },
+  /** `listCard` drops the card's own vertical padding for the rows; a sentence needs it back. */
+  emptyList: {
+    paddingVertical: spacing.md,
   },
   guideCard: {
     marginTop: spacing.lg,

@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 97 passed
-Tests:       2155 passed
+Tests:       2157 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1176,6 +1176,7 @@ Tests:       2155 passed
   stakesPicker        5   whether the blinds on screen are the blinds saved
   staleData           5   a read that failed after the app was already open
   varianceCurrency    5   the variance page stops adding euros to dollars
+  dashboardFirstRun   4   labels on the dashboard with nothing under them yet
   importWarnings      4   what the import screen says about a file it could not use
   transactionQueue    4   two writes at once, on a database with no queue of its own
   lintReach           3   which files npm run lint actually looks at
@@ -1184,7 +1185,6 @@ Tests:       2155 passed
   settingsSeed        3   the demo set, and the one device it must not be written onto
   varianceHonesty     3   the two sentences on the Variance tab that could deny themselves
   allHands            2   who pays for a read of the whole journal
-  dashboardFirstRun   2   labels on the dashboard with nothing under them yet
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

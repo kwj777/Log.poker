@@ -76,3 +76,28 @@ describe('the bankroll axis, against a chart that refused to draw', () => {
     expect(screen.getByText('$5.4k')).toBeTruthy();
   });
 });
+
+describe('the recent-sessions list, on a log where nothing has finished', () => {
+  it('says why it is empty rather than labelling a blank card', async () => {
+    // `recent` filters on `endedAt !== null`, while the empty state above this
+    // whole branch is gated on there being no session at all. So a player who
+    // installed the app, tapped "Start a session" from the empty state and
+    // came back to the Dashboard takes the full branch with `recent` empty,
+    // and the page ended on an overline with nothing under it: `listCard` is
+    // `paddingVertical: 0`, so with no rows the card collapses to about a
+    // hairline and the heading labels the bottom of the screen.
+    const live = session('s1', { endedAt: null, cashOut: null });
+    load([live], { activeSession: live });
+    await renderScreen(<DashboardScreen />);
+
+    expect(screen.getByText('Recent sessions')).toBeTruthy();
+    expect(screen.getByText(/Nothing finished yet/)).toBeTruthy();
+  });
+
+  it('and says nothing of the kind once one has', async () => {
+    load([won('s1')]);
+    await renderScreen(<DashboardScreen />);
+
+    expect(screen.queryByText(/Nothing finished yet/)).toBeNull();
+  });
+});

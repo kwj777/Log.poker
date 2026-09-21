@@ -471,11 +471,20 @@ export const useLogStore = create<LogState>((set, get) => ({
     if (fromId === intoId) return 0;
     const repository = await getRepository();
     const moving = await repository.listSessions({ venueId: fromId });
-    for (const session of moving) {
-      await repository.updateSession(session.id, { venueId: intoId });
+    // The half-done state above is an accepted cost in storage and was not one
+    // in memory: a throw part way skipped the re-read, so the store went on
+    // describing venue counts and session rows as they were before a single
+    // row moved. Settings draws those counts, so a merge that stopped halfway
+    // looked like a merge that had not started. Same shape as `startSession`
+    // and `endSession`, which is where the reasoning for it is written out.
+    try {
+      for (const session of moving) {
+        await repository.updateSession(session.id, { venueId: intoId });
+      }
+      await repository.deleteVenue(fromId);
+    } finally {
+      await get().refresh(['venues', 'sessions']);
     }
-    await repository.deleteVenue(fromId);
-    await get().refresh(['venues', 'sessions']);
     return moving.length;
   },
 

@@ -2,6 +2,7 @@ import {
   detectDateOrder,
   durationUnitFromHeader,
   hasAmbiguousDateShape,
+  parseCount,
   parseCurrency,
   parseDurationMs,
   parseGameType,
@@ -315,5 +316,57 @@ describe('parseGameType', () => {
   it('files anything else under OTHER, and an empty cell under nothing', () => {
     expect(parseGameType('Stud')).toBe('OTHER');
     expect(parseGameType('')).toBeNull();
+  });
+});
+
+describe('parseCount', () => {
+  it('reads the shapes a file writes a field size or a finish in', () => {
+    expect(parseCount('12')).toBe(12);
+    expect(parseCount('1,240')).toBe(1240);
+    expect(parseCount('1 240')).toBe(1240);
+    expect(parseCount('12th')).toBe(12);
+    expect(parseCount('21st')).toBe(21);
+    expect(parseCount('#12')).toBe(12);
+    expect(parseCount('1,240th')).toBe(1240);
+    expect(parseCount('  7  ')).toBe(7);
+  });
+
+  it('refuses a cell that is not one number, rather than keeping its digits', () => {
+    // The whole of the old bug in one list. Every one of these came back as a
+    // number: `-5` as 5, `12.5` as 125, `1 of 100` as 1100, `3rd of 9` as 39,
+    // `1e3` as 13. They were stripped of everything but their digits and the
+    // remainder was read, so "refuses anything that is not a positive whole
+    // number" only ever fired on a cell with no digits in it at all.
+    //
+    // Which matters because of where the answer goes: a non-null count is what
+    // `impliedByField` in `sessionImport.ts` reads to call the row a
+    // tournament, and calling it one throws the stakes away. A mis-mapped
+    // column is precisely the cell that lands here.
+    expect(parseCount('-5')).toBeNull();
+    expect(parseCount('12.5')).toBeNull();
+    expect(parseCount('1 of 100')).toBeNull();
+    expect(parseCount('3rd of 9')).toBeNull();
+    expect(parseCount('1e3')).toBeNull();
+    expect(parseCount('1/100')).toBeNull();
+    expect(parseCount('+4')).toBeNull();
+    expect(parseCount('$12')).toBeNull();
+  });
+
+  it('refuses a zeroth place, an empty cell and a number too large to be one', () => {
+    expect(parseCount('0')).toBeNull();
+    expect(parseCount('')).toBeNull();
+    expect(parseCount('N/A')).toBeNull();
+    expect(parseCount('9999999999999999999')).toBeNull();
+  });
+
+  it('reads its separators by the rule the rest of the file reads them by', () => {
+    // `toNumeric`, so a comma means here what it means in a money cell and in
+    // a typed amount. A lone dot is a decimal point, which leaves a European
+    // `1.240` unreadable as a count -- refused rather than guessed at, because
+    // a null leaves the row a cash game and a guess writes a field size
+    // nobody's file contained.
+    expect(parseCount('1,234,567')).toBe(1234567);
+    expect(parseCount('1,24')).toBeNull();
+    expect(parseCount('1.240')).toBeNull();
   });
 });

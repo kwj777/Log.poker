@@ -323,6 +323,28 @@ describe('bootstrapRoi', () => {
     expect(samplesFor(100_000)).toBe(MIN_BOOTSTRAP_SAMPLES);
   });
 
+  it('but the floor bounds the budget rather than the caller', () => {
+    // It was `max(MIN, min(requested, affordable))`, so anybody asking for
+    // fewer than 500 got 500 -- which is the opposite of what `bootstrapRoi`
+    // says in as many words: "An explicit `samples` is still a ceiling, so a
+    // caller asking for fewer gets fewer."
+    //
+    // Nothing on screen was wrong, because no production caller passes
+    // `samples`. The caller that does is this file: the slowest test in it
+    // asks for 400 and 200 to stay quick, was handed 500 three times over,
+    // and ran for ten seconds against a 166ms runner-up for everything else.
+    expect(samplesFor(40, 25)).toBe(25);
+    expect(samplesFor(5_000, 400)).toBe(400);
+    expect(bootstrapRoi(runs(50, BREAK_EVEN), { samples: 200 })!.samples).toBe(200);
+  });
+
+  it('and the ceiling can still ask for nothing, which is not an interval', () => {
+    // The `samples < 1` guard in `bootstrapRoi` was unreachable for any
+    // non-empty list while the floor outranked the request. It is live again.
+    expect(samplesFor(40, 0)).toBe(0);
+    expect(bootstrapRoi(runs(50, BREAK_EVEN), { samples: 0 })).toBeNull();
+  });
+
   it('still brackets the observed ROI at the reduced count', () => {
     // The trade is only defensible if the answer is still an answer.
     const interval = bootstrapRoi(runs(400, BREAK_EVEN))!;

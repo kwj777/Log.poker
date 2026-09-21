@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 98 passed
-Tests:       2159 passed
+Tests:       2165 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1103,7 +1103,7 @@ Tests:       2159 passed
   syncingRepository   49   two devices and one server, no fakes in between
   endpoint            47   the sync endpoint, end to end
   values              46   money, dates, durations, stakes, formats, counts
-  variance            41   win rate, σ, confidence bands, verdicts
+  variance            45   win rate, σ, confidence bands, verdicts
   blog                39   the post grammar, the share cards, and what it refuses
   mood                34   what tilt costs, and when to say nothing
   merge               33   two devices disagreeing, and who wins
@@ -1176,6 +1176,7 @@ Tests:       2159 passed
   stakesPicker         5   whether the blinds on screen are the blinds saved
   staleData            5   a read that failed after the app was already open
   varianceCurrency     5   the variance page stops adding euros to dollars
+  varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
   dashboardFirstRun    4   labels on the dashboard with nothing under them yet
   importWarnings       4   what the import screen says about a file it could not use
   transactionQueue     4   two writes at once, on a database with no queue of its own
@@ -1183,7 +1184,6 @@ Tests:       2159 passed
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
   settingsSeed         3   the demo set, and the one device it must not be written onto
-  varianceHonesty      3   the two sentences on the Variance tab that could deny themselves
   allHands             2   who pays for a read of the whole journal
   newSessionDefaults   2   where the pre-filled session says its numbers came from
 ```

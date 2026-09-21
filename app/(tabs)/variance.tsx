@@ -31,6 +31,7 @@ import {
   assessRecentStretch,
   confidenceBand,
   estimatePlayer,
+  nothingReadable,
   oddsInWords,
   probabilityOfLoss,
   toObservations,
@@ -163,6 +164,15 @@ export default function VarianceScreen() {
     () => assessRoi(roiInterval, concentration, entries.length),
     [roiInterval, concentration, entries.length],
   );
+  /**
+   * The case where the shortfall below is not the honest answer: sessions
+   * logged, none of them readable by a model that works in big blinds. See
+   * `nothingReadable`.
+   */
+  const unreadable = useMemo(
+    () => nothingReadable(sessions, observations),
+    [sessions, observations],
+  );
   const estimate = useMemo(() => estimatePlayer(observations), [observations]);
   const assessment = useMemo(
     () => assessRecentStretch(observations, estimate, RECENT_SESSIONS),
@@ -289,7 +299,18 @@ export default function VarianceScreen() {
         <View style={styles.header}>
           <Text variant="title">Variance</Text>
         </View>
-        <EmptyState title={assessment.headline} body={assessment.body} />
+        {/*
+          `shortfall` counts against the cash floors, so a tournament-only
+          player was told to log eight more sessions and twenty more hours --
+          which many of them had already done, and which no amount of playing
+          was ever going to change, because `toObservations` drops every
+          tournament before the count is taken. The card under this one was
+          meanwhile full of their actual results.
+        */}
+        <EmptyState
+          title={unreadable?.headline ?? assessment.headline}
+          body={unreadable?.body ?? assessment.body}
+        />
         {tournaments.entries > 0 ? (
           <TournamentCard
             totals={tournaments}

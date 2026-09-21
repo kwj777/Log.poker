@@ -195,3 +195,65 @@ describe('how much of the list is mounted', () => {
     expect(screen.queryAllByTestId('session-row').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Finding the night somebody remembers by what they wrote about it.
+ *
+ * The chips narrow by what the app knows: when, which game, which room. The
+ * note is the one field a player writes in their own words, and it was
+ * write-only -- readable on the session it belongs to and searchable nowhere.
+ */
+describe('searching the log', () => {
+  const box = () => screen.getByLabelText('Search sessions');
+
+  it('finds a session by something written in its note', async () => {
+    load({
+      sessions: [
+        session('a', { notes: 'Ran into quads on the river' }),
+        session('b', { notes: 'Quiet night, went home early' }),
+      ],
+    });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.type(box(), 'quads');
+    expect(screen.getByText('1 session')).toBeTruthy();
+  });
+
+  it('and by the room, which is the other thing anybody remembers', async () => {
+    load({
+      sessions: [
+        session('a', { venue: venue('v1', 'Aria') }),
+        session('b', { venueId: 'v2', venue: venue('v2', 'Bellagio') }),
+      ],
+      venues: [venue('v1', 'Aria'), venue('v2', 'Bellagio')],
+    });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.type(box(), 'bella');
+    expect(screen.getByText('1 session')).toBeTruthy();
+  });
+
+  it('wants every word, so a second one narrows', async () => {
+    load({
+      sessions: [
+        session('a', { venue: venue('v1', 'Aria'), notes: 'Ran into quads' }),
+        session('b', { venue: venue('v1', 'Aria'), notes: 'Quiet night' }),
+      ],
+    });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.type(box(), 'aria quads');
+    expect(screen.getByText('1 session')).toBeTruthy();
+  });
+
+  it('counts as a filter, so the way out is the one that is already there', async () => {
+    load({ sessions: [session('a', { notes: 'Ran into quads' })] });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.type(box(), 'nothing matches this');
+    expect(screen.getByText('No sessions match')).toBeTruthy();
+
+    await userEvent.press(screen.getByText('Clear filters'));
+    expect(screen.getByText('1 session')).toBeTruthy();
+  });
+});

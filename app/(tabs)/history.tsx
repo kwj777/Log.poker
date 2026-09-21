@@ -13,11 +13,13 @@ import { router } from 'expo-router';
 import { Button } from '../../src/components/Button';
 import { ChipGroup } from '../../src/components/Chip';
 import { EmptyState } from '../../src/components/EmptyState';
+import { SearchField } from '../../src/components/SearchField';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { currencyLabel, formatMoney } from '../../src/domain/money';
+import { matchesTerms, searchTerms } from '../../src/domain/search';
 import { currenciesUsed, inCurrency, totals } from '../../src/domain/stats';
 import {
   GAME_TYPES,
@@ -70,6 +72,7 @@ export default function HistoryScreen() {
   const [gameType, setGameType] = useState<GameType | null>(null);
   const [format, setFormat] = useState<SessionFormat | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
 
   /**
@@ -105,17 +108,32 @@ export default function HistoryScreen() {
 
   const filtered = useMemo(() => {
     const from = period === 'all' ? undefined : openedAt - Number(period) * DAY;
-    return filterSessions(sessions, {
+    const narrowed = filterSessions(sessions, {
       ...(from === undefined ? {} : { from }),
       ...(gameType === null ? {} : { gameType }),
       ...(format === null ? {} : { format }),
       ...(venueId === null ? {} : { venueId }),
     });
-  }, [sessions, period, gameType, format, venueId, openedAt]);
+    /*
+      The room and the note, which are the two things anybody remembers a
+      session by. Not the numbers: somebody searching "300" means a buy-in,
+      a cash-out or a result and the app cannot tell which, and a search that
+      answers the wrong one of the three is worse than no search.
+    */
+    const terms = searchTerms(query);
+    if (terms.length === 0) return narrowed;
+    return narrowed.filter((session) =>
+      matchesTerms(terms, session.venue?.name, session.notes),
+    );
+  }, [sessions, period, gameType, format, venueId, openedAt, query]);
 
   const summary = useMemo(() => totals(filtered), [filtered]);
   const filtersActive =
-    period !== 'all' || gameType !== null || format !== null || venueId !== null;
+    period !== 'all' ||
+    gameType !== null ||
+    format !== null ||
+    venueId !== null ||
+    query.trim() !== '';
 
   /**
    * The format row is offered only to somebody who plays both, for the reason
@@ -169,6 +187,15 @@ export default function HistoryScreen() {
         </View>
       </View>
 
+      <View style={styles.search}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search rooms and notes"
+          accessibilityLabel="Search sessions"
+        />
+      </View>
+
       <View style={styles.filters}>
         <ChipGroup options={PERIOD_OPTIONS} value={period} onChange={setPeriod} scroll />
         <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} scroll />
@@ -219,6 +246,7 @@ export default function HistoryScreen() {
                 setGameType(null);
                 setFormat(null);
                 setVenueId(null);
+                setQuery('');
               }}
             />
           ) : undefined
@@ -319,6 +347,9 @@ const styles = StyleSheet.create({
     // The ghost button carries its own padding, so it is pulled back out to
     // the edge the title sits on.
     marginRight: -spacing.md,
+  },
+  search: {
+    marginBottom: spacing.md,
   },
   filters: {
     gap: spacing.sm,

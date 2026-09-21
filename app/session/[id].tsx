@@ -47,6 +47,7 @@ export default function SessionDetailScreen() {
   const moods = useMoodForSession(id ?? null);
   const updateNotes = useLogStore((state) => state.updateSessionNotes);
   const deleteSession = useLogStore((state) => state.deleteSession);
+  const activeSession = useLogStore((state) => state.activeSession);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -96,6 +97,17 @@ export default function SessionDetailScreen() {
   const hourly = hourlyRate(session, session.rebuys);
   const elapsed = durationMs(session);
   const live = session.endedAt === null;
+  /**
+   * Unfinished, and not the one the live screen would show.
+   *
+   * `getActiveSession` answers with the newest session that has no end, so a
+   * second one can exist and only one of them is reachable. Two devices each
+   * starting a session and syncing is the way it happens. Before this, such a
+   * session drew a "Back to live session" button that went to a different
+   * night entirely, which is worse than saying nothing: it is the app quietly
+   * changing the subject.
+   */
+  const stranded = live && activeSession !== null && activeSession.id !== session.id;
 
   /**
    * Save on blur, and say so when it does not save.
@@ -219,12 +231,30 @@ export default function SessionDetailScreen() {
         </View>
       ) : null}
 
-      {live ? (
+      {live && !stranded ? (
         <Button
           label="Back to live session"
           style={styles.resume}
           onPress={() => router.replace('/session/active')}
         />
+      ) : null}
+
+      {stranded ? (
+        <Card style={styles.stranded}>
+          <Text variant="bodyStrong">This one was never finished</Text>
+          <Text color={colors.textSecondary} style={styles.strandedBody}>
+            It has no result, and it is not the session the live screen is showing, so its
+            clock is not running anywhere. That usually means it was started on another
+            device. Edit it to give it a length and a cash-out, and it joins your numbers.
+          </Text>
+          <Button
+            label="Edit this session"
+            variant="secondary"
+            size="small"
+            style={styles.strandedAction}
+            onPress={() => router.push(`/session/edit?id=${session.id}`)}
+          />
+        </Card>
       ) : null}
 
       {/*
@@ -370,6 +400,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'flex-end',
+  },
+  stranded: {
+    marginTop: spacing.lg,
+  },
+  strandedBody: {
+    marginTop: spacing.sm,
+    lineHeight: 22,
+  },
+  strandedAction: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.lg,
   },
   missing: {
     paddingTop: spacing.xxxl,

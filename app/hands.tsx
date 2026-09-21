@@ -40,6 +40,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../src/components/Button';
 import { ChipGroup } from '../src/components/Chip';
 import { EmptyState } from '../src/components/EmptyState';
+import { SearchField } from '../src/components/SearchField';
 import { PageMeta } from '../src/components/PageMeta';
 import { Screen } from '../src/components/Screen';
 import { SectionHeader } from '../src/components/SectionHeader';
@@ -52,6 +53,7 @@ import {
   type HandTag,
   type Position,
 } from '../src/domain/types';
+import { matchesTerms, searchTerms } from '../src/domain/search';
 import { HandRow } from '../src/features/sessions/HandRow';
 import { useAllHands, useLogStore } from '../src/store/useLogStore';
 import { colors, radius, spacing } from '../src/theme';
@@ -84,6 +86,7 @@ export default function HandsScreen() {
   const [tag, setTag] = useState<HandTag | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   // Fixed at mount, for the reason the dashboard fixes its own: a window that
   // moves every frame re-derives the whole list constantly, and the one
@@ -107,17 +110,28 @@ export default function HandsScreen() {
   const filtered = useMemo(() => {
     if (hands === null) return [];
     const from = period === 'all' ? null : openedAt - Number(period) * DAY;
+    /*
+      The note, the cards and the board. The cards are worth searching and the
+      chips are not: "AsKd" is how the hand is stored and how the row draws it,
+      so somebody who remembers the hand can find it by the hand.
+    */
+    const terms = searchTerms(query);
     return hands.filter((hand) => {
       if (from !== null && hand.at < from) return false;
       if (tag !== null && !hand.tags.includes(tag)) return false;
       if (position !== null && hand.position !== position) return false;
       if (venueId !== null && sessionById.get(hand.sessionId)?.venueId !== venueId) return false;
+      if (!matchesTerms(terms, hand.note, hand.holeCards, hand.board)) return false;
       return true;
     });
-  }, [hands, period, tag, position, venueId, sessionById, openedAt]);
+  }, [hands, period, tag, position, venueId, sessionById, openedAt, query]);
 
   const filtersActive =
-    period !== 'all' || tag !== null || position !== null || venueId !== null;
+    period !== 'all' ||
+    tag !== null ||
+    position !== null ||
+    venueId !== null ||
+    query.trim() !== '';
   const last = filtered.length - 1;
 
   const header = (
@@ -137,6 +151,15 @@ export default function HandsScreen() {
         <Text color={colors.textSecondary} style={styles.subtitle}>
           Every hand you have written down, newest first. Tap one to change it.
         </Text>
+      </View>
+
+      <View style={styles.search}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search notes and cards"
+          accessibilityLabel="Search hands"
+        />
       </View>
 
       <View style={styles.filters}>
@@ -161,6 +184,7 @@ export default function HandsScreen() {
                 setTag(null);
                 setPosition(null);
                 setVenueId(null);
+                setQuery('');
               }}
             />
           ) : undefined
@@ -237,6 +261,9 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: spacing.xs,
     lineHeight: 22,
+  },
+  search: {
+    marginBottom: spacing.md,
   },
   filters: {
     gap: spacing.sm,

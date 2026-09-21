@@ -204,3 +204,63 @@ describe('the three ways it can be empty', () => {
     expect(screen.getByText('No hands match')).toBeTruthy();
   });
 });
+
+/**
+ * Finding one hand by what was written about it.
+ *
+ * The note on a hand is the one field a player writes in their own words, and
+ * it was readable only on the session that hand belongs to. The cards are
+ * searchable too, because somebody who remembers the hand remembers the hand.
+ */
+describe('searching the hands', () => {
+  const box = () => screen.getByLabelText('Search hands');
+
+  it('finds one by its note', async () => {
+    load([
+      hand({ id: 'a', note: 'Flopped a set and lost it' }),
+      hand({ id: 'b', note: 'Folded the river' }),
+    ]);
+    await renderScreen(<HandsScreen />);
+    await screen.findByText('2 hands');
+
+    await userEvent.type(box(), 'set');
+    expect(screen.getByText('1 hand')).toBeTruthy();
+  });
+
+  it('and by the cards, which is how somebody remembers a hand', async () => {
+    load([
+      hand({ id: 'a', holeCards: 'AsKd', note: 'The big one' }),
+      hand({ id: 'b', holeCards: 'QhQc', note: 'The other one' }),
+    ]);
+    await renderScreen(<HandsScreen />);
+    await screen.findByText('2 hands');
+
+    await userEvent.type(box(), 'qhqc');
+    expect(screen.getByText('1 hand')).toBeTruthy();
+    expect(screen.queryByText('The big one')).toBeNull();
+  });
+
+  it('and by the board, for the runout that made the night', async () => {
+    load([
+      hand({ id: 'a', board: '7c2sKh', note: 'On that board' }),
+      hand({ id: 'b', board: null, note: 'No board' }),
+    ]);
+    await renderScreen(<HandsScreen />);
+    await screen.findByText('2 hands');
+
+    await userEvent.type(box(), '7c2s');
+    expect(screen.getByText('1 hand')).toBeTruthy();
+  });
+
+  it('counts as a filter, so Clear filters empties it too', async () => {
+    load([hand({ id: 'a', note: 'Flopped a set' })]);
+    await renderScreen(<HandsScreen />);
+    await screen.findByText('1 hand');
+
+    await userEvent.type(box(), 'nothing matches');
+    expect(screen.getByText('No hands match')).toBeTruthy();
+
+    await userEvent.press(chip('Clear filters'));
+    expect(screen.getByText('1 hand')).toBeTruthy();
+  });
+});

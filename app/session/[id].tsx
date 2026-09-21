@@ -331,8 +331,21 @@ export default function SessionDetailScreen() {
       <View style={styles.dangerZone}>
         {confirmingDelete ? (
           <View style={styles.confirmRow}>
+            {/*
+              The moods are named because they go too. `deleteSession`
+              tombstones the session's rebuys, its hands and its mood entries
+              on both engines, and the contract test pins that cascade -- while
+              this sentence listed one of the three. The Tilt meter card is on
+              this screen, a few hundred pixels up, whenever the session has
+              any, and those entries are what the Variance tab compares a
+              stretch against. Everywhere else in the app already says it:
+              Settings lists "every session, hand, mood entry and venue", and
+              the Edit screen's header calls this same act "delete the session,
+              and its hands and its mood entries with it".
+            */}
             <Text color={colors.textSecondary} style={styles.confirmText}>
-              Delete this session and its hands? This can’t be undone.
+              Delete this session, its hands and the moods logged for it? This can’t be
+              undone.
             </Text>
             <View style={styles.confirmActions}>
               <Button

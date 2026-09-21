@@ -212,3 +212,29 @@ describe('the reset offered after a hand the game did to you', () => {
     expect(router.back).toHaveBeenCalled();
   });
 });
+
+describe('one deck, in both directions', () => {
+  it('will not deal a card onto the board and into the hand as well', async () => {
+    // The guard was wired one way only. The board picker is told the hole
+    // cards, with a comment saying why, and the hole-card picker was told
+    // nothing: set the runout first and your own cards second, and the same
+    // card goes in twice. `clashingCards` had been written for exactly this
+    // and had no caller anywhere in the app.
+    await renderScreen(<LogHandScreen />);
+
+    // The runout first, which is the order that used to let it through. With
+    // the board open there are two pickers, so each rank row has to be reached
+    // by position: the player's own cards render first and the board second.
+    await userEvent.press(screen.getByLabelText('Add a board'));
+    await userEvent.press(screen.getAllByLabelText('Rank A')[1]);
+    await userEvent.press(screen.getByLabelText('A of spades'));
+
+    // And now the same card, in the hand. The picker is open on the board's
+    // ace already being taken, so the only ace of spades on screen is a
+    // disabled one.
+    // The first picker on screen is the one for the player's own cards.
+    await userEvent.press(screen.getAllByLabelText('Rank A')[0]);
+    expect(screen.getByLabelText('A of spades')).toBeDisabled();
+    expect(screen.getByLabelText('A of hearts')).not.toBeDisabled();
+  });
+});

@@ -220,18 +220,30 @@ const unsettled = (
  * already contributes more error than the gap can absorb, which is the case
  * where no amount of the other kind of session helps and the honest answer is
  * null.
+ *
+ * **`hWanted` is the total the thinner group has to end up with, and what is
+ * wanted here is how many more than it has.** So the hours already banked come
+ * off the end. Without that the answer is always too big by exactly the hours
+ * the player has already played on that side: not settled means
+ * `|d| < z*sigma*sqrt(1/hFixed + 1/hThin)`, so `denominator < 1/hThin`, so
+ * `1/denominator > hThin`, every time. It is worst where it matters most.
+ * A player one short session away from an answer, 120 steady hours against 40
+ * rattled at z = -1.596, was told "Another 43 hours or so" when the real figure
+ * was three and a half: thirteen times over, at the one moment the card had
+ * something useful to say.
  */
 const hoursToSettle = (
   difference: number,
   sigma: number,
   hFixed: number,
+  hThin: number,
   z: number,
 ): number | null => {
   if (difference === 0 || sigma <= 0 || hFixed <= 0) return null;
   const budget = (Math.abs(difference) / z / sigma) ** 2;
   const denominator = budget - 1 / hFixed;
   if (denominator <= 0) return null;
-  return 1 / denominator;
+  return Math.max(0, 1 / denominator - hThin);
 };
 
 /**
@@ -291,7 +303,7 @@ export const compareStartMood = (
     blocker: settled ? null : 'inside-the-noise',
     hoursNeeded: settled
       ? null
-      : hoursToSettle(difference, sigma, other.hours, Z_SCORES[level]),
+      : hoursToSettle(difference, sigma, other.hours, thinner.hours, Z_SCORES[level]),
   };
 };
 

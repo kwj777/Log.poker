@@ -301,7 +301,10 @@ export const seedDemoData = async (
 
   return {
     venues: Object.keys(venues).length,
-    sessions: PLAN.length,
+    // `ALL_PLANS`, which is what the loop above writes: `PLAN` is the cash half
+    // alone, so Settings reported 20 sessions after writing 32 and anybody who
+    // counted the history screen found the seeder lying about its own work.
+    sessions: DEMO_SESSION_COUNT,
     hands: handCount,
     moodEntries: moodCount,
   };

@@ -1,7 +1,7 @@
 /**
  * IndexedDB-backed repository -- the web implementation.
  *
- * Behaviourally identical to `SqlRepository`; the shared conformance suite in
+ * Behaviorally identical to `SqlRepository`; the shared conformance suite in
  * `src/data/__tests__/repositoryContract.ts` runs against both to keep it that way.
  */
 
@@ -140,6 +140,38 @@ const toRebuy = (record: RebuyRecord): Rebuy => ({
   createdAt: record.createdAt,
   updatedAt: record.updatedAt,
 });
+
+/**
+ * The fields of an incoming record that this file is about to spread, made safe
+ * to spread.
+ *
+ * The server validates an id and a stamp and carries every other field through
+ * untouched; `sanitize` in `src/sync/bundle.ts` says so in as many words. So a
+ * hand can arrive with no `tags` at all and a session with no `stakes`, and
+ * `[...undefined]` throws.
+ *
+ * A throw inside `applyChanges` is not one bad row. It rolls back every venue,
+ * session, rebuy, hand and mood entry in the same answer, and it escapes before
+ * the cursor is written, so the identical batch is fetched and rejected again
+ * on every sync after it: one record nobody could see would end web sync for
+ * that account for good. That is the opposite of what the contract promises,
+ * which is that an inconsistent row costs that row and not the sync, and it is
+ * why the whole of `applyChanges` is written to skip rather than throw.
+ *
+ * SQLite reads the same two fields as `record.tags ?? []` and
+ * `record.stakes?.bigBlind ?? 0`, so only the web build was ever exposed. These
+ * are that guard, on this side, landing on the same answers: no tags, and no
+ * stakes, which is what `0/0` reads back as there.
+ */
+const incomingTags = (tags: Hand['tags'] | undefined): Hand['tags'] =>
+  Array.isArray(tags) ? [...tags] : [];
+
+const incomingStakes = (stakes: Session['stakes'] | undefined): Session['stakes'] => {
+  if (stakes === null || stakes === undefined) return null;
+  const { smallBlind, bigBlind, ante } = stakes;
+  if (typeof smallBlind !== 'number' || typeof bigBlind !== 'number') return null;
+  return typeof ante === 'number' ? { smallBlind, bigBlind, ante } : { smallBlind, bigBlind };
+};
 
 const toHand = (record: HandRecord): Hand => ({
   id: record.id,
@@ -303,7 +335,10 @@ export class DexieRepository implements Repository {
           // Through `fromSession` rather than around it: a key it does not keep
           // has to be absent from the record, not null, or every loser lands in
           // the unique index under the same key. See `SessionRecord.importKey`.
-          await this.db.sessions.put({ ...fromSession({ ...record, importKey: key }), deletedAt });
+          await this.db.sessions.put({
+            ...fromSession({ ...record, stakes: incomingStakes(record.stakes), importKey: key }),
+            deletedAt,
+          });
           stored.add(record.id);
         }
 
@@ -320,7 +355,7 @@ export class DexieRepository implements Repository {
         const staleHands = await newerHere(this.db.hands, changes.hands);
         for (const { record, deletedAt } of changes.hands) {
           if (!sessions.has(record.sessionId) || staleHands.has(record.id)) continue;
-          await this.db.hands.put({ ...record, tags: [...record.tags], deletedAt });
+          await this.db.hands.put({ ...record, tags: incomingTags(record.tags), deletedAt });
         }
         const staleMoods = await newerHere(this.db.moodEntries, changes.moodEntries);
         for (const { record, deletedAt } of changes.moodEntries) {

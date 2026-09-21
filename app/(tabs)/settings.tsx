@@ -371,8 +371,10 @@ export default function SettingsScreen() {
       <Card>
         <Text color={colors.textSecondary} style={styles.body}>
           Your log as spreadsheets. The sessions file is the only one Log reads back: import it
-          here and it lands as the sessions it came from, which makes it a backup as well as a
-          record. The other two are records.
+          here and every finished session lands as the session it came from, which makes it a
+          backup as well as a record. A night still in progress is written down with the rest,
+          but it has no result yet, so it is the one row an import will pass over. The other two
+          files are records.
         </Text>
         <View style={styles.exportRow}>
           <Button

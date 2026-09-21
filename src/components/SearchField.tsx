@@ -15,7 +15,7 @@
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, layout, radius, spacing, typography } from '../theme';
 
 interface SearchFieldProps {
   value: string;
@@ -50,7 +50,12 @@ export const SearchField = ({
         accessibilityRole="button"
         accessibilityLabel="Clear the search"
         onPress={() => onChangeText('')}
-        hitSlop={8}
+        // The glyph draws at 18 and the floor is 48, so it needs 15 a side
+        // rather than the 8 it had, which left it at 34. `Explain` did this
+        // arithmetic for its badge already and said why; this is the same
+        // shortfall on the one control whose job is getting a player back out
+        // of a filter they cannot see past.
+        hitSlop={Math.ceil((layout.tapTarget - 18) / 2)}
       >
         <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
       </Pressable>

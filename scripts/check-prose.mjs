@@ -66,17 +66,29 @@ const BRITISH = [
 ];
 
 /**
- * Word-bounded, suffix-tolerant, and it treats a capital as a boundary too.
+ * Suffix-tolerant, and bounded only on the side that needs bounding.
  *
- * A plain `\b...\b` around the list has two holes, and both were open here:
- * `colours` walked past `colour`, and `centreX` walked past `centre`, so the
- * plural of a banned word and the camelCase compound of one were both legal.
+ * A plain `\b...\b` around the list has three holes. `colours` walked past
+ * `colour`; `centreX` walked past `centre`; and `relabelled` walked past
+ * `labelled`, because the position between `re` and `labelled` is not a word
+ * boundary either. The first two were closed and the third was not, though the
+ * comment here claimed the compound case was covered: only the trailing half
+ * of it was.
+ *
+ * So there is no leading boundary at all. A banned spelling is banned wherever
+ * it turns up, which is what `epicentre`, `watercolour` and `relabelled` need,
+ * and the trailing `(?![a-z])` is what keeps `greyhound` out of it. Run across
+ * every tracked file, the relaxation found the three live violations that were
+ * shipping and nothing else.
+ *
+ * `al` and `ally` are in the suffix list for `behavioural`, which is the shape
+ * that got two of those three past.
  */
 /** `colour` and `Colour`, without the /i flag that would blind the lookahead. */
 const eitherCase = (word) => `[${word[0].toUpperCase()}${word[0]}]${word.slice(1)}`;
 
 const BRITISH_RE = new RegExp(
-  `\\b(${BRITISH.map(eitherCase).join('|')})(s|es|d|ed|r|rs|ing|ly|ment|ments)?(?![a-z])`,
+  `(${BRITISH.map(eitherCase).join('|')})(s|es|d|ed|r|rs|ing|ly|al|ally|ment|ments)?(?![a-z])`,
 );
 
 const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {

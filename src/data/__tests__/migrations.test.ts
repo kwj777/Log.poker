@@ -385,3 +385,81 @@ describe('a hand written before there was anywhere to put the board', () => {
     expect((await repository.getHand('h1'))?.board).toBe('7c2sKhAd9d');
   });
 });
+
+describe('an upgrade that was interrupted halfway through', () => {
+  let driver: NodeSqliteDriver;
+
+  afterEach(async () => {
+    await driver.close();
+  });
+
+  /** A v3 database, which is the version migration 4 upgrades from. */
+  const atVersionThree = async (): Promise<NodeSqliteDriver> => {
+    const fresh = new NodeSqliteDriver(':memory:');
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 3)) {
+      for (const statement of migration.statements) await fresh.execute(statement);
+    }
+    await fresh.execute('PRAGMA user_version = 3');
+    await fresh.run(
+      `INSERT INTO venues (id, name, is_home_game, created_at, updated_at)
+       VALUES ('v1', 'Aria', 0, ?, ?)`,
+      [T0, T0],
+    );
+    await fresh.run(
+      `INSERT INTO sessions (id, venue_id, format, game_type, small_blind, big_blind, ante,
+         currency, buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
+         notes, import_key, created_at, updated_at)
+       VALUES ('s1', 'v1', 'cash', 'NLHE', 100, 200, NULL, 'USD', 30000, NULL, 45000, NULL,
+         NULL, ?, ?, NULL, NULL, ?, ?)`,
+      [T0, T0 + 3_600_000, T0, T0],
+    );
+    return fresh;
+  };
+
+  it('leaves nothing behind when the process stops between two statements', async () => {
+    driver = await atVersionThree();
+
+    // Migration 4 is five `ALTER TABLE ... ADD COLUMN`s. The app is killed
+    // after the second: a cold start upgrade is exactly the moment somebody
+    // backgrounds the app, and the device can also simply run out of storage.
+    const killed = MIGRATIONS.find((entry) => entry.version === 4);
+    if (killed === undefined) throw new Error('migration 4 has gone missing');
+    await expect(
+      driver.transaction(async () => {
+        await driver.execute(killed.statements[0]);
+        await driver.execute(killed.statements[1]);
+        throw new Error('app killed');
+      }),
+    ).rejects.toThrow('app killed');
+
+    // The columns that landed are rolled back with the ones that did not, so
+    // the database is still honestly on version 3 rather than half on 4.
+    const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
+    expect(row.user_version).toBe(3);
+    const columns = await driver.all<{ name: string }>(`PRAGMA table_info(venues)`);
+    expect(columns.map((column) => column.name)).not.toContain('deleted_at');
+  });
+
+  it('opens on the next launch and finishes the job', async () => {
+    driver = await atVersionThree();
+    const killed = MIGRATIONS.find((entry) => entry.version === 4);
+    if (killed === undefined) throw new Error('migration 4 has gone missing');
+    await driver
+      .transaction(async () => {
+        await driver.execute(killed.statements[0]);
+        await driver.execute(killed.statements[1]);
+        throw new Error('app killed');
+      })
+      .catch(() => undefined);
+
+    // The whole point. Before the migration ran in a transaction this replay
+    // threw `duplicate column name: deleted_at` here and on every launch
+    // after it, and the player's history was intact and unreachable for good.
+    const repository = new SqlRepository(driver);
+    await expect(repository.init()).resolves.toBeUndefined();
+
+    const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
+    expect(row.user_version).toBe(LATEST_VERSION);
+    expect(await repository.listSessions()).toHaveLength(1);
+  });
+});

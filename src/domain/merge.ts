@@ -96,11 +96,26 @@ export const resolve = <T extends Mergeable>(mine: Versioned<T>, theirs: Version
  * order is *insertion* order. The SQL and Dexie row builders happen to agree
  * on that today, so nothing was wrong yet; the moment one of them adds a column
  * in a different place, the same record serializes two ways and the two devices
- * pick opposite winners. Sorting the keys costs a comparison nobody makes twice
- * a second and removes the dependence entirely.
+ * pick opposite winners. Sorting the keys removes the dependence entirely.
+ *
+ * **Sorted entries rather than a key list**, which is the version of this that
+ * works. `JSON.stringify(value, array)` does not take a key *order*, it takes
+ * an allowlist, and it applies that allowlist at every depth. A session's
+ * `stakes` holds `smallBlind`, `bigBlind` and `ante`, none of which are keys of
+ * the session, so every session serialized with `"stakes":{}` in it and two
+ * sessions differing in nothing but their blinds compared equal. The tiebreak
+ * then fell to `>=`, which answers `mine` -- and `mergeIntoBundle` always
+ * passes the stored record as `mine`, so the winner was whichever push arrived
+ * first. That is the order dependence this function exists to remove, worse
+ * than the one it replaced, and on the field a player is most likely to be
+ * correcting on two devices at once.
  */
 const canonical = (record: Mergeable): string =>
-  JSON.stringify(record, Object.keys(record).sort());
+  JSON.stringify(
+    Object.keys(record)
+      .sort()
+      .map((key) => [key, (record as unknown as Record<string, unknown>)[key]]),
+  );
 
 /* ------------------------------------------------------- one active session */
 

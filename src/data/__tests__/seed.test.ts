@@ -100,6 +100,14 @@ describe('demo dataset', () => {
     expect(await repository.listVenues()).toHaveLength(4);
   });
 
+  it('reports back the number it actually wrote', async () => {
+    // Settings prints this verbatim, and it counted the cash plans only, so it
+    // said 20 after writing 32 and the history screen contradicted it.
+    const result = await seedDemoData(repository, { now: NOW });
+    expect(result.sessions).toBe(DEMO_SESSION_COUNT);
+    expect(result.sessions).toBe((await repository.listSessions()).length);
+  });
+
   it('seeds both formats, so every screen has something to show', async () => {
     const sessions = await repository.listSessions();
     const tournaments = sessions.filter((session) => session.format === 'tournament');

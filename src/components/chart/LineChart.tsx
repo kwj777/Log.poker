@@ -63,6 +63,15 @@ interface LineChartProps {
   height?: number;
   /** Draws a horizontal rule at y = 0 -- break-even. */
   showZeroLine?: boolean;
+  /**
+   * Where the axis is anchored and where a filled series is filled down to.
+   *
+   * Zero for a curve that is a movement, which is what break even means and
+   * what every caller wanted before this existed. A curve that is a *balance*
+   * starts somewhere else, and forcing zero into its range leaves the data in
+   * a few pixels at the top of the plot. See `padBounds`.
+   */
+  baseline?: number;
   /** Marks the final point of the first series. */
   showEndPoint?: boolean;
   emptyMessage?: string;
@@ -77,6 +86,7 @@ export const LineChart = ({
   height = 180,
   showZeroLine = true,
   showEndPoint = true,
+  baseline = 0,
   emptyMessage = 'Not enough data yet',
 }: LineChartProps) => {
   const [width, setWidth] = useState(0);
@@ -91,7 +101,7 @@ export const LineChart = ({
   ];
   const hasData = allPoints.some((points) => points.length > 1);
 
-  const bounds = padBounds(boundsOf(allPoints));
+  const bounds = padBounds(boundsOf(allPoints), baseline);
   const area = { width, height, padding: PADDING };
   const project = projector(bounds, area);
   const primary = series[0];
@@ -132,7 +142,7 @@ export const LineChart = ({
             entry.fill ? (
               <Path
                 key={`fill-${index}`}
-                d={areaPath(entry.points, project, 0)}
+                d={areaPath(entry.points, project, baseline)}
                 fill={entry.fill}
               />
             ) : null,

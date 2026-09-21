@@ -126,3 +126,42 @@ describe('with one in a currency this view is not in', () => {
     expect(headline()).toBe('Profit: +$200');
   });
 });
+
+describe('the curve under the headline', () => {
+  /** The chart's spoken label, which is all a screen reader is given for it. */
+  const curveLabel = () => screen.getByLabelText(/^Bankroll over /).props.accessibilityLabel;
+
+  /** Two sessions, because a line needs two points before it is drawn at all. */
+  const TWO = [WON, session('s3', { buyIn: 30_000, cashOut: 40_000 })];
+
+  it('ends where the line ends, rather than at the profit', async () => {
+    // Two different numbers once there is a balance, and this is the one a
+    // screen reader is handed in place of the drawing. It said "ending at
+    // +$300" under a headline reading "Bankroll: $5,300", and the line really
+    // does end at 5,300.
+    load(TWO, { cents: 500_000, currency: 'USD' });
+    await renderScreen(<DashboardScreen />);
+    expect(curveLabel()).toBe('Bankroll over 2 sessions, ending at $5,300.');
+  });
+
+  it('keeps the sign when the figure is a profit rather than a balance', async () => {
+    load(TWO);
+    await renderScreen(<DashboardScreen />);
+    expect(curveLabel()).toBe('Bankroll over 2 sessions, ending at +$300.');
+  });
+
+  it('names where the line starts on the axis under it', async () => {
+    // Hard-coded, the left caption read $0 under a curve based at $5,000
+    // while the caption at the other end of the same axis read $5.3k.
+    load(TWO, { cents: 500_000, currency: 'USD' });
+    await renderScreen(<DashboardScreen />);
+    expect(screen.getByText('$5k')).toBeTruthy();
+    expect(screen.getByText('$5.3k')).toBeTruthy();
+  });
+
+  it('still starts at zero for somebody who has not set one', async () => {
+    load(TWO);
+    await renderScreen(<DashboardScreen />);
+    expect(screen.getByText('$0')).toBeTruthy();
+  });
+});

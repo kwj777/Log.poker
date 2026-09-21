@@ -1,4 +1,11 @@
-import { DEFAULT_VENUE_NAME, parseSessionCsv } from '../sessionImport';
+import {
+  DEFAULT_VENUE_NAME,
+  draftNet,
+  parseSessionCsv,
+  type ImportedSessionDraft,
+} from '../sessionImport';
+import { totalInvested } from '../../stats';
+import type { Session } from '../../types';
 
 const local = (y: number, m: number, d: number, h = 0, min = 0): number =>
   new Date(y, m - 1, d, h, min, 0, 0).getTime();
@@ -445,5 +452,108 @@ describe('parseSessionCsv', () => {
       const csv = 'Date,Buyin,Cashout\n2024-01-15,,88\n2024-01-16,50,20\n';
       expect(messages(parseSessionCsv(csv))).toContain('1 row had no buy-in');
     });
+  });
+});
+
+
+describe('what a row will be worth', () => {
+  it('takes the tournament entry fee off, the way the rest of the app does', () => {
+    // The preview card is the whole point of the import screen: see what was
+    // parsed, then import. Its headline figure was `cashOut - buyIn` written
+    // out inline, so it left the fee on the table while `totalInvested` takes
+    // it off everywhere else, and a $100+$10 that cashed for nothing previewed
+    // as -$100 and landed as -$110.
+    expect(draftNet({ buyIn: 10_000, fee: 1_000, cashOut: 0 } as ImportedSessionDraft)).toBe(
+      -11_000,
+    );
+    expect(
+      draftNet({ buyIn: 10_000, fee: 1_000, cashOut: 50_000 } as ImportedSessionDraft),
+    ).toBe(39_000);
+  });
+
+  it('leaves a cash game exactly where it was, since it has no fee', () => {
+    expect(draftNet({ buyIn: 30_000, fee: null, cashOut: 45_000 } as ImportedSessionDraft)).toBe(
+      15_000,
+    );
+  });
+
+  it('agrees with `totalInvested`, which is the number that actually lands', () => {
+    const draft = { buyIn: 10_000, fee: 1_000, cashOut: 50_000 } as ImportedSessionDraft;
+    const landed =
+      draft.cashOut - totalInvested({ buyIn: draft.buyIn, fee: draft.fee } as Session, []);
+    expect(draftNet(draft)).toBe(landed);
+  });
+});
+
+
+describe('a tournament file that reports a profit rather than a prize', () => {
+  const parse = (rows: string[]) =>
+    parseSessionCsv(
+      ['Date,Game,Buy-in,Entry fee,Entrants,Finish,Profit', ...rows].join('\n'),
+    );
+
+  /** What the app will actually call this session's result once it is stored. */
+  const landed = (draft: ImportedSessionDraft) =>
+    draft.cashOut - totalInvested({ buyIn: draft.buyIn, fee: draft.fee } as Session, []);
+
+  it('stores the profit the file states, fee and all', () => {
+    // The result column has already had the fee taken off it, so rebuilding
+    // the cash-out as buy-in plus result left `netResult` to subtract the fee
+    // a second time: the file said +$50 and the dashboard said +$40.
+    const [row] = parse(['2026-03-14 19:30,NLHE,100.00,10.00,120,7,50.00']).sessions;
+    expect(row.draft.format).toBe('tournament');
+    expect(row.draft.buyIn).toBe(10_000);
+    expect(row.draft.fee).toBe(1_000);
+    expect(landed(row.draft)).toBe(5_000);
+  });
+
+  it('and never books a prize nobody was paid to do it', () => {
+    // A busted entry: `buyIn + result` is negative, which is a cash-out that
+    // does not happen. Adding the fee back keeps the arithmetic where it
+    // belongs, on the cost side.
+    const [row] = parse(['2026-03-15 19:30,NLHE,100.00,10.00,120,90,-110.00']).sessions;
+    expect(row.draft.cashOut).toBe(0);
+    expect(landed(row.draft)).toBe(-11_000);
+  });
+
+  it('leaves the derived cash-out of a cash game exactly where it was', () => {
+    const [row] = parseSessionCsv(
+      ['Date,Game,Stakes,Buy-in,Profit', '2026-03-14 19:30,NLHE,$1/$2,300.00,150.00'].join('\n'),
+    ).sessions;
+    expect(row.draft.format).toBe('cash');
+    expect(row.draft.fee).toBeNull();
+    expect(row.draft.cashOut).toBe(45_000);
+    expect(landed(row.draft)).toBe(15_000);
+  });
+});
+
+
+describe('a row that ends exactly where it starts', () => {
+  it('is counted as having no duration, which is what it has', () => {
+    // Date-only Start and End columns are the ordinary shape of a hand-kept
+    // spreadsheet, and a duration cell of 0 reads as zero rather than as
+    // nothing. Counted only when the end was missing or backwards, these rows
+    // landed with no hours and no warning: the profit went into the dashboard
+    // and the hours did not, and the sentence that would have explained the
+    // hourly rate moving never appeared.
+    const reading = parseSessionCsv(
+      [
+        'Date,End,Buy-in,Cash-out',
+        '2026-03-14,2026-03-14,100,150',
+        '2026-03-15,2026-03-15,100,60',
+      ].join('\n'),
+    );
+    expect(reading.sessions).toHaveLength(2);
+    for (const row of reading.sessions) {
+      expect(row.draft.endedAt).toBe(row.draft.startedAt);
+    }
+    expect(messages(reading)).toContain('2 sessions had no duration');
+  });
+
+  it('and a row with real hours on it is not', () => {
+    const reading = parseSessionCsv(
+      ['Date,End,Buy-in,Cash-out', '2026-03-14 19:00,2026-03-14 23:00,100,150'].join('\n'),
+    );
+    expect(messages(reading)).not.toContain('no duration');
   });
 });

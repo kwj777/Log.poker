@@ -96,6 +96,23 @@ export interface ImportedSession {
   draft: ImportedSessionDraft;
 }
 
+/**
+ * What a parsed row will be worth once it is a session.
+ *
+ * The preview card's whole job is to be the number the player gets, so the
+ * arithmetic has to be the app's rather than the screen's. It was
+ * `cashOut - buyIn` written out inline, which leaves the tournament entry fee
+ * on the table -- `totalInvested` takes it off everywhere else, and the
+ * Variance tab gives it a tile of its own labeled "never coming back". A year
+ * of $100+$10 tournaments previewed a whole fee column better than it landed,
+ * and always in the flattering direction.
+ *
+ * No rebuys in the subtraction because an import makes none: the row is one
+ * line with one buy-in on it.
+ */
+export const draftNet = (draft: ImportedSessionDraft): Cents =>
+  draft.cashOut - draft.buyIn - (draft.fee ?? 0);
+
 export interface SessionImportOptions {
   /** Used when neither a currency column nor the money cells name one. */
   defaultCurrency?: string;
@@ -294,6 +311,16 @@ export const parseSessionCsv = (
 
     // A cash-out column is the direct measurement; a result column is derived
     // from one, so it only fills in where the first is absent.
+    //
+    // **The entry fee is part of what the result was measured against.** A
+    // file reporting a profit has already taken the fee off it, so a cash-out
+    // rebuilt as buy-in plus result leaves the fee to be subtracted a second
+    // time by `netResult`, which is `cashOut - (buyIn + fee + rebuys)`. Every
+    // tournament row from a results-only export landed short by exactly its
+    // fee: a $100+$10 that the file says made $50 stored as +$40. The losing
+    // rows were worse, since `buyIn + result` goes negative and books a prize
+    // nobody was ever paid.
+    const entryFee = tournament ? (feeCell?.cents ?? 0) : 0;
     let buyIn = buyInCell?.cents ?? 0;
     let cashOut: number | null;
     if (cashOutCell !== null) {
@@ -303,11 +330,13 @@ export const parseSessionCsv = (
         // Nothing says what went on the table, but a loss entails at least as
         // much as was lost -- that is entailed, not invented. Booking it keeps
         // the net exact and both figures readable: a cash-out of minus forty
-        // is not a thing that happens.
-        buyIn = -resultCell.cents;
+        // is not a thing that happens. The fee is part of that cost where the
+        // file named one, so it comes out of the buy-in rather than being
+        // added on top of a total the result already fixes.
+        buyIn = Math.max(0, -resultCell.cents - entryFee);
         cashOut = 0;
       } else {
-        cashOut = buyIn + resultCell.cents;
+        cashOut = buyIn + entryFee + resultCell.cents;
       }
     } else {
       cashOut = null;
@@ -327,12 +356,19 @@ export const parseSessionCsv = (
     }
     if (endedAt === null) {
       endedAt = startedAt;
-      noDuration += 1;
     } else if (endedAt < startedAt) {
       warn(row.line, 'The end time is before the start time; this session was given no duration.');
       endedAt = startedAt;
-      noDuration += 1;
     }
+    // Counted on the outcome rather than inside the two branches above, so the
+    // third way of getting here is counted too: an end that parses to exactly
+    // the start. That is the ordinary shape of a spreadsheet whose date
+    // columns carry no time of day, and of any duration cell holding 0 or
+    // 0:00, since `parseDurationMs` reads those as zero rather than as
+    // nothing. Those rows landed with no hours and no warning, so their profit
+    // went into the dashboard while their hours did not, and the one sentence
+    // that would have explained the hourly rate moving never appeared.
+    if (endedAt <= startedAt) noDuration += 1;
 
     // A tournament has no blinds, so an unreadable stakes cell is only worth
     // counting against a cash game -- where it is the difference between

@@ -161,7 +161,7 @@ describe('who the page says touches it', () => {
 
 describe('how the page says to delete it', () => {
   it('names the control by the label the app actually shows', () => {
-    // Two files and one string between them. A relabelled button and a page
+    // Two files and one string between them. A relabeled button and a page
     // still naming the old one sends somebody hunting for a control that is
     // right in front of them.
     const copy = read('src', 'features', 'account', 'copy.ts');

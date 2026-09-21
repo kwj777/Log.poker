@@ -293,6 +293,31 @@ export interface StretchAssessment {
   suggestsUntilt: boolean;
 }
 
+/**
+ * What the player is actually short of, and only that.
+ *
+ * `reliable` wants both floors cleared, and a player can clear one without the
+ * other, so the two shortfalls were printed unconditionally and one of them was
+ * routinely zero: somebody nine sessions in at eighteen hours read "Log 0 more
+ * sessions and around 2 more hours", and at nineteen hours, "around 1 more
+ * hours". This is the whole body of the empty state that fills the Variance
+ * tab, so it is the first thing that page ever says to anybody.
+ *
+ * Only the halves with a number left in them, and both counted the same way.
+ */
+const shortfall = (estimate: PlayerEstimate): string => {
+  const sessions = Math.max(0, MIN_SESSIONS_FOR_ESTIMATE - estimate.sessionCount);
+  const hours = Math.max(0, Math.round(MIN_HOURS_FOR_ESTIMATE - estimate.totalHours));
+  const parts: string[] = [];
+  if (sessions > 0) parts.push(`${sessions} more session${sessions === 1 ? '' : 's'}`);
+  if (hours > 0) parts.push(`around ${hours} more hour${hours === 1 ? '' : 's'}`);
+  // Both floors cleared and still here: `stdDevBbPerHour` is zero, which takes
+  // sessions that every one of them landed exactly on the player's average.
+  // Rare, and "log 0 more of anything" is not the answer to it.
+  if (parts.length === 0) return 'a few more sessions';
+  return parts.join(' and ');
+};
+
 const formatBb = (bb: number): string => `${bb >= 0 ? '+' : ''}${Math.round(bb)} bb`;
 
 const formatHours = (hours: number): string =>
@@ -332,15 +357,9 @@ export const assessRecentStretch = (
       ...base,
       verdict: 'insufficient_data',
       headline: 'Not enough hours yet',
-      body: `Variance needs history to say anything honest. Log ${Math.max(
-        0,
-        MIN_SESSIONS_FOR_ESTIMATE - estimate.sessionCount,
-      )} more session${
-        MIN_SESSIONS_FOR_ESTIMATE - estimate.sessionCount === 1 ? '' : 's'
-      } and around ${Math.max(
-        0,
-        Math.round(MIN_HOURS_FOR_ESTIMATE - estimate.totalHours),
-      )} more hours, and this page will start comparing your recent stretch to your own numbers.`,
+      body: `Variance needs history to say anything honest. Log ${shortfall(
+        estimate,
+      )}, and this page will start comparing your recent stretch to your own numbers.`,
       suggestsUntilt: false,
     };
   }

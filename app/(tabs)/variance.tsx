@@ -527,7 +527,12 @@ const TournamentCard = ({
       <View style={styles.tournamentTiles}>
         <StatTile
           label="ROI"
-          value={totals.roi === null ? '--' : `${totals.roi >= 0 ? '+' : ''}${Math.round(totals.roi * 100)}%`}
+          // Through `formatRoi`, like the dashboard tile and like the interval
+          // bounds two lines down. Hand-rolled, a small loss lost its sign
+          // twice over: the guard picked no '+', and `Math.round` turned -0.4%
+          // into -0, which stringifies as "0". The tile read a bare "0%",
+          // colored loss red, over a hint reading "-9% to +2%".
+          value={totals.roi === null ? '--' : formatRoi(totals.roi)}
           valueColor={resultColor(totals.net)}
           hint={
             interval === null

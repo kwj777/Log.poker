@@ -1066,31 +1066,31 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 81 passed
-Tests:       1968 passed
+Test Suites: 83 passed
+Tests:       2008 passed
 
-  dexieRepository   133   the IndexedDB path, against real IndexedDB
-  sqlRepository     133   the SQLite path, against real SQLite
+  dexieRepository   135   the IndexedDB path, against real IndexedDB
+  sqlRepository     135   the SQLite path, against real SQLite
   bundle             68   what ships to each platform, against the real output
+  sessionImport      63   reading a session-summary export
+  site               62   the marketing/app split, the PWA, the sitemap
+  tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
-  site               61   the marketing/app split, the PWA, the sitemap
-  tournaments        58   ROI, its interval, cash rate, dry runs, finishes
   content            55   every figure in the guides, re-derived and read back
-  sessionImport      55   reading a session-summary export
   signinEndpoint     55   the free door, and every bound on it
   stats              54   P/L, rebuys, duration, win rate, groupings
   verify             52   checking a token, and every way past it that must not work
-  copy               50   what the sign-in and the sync are allowed to say
+  copy               51   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
-  variance           40   win rate, σ, confidence bands, verdicts
+  variance           41   win rate, σ, confidence bands, verdicts
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
-  merge              32   two devices disagreeing, and who wins
-  mood               32   what tilt costs, and when to say nothing
+  merge              33   two devices disagreeing, and who wins
+  mood               33   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
+  migrations         29   a filled v2 database walked forward, both engines
   token              29   the family token grammar, against signed fixtures
-  migrations         27   a filled v2 database walked forward, both engines
   palette            27   the theme matches BRAND.md
   sessionExport      27   the log written out, and read back by the importer
   session            24   holding a token, and stores that fail as real ones do
@@ -1104,11 +1104,11 @@ Tests:       1968 passed
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
   clock              18   a typed date, a typed length, and what neither will accept
+  editSession        18   correcting a session, including the one nobody cashed out
   history            18   the session list, its filters, and how much of it mounts
   money              18   cents arithmetic, parsing, formatting
-  editSession        17   correcting a session, including the one nobody cashed out
+  seed               18   the demo dataset stays coherent
   pastSession        17   logging a night that was played before it was logged
-  seed               17   the demo dataset stays coherent
   writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
@@ -1118,6 +1118,7 @@ Tests:       1968 passed
   settingsExport     15   the export card, and what it refuses to write
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
+  bankrollHeadline   13   the word over the headline figure, and what it has to be true of
   editHand           13   fixing or deleting a hand that was logged wrong
   rateLimit          13   how often one person may ask, and what a refusal costs
   sessionDetail      13   one session and the hands that belong to it
@@ -1128,7 +1129,6 @@ Tests:       1968 passed
   columns            10   header matching
   search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
-  bankrollHeadline    9   the word over the headline figure, and what it has to be true of
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
@@ -1144,10 +1144,12 @@ Tests:       1968 passed
   settingsVenues      7   renaming a venue, and merging two that are one room
   venues              7   which spellings of a room name are the same room
   readme              6   the test table adds up and says what each suite is for
+  scale               6   how much of the plot the data actually gets
   settingsHelp        6   the privacy link, the support address, the build
   venuePicker         6   typing a room you already have, rather than adding a second
   errorBoundary       5   a render that throws, and the way back from it
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
+  stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars
   notFound            3   where a link that names nothing lands
 ```

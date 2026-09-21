@@ -125,6 +125,27 @@ describe('a cash-out typed wrong', () => {
     await userEvent.press(screen.getByText('Save changes'));
 
     expect(edits[0].patch.cashOut).toBeNull();
+    // The half this asserted by its name and not in its body. The screen sent
+    // the length regardless, so the night came back with no result and an end
+    // still on it: not running, because `getActiveSession` wants an open end,
+    // and not complete, because `isComplete` wants both. It dropped out of the
+    // totals, the bankroll curve and the variance sample, and History drew it
+    // as an ordinary +$0 night with no Live badge, which is the one reading the
+    // hint under that field promises it is not.
+    expect(edits[0].patch.endedAt).toBeNull();
+  });
+
+  it('and leaves the end alone when the cash-out is only corrected', async () => {
+    load({ startedAt: START, endedAt: START + 3 * HOUR });
+    await renderScreen(<EditSessionScreen />);
+
+    const field = screen.getByLabelText('Cash-out amount');
+    await userEvent.clear(field);
+    await userEvent.type(field, '520');
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits[0].patch.cashOut).toBe(52_000);
+    expect(edits[0].patch.endedAt).toBe(START + 3 * HOUR);
   });
 
   it('leaves every field nobody touched exactly as it was', async () => {

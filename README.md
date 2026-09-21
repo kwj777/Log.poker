@@ -1067,14 +1067,14 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 81 passed
-Tests:       1968 passed
+Tests:       1981 passed
 
-  dexieRepository   133   the IndexedDB path, against real IndexedDB
-  sqlRepository     133   the SQLite path, against real SQLite
+  dexieRepository   135   the IndexedDB path, against real IndexedDB
+  sqlRepository     135   the SQLite path, against real SQLite
   bundle             68   what ships to each platform, against the real output
+  tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
   site               61   the marketing/app split, the PWA, the sitemap
-  tournaments        58   ROI, its interval, cash rate, dry runs, finishes
   content            55   every figure in the guides, re-derived and read back
   sessionImport      55   reading a session-summary export
   signinEndpoint     55   the free door, and every bound on it
@@ -1083,14 +1083,14 @@ Tests:       1968 passed
   copy               50   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
-  variance           40   win rate, σ, confidence bands, verdicts
+  variance           41   win rate, σ, confidence bands, verdicts
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
+  mood               33   what tilt costs, and when to say nothing
   merge              32   two devices disagreeing, and who wins
-  mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
+  migrations         29   a filled v2 database walked forward, both engines
   token              29   the family token grammar, against signed fixtures
-  migrations         27   a filled v2 database walked forward, both engines
   palette            27   the theme matches BRAND.md
   sessionExport      27   the log written out, and read back by the importer
   session            24   holding a token, and stores that fail as real ones do
@@ -1106,9 +1106,9 @@ Tests:       1968 passed
   clock              18   a typed date, a typed length, and what neither will accept
   history            18   the session list, its filters, and how much of it mounts
   money              18   cents arithmetic, parsing, formatting
+  seed               18   the demo dataset stays coherent
   editSession        17   correcting a session, including the one nobody cashed out
   pastSession        17   logging a night that was played before it was logged
-  seed               17   the demo dataset stays coherent
   writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch

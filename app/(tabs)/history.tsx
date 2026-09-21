@@ -17,8 +17,8 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
-import { formatMoney } from '../../src/domain/money';
-import { totals } from '../../src/domain/stats';
+import { currencyLabel, formatMoney } from '../../src/domain/money';
+import { currenciesUsed, inCurrency, totals } from '../../src/domain/stats';
 import {
   GAME_TYPES,
   SESSION_FORMATS,
@@ -63,13 +63,30 @@ const FORMAT_OPTIONS = [
 const DAY = 86_400_000;
 
 export default function HistoryScreen() {
-  const sessions = useLogStore((state) => state.sessions);
+  const all = useLogStore((state) => state.sessions);
   const venues = useLogStore((state) => state.venues);
 
   const [period, setPeriod] = useState<Period>('all');
   const [gameType, setGameType] = useState<GameType | null>(null);
   const [format, setFormat] = useState<SessionFormat | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  /**
+   * The totals strip is a sum, so it has to be a sum of one currency.
+   *
+   * Same reasoning as the dashboard's: a log with a trip abroad in it was
+   * adding euros to dollars and printing the answer with a dollar sign. The
+   * list itself shows every session in the money it was played for, because a
+   * row is one session and a session knows its own currency; it is only the
+   * three tiles above it that had to pick.
+   */
+  const currencies = useMemo(() => currenciesUsed(all), [all]);
+  const currency = picked !== null && currencies.includes(picked) ? picked : currencies[0] ?? 'USD';
+  const sessions = useMemo(
+    () => (currencies.length > 1 ? inCurrency(all, currency) : all),
+    [all, currencies.length, currency],
+  );
 
   /**
    * The clock is read once, on mount, rather than during render: a "last 30
@@ -141,17 +158,29 @@ export default function HistoryScreen() {
         {venues.length > 1 ? (
           <ChipGroup options={venueOptions} value={venueId} onChange={setVenueId} scroll />
         ) : null}
+        {currencies.length > 1 ? (
+          <ChipGroup
+            options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
+            value={currency}
+            onChange={setPicked}
+            scroll
+          />
+        ) : null}
       </View>
 
       <View style={styles.tiles}>
         <StatTile
           label="Profit"
-          value={formatMoney(summary.net, { signed: true })}
+          value={formatMoney(summary.net, { currency, signed: true })}
           valueColor={resultColor(summary.net)}
         />
         <StatTile
           label="Hourly"
-          value={summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true })}
+          value={
+            summary.hourly === null
+              ? '--'
+              : formatMoney(summary.hourly, { currency, signed: true })
+          }
           valueColor={resultColor(summary.hourly)}
         />
         <StatTile label="Hours" value={String(Math.round(summary.hours))} />
@@ -197,14 +226,14 @@ export default function HistoryScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           <EmptyState
-            title={sessions.length === 0 ? 'Nothing logged yet' : 'No sessions match'}
+            title={all.length === 0 ? 'Nothing logged yet' : 'No sessions match'}
             body={
-              sessions.length === 0
+              all.length === 0
                 ? 'Your sessions will appear here once you log one.'
                 : 'Try widening the filters, or go play some poker.'
             }
             action={
-              sessions.length === 0 ? (
+              all.length === 0 ? (
                 <Button label="Start a session" onPress={() => router.push('/session/new')} />
               ) : undefined
             }

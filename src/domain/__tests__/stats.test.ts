@@ -6,11 +6,14 @@ import {
   byStakes,
   byVenue,
   cashWinRate,
+  currenciesUsed,
   durationHours,
   durationMs,
   formatDuration,
   hourlyRate,
+  inCurrency,
   isComplete,
+  primaryCurrency,
   netResult,
   rebuyTotal,
   summarize,
@@ -362,5 +365,46 @@ describe('cashWinRate', () => {
       hours: 6,
     });
     expect(cashWinRate([won(), cashed]).sessions).toBe(1);
+  });
+});
+
+
+describe('which currency a log is in', () => {
+  const at = (currency: string, day: number) =>
+    completed({ currency, startedAt: T0 + day * 24 * HOUR, hours: 3, cashOut: 40_000 });
+
+  it('is one answer for a log with one currency', () => {
+    expect(currenciesUsed([at('USD', 0), at('USD', 1)])).toEqual(['USD']);
+    expect(primaryCurrency([at('USD', 0)])).toBe('USD');
+  });
+
+  it('names every currency a session was played for, commonest first', () => {
+    const log = [at('EUR', 0), at('USD', 1), at('USD', 2), at('USD', 3), at('EUR', 4)];
+    expect(currenciesUsed(log)).toEqual(['USD', 'EUR']);
+  });
+
+  it('breaks a tie toward the one being played now', () => {
+    // Somebody who has moved. Equal history either side, and the currency they
+    // are living in is the one the dashboard should open on.
+    const log = [at('USD', 0), at('USD', 1), at('GBP', 2), at('GBP', 3)];
+    expect(primaryCurrency(log)).toBe('GBP');
+  });
+
+  it('falls back to the default with nothing logged', () => {
+    // A dashboard with no sessions still has to draw a symbol in front of zero.
+    expect(currenciesUsed([])).toEqual([]);
+    expect(primaryCurrency([])).toBe('USD');
+  });
+
+  it('and a total taken over one currency is a total of that currency alone', () => {
+    // The defect. `totals` sums `netResult` and has no idea what the money is,
+    // so a trip abroad used to be added to the bankroll at face value.
+    const log = [
+      completed({ currency: 'USD', buyIn: 20_000, cashOut: 50_000, hours: 3 }),
+      completed({ currency: 'EUR', buyIn: 20_000, cashOut: 60_000, hours: 3 }),
+    ];
+    expect(totals(log).net).toBe(70_000);
+    expect(totals(inCurrency(log, 'USD')).net).toBe(30_000);
+    expect(totals(inCurrency(log, 'EUR')).net).toBe(40_000);
   });
 });

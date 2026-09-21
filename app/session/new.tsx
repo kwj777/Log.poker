@@ -20,7 +20,14 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
 import { successFeedback } from '../../src/components/haptics';
-import { formatEntry, formatMoney, formatStakes, parseAmount } from '../../src/domain/money';
+import {
+  CURRENCIES,
+  currencyLabel,
+  formatEntry,
+  formatMoney,
+  formatStakes,
+  parseAmount,
+} from '../../src/domain/money';
 import {
   GAME_TYPES,
   SESSION_FORMATS,
@@ -52,6 +59,8 @@ const FORMAT_OPTIONS = SESSION_FORMATS.map((value) => ({
   label: SESSION_FORMAT_LABELS[value],
 }));
 
+const CURRENCY_OPTIONS = CURRENCIES.map((value) => ({ value, label: currencyLabel(value) }));
+
 export default function NewSessionScreen() {
   const venues = useLogStore((state) => state.venues);
   const sessions = useLogStore((state) => state.sessions);
@@ -66,6 +75,7 @@ export default function NewSessionScreen() {
   const [format, setFormat] = useState<SessionFormat>(defaults.format);
   const [gameType, setGameType] = useState<GameType>(defaults.gameType);
   const [stakes, setStakes] = useState<Stakes>(defaults.stakes);
+  const [currency, setCurrency] = useState(defaults.currency);
   const [buyIn, setBuyIn] = useState(String(defaults.buyIn / 100));
   const [fee, setFee] = useState(String(defaults.fee / 100));
   const [mood, setMood] = useState<MoodScore | null>(null);
@@ -90,7 +100,7 @@ export default function NewSessionScreen() {
         // A tournament has no blinds; `buildSession` drops them anyway, but
         // sending them would be sending something the screen never asked for.
         stakes: tournament ? null : stakes,
-        currency: defaults.currency,
+        currency,
         buyIn: buyInCents,
         fee: tournament ? feeCents : null,
         mood,
@@ -116,11 +126,10 @@ export default function NewSessionScreen() {
               !canStart
                 ? 'Start session'
                 : tournament
-                  ? `Start ${formatEntry(buyInCents ?? 0, feeCents, defaults.currency)}`
-                  : `Start ${formatStakes(stakes, defaults.currency)} · ${formatMoney(
-                      buyInCents ?? 0,
-                      { currency: defaults.currency },
-                    )}`
+                  ? `Start ${formatEntry(buyInCents ?? 0, feeCents, currency)}`
+                  : `Start ${formatStakes(stakes, currency)} · ${formatMoney(buyInCents ?? 0, {
+                      currency,
+                    })}`
             }
             onPress={() => void start()}
             disabled={!canStart}
@@ -153,6 +162,21 @@ export default function NewSessionScreen() {
       <SectionHeader title="Game" />
       <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} />
 
+      {/*
+        Set once and then carried by `deriveDefaults`, like everything else on
+        this screen: a player picks their currency on their first session and
+        never thinks about it again, and one who flies somewhere to play can
+        change it for that trip and change it back.
+
+        Here rather than in Settings because this is where the money on this
+        session is decided, and because a setting somewhere else would be a
+        second source of truth for a field that already lives on the record.
+        Every price on this screen redraws when it moves, so the choice is
+        visible rather than filed away.
+      */}
+      <SectionHeader title="Currency" />
+      <ChipGroup options={CURRENCY_OPTIONS} value={currency} onChange={setCurrency} scroll />
+
       {tournament ? (
         <>
           <SectionHeader title="Entry" />
@@ -160,7 +184,7 @@ export default function NewSessionScreen() {
             {ENTRY_PRESETS.map((preset) => (
               <Chip
                 key={preset.buyIn}
-                label={formatEntry(preset.buyIn, preset.fee, defaults.currency)}
+                label={formatEntry(preset.buyIn, preset.fee, currency)}
                 selected={buyInCents === preset.buyIn && feeCents === preset.fee}
                 onPress={() => {
                   setBuyIn(String(preset.buyIn / 100));
@@ -172,14 +196,14 @@ export default function NewSessionScreen() {
           <AmountInput
             value={buyIn}
             onChangeText={setBuyIn}
-            currency={defaults.currency}
+            currency={currency}
             accessibilityLabel="Tournament buy-in"
           />
           <SectionHeader title="Entry fee" />
           <AmountInput
             value={fee}
             onChangeText={setFee}
-            currency={defaults.currency}
+            currency={currency}
             accessibilityLabel="Tournament entry fee"
           />
           <Text variant="caption" color={colors.textTertiary} style={styles.moodHint}>
@@ -190,13 +214,13 @@ export default function NewSessionScreen() {
       ) : (
         <>
           <SectionHeader title="Stakes" />
-          <StakesPicker value={stakes} onChange={setStakes} />
+          <StakesPicker value={stakes} onChange={setStakes} currency={currency} />
 
           <SectionHeader title="Buy-in" />
           <AmountInput
             value={buyIn}
             onChangeText={setBuyIn}
-            currency={defaults.currency}
+            currency={currency}
             presets={buyInPresets(stakes)}
             accessibilityLabel="Buy-in amount"
           />

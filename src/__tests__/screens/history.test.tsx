@@ -119,6 +119,40 @@ describe('the session list', () => {
     expect(screen.queryByText('Aria')).toBeNull();
   });
 
+  it('totals one currency at a time, rather than adding euros to dollars', async () => {
+    // The defect: the strip above the list sums `netResult` over whatever it
+    // is given, and a trip abroad used to land in the bankroll at face value
+    // with a dollar sign drawn in front of it.
+    const DAY = 86_400_000;
+    const T = Date.UTC(2026, 0, 10);
+    // Two of each, with totals that match no single row, so the strip cannot
+    // pass by accident on a row's figure. The dollar sessions are the recent
+    // ones, which is what makes dollars the default here.
+    load({
+      sessions: [
+        session('home-1', { currency: 'USD', buyIn: 20_000, cashOut: 50_000, startedAt: T }),
+        session('home-2', { currency: 'USD', buyIn: 20_000, cashOut: 30_000, startedAt: T - DAY }),
+        session('trip-1', { currency: 'EUR', buyIn: 20_000, cashOut: 70_000, startedAt: T - 8 * DAY }),
+        session('trip-2', { currency: 'EUR', buyIn: 20_000, cashOut: 40_000, startedAt: T - 9 * DAY }),
+      ],
+    });
+    await renderScreen(<HistoryScreen />);
+
+    expect(screen.getByText('+$400')).toBeTruthy();
+    // What it used to say: every net added together, drawn as dollars.
+    expect(screen.queryByText('+$1,100')).toBeNull();
+
+    await userEvent.press(screen.getByText('€ EUR'));
+    expect(screen.getByText('+€700')).toBeTruthy();
+    expect(screen.getByText('2 sessions')).toBeTruthy();
+  });
+
+  it('and offers no currency chips to a player who only ever plays in one', async () => {
+    load({ sessions: [session('a'), session('b')] });
+    await renderScreen(<HistoryScreen />);
+    expect(screen.queryByText('$ USD')).toBeNull();
+  });
+
   it('but does not offer the format chips to somebody who plays one', async () => {
     // A filter whose only two answers are "everything" and "nothing" is a row
     // of chips in the way of the list.

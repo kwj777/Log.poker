@@ -5,6 +5,16 @@
  * What is left to get wrong is here: reading the whole log rather than the
  * part the store happens to hold, offering a file there is nothing to put in,
  * and saying something afterwards that is true.
+ *
+ * ## This file runs Settings as a shipped build
+ *
+ * `ALLOW_DEMO_SEED` is `IS_DEV`, and `jest-expo` defines `__DEV__` as true, so
+ * without the mock below every test here renders a developer card no installed
+ * app has ever shown. That is not a detail: the screen's only render of its
+ * result message used to live inside that card, so an export said nothing, a
+ * failed export said nothing and clearing the whole log said nothing -- while
+ * a green test on this very line asserted the opposite. Forcing the flag off
+ * is what makes these assertions about the app rather than about the harness.
  */
 
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
@@ -26,6 +36,11 @@ jest.mock('../../features/export/saveCsv', () => ({
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
+jest.mock('../../config', () => ({
+  ...jest.requireActual('../../config'),
+  ALLOW_DEMO_SEED: false,
+}));
+
 // Neither is what this file is about, and the sign-in card reaches the whole
 // auth stack -- a token store, a session manager, a clock -- to render a button.
 jest.mock('../../features/account/SignInCard', () => ({ SignInCard: () => null }));
@@ -35,6 +50,9 @@ const mockRepository = {
   listSessions: jest.fn(),
   listHands: jest.fn(),
   listMoodEntries: jest.fn(),
+  listVenues: jest.fn(),
+  deleteVenue: jest.fn(),
+  clearAll: jest.fn(),
 };
 
 jest.mock('../../data', () => ({
@@ -65,6 +83,9 @@ beforeEach(() => {
     { id: 'm1', sessionId: 's1', phase: 'start', score: 4, at: 1, createdAt: 1, updatedAt: 1 },
     { id: 'm2', sessionId: 's1', phase: 'end', score: 2, at: 2, createdAt: 1, updatedAt: 1 },
   ]);
+  mockRepository.listVenues.mockImplementation(async () => []);
+  mockRepository.deleteVenue.mockImplementation(async () => undefined);
+  mockRepository.clearAll.mockImplementation(async () => undefined);
   load();
 });
 
@@ -173,5 +194,64 @@ describe('exporting how the sessions felt', () => {
     load({ moodEntries: [] });
     await renderScreen(<SettingsScreen />);
     expect(screen.getByText('Moods')).toBeDisabled();
+  });
+});
+
+/**
+ * Saying what just happened, in the build people actually install.
+ *
+ * Every assertion here failed before the screen stopped keeping its one
+ * message inside the developer card. They are written against four separate
+ * actions rather than one, because the card each result belongs to is the part
+ * that was wrong -- a single assertion would pass again the moment somebody
+ * moved the render somewhere convenient and dev-only.
+ */
+describe('a shipped build saying what it did', () => {
+  it('has no developer card to hide a message in', async () => {
+    await renderScreen(<SettingsScreen />);
+    expect(screen.queryByText('Load demo data')).toBeNull();
+  });
+
+  it('confirms an export under the export card', async () => {
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Sessions'));
+    expect(await screen.findByText('Exported 2 sessions.')).toBeTruthy();
+  });
+
+  it('says an export failed', async () => {
+    mockRepository.listSessions.mockImplementation(async () => {
+      throw new Error('the database is gone');
+    });
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Sessions'));
+    expect(await screen.findByText('the database is gone')).toBeTruthy();
+  });
+
+  it('confirms that everything was cleared, which is the one worth being sure of', async () => {
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Clear all data'));
+    await userEvent.press(screen.getByText('Delete everything'));
+    expect(await screen.findByText('All data cleared.')).toBeTruthy();
+  });
+
+  it('says when removing a venue did not work, rather than leaving the row there', async () => {
+    mockRepository.deleteVenue.mockImplementation(async () => {
+      throw new Error('venue is in use');
+    });
+    load({
+      venues: [
+        {
+          id: 'v1',
+          name: 'Aria',
+          isHomeGame: false,
+          sessionCount: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Remove'));
+    expect(await screen.findByText('venue is in use')).toBeTruthy();
   });
 });

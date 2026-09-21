@@ -1216,6 +1216,45 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listSessions()).toEqual([]);
       });
 
+      it('takes a hand with no tags at all, and the rest of the answer with it', async () => {
+        // The server validates an id and a stamp and carries every other field
+        // through untouched, so a record can arrive missing a field the domain
+        // type says is always there. On the IndexedDB side `[...record.tags]`
+        // threw on exactly this, inside the transaction, which rolled back
+        // every other table in the same answer and left the cursor where it
+        // was: the identical batch came down and failed again on every sync
+        // after it, forever, for one record nobody could see.
+        await repository.applyChanges(set({
+          venues: [change(foreignVenue('v-remote', T0))],
+          sessions: [change(foreignSession('s-remote', 'v-remote'))],
+          hands: [change({
+            id: 'h-remote', sessionId: 's-remote', holeCards: 'AsKd', position: null,
+            note: null, amount: null, at: T0, createdAt: T0, updatedAt: T0,
+          })],
+        }));
+
+        expect((await repository.getHand('h-remote'))?.tags).toEqual([]);
+        // The point of the case: the rest of the answer landed too.
+        expect((await repository.listSessions()).map((session) => session.id))
+          .toEqual(['s-remote']);
+        expect((await repository.listVenues()).map((venue) => venue.id)).toEqual(['v-remote']);
+      });
+
+      it('takes a session with no stakes at all, and reads it back as having none', async () => {
+        // The same hole, one table up: `{ ...undefined }` does not throw, it
+        // quietly writes a stakes object with no blinds in it, and every
+        // reading of that session divides by an undefined big blind from then
+        // on. SQLite stores the missing halves as the 0/0 sentinel and reads
+        // that back as null, so null is the answer both engines have to give.
+        const { stakes: _dropped, ...noStakes } = foreignSession('s-remote', 'v-remote');
+        await repository.applyChanges(set({
+          venues: [change(foreignVenue('v-remote', T0))],
+          sessions: [change(noStakes)],
+        }));
+
+        expect((await repository.getSession('s-remote'))?.stakes).toBeNull();
+      });
+
       it('takes a venue and the session on it in one call', async () => {
         // Parents first, within the one call, or the session would be skipped.
         await repository.applyChanges(set({

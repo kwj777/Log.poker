@@ -31,7 +31,7 @@ import { Text } from '../../components/Text';
 import { formatNotation } from '../../domain/handNotation';
 import type { Hand } from '../../domain/types';
 import { colors, radius, spacing } from '../../theme';
-import { openHandOff } from './hooks';
+import { openLink } from './hooks';
 import { drillHandOff } from './links';
 import { promptCopy, promptTitle, type ReviewPrompt } from './reviewPrompt';
 
@@ -88,7 +88,7 @@ const FlaggedHand = ({ hand, last }: { hand: Hand; last: boolean }) => {
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={handOff.label}
-      onPress={() => openHandOff(handOff.url)}
+      onPress={() => openLink(handOff.url)}
       style={({ pressed }) => [
         styles.row,
         last ? styles.lastRow : null,

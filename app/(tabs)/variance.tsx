@@ -54,7 +54,7 @@ import { useEntryResults, useRoiInterval } from '../../src/features/sessions/use
 import { Explain } from '../../src/components/Explain';
 import { STAT_HELP } from '../../src/domain/glossary';
 import { startMoodComparison } from '../../src/domain/mood';
-import { openHandOff } from '../../src/features/family/hooks';
+import { openLink } from '../../src/features/family/hooks';
 import { untiltHandOff } from '../../src/features/family/links';
 import { useAllHands, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
@@ -255,7 +255,7 @@ export default function VarianceScreen() {
       variant="secondary"
       size="small"
       href={GUIDES.runningBad}
-      onPress={() => openHandOff(GUIDES.runningBad)}
+      onPress={() => openLink(GUIDES.runningBad)}
       style={styles.guide}
     />
   );
@@ -401,7 +401,7 @@ export default function VarianceScreen() {
               label={untiltHandOff().label}
               variant="secondary"
               size="medium"
-              onPress={() => openHandOff(untiltHandOff().url)}
+              onPress={() => openLink(untiltHandOff().url)}
             />
           </Card>
         </>

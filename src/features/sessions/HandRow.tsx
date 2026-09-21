@@ -21,7 +21,7 @@ import { Text } from '../../components/Text';
 import { formatMoney } from '../../domain/money';
 import { formatNotation } from '../../domain/handNotation';
 import { HAND_TAG_LABELS, type Hand } from '../../domain/types';
-import { openHandOff } from '../family/hooks';
+import { openLink } from '../family/hooks';
 import { drillHandOff } from '../family/links';
 import { colors, radius, resultColor, spacing, typography } from '../../theme';
 
@@ -137,7 +137,7 @@ const DrillLink = ({ hand }: { hand: Hand }) => {
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={handOff.label}
-      onPress={() => openHandOff(handOff.url)}
+      onPress={() => openLink(handOff.url)}
       style={({ pressed }) => [styles.drill, pressed ? styles.drillPressed : null]}
     >
       <Ionicons name="flash-outline" size={14} color={colors.accent} />

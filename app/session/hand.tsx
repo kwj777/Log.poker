@@ -80,7 +80,7 @@ import {
   isBoard,
 } from '../../src/domain/handNotation';
 import { formatSessionDate } from '../../src/features/sessions/format';
-import { openHandOff } from '../../src/features/family/hooks';
+import { openLink } from '../../src/features/family/hooks';
 import { tableHandOff } from '../../src/features/family/links';
 import { tableOfferCopy, wantsTableReset } from '../../src/features/family/tableOffer';
 import { useHandById, useLogStore, useSessionById } from '../../src/store/useLogStore';
@@ -353,7 +353,7 @@ export default function LogHandScreen() {
               label={offer.label}
               variant="secondary"
               size="small"
-              onPress={() => openHandOff(offer.url)}
+              onPress={() => openLink(offer.url)}
             />
             <Button
               label="Back to the game"

@@ -38,7 +38,7 @@ import {
   totals,
 } from '../../src/domain/stats';
 import { formatRoi, tournamentTotals } from '../../src/domain/tournaments';
-import { openHandOff } from '../../src/features/family/hooks';
+import { openLink } from '../../src/features/family/hooks';
 import { ReviewFlagged } from '../../src/features/family/ReviewFlagged';
 import { reviewPrompt } from '../../src/features/family/reviewPrompt';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
@@ -477,7 +477,7 @@ export default function DashboardScreen() {
           variant="secondary"
           size="small"
           href={GUIDES.bankroll}
-          onPress={() => openHandOff(GUIDES.bankroll)}
+          onPress={() => openLink(GUIDES.bankroll)}
           style={styles.guideLink}
         />
       </Card>

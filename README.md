@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 87 passed
-Tests:       2065 passed
+Test Suites: 88 passed
+Tests:       2071 passed
 
   dexieRepository   137   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
@@ -1161,11 +1161,12 @@ Tests:       2065 passed
   mergeVenues         7   folding one room into another, and the order it does it in
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   settingsBankroll    7   entering what you had behind you before the log started
+  settingsHelp        7   the privacy link, the support address, the build
   settingsVenues      7   renaming a venue, and merging two that are one room
   venues              7   which spellings of a room name are the same room
   readme              6   the test table adds up and says what each suite is for
   scale               6   how much of the plot the data actually gets
-  settingsHelp        6   the privacy link, the support address, the build
+  crossPromo          5   the family card as drawn, and the link a refusing device gives back
   errorBoundary       5   a render that throws, and the way back from it
   lineChart           5   what a chart says before it has been measured
   roiInterval         5   the ROI bootstrap runs once per result set, not per render

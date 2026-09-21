@@ -27,7 +27,7 @@
  */
 
 import { useState } from 'react';
-import { Linking, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { AmountInput } from '../../src/components/AmountInput';
@@ -57,6 +57,7 @@ import { DEMO_SESSION_COUNT, seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
 import { VenueRow } from '../../src/features/venues/VenueRow';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
+import { openLink } from '../../src/features/family/hooks';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { releaseLabel } from '../../src/version';
@@ -523,14 +524,14 @@ export default function SettingsScreen() {
             variant="secondary"
             size="medium"
             style={styles.exportButton}
-            onPress={() => void Linking.openURL(PRIVACY_POLICY)}
+            onPress={() => openLink(PRIVACY_POLICY)}
           />
           <Button
             label="Contact support"
             variant="secondary"
             size="medium"
             style={styles.exportButton}
-            onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            onPress={() => openLink(`mailto:${SUPPORT_EMAIL}`)}
           />
         </View>
         <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>

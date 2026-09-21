@@ -29,7 +29,7 @@ import {
   type MoodComparison,
 } from '../../domain/mood';
 import { colors, spacing } from '../../theme';
-import { openHandOff } from '../family/hooks';
+import { openLink } from '../family/hooks';
 import { untiltHandOff } from '../family/links';
 
 const rate = (bbPerHour: number): string => `${Math.abs(bbPerHour).toFixed(1)} bb/hr`;
@@ -167,7 +167,7 @@ export const MoodCost = ({ comparison }: { comparison: MoodComparison }) => {
               label={untiltHandOff().label}
               variant="secondary"
               size="medium"
-              onPress={() => openHandOff(untiltHandOff().url)}
+              onPress={() => openLink(untiltHandOff().url)}
             />
           </View>
         ) : null}

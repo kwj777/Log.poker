@@ -58,7 +58,7 @@ import { Card } from '../../components/Card';
 import { Text } from '../../components/Text';
 import { getSession, hasPass } from '../../auth';
 import { colors, spacing } from '../../theme';
-import { openHandOff } from '../family/hooks';
+import { openLink } from '../family/hooks';
 import { postSessionHandOff } from '../family/links';
 
 /**
@@ -116,7 +116,7 @@ export const PostSessionReset = () => {
           label={offer.label}
           variant="secondary"
           size="small"
-          onPress={() => openHandOff(offer.url)}
+          onPress={() => openLink(offer.url)}
         />
         <Button
           label="Not now"

@@ -13,6 +13,24 @@
  * rather than by the way out -- once per session, and never in front of the
  * write. See `features/family/tableOffer.ts` for which tags and why those.
  *
+ * ## Which session it writes to
+ *
+ * The live one by default, and the one named by `sessionId` when the screen is
+ * opened from a session that has already ended. `logHand` has always taken a
+ * session id and has never cared whether that session was running; only this
+ * screen cared, by reading `activeSession` and refusing when there was none.
+ * The effect was that a night you wrote down afterwards could never have a
+ * hand attached to it, for as long as it existed -- which sat oddly beside an
+ * app that will let you add the session itself, edit it, and edit every hand
+ * already in it.
+ *
+ * A hand added to a session that is over is timed at that session's end rather
+ * than at now. It happened somewhere inside that night, this screen cannot
+ * know where, and the end of it is the one guess that keeps the hand among the
+ * right session's hands and in the right year. It also gets no reset offer,
+ * for the reason editing does not: the offer is for the minute after a hand
+ * happened, and neither of these is that minute.
+ *
  * ## The same screen edits one
  *
  * With an `id` it opens on a hand that already exists and writes over it. One
@@ -56,6 +74,7 @@ import {
 import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { CardPicker } from '../../src/features/hands/CardPicker';
 import { MAX_BOARD, isBoard } from '../../src/domain/handNotation';
+import { formatSessionDate } from '../../src/features/sessions/format';
 import { openHandOff } from '../../src/features/family/hooks';
 import { tableHandOff } from '../../src/features/family/links';
 import { tableOfferCopy, wantsTableReset } from '../../src/features/family/tableOffer';
@@ -67,8 +86,12 @@ const POSITION_OPTIONS = POSITIONS.map((value) => ({ value, label: value }));
 const TAG_OPTIONS = HAND_TAGS.map((value) => ({ value, label: HAND_TAG_LABELS[value] }));
 
 export default function LogHandScreen() {
-  /** Present when this screen is opened on a hand that already exists. */
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  /**
+   * `id` is present when this screen is opened on a hand that already exists;
+   * `sessionId` when it is opened to add one to a session that is not running.
+   * Neither is present for the ordinary case, a hand at a live table.
+   */
+  const { id, sessionId } = useLocalSearchParams<{ id?: string; sessionId?: string }>();
   const editingId = id ?? null;
   const editing = editingId !== null;
 
@@ -88,7 +111,22 @@ export default function LogHandScreen() {
    * night being edited during a hold'em session has to keep asking for four.
    */
   const handSession = useSessionById(existing == null ? null : existing.sessionId);
-  const session = editing ? handSession : activeSession;
+  /** The session named by the route, for a hand being added to a finished night. */
+  const namedSession = useSessionById(editing ? null : (sessionId ?? null));
+  const session = editing ? handSession : (namedSession ?? activeSession);
+
+  /**
+   * Whether this is a hand at the table the player is sitting at right now.
+   *
+   * Against `activeSession` rather than against which param was used, because
+   * those can disagree in both directions. Opening the live session's own
+   * detail screen and tapping Log a hand passes its id, and that is still a
+   * live hand. A session left running from a week ago has a null `endedAt` and
+   * is not one: the store calls that stranded, the player is not at it, and it
+   * should no more offer them a break than last Tuesday should.
+   */
+  const atTheTable =
+    !editing && session !== null && activeSession !== null && session.id === activeSession.id;
 
   const [holeCards, setHoleCards] = useState<string | null>(null);
   const [board, setBoard] = useState<string | null>(null);
@@ -168,15 +206,21 @@ export default function LogHandScreen() {
         </Screen>
       );
     }
+    // A named session that is not here is a different thing from no session at
+    // all, and telling somebody to start one would be advice for a problem
+    // they do not have.
+    const named = sessionId != null;
     return (
       <Screen>
         <PageMeta title={pageTitle} />
         <View style={styles.empty}>
           <Text variant="heading" center>
-            No session running
+            {named ? 'Session not found' : 'No session running'}
           </Text>
           <Text color={colors.textSecondary} center>
-            Hands are logged against a live session. Start one first.
+            {named
+              ? 'It may have been deleted.'
+              : 'Start a session, or open one you have already logged and add the hand there.'}
           </Text>
           <Button label="Close" onPress={() => router.back()} style={styles.emptyAction} />
         </View>
@@ -223,7 +267,14 @@ export default function LogHandScreen() {
         router.back();
         return;
       }
-      await logHand({ sessionId: session.id, ...entered() });
+      await logHand({
+        sessionId: session.id,
+        // A hand added to a night that is over is timed at the end of it. See
+        // the header: nothing here knows when inside the session it happened,
+        // and `Date.now()` would file it under today.
+        ...(atTheTable ? {} : { at: session.endedAt ?? session.startedAt }),
+        ...entered(),
+      });
       successFeedback();
       /*
         The write is done and nothing below may undo it or stand in front of
@@ -233,7 +284,7 @@ export default function LogHandScreen() {
         the tags that were actually written, and the worst it can do is leave
         somebody on a screen with a way out on it.
       */
-      if (wantsTableReset(tags) && tableOfferMadeAt === null) {
+      if (atTheTable && wantsTableReset(tags) && tableOfferMadeAt === null) {
         markTableOffer();
         setOffered(true);
         return;
@@ -310,7 +361,11 @@ export default function LogHandScreen() {
         <Text color={colors.textSecondary} style={styles.subtitle}>
           {editing
             ? 'Change what was wrong. Everything here is still optional.'
-            : 'Everything here is optional. Tap what matters and save.'}
+            : atTheTable
+              ? 'Everything here is optional. Tap what matters and save.'
+              : // Which night it is going into, since this is the one case
+                // where the answer is not "the one you are sitting in".
+                `Adding to ${session.venue?.name ?? 'your session'} on ${formatSessionDate(session.startedAt)}. Everything here is optional.`}
         </Text>
       </View>
 

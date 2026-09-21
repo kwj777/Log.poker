@@ -280,7 +280,23 @@ export default function SessionDetailScreen() {
         that gap would be wrong rather than early, so the count and the card
         both wait for the answer.
       */}
-      <SectionHeader title={hands === null ? 'Hands' : `Hands (${hands.length})`} />
+      <SectionHeader
+        title={hands === null ? 'Hands' : `Hands (${hands.length})`}
+        /*
+          Every hand here could already be edited or deleted, and none could be
+          added: the hand screen read the live session and refused when there
+          was none, so a night written down afterwards could never gain one.
+          The store never had that restriction.
+        */
+        action={
+          <Button
+            label="Log a hand"
+            variant="ghost"
+            size="small"
+            onPress={() => router.push(`/session/hand?sessionId=${session.id}`)}
+          />
+        }
+      />
       {hands === null ? null : hands.length === 0 ? (
         <Card>
           <Text color={colors.textSecondary}>No hands logged for this session.</Text>

@@ -36,6 +36,7 @@ import type {
   Stakes,
   Venue,
 } from '../domain/types';
+import type { StartingBalance } from '../data/repository';
 
 export type Status = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -156,6 +157,17 @@ interface LogState {
   moodEntries: MoodEntry[];
 
   /**
+   * What the player had behind them before the first logged session.
+   *
+   * Null is unasked and `{ cents: 0 }` is a player who started from nothing,
+   * and nothing downstream may collapse the two: the difference is whether the
+   * dashboard headline is a bankroll or a profit figure. It carries its own
+   * currency, because the dashboard is scoped to one. See `Preferences`, which
+   * also says why this does not sync.
+   */
+  startingBalance: StartingBalance | null;
+
+  /**
    * How many hands are logged, which is all the store knows about them.
    *
    * It used to hold every one. A hand belongs to a session and every screen
@@ -192,6 +204,9 @@ interface LogState {
   hydrate: () => Promise<void>;
   /** Defaults to every slice; a write names only what it could have changed. */
   refresh: (parts?: readonly Slice[]) => Promise<void>;
+
+  /** Null clears it, which puts the dashboard back to showing profit. */
+  setStartingBalance: (balance: StartingBalance | null) => Promise<void>;
 
   createVenue: (name: string, isHomeGame: boolean) => Promise<Venue>;
   renameVenue: (id: string, name: string) => Promise<void>;
@@ -233,9 +248,15 @@ interface LogState {
  * the sessions do, and giving it a name of its own would only create a way for
  * the two to be refreshed apart.
  */
-type Slice = 'venues' | 'sessions' | 'hands' | 'moodEntries';
+type Slice = 'venues' | 'sessions' | 'hands' | 'moodEntries' | 'preferences';
 
-const EVERYTHING: readonly Slice[] = ['venues', 'sessions', 'hands', 'moodEntries'];
+const EVERYTHING: readonly Slice[] = [
+  'venues',
+  'sessions',
+  'hands',
+  'moodEntries',
+  'preferences',
+];
 
 /**
  * Read back the slices a write could have changed, and only those.
@@ -288,6 +309,14 @@ const load = async (parts: ReadonlySet<Slice>): Promise<Map<Slice, Partial<LogSt
           .listMoodEntries()
           .then((moodEntries) => void loaded.set('moodEntries', { moodEntries }))
       : null,
+    // A slice of one value. It goes through the same machinery as the rest
+    // rather than being read once at hydrate, because `clearAll` takes it too
+    // and a second mechanism to remember that in is a second one to forget.
+    parts.has('preferences')
+      ? repository
+          .getPreferences()
+          .then(({ startingBalance }) => void loaded.set('preferences', { startingBalance }))
+      : null,
   ]);
   return loaded;
 };
@@ -306,7 +335,13 @@ const load = async (parts: ReadonlySet<Slice>): Promise<Map<Slice, Partial<LogSt
  * and nowhere else: one number would make the sync's venues and sessions stale
  * too, and throw away three good slices to settle one.
  */
-const owner: Record<Slice, number> = { venues: 0, sessions: 0, hands: 0, moodEntries: 0 };
+const owner: Record<Slice, number> = {
+  venues: 0,
+  sessions: 0,
+  hands: 0,
+  moodEntries: 0,
+  preferences: 0,
+};
 
 /** Claim the slices, read them, and keep whichever are still this read's to set. */
 const read = async (parts: readonly Slice[]): Promise<Partial<LogState>> => {
@@ -358,6 +393,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   sessions: [],
   activeSession: null,
   moodEntries: [],
+  startingBalance: null,
   handCount: 0,
   handsVersion: 0,
   lastMidSessionPromptAt: null,
@@ -387,6 +423,14 @@ export const useLogStore = create<LogState>((set, get) => ({
     } catch (error) {
       set({ error: describeError(error) });
     }
+  },
+
+  setStartingBalance: async (balance) => {
+    const repository = await getRepository();
+    const { startingBalance } = await repository.setPreferences({ startingBalance: balance });
+    // Set from the answer rather than from the argument, so the screen shows
+    // what was stored rather than what was asked for.
+    set({ startingBalance });
   },
 
   createVenue: async (name, isHomeGame) => {

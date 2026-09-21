@@ -728,6 +728,21 @@ export class SyncingRepository implements Repository {
   }
 
   /**
+   * Straight through, and deliberately not `touched`.
+   *
+   * Preferences do not sync: they are not in `SYNC_TABLES`, there is no bundle
+   * entry for them and no tombstone. Marking the log dirty for one would push
+   * nothing and cost a round trip. See `Preferences` for what that trade buys
+   * and what it costs.
+   */
+  getPreferences() {
+    return this.local.getPreferences();
+  }
+  setPreferences(patch: Parameters<Repository['setPreferences']>[0]) {
+    return this.local.setPreferences(patch);
+  }
+
+  /**
    * Back to the beginning of the conversation, keeping the device id.
    *
    * The id survives, because forgetting it would make this device look like a

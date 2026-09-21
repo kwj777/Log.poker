@@ -181,6 +181,9 @@ export const VenueRow = ({
           <Button
             label="Save"
             size="small"
+            // Named, because a bare "Save" read out in a list of venues does
+            // not say which one it is about.
+            accessibilityLabel={`Save the name for ${venue.name}`}
             disabled={!canSave || busy}
             onPress={() => void rename()}
           />

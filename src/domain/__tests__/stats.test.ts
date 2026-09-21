@@ -185,6 +185,47 @@ describe('bankroll curve', () => {
   it('ignores sessions still in progress', () => {
     expect(bankrollCurve([session()])).toEqual([]);
   });
+
+  /**
+   * The curve began at zero and the dashboard called the result a bankroll,
+   * which it was not: it differs from one by whatever the player sat down
+   * with, and for a losing player it was negative, which no bankroll is.
+   */
+  describe('with what the player started with', () => {
+    const three = [
+      completed({ id: 'a', startedAt: T0, hours: 2, buyIn: 100, cashOut: 300 }),
+      completed({ id: 'b', startedAt: T0 + 10 * HOUR, hours: 2, buyIn: 100, cashOut: 0 }),
+      completed({ id: 'c', startedAt: T0 + 20 * HOUR, hours: 2, buyIn: 100, cashOut: 400 }),
+    ];
+
+    it('starts from the balance rather than from nothing', () => {
+      expect(bankrollCurve(three, 1_000).map((point) => point.cumulative)).toEqual([
+        1_200,
+        1_100,
+        1_400,
+      ]);
+    });
+
+    it('moves by the same amounts, since only where it starts has changed', () => {
+      const from = bankrollCurve(three, 1_000).map((point) => point.net);
+      expect(from).toEqual(bankrollCurve(three).map((point) => point.net));
+    });
+
+    it('is the curve it always was when nothing is passed', () => {
+      // Every existing caller and every existing reading of this is unchanged.
+      expect(bankrollCurve(three)).toEqual(bankrollCurve(three, 0));
+    });
+
+    it('carries a balance through a log that is under water', () => {
+      // The case the old curve got most visibly wrong: a bankroll that is
+      // smaller than it was is still a positive number.
+      const curve = bankrollCurve(
+        [completed({ id: 'a', startedAt: T0, hours: 2, buyIn: 20_000, cashOut: 0 })],
+        100_000,
+      );
+      expect(curve[0].cumulative).toBe(80_000);
+    });
+  });
 });
 
 describe('grouping', () => {

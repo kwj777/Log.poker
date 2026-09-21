@@ -1479,12 +1479,87 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
       });
     });
 
+    /**
+     * The player's own settings, which are not part of the log and do not sync.
+     *
+     * The distinction both engines have to keep is null against zero. Unasked
+     * is null; a player who started from nothing is zero; and the dashboard
+     * says "bankroll" for one and not the other. A store that collapsed them
+     * would be one that quietly answered a question nobody had been asked.
+     */
+    describe('preferences', () => {
+      const BALANCE = { cents: 250_000, currency: 'USD' };
+
+      it('starts out unasked rather than at zero', async () => {
+        expect(await repository.getPreferences()).toEqual({ startingBalance: null });
+      });
+
+      it('keeps what it was told, across a fresh read', async () => {
+        await repository.setPreferences({ startingBalance: BALANCE });
+        expect(await repository.getPreferences()).toEqual({ startingBalance: BALANCE });
+      });
+
+      it('answers the settings as they now are, so a caller need not read again', async () => {
+        expect(await repository.setPreferences({ startingBalance: BALANCE })).toEqual({
+          startingBalance: BALANCE,
+        });
+      });
+
+      it('keeps the currency with the amount, since a log can hold more than one', async () => {
+        await repository.setPreferences({ startingBalance: { cents: 90_000, currency: 'EUR' } });
+        expect(await repository.getPreferences()).toEqual({
+          startingBalance: { cents: 90_000, currency: 'EUR' },
+        });
+      });
+
+      it('holds zero, which is a real answer and not the absence of one', async () => {
+        await repository.setPreferences({ startingBalance: { cents: 0, currency: 'USD' } });
+        expect(await repository.getPreferences()).toEqual({
+          startingBalance: { cents: 0, currency: 'USD' },
+        });
+      });
+
+      it('holds a negative balance, since somebody can start logging while stuck', async () => {
+        await repository.setPreferences({ startingBalance: { cents: -50_000, currency: 'USD' } });
+        expect(await repository.getPreferences()).toEqual({
+          startingBalance: { cents: -50_000, currency: 'USD' },
+        });
+      });
+
+      it('goes back to unasked when it is cleared', async () => {
+        await repository.setPreferences({ startingBalance: BALANCE });
+        await repository.setPreferences({ startingBalance: null });
+        expect(await repository.getPreferences()).toEqual({ startingBalance: null });
+      });
+
+      it('writes nothing for an empty patch', async () => {
+        await repository.setPreferences({ startingBalance: BALANCE });
+        expect(await repository.setPreferences({})).toEqual({ startingBalance: BALANCE });
+      });
+
+      it('does not appear in what the sync layer is offered', async () => {
+        await repository.setPreferences({ startingBalance: BALANCE });
+        // Not in SYNC_TABLES, so there is nowhere for it to show up. The test
+        // is here because the day it does sync, this line is what fails.
+        expect(await repository.listChangedSince(0)).toEqual({
+          venues: [],
+          sessions: [],
+          rebuys: [],
+          hands: [],
+          moodEntries: [],
+        });
+      });
+    });
+
     describe('maintenance', () => {
       it('clears every table', async () => {
         const session = await newSession();
         await repository.addRebuy({ sessionId: session.id, amount: 100, at: T0 });
         await repository.createHand({ sessionId: session.id, at: T0 });
         await repository.createMoodEntry({ sessionId: session.id, phase: 'start', score: 3, at: T0 });
+        await repository.setPreferences({
+          startingBalance: { cents: 250_000, currency: 'USD' },
+        });
 
         await repository.clearAll();
 
@@ -1492,6 +1567,8 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listSessions()).toEqual([]);
         expect(await repository.listHands()).toEqual([]);
         expect(await repository.listMoodEntries()).toEqual([]);
+        // A device with no sessions on it has no starting balance either.
+        expect(await repository.getPreferences()).toEqual({ startingBalance: null });
       });
 
       it('clears without leaving tombstones, because reset is not erasure', async () => {

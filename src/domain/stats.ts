@@ -248,23 +248,45 @@ export const cashWinRate = (sessions: readonly SessionWithChildren[]): WinRate =
 
 export interface BankrollPoint {
   at: number;
-  /** Running total of net result, in cents, after this session. */
+  /**
+   * The balance after this session, in cents: the starting balance the curve
+   * was seeded with plus every result up to and including this one. With no
+   * starting balance that is cumulative profit, which is what it always was.
+   */
   cumulative: Cents;
   net: Cents;
   sessionId: string;
 }
 
 /**
- * Cumulative P/L over time, oldest first -- the bankroll graph's data.
- * Ordered by session end so the curve reflects when results were realized.
+ * The bankroll over time, oldest first. Ordered by session end, so the curve
+ * moves when a result was realized rather than when a night began.
+ *
+ * ## What `startingBalance` is for
+ *
+ * This used to begin at zero and the dashboard called the result "Bankroll",
+ * which it was not: a bankroll is a balance and this was profit since the
+ * first logged session. For a winning player the two differ by whatever they
+ * sat down with, and for a losing one the headline was negative, which no
+ * bankroll has ever been.
+ *
+ * Passing what the player had behind them makes the word true. Zero is still
+ * the default and is still a real answer -- somebody who started from nothing
+ * -- so a caller with no balance to offer gets exactly the curve this returned
+ * before, and every existing reading of it is unchanged. The dashboard is what
+ * knows the difference between zero and unasked, because that is the
+ * difference between calling it a bankroll and not.
  */
-export const bankrollCurve = (sessions: readonly SessionWithChildren[]): BankrollPoint[] => {
+export const bankrollCurve = (
+  sessions: readonly SessionWithChildren[],
+  startingBalance: Cents = 0,
+): BankrollPoint[] => {
   const completed = sessions
     .filter(isComplete)
     .slice()
     .sort((a, b) => (a.endedAt ?? 0) - (b.endedAt ?? 0));
 
-  let cumulative = 0;
+  let cumulative = startingBalance;
   return completed.map((session) => {
     const net = netResult(session, session.rebuys) ?? 0;
     cumulative += net;

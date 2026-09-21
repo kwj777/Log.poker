@@ -93,7 +93,7 @@ describe('renaming a venue', () => {
     const field = screen.getByLabelText('Name for Aria High Limt');
     await userEvent.clear(field);
     await userEvent.type(field, 'Aria High Limit');
-    await userEvent.press(screen.getByText('Save'));
+    await userEvent.press(screen.getByLabelText('Save the name for Aria High Limt'));
 
     expect(mockRenamed).toEqual([{ id: 'v1', name: 'Aria High Limit' }]);
   });
@@ -103,7 +103,7 @@ describe('renaming a venue', () => {
     const field = screen.getByLabelText('Name for Aria High Limt');
     await userEvent.clear(field);
     await userEvent.type(field, 'Aria High Limit');
-    await userEvent.press(screen.getByText('Save'));
+    await userEvent.press(screen.getByLabelText('Save the name for Aria High Limt'));
 
     expect(await screen.findByText('Renamed to Aria High Limit.')).toBeTruthy();
   });
@@ -116,7 +116,7 @@ describe('renaming a venue', () => {
 
     // Two rows cannot become one row by being called the same thing. What the
     // player meant is offered instead.
-    expect(screen.queryByText('Save')).toBeNull();
+    expect(screen.queryByLabelText('Save the name for Aria High Limt')).toBeNull();
     expect(screen.getByText('Merge into Bellagio')).toBeTruthy();
     expect(mockRenamed).toEqual([]);
   });

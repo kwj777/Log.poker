@@ -297,7 +297,7 @@ describe('the migration list', () => {
     // A device that ran version 3 last month will never run it again, so
     // editing one changes nothing there and everything on a fresh install, and
     // the two stop agreeing without anything erroring.
-    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5]);
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(MIGRATIONS[1].statements).toEqual([
       'ALTER TABLE sessions ADD COLUMN import_key TEXT',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)',
@@ -306,6 +306,14 @@ describe('the migration list', () => {
 
   it('adds the board to the hands and to nothing else', () => {
     expect(MIGRATIONS[4].statements).toEqual(['ALTER TABLE hands ADD COLUMN board TEXT']);
+  });
+
+  it('gives the preferences no tombstone column, because they do not sync', () => {
+    const [statement, ...rest] = MIGRATIONS[5].statements;
+    expect(rest).toEqual([]);
+    expect(statement).toContain('CREATE TABLE IF NOT EXISTS preferences');
+    // The day this table syncs it needs one, and this line is what asks.
+    expect(statement).not.toContain('deleted_at');
   });
 
   it('puts the tombstone column on every table that syncs', () => {

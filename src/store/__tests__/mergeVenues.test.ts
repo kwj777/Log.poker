@@ -23,6 +23,7 @@ const repository = {
   countHands: jest.fn(),
   listMoodEntries: jest.fn(),
   getActiveSession: jest.fn(),
+  getPreferences: jest.fn(),
   updateSession: jest.fn(),
   deleteVenue: jest.fn(),
 };
@@ -46,6 +47,7 @@ beforeEach(() => {
   repository.countHands.mockImplementation(async () => 0);
   repository.listMoodEntries.mockImplementation(async () => []);
   repository.getActiveSession.mockImplementation(async () => null);
+  repository.getPreferences.mockImplementation(async () => ({ startingBalance: null }));
   repository.listSessions.mockImplementation(async (filter?: { venueId?: string }) =>
     filter?.venueId === 'old' ? [{ id: 's1', rebuys: [] }, { id: 's2', rebuys: [] }] : [],
   );

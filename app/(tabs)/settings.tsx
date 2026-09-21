@@ -30,6 +30,7 @@ import { useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
+import { AmountInput } from '../../src/components/AmountInput';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
@@ -50,6 +51,8 @@ import {
   type ExportKind,
 } from '../../src/domain/export/sessionExport';
 import { saveCsv } from '../../src/features/export/saveCsv';
+import { formatMoney, fromCents, parseAmount } from '../../src/domain/money';
+import { primaryCurrency } from '../../src/domain/stats';
 import { seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
 import { VenueRow } from '../../src/features/venues/VenueRow';
@@ -60,7 +63,7 @@ import { releaseLabel } from '../../src/version';
 import { PageMeta } from '../../src/components/PageMeta';
 
 /** Which card an action reports under. */
-type ReportSection = 'venues' | 'export' | 'reset' | 'seed';
+type ReportSection = 'venues' | 'bankroll' | 'export' | 'reset' | 'seed';
 
 interface Report {
   section: ReportSection;
@@ -96,6 +99,8 @@ export default function SettingsScreen() {
   const sessions = useLogStore((state) => state.sessions);
   const handCount = useLogStore((state) => state.handCount);
   const moodEntries = useLogStore((state) => state.moodEntries);
+  const startingBalance = useLogStore((state) => state.startingBalance);
+  const setStartingBalance = useLogStore((state) => state.setStartingBalance);
   const deleteVenue = useLogStore((state) => state.deleteVenue);
   const renameVenue = useLogStore((state) => state.renameVenue);
   const mergeVenues = useLogStore((state) => state.mergeVenues);
@@ -200,6 +205,60 @@ export default function SettingsScreen() {
     }
   };
 
+  /**
+   * What the player had behind them before the first logged session.
+   *
+   * Seeded from what is stored and adjusted during render rather than synced
+   * in an effect, the way session detail seeds its notes: an effect would
+   * render an empty field first and then fill it, so somebody opening this
+   * screen would watch their own balance appear.
+   */
+  const [balanceDraft, setBalanceDraft] = useState('');
+  const [seededFrom, setSeededFrom] = useState<number | null | undefined>(undefined);
+  if (seededFrom !== (startingBalance?.cents ?? null)) {
+    setSeededFrom(startingBalance?.cents ?? null);
+    setBalanceDraft(startingBalance === null ? '' : String(fromCents(startingBalance.cents)));
+  }
+
+  /**
+   * The money a balance would be in: whatever the log is mostly in.
+   *
+   * Not a picker. A player with two currencies has one bankroll they think in,
+   * and a screen that asked them to choose would be asking a question to avoid
+   * making an assumption that is right almost every time. The dashboard shows
+   * profit rather than a bankroll for the currency this is not in, which is
+   * the honest behavior either way.
+   */
+  const balanceCurrency = primaryCurrency(sessions);
+  const draftCents = parseAmount(balanceDraft);
+
+  const saveBalance = async () => {
+    if (draftCents === null) return;
+    setBusy(true);
+    setReport(null);
+    try {
+      await setStartingBalance({ cents: draftCents, currency: balanceCurrency });
+      say('bankroll', `Starting balance set to ${formatMoney(draftCents, { currency: balanceCurrency })}.`);
+    } catch (error) {
+      say('bankroll', describeFailure(error, 'Could not save that.'), true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearBalance = async () => {
+    setBusy(true);
+    setReport(null);
+    try {
+      await setStartingBalance(null);
+      say('bankroll', 'Cleared. The dashboard shows your profit again.');
+    } catch (error) {
+      say('bankroll', describeFailure(error, 'Could not clear that.'), true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const reset = async () => {
     setBusy(true);
     setReport(null);
@@ -242,6 +301,56 @@ export default function SettingsScreen() {
           ))
         )}
         <ReportNote report={report} section="venues" />
+      </Card>
+
+      {/*
+        The number that makes the dashboard headline true.
+
+        It said "Bankroll" over cumulative profit from zero, which is not a
+        bankroll: it differs from one by whatever the player sat down with, and
+        for somebody down over their logged sessions it was negative, which no
+        bankroll has ever been. The app ships a guide about how big a bankroll
+        should be and had nowhere to put the number that guide is about.
+
+        Optional, and the dashboard says "Profit" without it, which is what it
+        has been showing all along.
+      */}
+      <SectionHeader title="Bankroll" />
+      <Card>
+        <Text color={colors.textSecondary} style={styles.body}>
+          What you had behind you before your first logged session. With it, the dashboard
+          shows your bankroll and what you have won or lost since. Without it, it shows what
+          you have won or lost, which is what it showed before.
+        </Text>
+        <AmountInput
+          value={balanceDraft}
+          onChangeText={setBalanceDraft}
+          currency={balanceCurrency}
+          accessibilityLabel="Starting balance"
+        />
+        <View style={styles.balanceRow}>
+          {startingBalance === null ? null : (
+            <Button
+              label="Clear"
+              variant="ghost"
+              size="small"
+              disabled={busy}
+              onPress={() => void clearBalance()}
+            />
+          )}
+          <View style={styles.spacer} />
+          <Button
+            label="Save"
+            variant="secondary"
+            size="small"
+            disabled={busy || draftCents === null}
+            onPress={() => void saveBalance()}
+          />
+        </View>
+        <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>
+          Kept on this device, and not carried to your other ones even when you are signed in.
+        </Text>
+        <ReportNote report={report} section="bankroll" />
       </Card>
 
       <SectionHeader title="Import" />
@@ -447,6 +556,15 @@ const styles = StyleSheet.create({
   body: {
     lineHeight: 23,
     marginBottom: spacing.lg,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  spacer: {
+    flex: 1,
   },
   exportRow: {
     flexDirection: 'row',

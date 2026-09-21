@@ -38,6 +38,60 @@ runRepositoryContract('IndexedDB', {
   },
 });
 
+describe('what counting the hands reads', () => {
+  it('counts keys rather than cursoring every hand in the log', async () => {
+    // The old version cursored the table and counted what survived `isLive`,
+    // under a comment claiming it was "one pass over keys". `Table.each`
+    // cursors values, so every hand came back out of IndexedDB as a structured
+    // clone -- for a number, on every refresh, after every hand written at the
+    // table and after every sync pull.
+    const db = createDatabase(`log-poker-test-count-${++counter}`);
+    const repository = new DexieRepository(db, {
+      clock: { now: () => T0 },
+      ids: { next: () => `id-${++ids}` },
+    });
+    await repository.init();
+
+    const venue = await repository.createVenue({ name: 'Aria', isHomeGame: false });
+    const session = await repository.createSession({
+      venueId: venue.id,
+      format: 'cash',
+      gameType: 'NLHE',
+      stakes: { smallBlind: 100, bigBlind: 200 },
+      currency: 'USD',
+      buyIn: 30_000,
+      startedAt: T0,
+    });
+    const hands = [];
+    for (let i = 0; i < 5; i += 1) {
+      hands.push(await repository.createHand({ sessionId: session.id, at: T0 + i }));
+    }
+    await repository.deleteHand(hands[0].id);
+    await repository.deleteHand(hands[1].id);
+
+    let whole = 0;
+    const readAll = db.hands.toArray.bind(db.hands);
+    const cursorAll = db.hands.each.bind(db.hands);
+    jest.spyOn(db.hands, 'toArray').mockImplementation(() => {
+      whole += 1;
+      return readAll();
+    });
+    jest.spyOn(db.hands, 'each').mockImplementation((callback) => {
+      whole += 1;
+      return cursorAll(callback);
+    });
+
+    // Three live of five, so the tombstones are really being taken off rather
+    // than the whole table being reported.
+    expect(await repository.countHands()).toBe(3);
+    expect(whole).toBe(0);
+
+    jest.restoreAllMocks();
+    db.close();
+    await db.delete();
+  });
+});
+
 describe('what reading one session reads', () => {
   it('counts the venues in hand rather than walking every session in the log', async () => {
     // `attachChildren` fills in each session's venue, and a venue carries how

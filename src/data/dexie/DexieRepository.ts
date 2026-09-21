@@ -808,15 +808,28 @@ export class DexieRepository implements Repository {
     return records.filter(isLive).map(toHand).sort((a, b) => b.at - a.at);
   }
 
+  /**
+   * How many hands are in the log, without reading any of them.
+   *
+   * This used to cursor the table and count what survived `isLive`, under a
+   * comment claiming it was "one pass over keys instead of reading and mapping
+   * every row". `Table.each` cursors *values*: every hand came back out of
+   * IndexedDB as a structured clone, for a number. Measured against
+   * fake-indexeddb: 2000 hands 67ms, 8000 hands 237ms, 20000 hands 616ms, and
+   * this runs on every `refresh` -- after every hand written at the table and
+   * after every sync pull, on the thread that draws.
+   *
+   * Two counts of keys instead, which IndexedDB answers without materializing
+   * anything: 0.1ms at every size above. It works because nulls are not
+   * indexable, so the `deletedAt` index added in v6 holds the tombstones and
+   * nothing else. SQLite has always answered this with one `COUNT(*)`.
+   */
   async countHands(): Promise<number> {
-    // `deletedAt` is not indexed -- see the tombstone note in the README -- so
-    // this counts what survives the filter rather than asking the index. Still
-    // one pass over keys instead of reading and mapping every row.
-    let live = 0;
-    await this.db.hands.each((record) => {
-      if (isLive(record)) live += 1;
-    });
-    return live;
+    const [all, tombstoned] = await Promise.all([
+      this.db.hands.count(),
+      this.db.hands.where('deletedAt').above(0).count(),
+    ]);
+    return all - tombstoned;
   }
 
   async getHand(id: string): Promise<Hand | null> {

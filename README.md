@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2178 passed
+Tests:       2179 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1118,11 +1118,11 @@ Tests:       2178 passed
   chip                23   /chip resolves, offline, and never quotes a price
   handNotation        23   parse, round-trip, hand classes
   money               22   cents arithmetic, parsing, formatting
+  release             21   app.json, eas.json and the icon a store refuses over
   clock               20   a typed date, a typed length, and what neither will accept
   compose             20   which repository a device gets, and the unsafe sweep
   glossary            20   the shorthand on screen still matches its explanation
   privacy             20   the policy page, held to the code it describes
-  release             20   app.json, eas.json and the icon a store refuses over
   batch               19   a backlog split into requests, without orphaning a child
   csv                 19   quoting, delimiters, line endings
   gateCheck           19   the key-on-the-site script, run rather than read

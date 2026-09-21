@@ -30,6 +30,7 @@ interface AppConfig {
       config?: { usesNonExemptEncryption?: boolean };
     };
     android: { package: string; versionCode: number };
+    web: Record<string, unknown>;
     plugins: (string | [string, Record<string, unknown>])[];
     experiments: Record<string, unknown>;
     splash?: unknown;
@@ -97,6 +98,27 @@ describe('the splash screen, which moved out from under the app', () => {
 
   it('with the package it needs as a dependency, not just a plugin name', () => {
     expect(pkg.dependencies['expo-splash-screen']).toBeDefined();
+  });
+});
+
+describe('the web block, which is read by less of the toolchain than it looks', () => {
+  it('declares only the keys a Metro static export actually reads', () => {
+    // The same failure as `splash` above, in the same file. `app/+html.tsx`
+    // replaces Expo's HTML template, so the path that would have written
+    // `web.name`, `web.themeColor` and `web.description` into every page is
+    // never taken, and a static export emits no manifest of its own -- the one
+    // in `dist/` is `public/manifest.webmanifest`, copied. So those keys, plus
+    // `shortName` and `backgroundColor`, reached nothing at all.
+    //
+    // Measured rather than argued: deleting them changed the export by zero
+    // bytes across all ninety files.
+    //
+    // Which is exactly why it is worth a line here. Nothing was wrong on
+    // screen, and nothing would have told somebody editing the file
+    // `src/version.ts` calls "the source of truth" that their edit had gone
+    // nowhere. The copy that is read lives in `public/manifest.webmanifest`
+    // and `app/+html.tsx`.
+    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'favicon', 'output']);
   });
 });
 

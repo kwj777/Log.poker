@@ -10,19 +10,29 @@
  * The failures are not exotic. IndexedDB has a quota, a phone runs out of disk,
  * and a constraint can be violated. The one that matters most is the cash-out,
  * because that is the moment the result is written.
+ *
+ * Session detail was missed when this suite was written, and had the same two
+ * holes in a quieter place: the notes were fired at the store on blur and
+ * forgotten, and the delete navigated to History before knowing whether the
+ * session had gone. Neither said anything, and the notes one is the worse of
+ * the two -- what you typed stays on screen looking saved.
  */
 
-import { screen, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
 import LogHandScreen from '../../../app/session/hand';
 import ActiveSessionScreen from '../../../app/session/active';
+import SessionDetailScreen from '../../../app/session/[id]';
 import { useLogStore } from '../../store/useLogStore';
 
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
+  useLocalSearchParams: () => ({ id: 's1' }),
 }));
+
+const replace = jest.requireMock('expo-router').router.replace as jest.Mock;
 
 jest.mock('../../data', () => ({
   getRepository: async () => ({ listHands: async () => [] }),
@@ -31,8 +41,9 @@ jest.mock('../../data', () => ({
 
 const full = () => new Error('The database is full.');
 
-const ready = (over: Partial<ReturnType<typeof useLogStore.getState>> = {}) =>
-  useLogStore.setState({
+const ready = (over: Partial<ReturnType<typeof useLogStore.getState>> = {}) => {
+  replace.mockClear();
+  return useLogStore.setState({
     status: 'ready',
     activeSession: session('s1'),
     sessions: [session('s1')],
@@ -42,6 +53,7 @@ const ready = (over: Partial<ReturnType<typeof useLogStore.getState>> = {}) =>
     handsVersion: 0,
     ...over,
   });
+};
 
 describe('a hand that will not save', () => {
   it('says so rather than just stopping', async () => {
@@ -117,6 +129,63 @@ describe('a cash-out that will not save', () => {
 
     await screen.findByText('The database is full.');
     expect(screen.getByText('End session')).toBeTruthy();
+  });
+});
+
+describe('session notes that will not save', () => {
+  it('says so, rather than leaving the text on screen looking saved', async () => {
+    ready({ updateSessionNotes: (async () => { throw full(); }) as never });
+    await renderScreen(<SessionDetailScreen />);
+
+    const notes = screen.getByLabelText('Session notes');
+    await userEvent.type(notes, 'Ran terrible.');
+    // Typing saves nothing; the write happens on blur, which is where the
+    // throw went unnoticed. Inside `act` because the write is awaited and the
+    // note it puts on screen lands a microtask later.
+    await act(async () => {
+      fireEvent(notes, 'blur');
+    });
+
+    expect(await screen.findByText('The database is full.')).toBeTruthy();
+  });
+
+  it('and keeps what was typed, so it can be copied out', async () => {
+    ready({ updateSessionNotes: (async () => { throw full(); }) as never });
+    await renderScreen(<SessionDetailScreen />);
+
+    const notes = screen.getByLabelText('Session notes');
+    await userEvent.type(notes, 'Ran terrible.');
+    await act(async () => {
+      fireEvent(notes, 'blur');
+    });
+
+    await screen.findByText('The database is full.');
+    expect(screen.getByDisplayValue('Ran terrible.')).toBeTruthy();
+  });
+});
+
+describe('a session that will not delete', () => {
+  it('says so rather than sending the player to History', async () => {
+    ready({ deleteSession: (async () => { throw full(); }) as never });
+    await renderScreen(<SessionDetailScreen />);
+
+    await userEvent.press(screen.getByText('Delete session'));
+    await userEvent.press(screen.getByText('Delete'));
+
+    expect(await screen.findByText('The database is full.')).toBeTruthy();
+    // The navigation used to happen regardless, which put the player in
+    // History with the session still sitting in it.
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('and goes to History when it does delete', async () => {
+    ready({ deleteSession: (async () => undefined) as never });
+    await renderScreen(<SessionDetailScreen />);
+
+    await userEvent.press(screen.getByText('Delete session'));
+    await userEvent.press(screen.getByText('Delete'));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/history'));
   });
 });
 

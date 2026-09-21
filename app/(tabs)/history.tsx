@@ -19,7 +19,13 @@ import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { formatMoney } from '../../src/domain/money';
 import { totals } from '../../src/domain/stats';
-import { GAME_TYPES, type GameType } from '../../src/domain/types';
+import {
+  GAME_TYPES,
+  SESSION_FORMATS,
+  SESSION_FORMAT_LABELS,
+  type GameType,
+  type SessionFormat,
+} from '../../src/domain/types';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { filterSessions, useLogStore } from '../../src/store/useLogStore';
 import { colors, radius, resultColor, spacing } from '../../src/theme';
@@ -39,6 +45,21 @@ const GAME_OPTIONS = [
   ...GAME_TYPES.map((value) => ({ value, label: value === 'OTHER' ? 'Other' : value })),
 ];
 
+/**
+ * Cash or tournament, which the rest of the app treats as two different games
+ * and this screen could not tell apart.
+ *
+ * It matters more than the game-type filter beside it: the totals strip above
+ * the list pools a tournament's result with a cash game's, and "how do I
+ * actually run in the Tuesday tournament" was the one question two taps could
+ * not answer. `SESSION_FORMAT_LABELS` rather than the bare values, because
+ * "cash" as a chip beside "NLHE" reads like a stake.
+ */
+const FORMAT_OPTIONS = [
+  { value: null, label: 'All formats' },
+  ...SESSION_FORMATS.map((value) => ({ value, label: SESSION_FORMAT_LABELS[value] })),
+];
+
 const DAY = 86_400_000;
 
 export default function HistoryScreen() {
@@ -47,6 +68,7 @@ export default function HistoryScreen() {
 
   const [period, setPeriod] = useState<Period>('all');
   const [gameType, setGameType] = useState<GameType | null>(null);
+  const [format, setFormat] = useState<SessionFormat | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
 
   /**
@@ -69,12 +91,30 @@ export default function HistoryScreen() {
     return filterSessions(sessions, {
       ...(from === undefined ? {} : { from }),
       ...(gameType === null ? {} : { gameType }),
+      ...(format === null ? {} : { format }),
       ...(venueId === null ? {} : { venueId }),
     });
-  }, [sessions, period, gameType, venueId, openedAt]);
+  }, [sessions, period, gameType, format, venueId, openedAt]);
 
   const summary = useMemo(() => totals(filtered), [filtered]);
-  const filtersActive = period !== 'all' || gameType !== null || venueId !== null;
+  const filtersActive =
+    period !== 'all' || gameType !== null || format !== null || venueId !== null;
+
+  /**
+   * The format row is offered only to somebody who plays both, for the reason
+   * the dashboard offers its own format breakdown conditionally: a chip that
+   * can only ever filter to everything or to nothing is a chip in the way.
+   */
+  const mixedFormats = useMemo(() => {
+    let cash = false;
+    let tournament = false;
+    for (const session of sessions) {
+      if (session.format === 'cash') cash = true;
+      else tournament = true;
+      if (cash && tournament) return true;
+    }
+    return false;
+  }, [sessions]);
 
   const last = filtered.length - 1;
 
@@ -95,6 +135,9 @@ export default function HistoryScreen() {
       <View style={styles.filters}>
         <ChipGroup options={PERIOD_OPTIONS} value={period} onChange={setPeriod} scroll />
         <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} scroll />
+        {mixedFormats ? (
+          <ChipGroup options={FORMAT_OPTIONS} value={format} onChange={setFormat} scroll />
+        ) : null}
         {venues.length > 1 ? (
           <ChipGroup options={venueOptions} value={venueId} onChange={setVenueId} scroll />
         ) : null}
@@ -125,6 +168,7 @@ export default function HistoryScreen() {
               onPress={() => {
                 setPeriod('all');
                 setGameType(null);
+                setFormat(null);
                 setVenueId(null);
               }}
             />

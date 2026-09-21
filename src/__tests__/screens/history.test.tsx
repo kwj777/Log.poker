@@ -95,6 +95,37 @@ describe('the session list', () => {
     expect(screen.getByText('Bellagio')).toBeTruthy();
     expect(screen.queryByText('Aria')).toBeNull();
   });
+
+  it('and to the format, which is the bigger of the two divisions', async () => {
+    // Cash and tournament are different games everywhere else in the app --
+    // different money, different math, a different screen. The totals strip
+    // above this list was pooling them, and nothing here could separate them.
+    load({
+      sessions: [
+        session('a', { format: 'cash', venue: venue('v1', 'Aria') }),
+        session('b', {
+          format: 'tournament',
+          stakes: null,
+          venue: venue('v2', 'Bellagio'),
+        }),
+      ],
+    });
+    await renderScreen(<HistoryScreen />);
+    expect(screen.getByText('2 sessions')).toBeTruthy();
+
+    await userEvent.press(screen.getByText('Tournament'));
+    expect(screen.getByText('1 session')).toBeTruthy();
+    expect(screen.getByText('Bellagio')).toBeTruthy();
+    expect(screen.queryByText('Aria')).toBeNull();
+  });
+
+  it('but does not offer the format chips to somebody who plays one', async () => {
+    // A filter whose only two answers are "everything" and "nothing" is a row
+    // of chips in the way of the list.
+    load({ sessions: [session('a'), session('b')] });
+    await renderScreen(<HistoryScreen />);
+    expect(screen.queryByText('All formats')).toBeNull();
+  });
 });
 
 describe('how much of the list is mounted', () => {

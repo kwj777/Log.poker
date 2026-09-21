@@ -29,6 +29,11 @@ export const selectSessionById = (
  * In-memory equivalent of `Repository.listSessions(filter)`, for the history
  * screen -- same semantics, including `from` inclusive and `to` exclusive, so the
  * two never disagree about which sessions a date range contains.
+ *
+ * `format` was in `SessionFilter` and honored by both repositories and not by
+ * this, so the two did disagree about exactly one field: a filter that said
+ * cash games got every tournament as well here, and silently, because an
+ * ignored filter draws no error.
  */
 export const filterSessions = (
   sessions: readonly SessionWithChildren[],
@@ -37,6 +42,7 @@ export const filterSessions = (
   sessions.filter((session) => {
     if (filter.venueId !== undefined && session.venueId !== filter.venueId) return false;
     if (filter.gameType !== undefined && session.gameType !== filter.gameType) return false;
+    if (filter.format !== undefined && session.format !== filter.format) return false;
     if (filter.from !== undefined && session.startedAt < filter.from) return false;
     if (filter.to !== undefined && session.startedAt >= filter.to) return false;
     if (filter.status === 'active' && session.endedAt !== null) return false;

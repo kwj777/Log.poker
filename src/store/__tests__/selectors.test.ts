@@ -82,6 +82,20 @@ describe('filterSessions', () => {
     expect(filterSessions(sessions, { status: 'completed' }).map((s) => s.id)).toEqual(['a', 'b']);
   });
 
+  it('and by format, which it used to accept and ignore', () => {
+    // `format` was on `SessionFilter` and honored by both repositories, so a
+    // caller had every reason to believe this honored it too. It did not, and
+    // an ignored filter is silent: the screen simply showed sessions it had
+    // asked not to be shown.
+    const mixed = [
+      completed({ id: 'cash', startedAt: T0, hours: 3, cashOut: 100 }),
+      { ...completed({ id: 'tourney', startedAt: T0, hours: 3, cashOut: 0 }), format: 'tournament' as const },
+    ];
+    expect(filterSessions(mixed, { format: 'cash' }).map((s) => s.id)).toEqual(['cash']);
+    expect(filterSessions(mixed, { format: 'tournament' }).map((s) => s.id)).toEqual(['tourney']);
+    expect(filterSessions(mixed, {})).toHaveLength(2);
+  });
+
   it('treats `from` as inclusive and `to` as exclusive, matching the repository', () => {
     expect(filterSessions(sessions, { from: T0 }).map((s) => s.id)).toEqual(['a', 'b', 'c']);
     expect(filterSessions(sessions, { to: T0 + 48 * HOUR }).map((s) => s.id)).toEqual(['a']);

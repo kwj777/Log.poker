@@ -154,6 +154,29 @@ export default function VarianceScreen() {
   const lossChance = probabilityOfLoss(estimate, assessment.hours);
 
   /**
+   * What the band chart says, for somebody who cannot see it.
+   *
+   * The prose under the chart already explains what the shaded area is, and it
+   * is the same prose every time. The part that changes -- where this player's
+   * own line finished, and whether that is inside the range -- was only ever
+   * in the drawing. `assessment.verdict` is the same call the headline
+   * above the chart reaches, so the two cannot disagree.
+   */
+  const chartLabel = useMemo(() => {
+    const last = band.length > 0 ? band[band.length - 1] : null;
+    if (last === null || last.actual === null) {
+      return 'Cumulative big blinds against your expected range.';
+    }
+    const inside = last.actual >= last.lower && last.actual <= last.upper;
+    return (
+      `Cumulative big blinds over ${Math.round(last.hours)} hours. ` +
+      `You are at ${Math.round(last.actual)} big blinds against an expected ` +
+      `${Math.round(last.expected)}, which is ${inside ? 'inside' : 'outside'} ` +
+      'the 95% range.'
+    );
+  }, [band]);
+
+  /**
    * The long version of what this screen is doing, on the marketing site.
    *
    * It appears in both branches below: with no sample yet, because that is
@@ -242,6 +265,10 @@ export default function VarianceScreen() {
           series={chart.series}
           band={chart.band}
           height={200}
+          // The prose under the chart explains what the band is; this says
+          // where the player's own line ended up inside it, which is the one
+          // thing only the drawing was saying.
+          label={chartLabel}
           emptyMessage="Log a few more sessions to draw the band"
         />
         <View style={styles.legend}>

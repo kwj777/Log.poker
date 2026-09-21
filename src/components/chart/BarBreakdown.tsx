@@ -4,6 +4,13 @@
  * Bars grow right from a center line for a win and left for a loss, scaled to
  * the largest absolute value on screen -- so the shape of a player's game
  * (crushing $1/$2, bleeding at $2/$5) is readable in one glance without axes.
+ *
+ * Each row is one accessible element rather than four. The numbers were always
+ * readable here -- unlike `LineChart`, which had no text at all -- but they
+ * were read as a label, then a figure, then a bar with nothing to say, then a
+ * line of counts, which is four stops to learn one thing. Composed into a
+ * sentence they are one. The bar itself is hidden: it draws the same number
+ * that is already being read.
  */
 
 import { StyleSheet, View } from 'react-native';
@@ -37,8 +44,23 @@ export const BarBreakdown = ({ groups, currency = 'USD', limit = 6 }: BarBreakdo
       {shown.map((group) => {
         const magnitude = Math.abs(group.net) / scale;
         const positive = group.net >= 0;
+        const sessionCount = `${group.sessionCount} session${
+          group.sessionCount === 1 ? '' : 's'
+        }`;
+        const hourly =
+          group.hourly === null
+            ? 'no hourly rate yet'
+            : `${formatMoney(group.hourly, { currency, signed: true })} an hour`;
         return (
-          <View key={group.key} style={styles.row}>
+          <View
+            key={group.key}
+            style={styles.row}
+            accessible
+            accessibilityLabel={`${group.label}: ${formatMoney(group.net, {
+              currency,
+              signed: true,
+            })} over ${sessionCount} and ${Math.round(group.hours)} hours, ${hourly}.`}
+          >
             <View style={styles.labels}>
               <Text numberOfLines={1} style={styles.label}>
                 {group.label}
@@ -48,7 +70,8 @@ export const BarBreakdown = ({ groups, currency = 'USD', limit = 6 }: BarBreakdo
               </Text>
             </View>
 
-            <View style={styles.track}>
+            {/* Decoration: it draws the figure the row has already said. */}
+            <View style={styles.track} importantForAccessibility="no-hide-descendants">
               <View style={styles.half}>
                 {positive ? null : (
                   <View
@@ -74,8 +97,7 @@ export const BarBreakdown = ({ groups, currency = 'USD', limit = 6 }: BarBreakdo
             </View>
 
             <Text variant="caption" color={colors.textTertiary}>
-              {group.sessionCount} session{group.sessionCount === 1 ? '' : 's'} ·{' '}
-              {Math.round(group.hours)}h ·{' '}
+              {sessionCount} · {Math.round(group.hours)}h ·{' '}
               {group.hourly === null
                 ? '--'
                 : `${formatMoney(group.hourly, { currency, signed: true })}/hr`}

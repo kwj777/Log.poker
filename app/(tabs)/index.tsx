@@ -277,7 +277,16 @@ export default function DashboardScreen() {
       <ReviewFlagged prompt={prompt} />
 
       <Card style={styles.chartCard}>
-        <LineChart series={chartSeries} height={170} />
+        <LineChart
+          series={chartSeries}
+          height={170}
+          // Read instead of the drawing. The figure is the one above it; what
+          // this adds is the shape, which is the only thing a curve says that
+          // the headline does not.
+          label={`Bankroll over ${summary.sessionCount} session${
+            summary.sessionCount === 1 ? '' : 's'
+          }, ending at ${formatMoney(summary.net, { signed: true })}.`}
+        />
         <View style={styles.chartAxis}>
           <Text variant="caption" color={colors.textTertiary}>
             {curve.length > 0 ? formatMoneyCompact(0) : ''}

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
+import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
@@ -48,6 +49,17 @@ export default function SessionDetailScreen() {
   const deleteSession = useLogStore((state) => state.deleteSession);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  /**
+   * A write on this screen that did not work, said out loud.
+   *
+   * The live-session screens learned this the hard way -- see
+   * `__tests__/screens/writeFailures.test.tsx`, which exists because a write
+   * that failed silently reads as a write that worked. Both writes on this
+   * screen were still silent: the notes were fired off on blur and forgotten,
+   * and the delete navigated away before it knew whether it had happened.
+   */
+  const [failed, setFailed] = useState<string | null>(null);
 
   /**
    * The notes field is a draft seeded from the stored value. It is re-seeded
@@ -85,10 +97,36 @@ export default function SessionDetailScreen() {
   const elapsed = durationMs(session);
   const live = session.endedAt === null;
 
-  const saveNotes = () => {
+  /**
+   * Save on blur, and say so when it does not save.
+   *
+   * What the player typed stays in the draft either way, which is the whole
+   * reason this is worth catching: the text is still on screen looking saved,
+   * so without a word here the only thing that ever says otherwise is coming
+   * back to the session tomorrow and finding it empty.
+   */
+  const saveNotes = async () => {
     const trimmed = notes.trim();
     if (trimmed === (session.notes ?? '')) return;
-    void updateNotes(session.id, trimmed === '' ? null : trimmed);
+    setFailed(null);
+    try {
+      await updateNotes(session.id, trimmed === '' ? null : trimmed);
+    } catch (error) {
+      setFailed(describeFailure(error, 'Those notes could not be saved.'));
+    }
+  };
+
+  const remove = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setFailed(null);
+    try {
+      await deleteSession(session.id);
+      router.replace('/history');
+    } catch (error) {
+      setFailed(describeFailure(error, 'That session could not be deleted.'));
+      setDeleting(false);
+    }
   };
 
   return (
@@ -217,7 +255,7 @@ export default function SessionDetailScreen() {
       <TextInput
         value={notes}
         onChangeText={setNotes}
-        onBlur={saveNotes}
+        onBlur={() => void saveNotes()}
         placeholder="Anything worth remembering about this session"
         placeholderTextColor={colors.textTertiary}
         multiline
@@ -242,10 +280,11 @@ export default function SessionDetailScreen() {
                 label="Delete"
                 variant="danger"
                 size="small"
-                onPress={() => {
-                  void deleteSession(session.id);
-                  router.replace('/history');
-                }}
+                loading={deleting}
+                // Awaited before leaving. Navigating first meant a delete that
+                // threw put the player in History with the session still in
+                // it and nothing anywhere saying why.
+                onPress={() => void remove()}
               />
             </View>
           </View>
@@ -257,6 +296,7 @@ export default function SessionDetailScreen() {
             onPress={() => setConfirmingDelete(true)}
           />
         )}
+        <ErrorNote message={failed} />
       </View>
     </Screen>
   );

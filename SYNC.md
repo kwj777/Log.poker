@@ -870,6 +870,16 @@ lose a record such a device created and never sent. It is the worse thing to
 lose and much the rarer: it needs six months offline and a write that never
 left, where the alternative needs only the six months.
 
+The refusal does not reach a parent the same push is carrying something live
+for. A venue whose tombstone was collected has no fresh sessions arriving
+beside it, so one that does is not the shape the backstop is aimed at. Without
+that exception it cascaded: tables merge parents first, so a refused venue left
+every session on it naming a parent the bundle does not have, the parent rule
+refused those in turn, and every hand, rebuy and mood entry under them went
+too, however recent. `rescuedParents` in `src/sync/bundle.ts` works out which
+parents a push is its own evidence for, and the backstop spares those and
+nothing else.
+
 ### Three ways collection was still wrong
 
 An adversarial audit of the merge found the rule above correct and its

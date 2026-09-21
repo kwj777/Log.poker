@@ -175,7 +175,6 @@ export const medianDryRun = (itmRate: number): number | null => {
 export interface TournamentAssessment {
   headline: string;
   body: string;
-  /** Whether the ROI above is a measurement or just a record of what happened. */
   /** True when the copy should offer an Untilt.poker nudge. */
   suggestsUntilt: boolean;
 }

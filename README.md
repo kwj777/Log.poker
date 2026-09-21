@@ -159,7 +159,7 @@ operational check rather than a test of the change in front of it.
 
 ### Demo data
 
-Settings → **Load demo data** seeds 20 mixed-result sessions with hands and mood
+Settings → **Load demo data** seeds 32 mixed-result sessions with hands and mood
 entries -- enough to fill the dashboard and give the variance view something to
 say. The control is gated behind `__DEV__`, so it is stripped from production
 builds entirely rather than merely hidden.
@@ -1036,6 +1036,17 @@ the worse thing to lose and much the rarer: it takes six months offline and a
 write that never left. The alternative is a deleted session reappearing on every
 device, which takes only the six months.
 
+**Unless the same push is carrying something live that hangs off it.** A venue
+whose tombstone was collected has no fresh sessions arriving beside it; a room
+somebody added while offline and has been playing at ever since does. Without
+that exception the refusal cascaded, and it cascaded onto records the backstop
+has no argument with: tables merge parents first, so a refused venue leaves
+every session on it naming a parent the bundle does not have, which the parent
+rule refuses in turn, and the hands under those go the same way. One venue
+stamped four months ago took last night down with it. So a record at or above
+the horizon keeps the parent it names, and a parent kept that way keeps its
+own.
+
 A device that never signs in collects on the window alone, having nothing to
 disagree with. One that does sync never collects further back than the server
 says it has: the server draws that line from every device, and this one only
@@ -1066,8 +1077,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 83 passed
-Tests:       2020 passed
+Test Suites: 84 passed
+Tests:       2024 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1108,9 +1119,9 @@ Tests:       2020 passed
   history            18   the session list, its filters, and how much of it mounts
   money              18   cents arithmetic, parsing, formatting
   seed               18   the demo dataset stays coherent
+  writeFailures      18   what the player sees when a write does not work
   client             17   the sync client, against a fake fetch
   pastSession        17   logging a night that was played before it was logged
-  writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
   handsList          15   browsing every hand, and finding one of them
@@ -1151,6 +1162,7 @@ Tests:       2020 passed
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars
+  midSessionCheckIn   3   whether a check-in that failed says it was logged
   notFound            3   where a link that names nothing lands
 ```
 

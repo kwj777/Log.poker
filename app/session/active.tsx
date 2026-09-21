@@ -28,6 +28,7 @@ import { formatSessionDate, formatTimeOfDay } from '../../src/features/sessions/
 import { parseCount } from '../../src/domain/import/values';
 import { formatDuration, rebuyTotal, totalInvested } from '../../src/domain/stats';
 import { fromHoursAndMinutes, isAhead } from '../../src/domain/clock';
+import { GAME_TYPE_LABELS } from '../../src/domain/types';
 import type { MoodScore } from '../../src/domain/types';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn';
@@ -274,8 +275,8 @@ export default function ActiveSessionScreen() {
             {tournament
               ? formatEntry(session.buyIn, session.fee, currency)
               : session.stakes === null
-                ? session.gameType
-                : `${formatStakes(session.stakes, currency)} · ${session.gameType}`}
+                ? GAME_TYPE_LABELS[session.gameType]
+                : `${formatStakes(session.stakes, currency)} · ${GAME_TYPE_LABELS[session.gameType]}`}
           </Text>
         </View>
 

@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 88 passed
-Tests:       2071 passed
+Tests:       2074 passed
 
   dexieRepository   137   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
@@ -1124,9 +1124,9 @@ Tests:       2071 passed
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
+  history            19   the session list, its filters, and how much of it mounts
   clock              18   a typed date, a typed length, and what neither will accept
   editSession        18   correcting a session, including the one nobody cashed out
-  history            18   the session list, its filters, and how much of it mounts
   seed               18   the demo dataset stays coherent
   signin             18   the sign-in client, against a fake fetch
   client             17   the sync client, against a fake fetch
@@ -1136,13 +1136,13 @@ Tests:       2071 passed
   useLogStore        16   what a write reads back, and what it leaves alone
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
+  sessionDetail      15   one session and the hands that belong to it
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   bankrollHeadline   13   the word over the headline figure, and what it has to be true of
   editHand           13   fixing or deleting a hand that was logged wrong
   logHand            13   logging a hand, the optional board, and the reset after a bad one
   rateLimit          13   how often one person may ask, and what a refusal costs
-  sessionDetail      13   one session and the hands that belong to it
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching

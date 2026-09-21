@@ -23,6 +23,7 @@ import { matchesTerms, searchTerms } from '../../src/domain/search';
 import { currenciesUsed, inCurrency, totals } from '../../src/domain/stats';
 import {
   GAME_TYPES,
+  GAME_TYPE_LABELS,
   SESSION_FORMATS,
   SESSION_FORMAT_LABELS,
   type GameType,
@@ -44,7 +45,7 @@ const PERIOD_OPTIONS = [
 
 const GAME_OPTIONS = [
   { value: null, label: 'All games' },
-  ...GAME_TYPES.map((value) => ({ value, label: value === 'OTHER' ? 'Other' : value })),
+  ...GAME_TYPES.map((value) => ({ value, label: GAME_TYPE_LABELS[value] })),
 ];
 
 /**

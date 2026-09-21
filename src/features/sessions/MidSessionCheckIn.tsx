@@ -33,6 +33,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { ErrorNote, describeFailure } from '../../components/ErrorNote';
 import { MoodPicker } from '../../components/MoodPicker';
 import { Text } from '../../components/Text';
 import { wantsReset } from '../../domain/mood';
@@ -66,9 +67,26 @@ export const MidSessionCheckIn = ({ session, elapsedMs }: MidSessionCheckInProps
     (entry) => entry.sessionId === session.id && entry.phase === 'mid',
   );
 
+  /**
+   * What the write said, when it did not work.
+   *
+   * The card that comes next opens with the word "Logged.", and this was the
+   * one mood write in the app with neither a catch nor anywhere to say so:
+   * every other one reports through `ErrorNote` and is pinned in
+   * `writeFailures.test.tsx`. A quota or a full disk left the rejection
+   * unhandled and the card asserting a check-in that is not in the log, which
+   * the end-of-session summary then quietly disagrees with.
+   */
+  const [failed, setFailed] = useState<string | null>(null);
+
   const record = (score: MoodScore) => {
-    // First, and not conditional on anything. See the header.
-    void logMood(session.id, 'mid', score);
+    setFailed(null);
+    // First, and not conditional on anything. See the header. The offer is
+    // about the player's head rather than about the write, so a failure says
+    // so beside it instead of holding it back.
+    void logMood(session.id, 'mid', score).catch((error: unknown) => {
+      setFailed(describeFailure(error, 'That check-in could not be saved.'));
+    });
     if (wantsReset(score)) setOffered(score);
   };
 
@@ -76,7 +94,8 @@ export const MidSessionCheckIn = ({ session, elapsedMs }: MidSessionCheckInProps
     const reset = resetHandOff();
     return (
       <Card style={styles.card}>
-        <Text variant="bodyStrong">Logged.</Text>
+        <Text variant="bodyStrong">{failed === null ? 'Logged.' : 'Not logged.'}</Text>
+        <ErrorNote message={failed} />
         <Text variant="caption" color={colors.textTertiary} style={styles.hint}>
           Untilt has a sixty-second reset for exactly this. It is free, it needs no
           account, and it is sixty seconds. Otherwise, back to the game.
@@ -99,7 +118,13 @@ export const MidSessionCheckIn = ({ session, elapsedMs }: MidSessionCheckInProps
     );
   }
 
-  if (elapsedMs < MID_SESSION_PROMPT_AFTER_MS || alreadyLogged || dismissed !== null) {
+  // A failure keeps the card up even once the moment for it has passed, so a
+  // score that wanted no reset has somewhere to report one: without this the
+  // card simply vanished and the write was lost in silence.
+  if (
+    failed === null &&
+    (elapsedMs < MID_SESSION_PROMPT_AFTER_MS || alreadyLogged || dismissed !== null)
+  ) {
     return null;
   }
 
@@ -113,6 +138,7 @@ export const MidSessionCheckIn = ({ session, elapsedMs }: MidSessionCheckInProps
         Two hours in. One tap, then back to the game.
       </Text>
       <MoodPicker value={null} onChange={record} compact />
+      <ErrorNote message={failed} />
     </Card>
   );
 };

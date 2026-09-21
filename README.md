@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 91 passed
-Tests:       2113 passed
+Test Suites: 92 passed
+Tests:       2118 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1173,6 +1173,7 @@ Tests:       2113 passed
   lineChart           5   what a chart says before it has been measured
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
+  staleData           5   a read that failed after the app was already open
   varianceCurrency    5   the variance page stops adding euros to dollars
   transactionQueue    4   two writes at once, on a database with no queue of its own
   lintReach           3   which files npm run lint actually looks at

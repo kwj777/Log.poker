@@ -1066,23 +1066,23 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 63 passed
-Tests:       1718 passed
+Test Suites: 69 passed
+Tests:       1806 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
   bundle             68   what ships to each platform, against the real output
   handOffs           61   where a hand-off goes, and what the four offer cards say
   site               61   the marketing/app split, the PWA, the sitemap
+  tournaments        58   ROI, its interval, cash rate, dry runs, finishes
   content            55   every figure in the guides, re-derived and read back
   sessionImport      55   reading a session-summary export
   signinEndpoint     55   the free door, and every bound on it
-  tournaments        54   ROI, its interval, cash rate, dry runs, finishes
   verify             52   checking a token, and every way past it that must not work
   copy               50   what the sign-in and the sync are allowed to say
+  stats              50   P/L, rebuys, duration, win rate, groupings
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
-  stats              45   P/L, rebuys, duration, win rate, groupings
   variance           40   win rate, σ, confidence bands, verdicts
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
@@ -1099,39 +1099,45 @@ Tests:       1718 passed
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
+  release            20   app.json, eas.json and the icon a store refuses over
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
   money              18   cents arithmetic, parsing, formatting
-  release            18   app.json, eas.json and the icon a store refuses over
   seed               17   the demo dataset stays coherent
+  writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
   client             15   the sync client, against a fake fetch
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
+  editSession        14   correcting a session, including the one nobody cashed out
   observe            14   how big the bundle was, said without saying whose
+  pastSession        14   logging a night that was played before it was logged
+  clock              13   a typed date, a typed length, and what neither will accept
+  editHand           13   fixing or deleting a hand that was logged wrong
+  history            13   the session list, its filters, and how much of it mounts
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
   logHand            12   logging a hand, the optional board, and the reset after a bad one
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching
-  history             9   the session list, its filters, and how much of it mounts
+  selectors          10   store reads and filters
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
-  selectors           9   store reads and filters
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
   sessionDetail       8   one session and the hands that belong to it
   tokenStore.web      8   the browser token store
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
-  writeFailures       7   what the player sees when a write does not work
   readme              6   the test table adds up and says what each suite is for
   settingsExport      6   the export card, and what it refuses to write
   settingsHelp        6   the privacy link, the support address, the build
   errorBoundary       5   a render that throws, and the way back from it
+  roiInterval         5   the ROI bootstrap runs once per result set, not per render
+  notFound            3   where a link that names nothing lands
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

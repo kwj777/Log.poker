@@ -96,6 +96,23 @@ export interface ImportedSession {
   draft: ImportedSessionDraft;
 }
 
+/**
+ * What a parsed row will be worth once it is a session.
+ *
+ * The preview card's whole job is to be the number the player gets, so the
+ * arithmetic has to be the app's rather than the screen's. It was
+ * `cashOut - buyIn` written out inline, which leaves the tournament entry fee
+ * on the table -- `totalInvested` takes it off everywhere else, and the
+ * Variance tab gives it a tile of its own labeled "never coming back". A year
+ * of $100+$10 tournaments previewed a whole fee column better than it landed,
+ * and always in the flattering direction.
+ *
+ * No rebuys in the subtraction because an import makes none: the row is one
+ * line with one buy-in on it.
+ */
+export const draftNet = (draft: ImportedSessionDraft): Cents =>
+  draft.cashOut - draft.buyIn - (draft.fee ?? 0);
+
 export interface SessionImportOptions {
   /** Used when neither a currency column nor the money cells name one. */
   defaultCurrency?: string;

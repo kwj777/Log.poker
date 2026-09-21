@@ -1,4 +1,11 @@
-import { DEFAULT_VENUE_NAME, parseSessionCsv } from '../sessionImport';
+import {
+  DEFAULT_VENUE_NAME,
+  draftNet,
+  parseSessionCsv,
+  type ImportedSessionDraft,
+} from '../sessionImport';
+import { totalInvested } from '../../stats';
+import type { Session } from '../../types';
 
 const local = (y: number, m: number, d: number, h = 0, min = 0): number =>
   new Date(y, m - 1, d, h, min, 0, 0).getTime();
@@ -445,5 +452,35 @@ describe('parseSessionCsv', () => {
       const csv = 'Date,Buyin,Cashout\n2024-01-15,,88\n2024-01-16,50,20\n';
       expect(messages(parseSessionCsv(csv))).toContain('1 row had no buy-in');
     });
+  });
+});
+
+
+describe('what a row will be worth', () => {
+  it('takes the tournament entry fee off, the way the rest of the app does', () => {
+    // The preview card is the whole point of the import screen: see what was
+    // parsed, then import. Its headline figure was `cashOut - buyIn` written
+    // out inline, so it left the fee on the table while `totalInvested` takes
+    // it off everywhere else, and a $100+$10 that cashed for nothing previewed
+    // as -$100 and landed as -$110.
+    expect(draftNet({ buyIn: 10_000, fee: 1_000, cashOut: 0 } as ImportedSessionDraft)).toBe(
+      -11_000,
+    );
+    expect(
+      draftNet({ buyIn: 10_000, fee: 1_000, cashOut: 50_000 } as ImportedSessionDraft),
+    ).toBe(39_000);
+  });
+
+  it('leaves a cash game exactly where it was, since it has no fee', () => {
+    expect(draftNet({ buyIn: 30_000, fee: null, cashOut: 45_000 } as ImportedSessionDraft)).toBe(
+      15_000,
+    );
+  });
+
+  it('agrees with `totalInvested`, which is the number that actually lands', () => {
+    const draft = { buyIn: 10_000, fee: 1_000, cashOut: 50_000 } as ImportedSessionDraft;
+    const landed =
+      draft.cashOut - totalInvested({ buyIn: draft.buyIn, fee: draft.fee } as Session, []);
+    expect(draftNet(draft)).toBe(landed);
   });
 });

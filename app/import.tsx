@@ -27,7 +27,7 @@ import { Text } from '../src/components/Text';
 import { successFeedback } from '../src/components/haptics';
 import { Explain } from '../src/components/Explain';
 import { importGlossary } from '../src/domain/glossary';
-import { FIELD_LABELS, parseSessionCsv, type ImportField } from '../src/domain/import';
+import { FIELD_LABELS, draftNet, parseSessionCsv, type ImportField } from '../src/domain/import';
 import { formatMoney } from '../src/domain/money';
 import { CAN_PICK_FILE, pickCsvFile } from '../src/features/import/pickCsvFile';
 import { useLogStore, type ImportSummary } from '../src/store/useLogStore';
@@ -59,10 +59,11 @@ export default function ImportScreen() {
     if (!reading || reading.sessions.length === 0) return null;
     const starts = reading.sessions.map((session) => session.draft.startedAt);
     return {
-      net: reading.sessions.reduce(
-        (sum, session) => sum + session.draft.cashOut - session.draft.buyIn,
-        0,
-      ),
+      // Through `draftNet`, so the figure the player checks before importing
+      // is the app's arithmetic rather than this screen's. Written out here it
+      // left the tournament entry fee off, and always in the flattering
+      // direction.
+      net: reading.sessions.reduce((sum, session) => sum + draftNet(session.draft), 0),
       currency: reading.sessions[0].draft.currency,
       from: Math.min(...starts),
       to: Math.max(...starts),

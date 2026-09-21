@@ -1078,7 +1078,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 84 passed
-Tests:       2024 passed
+Tests:       2029 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1089,7 +1089,7 @@ Tests:       2024 passed
   handOffs           61   where a hand-off goes, and what the four offer cards say
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
-  stats              54   P/L, rebuys, duration, win rate, groupings
+  stats              55   P/L, rebuys, duration, win rate, groupings
   verify             52   checking a token, and every way past it that must not work
   copy               51   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
@@ -1107,6 +1107,7 @@ Tests:       2024 passed
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
+  money              22   cents arithmetic, parsing, formatting
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1117,7 +1118,6 @@ Tests:       2024 passed
   clock              18   a typed date, a typed length, and what neither will accept
   editSession        18   correcting a session, including the one nobody cashed out
   history            18   the session list, its filters, and how much of it mounts
-  money              18   cents arithmetic, parsing, formatting
   seed               18   the demo dataset stays coherent
   writeFailures      18   what the player sees when a write does not work
   client             17   the sync client, against a fake fetch

@@ -326,7 +326,13 @@ export const byStakes = (sessions: readonly SessionWithChildren[]): GroupTotals[
     sessions.filter((session) => session.format === 'cash' && session.stakes !== null),
     (session) => ({
       key: stakesKey(session.stakes as Stakes, session.currency),
-      label: formatStakes(session.stakes as Stakes, session.currency),
+      // Without the ante, because the key is without it too and a bucket has
+      // one label. `stakesKey` pools anted and unanted games of the same
+      // blinds on purpose, and `groupBy` names a bucket after whichever
+      // session reached it first, so a bar holding both could read
+      // "$1/$2 ($2 ante)" and assert an ante most of its nights never had.
+      // The two now agree on what the identity of a game is.
+      label: formatStakes({ ...(session.stakes as Stakes), ante: undefined }, session.currency),
     }),
   );
 

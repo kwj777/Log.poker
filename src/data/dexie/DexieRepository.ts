@@ -31,6 +31,7 @@ import {
   type SessionPatch,
   type VenuePatch,
 } from '../repository';
+import { DEFAULT_CURRENCY } from '../../domain/money';
 import { patchedKeys, toPreferences } from '../preferences';
 import {
   applyPatch,
@@ -166,6 +167,28 @@ const toRebuy = (record: RebuyRecord): Rebuy => ({
 const incomingTags = (tags: Hand['tags'] | undefined): Hand['tags'] =>
   Array.isArray(tags) ? [...tags] : [];
 
+/**
+ * The rest of an incoming record's fields, coerced to what the column promises.
+ *
+ * The two guards above cover the fields that made this side *throw*. These
+ * cover the ones that made the two engines disagree: SQLite binds a record's
+ * fields straight into a statement and cannot bind `undefined` at all, so it
+ * now defaults every one of them, and a row that lands there as an empty name
+ * has to land here the same way rather than as a venue with no name property
+ * at all.
+ */
+const incomingText = (value: unknown, fallback: string): string =>
+  typeof value === 'string' ? value : fallback;
+
+const incomingMaybeText = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+const incomingNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const incomingMaybeNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
 const incomingStakes = (stakes: Session['stakes'] | undefined): Session['stakes'] => {
   if (stakes === null || stakes === undefined) return null;
   const { smallBlind, bigBlind, ante } = stakes;
@@ -290,7 +313,15 @@ export class DexieRepository implements Repository {
         const staleVenues = await newerHere(this.db.venues, changes.venues);
         for (const { record, deletedAt } of changes.venues) {
           if (staleVenues.has(record.id)) continue;
-          await this.db.venues.put({ ...fromVenue(record), deletedAt });
+          await this.db.venues.put({
+            ...fromVenue({
+              ...record,
+              name: incomingText(record.name, ''),
+              isHomeGame: record.isHomeGame === true,
+              createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            }),
+            deletedAt,
+          });
         }
 
         // No foreign keys here to throw, but the same skip: a session whose
@@ -336,7 +367,17 @@ export class DexieRepository implements Repository {
           // has to be absent from the record, not null, or every loser lands in
           // the unique index under the same key. See `SessionRecord.importKey`.
           await this.db.sessions.put({
-            ...fromSession({ ...record, stakes: incomingStakes(record.stakes), importKey: key }),
+            ...fromSession({
+              ...record,
+              gameType: incomingText(record.gameType, 'NLHE') as Session['gameType'],
+              currency: incomingText(record.currency, DEFAULT_CURRENCY),
+              buyIn: incomingNumber(record.buyIn, 0),
+              startedAt: incomingNumber(record.startedAt, record.updatedAt),
+              createdAt: incomingNumber(record.createdAt, record.updatedAt),
+              notes: incomingMaybeText(record.notes),
+              stakes: incomingStakes(record.stakes),
+              importKey: key,
+            }),
             deletedAt,
           });
           stored.add(record.id);
@@ -350,17 +391,41 @@ export class DexieRepository implements Repository {
         const staleRebuys = await newerHere(this.db.rebuys, changes.rebuys);
         for (const { record, deletedAt } of changes.rebuys) {
           if (!sessions.has(record.sessionId) || staleRebuys.has(record.id)) continue;
-          await this.db.rebuys.put({ ...record, deletedAt });
+          await this.db.rebuys.put({
+            ...record,
+            amount: incomingNumber(record.amount, 0),
+            at: incomingNumber(record.at, record.updatedAt),
+            createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            deletedAt,
+          });
         }
         const staleHands = await newerHere(this.db.hands, changes.hands);
         for (const { record, deletedAt } of changes.hands) {
           if (!sessions.has(record.sessionId) || staleHands.has(record.id)) continue;
-          await this.db.hands.put({ ...record, tags: incomingTags(record.tags), deletedAt });
+          await this.db.hands.put({
+            ...record,
+            holeCards: incomingMaybeText(record.holeCards),
+            board: incomingMaybeText(record.board),
+            position: incomingMaybeText(record.position) as Hand['position'],
+            note: incomingMaybeText(record.note),
+            amount: incomingMaybeNumber(record.amount),
+            at: incomingNumber(record.at, record.updatedAt),
+            createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            tags: incomingTags(record.tags),
+            deletedAt,
+          });
         }
         const staleMoods = await newerHere(this.db.moodEntries, changes.moodEntries);
         for (const { record, deletedAt } of changes.moodEntries) {
           if (!sessions.has(record.sessionId) || staleMoods.has(record.id)) continue;
-          await this.db.moodEntries.put({ ...record, deletedAt });
+          await this.db.moodEntries.put({
+            ...record,
+            phase: incomingText(record.phase, 'start') as MoodEntry['phase'],
+            score: incomingNumber(record.score, 3) as MoodEntry['score'],
+            at: incomingNumber(record.at, record.updatedAt),
+            createdAt: incomingNumber(record.createdAt, record.updatedAt),
+            deletedAt,
+          });
         }
       },
     );

@@ -42,6 +42,7 @@ import {
   type SessionPatch,
   type VenuePatch,
 } from '../repository';
+import { DEFAULT_CURRENCY } from '../../domain/money';
 import { patchedKeys, toPreferences } from '../preferences';
 import {
   applyPatch,
@@ -238,6 +239,41 @@ const toMoodEntry = (row: MoodRow): MoodEntry => ({
 
 const bool = (value: boolean): number => (value ? 1 : 0);
 
+/**
+ * An incoming field, coerced to something this driver can actually bind.
+ *
+ * `applyChanges` binds the fields of a record straight into a statement, and
+ * the only thing that has vouched for that record is `sanitize` in
+ * `src/sync/bundle.ts`, which validates an id and a stamp and carries
+ * everything else through untouched. So a field can arrive missing, and
+ * `undefined` is not a value SQLite takes at all: node:sqlite answers
+ * "Provided value cannot be bound to SQLite parameter 2" and expo-sqlite
+ * refuses it too, whether or not the column is nullable.
+ *
+ * That throw lands inside the transaction below, which rolls back every venue,
+ * session, rebuy, hand and mood entry in the same answer, and it escapes
+ * before the cursor is written, so the identical batch comes down and fails
+ * again on every sync after it. One record nobody could see would end sync on
+ * iOS and Android for good.
+ *
+ * The web build was given this guard a while ago, in `incomingTags` and
+ * `incomingStakes`, and only two fields of it reached here: `record.tags ?? []`
+ * and `record.stakes?.bigBlind ?? 0`. These are the rest of it, on this side,
+ * so a malformed row costs that row and nothing else -- which is what the
+ * contract promises and what every skip in this method is written for.
+ */
+const text = (value: unknown, fallback: string): string =>
+  typeof value === 'string' ? value : fallback;
+
+const maybeText = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+const number = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const maybeNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
 export class SqlRepository implements Repository {
   private readonly driver: SqlDriver;
   private readonly ctx: RepositoryContext;
@@ -342,7 +378,10 @@ export class SqlRepository implements Repository {
              updated_at = excluded.updated_at,
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= venues.updated_at`,
-          [record.id, record.name, bool(record.isHomeGame), record.createdAt, record.updatedAt, deletedAt],
+          [
+            record.id, text(record.name, ''), bool(record.isHomeGame === true),
+            number(record.createdAt, record.updatedAt), record.updatedAt, deletedAt,
+          ],
         );
       }
 
@@ -432,11 +471,15 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= sessions.updated_at`,
           [
-            record.id, record.venueId, record.format, record.gameType,
-            record.stakes?.smallBlind ?? 0, record.stakes?.bigBlind ?? 0,
-            record.stakes?.ante ?? null, record.currency, record.buyIn, record.fee,
-            record.cashOut, record.entrants, record.finishPosition, record.startedAt,
-            record.endedAt, record.notes, importKeyFor(record, owners), record.createdAt,
+            record.id, record.venueId, text(record.format, 'cash'),
+            text(record.gameType, 'NLHE'),
+            number(record.stakes?.smallBlind, 0), number(record.stakes?.bigBlind, 0),
+            maybeNumber(record.stakes?.ante), text(record.currency, DEFAULT_CURRENCY),
+            number(record.buyIn, 0), maybeNumber(record.fee),
+            maybeNumber(record.cashOut), maybeNumber(record.entrants),
+            maybeNumber(record.finishPosition), number(record.startedAt, record.updatedAt),
+            maybeNumber(record.endedAt), maybeText(record.notes),
+            importKeyFor(record, owners), number(record.createdAt, record.updatedAt),
             record.updatedAt, deletedAt,
           ],
         );
@@ -461,7 +504,11 @@ export class SqlRepository implements Repository {
              updated_at = excluded.updated_at,
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= rebuys.updated_at`,
-          [record.id, record.sessionId, record.amount, record.at, record.createdAt, record.updatedAt, deletedAt],
+          [
+            record.id, record.sessionId, number(record.amount, 0),
+            number(record.at, record.updatedAt), number(record.createdAt, record.updatedAt),
+            record.updatedAt, deletedAt,
+          ],
         );
       }
 
@@ -486,10 +533,11 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= hands.updated_at`,
           [
-            record.id, record.sessionId, record.holeCards, record.board ?? null,
-            record.position, record.note,
-            JSON.stringify(record.tags ?? []), record.amount, record.at,
-            record.createdAt, record.updatedAt, deletedAt,
+            record.id, record.sessionId, maybeText(record.holeCards),
+            maybeText(record.board), maybeText(record.position), maybeText(record.note),
+            JSON.stringify(Array.isArray(record.tags) ? record.tags : []),
+            maybeNumber(record.amount), number(record.at, record.updatedAt),
+            number(record.createdAt, record.updatedAt), record.updatedAt, deletedAt,
           ],
         );
       }
@@ -510,8 +558,9 @@ export class SqlRepository implements Repository {
              deleted_at = excluded.deleted_at
            WHERE excluded.updated_at >= mood_entries.updated_at`,
           [
-            record.id, record.sessionId, record.phase, record.score, record.at,
-            record.createdAt, record.updatedAt, deletedAt,
+            record.id, record.sessionId, text(record.phase, 'start'),
+            number(record.score, 3), number(record.at, record.updatedAt),
+            number(record.createdAt, record.updatedAt), record.updatedAt, deletedAt,
           ],
         );
       }

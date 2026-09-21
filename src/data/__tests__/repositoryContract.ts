@@ -1240,6 +1240,47 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect((await repository.listVenues()).map((venue) => venue.id)).toEqual(['v-remote']);
       });
 
+      it('takes a venue with no name, rather than failing the whole answer', async () => {
+        // The other half of the guard the two cases below already cover. The
+        // server validates an id and a stamp and carries every other field
+        // through untouched, and SQLite binds a record's fields straight into
+        // a statement: `undefined` is not a value it takes at all, whether or
+        // not the column is nullable, so it answered "Provided value cannot be
+        // bound to SQLite parameter 2" and rolled back every table in the same
+        // response. The cursor was never written, so the identical batch came
+        // down and failed again on every sync after it, which ended sync on
+        // iOS and Android for good while the browser absorbed it.
+        const { name: _dropped, ...noName } = foreignVenue('v-remote', T0);
+        await repository.applyChanges(set({
+          venues: [change(noName)],
+          sessions: [change(foreignSession('s-remote', 'v-remote'))],
+        }));
+
+        // The row lands, with an empty name rather than no name, and both
+        // engines say the same thing about it.
+        expect((await repository.getVenue('v-remote'))?.name).toBe('');
+        // And the rest of the answer landed with it, which is the point.
+        expect((await repository.listSessions()).map((session) => session.id))
+          .toEqual(['s-remote']);
+      });
+
+      it('and a session missing the fields a column insists on', async () => {
+        const { currency: _c, buyIn: _b, startedAt: _s, gameType: _g, ...thin } =
+          foreignSession('s-remote', 'v-remote');
+        await repository.applyChanges(set({
+          venues: [change(foreignVenue('v-remote', T0))],
+          sessions: [change(thin)],
+        }));
+
+        const session = await repository.getSession('s-remote');
+        expect(session).not.toBeNull();
+        expect(session?.currency).toBe('USD');
+        expect(session?.buyIn).toBe(0);
+        expect(session?.gameType).toBe('NLHE');
+        // The stamp it does have, rather than the start of the epoch.
+        expect(session?.startedAt).toBe(T0);
+      });
+
       it('takes a session with no stakes at all, and reads it back as having none', async () => {
         // The same hole, one table up: `{ ...undefined }` does not throw, it
         // quietly writes a stakes object with no blinds in it, and every

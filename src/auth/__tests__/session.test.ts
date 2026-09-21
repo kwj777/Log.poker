@@ -183,6 +183,36 @@ describe('a store with nowhere to write', () => {
     expect(await manager.token()).toBe(fresh);
   });
 
+  it('never disappears while a renewal is being kept', async () => {
+    // `renewIfDue` runs at launch and is not awaited, so anything can read
+    // across it. Keeping a token is several awaits, and emptying the memory
+    // fallback before the durable write left a window where a device with no
+    // durable store had nothing anywhere -- a `current()` landing in it reports
+    // signed out, and `data/index.ts` composes the plain local repository on
+    // that answer and stops syncing for the rest of the process.
+    const DAY = 24 * HOUR;
+    const nearlyOut = token(NOW + 3 * DAY, 'free');
+    const renewed = token(NOW + 30 * DAY, 'free');
+    const manager = new SessionManager(deadStore(), () => NOW);
+    await manager.signIn(nearlyOut);
+
+    const seen: boolean[] = [];
+    const renewal = manager.renewIfDue(async () => {
+      await Promise.resolve();
+      return renewed;
+    });
+    // Interleaved with the renewal's own awaits rather than after it: the
+    // failure is a window, and a check either side of one finds nothing.
+    for (let spin = 0; spin < 12; spin += 1) {
+      seen.push((await manager.current()) !== null);
+      await Promise.resolve();
+    }
+    await renewal;
+
+    expect(seen).not.toContain(false);
+    expect(await manager.token()).toBe(renewed);
+  });
+
   it('is not reached at all by a store that works', async () => {
     // The tripwire against holding every token in memory regardless. A store
     // that kept it is the only thing holding it, so emptying the store behind

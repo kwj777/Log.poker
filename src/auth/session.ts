@@ -127,11 +127,20 @@ export class SessionManager {
    * The read-back is the whole of the test, because a `TokenStore` cannot say
    * no: `write` resolves either way by design. Reading it back is the only
    * question that has a different answer.
+   *
+   * **The fallback is never emptied on the way through.** It is set or cleared
+   * once the durable store has answered, so at every await in here one of the
+   * two is holding a token. Clearing it first read cleanly and left a window
+   * -- three awaits wide, and `renewIfDue` runs at launch without being
+   * awaited -- where a device with no durable store had nothing anywhere, and
+   * a `current()` landing in it reported signed out. That is not a cosmetic
+   * answer: `data/index.ts` composes the plain local repository on it and
+   * nothing syncs for the rest of the process.
    */
   private async keep(token: string): Promise<void> {
-    await this.fallback.clear();
     await this.store.write(token);
-    if ((await this.store.read()) !== token) await this.fallback.write(token);
+    if ((await this.store.read()) === token) await this.fallback.clear();
+    else await this.fallback.write(token);
   }
 
   /** Forget it in both places, so neither can put back what the other dropped. */

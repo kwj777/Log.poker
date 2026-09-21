@@ -41,22 +41,29 @@ const START = new Date(2026, 8, 19, 19, 0).getTime();
 
 const edits: { id: string; patch: Record<string, unknown> }[] = [];
 
-const load = (over: Partial<SessionWithChildren> = {}) => {
+/**
+ * `live` is whether this session is the one the live screen is showing.
+ *
+ * Not whether it has an end. The two were the same thing here, and in the
+ * screen, and that is what hid the case below: a session with no end that is
+ * not the active one is stranded, not running, and it is the one session
+ * detail sends people to this screen to finish.
+ */
+const load = (over: Partial<SessionWithChildren> = {}, { live = false } = {}) => {
   params.id = 's1';
   back.mockClear();
   edits.length = 0;
+  const only = session('s1', {
+    startedAt: START,
+    endedAt: START + 4 * HOUR,
+    buyIn: 30_000,
+    cashOut: 45_000,
+    ...over,
+  });
   useLogStore.setState({
     status: 'ready',
-    activeSession: null,
-    sessions: [
-      session('s1', {
-        startedAt: START,
-        endedAt: START + 4 * HOUR,
-        buyIn: 30_000,
-        cashOut: 45_000,
-        ...over,
-      }),
-    ],
+    activeSession: live ? only : null,
+    sessions: [only],
     venues: [],
     moodEntries: [],
     handCount: 0,
@@ -242,7 +249,7 @@ describe('what the form refuses to write', () => {
 
 describe('a session that is still running', () => {
   it('offers its start and not its length, which is not a fact yet', async () => {
-    load({ endedAt: null, cashOut: null });
+    load({ endedAt: null, cashOut: null }, { live: true });
     await renderScreen(<EditSessionScreen />);
 
     expect(screen.getByLabelText('Start date')).toBeTruthy();
@@ -251,7 +258,7 @@ describe('a session that is still running', () => {
   });
 
   it('and leaves its open end open when the start is fixed', async () => {
-    load({ endedAt: null, cashOut: null });
+    load({ endedAt: null, cashOut: null }, { live: true });
     await renderScreen(<EditSessionScreen />);
 
     const time = screen.getByLabelText('Start time');
@@ -306,5 +313,65 @@ describe('a correction dated in the future', () => {
     await renderScreen(<EditSessionScreen />);
     await userEvent.press(screen.getByText('Save changes'));
     expect(edits).toHaveLength(1);
+  });
+});
+
+/**
+ * A session with no end that is not the one the live screen is showing.
+ *
+ * Two devices each starting a session is all it takes, and session detail has
+ * a card for it: "It has no result, and it is not the session the live screen
+ * is showing, so its clock is not running anywhere ... Edit it to give it a
+ * length and a cash-out, and it joins your numbers", over a button that opens
+ * this screen.
+ *
+ * This screen decided what to offer from `endedAt === null` alone, so it read
+ * that session as the live one: it hid both of the fields that card had just
+ * promised, and told the player it was still running. The button went
+ * somewhere that could not do the thing the button was for.
+ */
+describe('a session that was never finished', () => {
+  it('offers the length and the cash-out, which is what it was opened for', async () => {
+    load({ endedAt: null, cashOut: null });
+    await renderScreen(<EditSessionScreen />);
+
+    expect(screen.getByLabelText('Hours played')).toBeTruthy();
+    expect(screen.getByLabelText('Cash-out amount')).toBeTruthy();
+  });
+
+  it('and does not claim it is still running', async () => {
+    load({ endedAt: null, cashOut: null });
+    await renderScreen(<EditSessionScreen />);
+
+    expect(screen.queryByText(/still running/)).toBeNull();
+    expect(screen.getByText(/never finished/)).toBeTruthy();
+  });
+
+  it('gives it an end when a length and a result are typed in', async () => {
+    load({ endedAt: null, cashOut: null });
+    await renderScreen(<EditSessionScreen />);
+
+    await userEvent.type(screen.getByLabelText('Hours played'), '4');
+    await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits[0].patch.endedAt).toBe(START + 4 * HOUR);
+    expect(edits[0].patch.cashOut).toBe(45_000);
+  });
+
+  it('and leaves it unfinished when only the room was wrong', async () => {
+    // A length is only wrong when there is a result for it to belong to. This
+    // arrives with neither, which is a session waiting to be finished rather
+    // than a field somebody has already got wrong, so Save is not blocked.
+    load({ endedAt: null, cashOut: null });
+    await renderScreen(<EditSessionScreen />);
+
+    const time = screen.getByLabelText('Start time');
+    await userEvent.clear(time);
+    await userEvent.type(time, '20:15');
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits[0].patch.startedAt).toBe(new Date(2026, 8, 19, 20, 15).getTime());
+    expect(edits[0].patch.endedAt).toBeNull();
   });
 });

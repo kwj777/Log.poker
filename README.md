@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 94 passed
-Tests:       2129 passed
+Tests:       2133 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1115,6 +1115,7 @@ Tests:       2129 passed
   sessionExport      27   the log written out, and read back by the importer
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
+  editSession        22   correcting a session, including the one nobody cashed out
   money              22   cents arithmetic, parsing, formatting
   writeFailures      21   what the player sees when a write does not work
   compose            20   which repository a device gets, and the unsafe sweep
@@ -1126,7 +1127,6 @@ Tests:       2129 passed
   gateCheck          19   the key-on-the-site script, run rather than read
   history            19   the session list, its filters, and how much of it mounts
   clock              18   a typed date, a typed length, and what neither will accept
-  editSession        18   correcting a session, including the one nobody cashed out
   seed               18   the demo dataset stays coherent
   signin             18   the sign-in client, against a fake fetch
   client             17   the sync client, against a fake fetch

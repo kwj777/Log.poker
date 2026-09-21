@@ -508,12 +508,34 @@ export const useLogStore = create<LogState>((set, get) => ({
       fee,
       startedAt: at,
     });
-    if (mood != null) {
-      await repository.createMoodEntry({ sessionId: session.id, phase: 'start', score: mood, at });
+    // The session is committed from here on, and everything below it is a
+    // second write that can fail on its own.
+    //
+    // It used to fail the whole call, and the refresh below never ran: the
+    // store went on showing no session while the database held a live one, and
+    // `app/session/new.tsx` caught the rejection, said "That session could not
+    // be started" and put the Start button back. Pressing it wrote a second
+    // live session, and `getActiveSession` reads the newest open one, so the
+    // first became a row that is invisible and permanently open, which is the
+    // state `resolveActiveSessions` exists to clean up after two devices.
+    //
+    // **The mood does not get to say the session failed.** It is one optional
+    // tap, it is offered again two hours in by `MidSessionCheckIn`, and a
+    // night in the log twice is a worse thing to carry than a tilt reading
+    // nobody took. So the start stands, and the refresh runs on both paths, so
+    // the store matches storage whatever happened.
+    try {
+      if (mood != null) {
+        await repository.createMoodEntry({ sessionId: session.id, phase: 'start', score: mood, at });
+      }
+    } catch {
+      // Left unrecorded rather than fatal. See above.
+    } finally {
+      set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
+      // Venues, because `sessionCount` is derived at read time and this changed it.
+      await get()
+        .refresh(mood == null ? ['sessions', 'venues'] : ['sessions', 'venues', 'moodEntries']);
     }
-    set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
-    // Venues, because `sessionCount` is derived at read time and this changed it.
-    await get().refresh(mood == null ? ['sessions', 'venues'] : ['sessions', 'venues', 'moodEntries']);
     return session;
   },
 
@@ -557,19 +579,33 @@ export const useLogStore = create<LogState>((set, get) => ({
     const repository = await getRepository();
     const endedAt = result?.endedAt ?? Date.now();
     await repository.endSession(sessionId, cashOut, endedAt);
-    // A second write rather than a wider `endSession`: cashing out is the same
-    // operation for both formats, and only a tournament has anywhere it came.
-    if (result && (result.entrants != null || result.finishPosition != null)) {
-      await repository.updateSession(sessionId, {
-        ...(result.entrants == null ? {} : { entrants: result.entrants }),
-        ...(result.finishPosition == null ? {} : { finishPosition: result.finishPosition }),
-      });
+    // The night is closed from here on, and the two writes below can fail
+    // after it. They used to take the refresh down with them, so the store
+    // went on drawing a session the database had already finished: History
+    // showed it live, the dashboard left it out of every total, and the
+    // cash-out sheet stayed open inviting a second go at a session that no
+    // longer had one to give.
+    //
+    // The throw stands, unlike the mood on the way in, because what is in
+    // these two is a tournament's field and finish rather than an optional
+    // tap: worth telling somebody about, and fixable in Edit once the store
+    // agrees the session is over.
+    try {
+      // A second write rather than a wider `endSession`: cashing out is the same
+      // operation for both formats, and only a tournament has anywhere it came.
+      if (result && (result.entrants != null || result.finishPosition != null)) {
+        await repository.updateSession(sessionId, {
+          ...(result.entrants == null ? {} : { entrants: result.entrants }),
+          ...(result.finishPosition == null ? {} : { finishPosition: result.finishPosition }),
+        });
+      }
+      if (mood != null) {
+        await repository.createMoodEntry({ sessionId, phase: 'end', score: mood, at: endedAt });
+      }
+    } finally {
+      set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
+      await get().refresh(mood == null ? ['sessions'] : ['sessions', 'moodEntries']);
     }
-    if (mood != null) {
-      await repository.createMoodEntry({ sessionId, phase: 'end', score: mood, at: endedAt });
-    }
-    set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
-    await get().refresh(mood == null ? ['sessions'] : ['sessions', 'moodEntries']);
   },
 
   updateSessionNotes: async (sessionId, notes) => {

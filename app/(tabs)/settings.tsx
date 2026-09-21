@@ -52,6 +52,7 @@ import {
 import { saveCsv } from '../../src/features/export/saveCsv';
 import { seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
+import { VenueRow } from '../../src/features/venues/VenueRow';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
@@ -96,6 +97,8 @@ export default function SettingsScreen() {
   const handCount = useLogStore((state) => state.handCount);
   const moodEntries = useLogStore((state) => state.moodEntries);
   const deleteVenue = useLogStore((state) => state.deleteVenue);
+  const renameVenue = useLogStore((state) => state.renameVenue);
+  const mergeVenues = useLogStore((state) => state.mergeVenues);
   const refresh = useLogStore((state) => state.refresh);
   const clearAll = useLogStore((state) => state.clearAll);
 
@@ -107,23 +110,45 @@ export default function SettingsScreen() {
     setReport({ section, text, failed });
 
   /**
-   * Remove a venue nothing is logged against.
+   * Run one venue write, report what it did, and say whether the row may close.
    *
-   * Awaited and caught rather than fired off, which is what it was: a delete
-   * that threw left the row on screen and the rejection unhandled, so the only
-   * evidence was a venue that would not go away.
+   * Awaited and caught rather than fired off, which is what removal was: a
+   * `void deleteVenue(id)` with no catch at all, so a delete that threw left
+   * the row on screen and the rejection unhandled. The boolean is what the row
+   * needs and the only thing it needs -- a failed write leaves the editor open
+   * with what was typed still in it.
    */
-  const removeVenue = async (id: string) => {
+  const venueWrite = async (run: () => Promise<string>, whenItFails: string) => {
     setBusy(true);
     setReport(null);
     try {
-      await deleteVenue(id);
+      say('venues', await run());
+      return true;
     } catch (error) {
-      say('venues', describeFailure(error, 'Could not remove that venue.'), true);
+      say('venues', describeFailure(error, whenItFails), true);
+      return false;
     } finally {
       setBusy(false);
     }
   };
+
+  const removeVenue = (id: string) =>
+    venueWrite(async () => {
+      await deleteVenue(id);
+      return 'Venue removed.';
+    }, 'Could not remove that venue.');
+
+  const rename = (id: string, name: string) =>
+    venueWrite(async () => {
+      await renameVenue(id, name);
+      return `Renamed to ${name}.`;
+    }, 'Could not rename that venue.');
+
+  const merge = (fromId: string, into: { id: string; name: string }) =>
+    venueWrite(async () => {
+      const moved = await mergeVenues(fromId, into.id);
+      return `Moved ${moved} session${moved === 1 ? '' : 's'} to ${into.name}.`;
+    }, 'Could not merge those venues.');
 
   const seed = async () => {
     setBusy(true);
@@ -205,26 +230,15 @@ export default function SettingsScreen() {
           </Text>
         ) : (
           venues.map((venue) => (
-            <View key={venue.id} style={styles.venueRow}>
-              <View style={styles.venueBody}>
-                <Text variant="bodyStrong" numberOfLines={1}>
-                  {venue.name}
-                </Text>
-                <Text variant="caption" color={colors.textTertiary}>
-                  {venue.isHomeGame ? 'Home game · ' : ''}
-                  {venue.sessionCount} session{venue.sessionCount === 1 ? '' : 's'}
-                </Text>
-              </View>
-              {venue.sessionCount === 0 ? (
-                <Button
-                  label="Remove"
-                  variant="ghost"
-                  size="small"
-                  disabled={busy}
-                  onPress={() => void removeVenue(venue.id)}
-                />
-              ) : null}
-            </View>
+            <VenueRow
+              key={venue.id}
+              venue={venue}
+              others={venues.filter((other) => other.id !== venue.id)}
+              busy={busy}
+              onRename={rename}
+              onMerge={merge}
+              onRemove={removeVenue}
+            />
           ))
         )}
         <ReportNote report={report} section="venues" />
@@ -429,16 +443,6 @@ const styles = StyleSheet.create({
   },
   venues: {
     paddingVertical: spacing.xs,
-  },
-  venueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  venueBody: {
-    flex: 1,
-    gap: 2,
   },
   body: {
     lineHeight: 23,

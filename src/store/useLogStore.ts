@@ -195,6 +195,8 @@ interface LogState {
 
   createVenue: (name: string, isHomeGame: boolean) => Promise<Venue>;
   renameVenue: (id: string, name: string) => Promise<void>;
+  /** Move every session off one venue and onto another, then remove the emptied one. */
+  mergeVenues: (fromId: string, intoId: string) => Promise<number>;
   deleteVenue: (id: string) => Promise<void>;
 
   startSession: (input: StartSessionInput) => Promise<Session>;
@@ -400,6 +402,37 @@ export const useLogStore = create<LogState>((set, get) => ({
     // did not reload them would leave the old name on every row that shows one.
     await repository.updateVenue(id, { name });
     await get().refresh(['venues', 'sessions']);
+  },
+
+  /**
+   * Fold one venue into another and return how many sessions moved.
+   *
+   * The two spellings of a room somebody typed at a table on two different
+   * nights are the case this exists for, and until now they were permanent:
+   * `deleteVenue` is refused while anything is logged against a venue, which
+   * is right, and left a typo with one session against it there forever.
+   *
+   * Session by session rather than in one statement, because the contract has
+   * no bulk update and inventing one for this would mean a new method on both
+   * repositories, both their tests and the sync payload. A merge is a handful
+   * of rows and a deliberate act somebody waits a moment for.
+   *
+   * Not a transaction, which is the honest cost. A failure part way leaves the
+   * sessions that moved on the new venue and the rest on the old one, with
+   * both venues still there -- which is the state the merge started from, only
+   * smaller, and running it again finishes the job. The alternative was a
+   * transaction primitive the contract does not have.
+   */
+  mergeVenues: async (fromId, intoId) => {
+    if (fromId === intoId) return 0;
+    const repository = await getRepository();
+    const moving = await repository.listSessions({ venueId: fromId });
+    for (const session of moving) {
+      await repository.updateSession(session.id, { venueId: intoId });
+    }
+    await repository.deleteVenue(fromId);
+    await get().refresh(['venues', 'sessions']);
+    return moving.length;
   },
 
   deleteVenue: async (id) => {

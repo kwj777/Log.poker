@@ -251,6 +251,8 @@ describe('a shipped build saying what it did', () => {
       ],
     });
     await renderScreen(<SettingsScreen />);
+    // Remove lives in the row's editor now, beside rename and merge.
+    await userEvent.press(screen.getByLabelText('Edit Aria'));
     await userEvent.press(screen.getByText('Remove'));
     expect(await screen.findByText('venue is in use')).toBeTruthy();
   });

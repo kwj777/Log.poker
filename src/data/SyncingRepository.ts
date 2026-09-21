@@ -265,8 +265,15 @@ export class SyncingRepository implements Repository {
    * flight joins the first rather than starting a race, and a call inside the
    * backoff window returns without touching the network. Both matter because
    * the caller is every write in the app.
+   *
+   * `force` lifts two guards that are not wanted equally. One is "nothing has
+   * changed here", which a device that only ever reads needs lifted or it
+   * never asks again after its first success. The other is the backoff, which
+   * nothing in the app wants lifted: it is what stands between a server that
+   * is down and every device pointed at it. `honorBackoff` keeps the second
+   * while lifting the first, and `resume` is the caller that wants that.
    */
-  async push(force = false): Promise<void> {
+  async push(force = false, honorBackoff = false): Promise<void> {
     if (this.inFlight) {
       await this.inFlight;
       // A run lets go of its flag one microtask after it decides to stop, and a
@@ -286,7 +293,14 @@ export class SyncingRepository implements Repository {
     }
     if (this.halted) return;
     if (!force && !this.dirty && this.state.lastSyncedAt !== null) return;
-    if (!force && this.waiting()) return;
+    // Checked here as well as by `resume` before it called, because those are
+    // not the same moment. A forced call that finds a run already in flight
+    // waits for it, and if that run is the one that fails it arms the window
+    // while the joiner is still suspended. The joiner then fell straight
+    // through this line and opened a second request inside a window that had
+    // just closed, which on a server that is down is one request per app
+    // switch from every device pointed at it.
+    if ((!force || honorBackoff) && this.waiting()) return;
 
     this.inFlight = (async () => {
       // Around again while writes keep landing. Joining an in-flight run is
@@ -349,7 +363,9 @@ export class SyncingRepository implements Repository {
     if (since >= 0 && since < RESUME_THROTTLE_MS) return;
 
     this.lastResumeAt = at;
-    await this.push(true);
+    // Forced past "nothing has changed here", which is the whole point, and
+    // not past the backoff, which the paragraph above says in as many words.
+    await this.push(true, true);
   }
 
   /**

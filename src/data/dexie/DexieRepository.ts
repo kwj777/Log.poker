@@ -603,33 +603,43 @@ export class DexieRepository implements Repository {
 
   // -------------------------------------------------------------- sessions
 
+  /**
+   * Sessions newest first, filtered, and no more of them than were asked for.
+   *
+   * Every clause is a predicate on the cursor rather than a pass over an array
+   * that has already been read. This used to pull the whole table, deserialize
+   * every session, and then narrow -- so `limit` bounded what came back and not
+   * what it cost, while the SQLite side has always pushed both the clauses and
+   * the `LIMIT` into the statement. The caller that most wants the difference
+   * is `app/claim.tsx`, asking for one session to find out whether this device
+   * has a log at all, and the hand-off is web only, so the one caller with a
+   * limit ran exclusively on the engine that ignored it.
+   *
+   * `capped` is the SQLite side's rule, moved here rather than reinvented: a
+   * limit that is not a number is no limit, which is what a missing one already
+   * means. This read it as `Math.floor(NaN)` and sliced to it, and
+   * `slice(0, NaN)` is empty -- so the two engines answered the same call with
+   * the whole log and with nothing.
+   */
   async listSessions(filter: SessionFilter = {}): Promise<SessionWithChildren[]> {
-    let records = (await this.db.sessions.orderBy('startedAt').reverse().toArray()).filter(isLive);
+    const wanted = (record: SessionRecord): boolean => {
+      if (!isLive(record)) return false;
+      if (filter.venueId !== undefined && record.venueId !== filter.venueId) return false;
+      if (filter.format !== undefined && record.format !== filter.format) return false;
+      if (filter.gameType !== undefined && record.gameType !== filter.gameType) return false;
+      if (filter.from !== undefined && record.startedAt < filter.from) return false;
+      if (filter.to !== undefined && record.startedAt >= filter.to) return false;
+      if (filter.status === 'active' && record.endedAt !== OPEN_SESSION_ENDED_AT) return false;
+      if (filter.status === 'completed' && record.endedAt === OPEN_SESSION_ENDED_AT) return false;
+      return true;
+    };
 
-    if (filter.venueId !== undefined) {
-      records = records.filter((record) => record.venueId === filter.venueId);
-    }
-    if (filter.format !== undefined) {
-      records = records.filter((record) => record.format === filter.format);
-    }
-    if (filter.gameType !== undefined) {
-      records = records.filter((record) => record.gameType === filter.gameType);
-    }
-    if (filter.from !== undefined) {
-      records = records.filter((record) => record.startedAt >= filter.from!);
-    }
-    if (filter.to !== undefined) {
-      records = records.filter((record) => record.startedAt < filter.to!);
-    }
-    if (filter.status === 'active') {
-      records = records.filter((record) => record.endedAt === OPEN_SESSION_ENDED_AT);
-    }
-    if (filter.status === 'completed') {
-      records = records.filter((record) => record.endedAt !== OPEN_SESSION_ENDED_AT);
-    }
-    if (filter.limit !== undefined) {
-      records = records.slice(0, Math.max(0, Math.floor(filter.limit)));
-    }
+    const capped = Number.isFinite(filter.limit as number)
+      ? Math.max(0, Math.floor(filter.limit as number))
+      : null;
+
+    const matching = this.db.sessions.orderBy('startedAt').reverse().filter(wanted);
+    const records = await (capped === null ? matching : matching.limit(capped)).toArray();
 
     return this.attachChildren(records.map(toSession));
   }

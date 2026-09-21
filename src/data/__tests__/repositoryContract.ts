@@ -619,6 +619,44 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         const sessions = await repository.listSessions({ limit: 1 });
         expect(sessions.map((session) => session.id)).toEqual([c.id]);
       });
+
+      it('and after the filters, not before them', async () => {
+        // A limit narrows what the filters left, rather than cutting the table
+        // down first and filtering the piece. One completed NLHE session at the
+        // room, and it is not the newest session in the log.
+        const { room, c } = await seedFiltered();
+        const sessions = await repository.listSessions({
+          venueId: room.id,
+          status: 'completed',
+          gameType: 'NLHE',
+          limit: 1,
+        });
+        expect(sessions.map((session) => session.id)).toEqual([c.id]);
+      });
+
+      it('treats a limit that is not a number as no limit at all', async () => {
+        // Which is what a missing one already means. The two engines disagreed
+        // here: SQLite refuses to interpolate a non-number and drops the LIMIT,
+        // while the other read it as a slice length and `slice(0, NaN)` is
+        // empty -- so the same call answered with the whole log on one and with
+        // nothing on the other.
+        await seedFiltered();
+        const whole = await repository.listSessions();
+        expect(whole.length).toBeGreaterThan(1);
+
+        for (const limit of [Number.NaN, Number.POSITIVE_INFINITY]) {
+          const sessions = await repository.listSessions({ limit });
+          expect(sessions.map((session) => session.id)).toEqual(
+            whole.map((session) => session.id),
+          );
+        }
+      });
+
+      it('and a limit of zero as none of them, which is a number', async () => {
+        await seedFiltered();
+        expect(await repository.listSessions({ limit: 0 })).toEqual([]);
+        expect(await repository.listSessions({ limit: -5 })).toEqual([]);
+      });
     });
 
     describe('rebuys', () => {

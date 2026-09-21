@@ -38,6 +38,62 @@ runRepositoryContract('IndexedDB', {
   },
 });
 
+describe('what a limited list reads', () => {
+  it('stops at the limit instead of reading the log and slicing it', async () => {
+    // `limit` used to bound what came back and not what it cost: the whole
+    // table was read and deserialized and then sliced. The SQLite side has
+    // always put the LIMIT in the statement. The caller that wants this most is
+    // app/claim.tsx, asking for one session to find out whether this device has
+    // a log at all -- and the hand-off is web only, so the one caller with a
+    // limit ran exclusively on the engine that ignored it.
+    const db = createDatabase(`log-poker-test-limit-${++counter}`);
+    const repository = new DexieRepository(db, {
+      clock: { now: () => T0 },
+      ids: { next: () => `id-${++ids}` },
+    });
+    await repository.init();
+
+    // Fifty nights at one room and the most recent at another. The answer is
+    // the one at the other room, so the fifty are what a limit is supposed to
+    // stop this from touching -- and counting a venue's sessions, which
+    // `attachChildren` does afterwards, only reaches the one it is about.
+    const old = await repository.createVenue({ name: 'Aria', isHomeGame: false });
+    const newest = await repository.createVenue({ name: 'Bellagio', isHomeGame: false });
+    const night = (venueId: string, at: number) => ({
+      venueId,
+      format: 'cash' as const,
+      gameType: 'NLHE' as const,
+      stakes: { smallBlind: 100, bigBlind: 200 },
+      currency: 'USD',
+      buyIn: 30_000,
+      startedAt: at,
+    });
+    await repository.createSessions(
+      Array.from({ length: 50 }, (_, i) => night(old.id, T0 + i)),
+    );
+    await repository.createSession(night(newest.id, T0 + 1000));
+
+    // Dexie's own count of records handed out of the store, which is the cost
+    // this is about: a timer would say the same thing less reliably.
+    let read = 0;
+    const counting = (record: unknown) => {
+      read += 1;
+      return record;
+    };
+    db.sessions.hook('reading', counting);
+
+    const sessions = await repository.listSessions({ limit: 1 });
+    expect(sessions.map((session) => session.venue?.name)).toEqual(['Bellagio']);
+    // The one session, and the one session behind its venue's count. Not the
+    // fifty at the other room.
+    expect(read).toBeLessThan(5);
+
+    db.sessions.hook('reading').unsubscribe(counting);
+    db.close();
+    await db.delete();
+  });
+});
+
 describe('what counting the hands reads', () => {
   it('counts keys rather than cursoring every hand in the log', async () => {
     // The old version cursored the table and counted what survived `isLive`,

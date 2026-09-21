@@ -89,6 +89,13 @@ export default function ActiveSessionScreen() {
           <Text variant="heading" center>
             No session running
           </Text>
+          {/* The cash-out's own failure is drawn here as well as below,
+              because this is where it now lands. `endSession` re-reads the log
+              whether or not its later writes threw, so a night whose result
+              landed and whose mood did not takes this branch before the catch
+              has finished speaking, and a message set into the other branch is
+              a message nothing draws. */}
+          <ErrorNote message={failed} />
           <Button
             label="Back to dashboard"
             style={styles.emptyAction}
@@ -201,7 +208,24 @@ export default function ActiveSessionScreen() {
     } catch (error) {
       // The worst one to lose silently: this is the moment the result is
       // written, and the sheet closing is the only thing that ever said so.
-      setFailed(describeFailure(error, 'That session could not be closed out.'));
+      //
+      // Two different failures arrive here, and they want different words.
+      // `endSession` writes the cash-out first and the tournament result and
+      // the end mood after it, and re-reads the log either way, so by the time
+      // this line runs the store already knows which happened. A session that
+      // is gone from it is one that closed: what failed was a field and a
+      // finish, which Edit can still fix, and telling the player their night
+      // could not be closed out would send them back for something they
+      // already have.
+      const closed = useLogStore.getState().activeSession === null;
+      setFailed(
+        describeFailure(
+          error,
+          closed
+            ? 'The session was closed, but not everything was saved. You can fix it in Edit.'
+            : 'That session could not be closed out.',
+        ),
+      );
     } finally {
       setBusy(false);
     }

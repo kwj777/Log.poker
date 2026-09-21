@@ -38,6 +38,27 @@ export const SessionRow = ({ session, onPress, standalone = false }: SessionRowP
         ? session.gameType
         : `${formatStakes(session.stakes, currency)} · ${session.gameType}`;
 
+  /**
+   * Everything the row draws, in the order it draws it.
+   *
+   * `Card` renders a `Pressable`, and a `Pressable` groups its children into
+   * one element, so a label on it is not a hint alongside the content -- it is
+   * the whole of what is announced. This said "Session at Aria" over a row
+   * whose point is the figure on the right, so the date, the stakes, the
+   * length and the result were drawn and never spoken, and ten nights at one
+   * room read as ten identical rows.
+   *
+   * The same strings the row shows, because a name that paraphrases what is on
+   * screen is a second copy of it to keep true.
+   */
+  const spoken = [
+    `Session at ${session.venue?.name ?? 'unknown venue'}`,
+    formatRelativeDay(session.startedAt),
+    descriptor,
+    formatDuration(durationMs(session)),
+    live ? 'Live' : formatMoney(net ?? 0, { currency, signed: true }),
+  ].join(', ');
+
   // Named so a test can count how many of these a long history actually
   // mounts, which is the difference between a virtualized list and a loop.
   const content = (
@@ -68,18 +89,14 @@ export const SessionRow = ({ session, onPress, standalone = false }: SessionRowP
 
   if (standalone) {
     return (
-      <Card onPress={onPress} accessibilityLabel={`Session at ${session.venue?.name ?? 'unknown venue'}`}>
+      <Card onPress={onPress} accessibilityLabel={spoken}>
         {content}
       </Card>
     );
   }
 
   return (
-    <Card
-      onPress={onPress}
-      style={styles.inline}
-      accessibilityLabel={`Session at ${session.venue?.name ?? 'unknown venue'}`}
-    >
+    <Card onPress={onPress} style={styles.inline} accessibilityLabel={spoken}>
       {content}
     </Card>
   );

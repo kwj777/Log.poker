@@ -103,10 +103,7 @@ export const HandRow = ({
       {onPress ? (
         <Pressable
           accessibilityRole="button"
-          // The cards, which is what a player scans the list by and the one
-          // part of a row that is always there. The note and the tags are read
-          // after it by the elements that hold them.
-          accessibilityLabel={`${describeHand(hand)}. Opens the hand.`}
+          accessibilityLabel={`${describeHand(hand, currency)}. Opens the hand.`}
           onPress={onPress}
           style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
         >
@@ -121,10 +118,31 @@ export const HandRow = ({
   );
 };
 
-/** What a row is, in a phrase, for the label on the control that opens it. */
-const describeHand = (hand: Hand): string => {
+/**
+ * What a row is, in a phrase, for the label on the control that opens it.
+ *
+ * All of it, not just the cards. This returned the cards and the seat under a
+ * comment saying "the note and the tags are read after it by the elements that
+ * hold them" -- and they are not. A `Pressable` with a label is one
+ * accessibility element and that label is its whole name, so the note, the
+ * runout, the tags and the amount were drawn on screen and never spoken. The
+ * note is the reason a hand was written down.
+ *
+ * The same strings the row shows, in the order it shows them.
+ */
+const describeHand = (hand: Hand, currency: string): string => {
   const cards = hand.holeCards === null ? 'Hand with no cards' : formatNotation(hand.holeCards);
-  return hand.position === null ? cards : `${cards} from ${hand.position}`;
+  return [
+    hand.position === null ? cards : `${cards} from ${hand.position}`,
+    hand.board === null ? null : formatNotation(hand.board),
+    hand.note,
+    hand.tags.length === 0 ? null : hand.tags.map((tag) => HAND_TAG_LABELS[tag]).join(', '),
+    hand.amount === null || hand.amount === 0
+      ? null
+      : formatMoney(hand.amount, { currency, signed: true }),
+  ]
+    .filter((part): part is string => part !== null && part !== '')
+    .join(', ');
 };
 
 /**

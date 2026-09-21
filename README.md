@@ -1066,16 +1066,16 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 81 passed
-Tests:       1991 passed
+Test Suites: 82 passed
+Tests:       2001 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
   bundle             68   what ships to each platform, against the real output
+  site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
-  site               61   the marketing/app split, the PWA, the sitemap
-  sessionImport      58   reading a session-summary export
+  sessionImport      61   reading a session-summary export
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   stats              54   P/L, rebuys, duration, win rate, groupings
@@ -1144,6 +1144,7 @@ Tests:       1991 passed
   settingsVenues      7   renaming a venue, and merging two that are one room
   venues              7   which spellings of a room name are the same room
   readme              6   the test table adds up and says what each suite is for
+  scale               6   how much of the plot the data actually gets
   settingsHelp        6   the privacy link, the support address, the build
   venuePicker         6   typing a room you already have, rather than adding a second
   errorBoundary       5   a render that throws, and the way back from it

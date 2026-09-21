@@ -254,6 +254,19 @@ describe('the worker caches the app and not the marketing site', () => {
     expect(worker).toContain("pathname.startsWith('/app/assets/')");
   });
 
+  it('and so does the CDN, at the same paths', () => {
+    // The worker was updated when the bundle moved under /app and these were
+    // not, so they named /_expo/* and /assets/*, where nothing is published:
+    // two rules matching zero requests, and the one set of files on this site
+    // that can be cached forever revalidated on every visit instead. Nothing
+    // could show it, because a header rule that matches nothing fails silently
+    // and the worker covered the case for anybody who had one.
+    expect(netlify).toContain('for = "/app/_expo/*"');
+    expect(netlify).toContain('for = "/app/assets/*"');
+    expect(netlify).not.toContain('for = "/_expo/*"');
+    expect(netlify).not.toContain('for = "/assets/*"');
+  });
+
   it('was bumped, so an existing install discards the caches it filled at /', () => {
     expect(worker).not.toContain("CACHE_VERSION = 'v1'");
   });

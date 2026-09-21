@@ -179,13 +179,21 @@
     Content-Type = "application/manifest+json"
 
 # Bundler output is content-hashed, so it can be cached indefinitely.
+#
+# Under /app, because that is where `scripts/build-web.mjs` moves it and where
+# `experiments.baseUrl` makes the export reference itself. These two said
+# /_expo/* and /assets/* until now, which is where the bundle lived before the
+# move and where nothing has been published since: both rules matched zero
+# requests, so the one set of files on this site that can be cached forever was
+# the one set being revalidated on every visit. `public/sw.js` was updated for
+# the same move and kept working, which is why nothing showed it.
 [[headers]]
-  for = "/_expo/*"
+  for = "/app/_expo/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
-  for = "/assets/*"
+  for = "/app/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 

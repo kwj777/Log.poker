@@ -35,16 +35,12 @@ import {
   formatDuration,
   totals,
 } from '../../src/domain/stats';
-import {
-  bootstrapRoi,
-  formatRoi,
-  toEntryResults,
-  tournamentTotals,
-} from '../../src/domain/tournaments';
+import { formatRoi, tournamentTotals } from '../../src/domain/tournaments';
 import { openHandOff } from '../../src/features/family/hooks';
 import { ReviewFlagged } from '../../src/features/family/ReviewFlagged';
 import { reviewPrompt } from '../../src/features/family/reviewPrompt';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
+import { useEntryResults, useRoiInterval } from '../../src/features/sessions/useRoiInterval';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
@@ -61,7 +57,13 @@ export default function DashboardScreen() {
   const summary = useMemo(() => totals(sessions), [sessions]);
   const winRate = useMemo(() => cashWinRate(sessions), [sessions]);
   const tourneys = useMemo(() => tournamentTotals(sessions), [sessions]);
-  const roiInterval = useMemo(() => bootstrapRoi(toEntryResults(sessions)), [sessions]);
+  /**
+   * Keyed on the entries rather than on `sessions`, which the store replaces
+   * on every write and every sync. See `useRoiInterval`: this used to resample
+   * the whole entry list after a rebuy.
+   */
+  const entries = useEntryResults(sessions);
+  const roiInterval = useRoiInterval(entries);
   const curve = useMemo(() => bankrollCurve(sessions), [sessions]);
 
   /**

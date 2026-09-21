@@ -293,6 +293,61 @@ export const MIN_ENTRIES_FOR_INTERVAL = 10;
 export const BOOTSTRAP_SAMPLES = 2_000;
 
 /**
+ * The most resampling this will do, counted in entries drawn rather than in
+ * samples.
+ *
+ * A bootstrap draws `count` entries per sample, so the work is samples times
+ * entries and it is the product that costs time, not either half. At the full
+ * 2,000 samples a player with a thousand entries behind them was paying over a
+ * second of blocked JavaScript for one line of a stat tile, on a screen that
+ * had already drawn everything else.
+ *
+ * The budget is set so that nothing under a hundred entries is touched at all,
+ * which is every player this feature was designed around. Past that it trades
+ * resamples for time, and it can: the Monte Carlo error of a percentile falls
+ * as one over the root of the sample count, while the interval's own width is
+ * set by the data -- so the bigger the entry list, the less the last thousand
+ * resamples were telling anybody. The floor keeps that trade from going too
+ * far at any size.
+ */
+export const BOOTSTRAP_DRAW_BUDGET = 200_000;
+
+/** However large the list, never fewer resamples than this. */
+export const MIN_BOOTSTRAP_SAMPLES = 500;
+
+/**
+ * How many resamples a list of `count` entries gets.
+ *
+ * Exported because it is the honest answer to "why does my interval say 500
+ * samples", which `RoiInterval.samples` puts on the screen.
+ */
+export const samplesFor = (count: number, requested = BOOTSTRAP_SAMPLES): number => {
+  if (count <= 0) return requested;
+  const affordable = Math.floor(BOOTSTRAP_DRAW_BUDGET / count);
+  return Math.max(MIN_BOOTSTRAP_SAMPLES, Math.min(requested, affordable));
+};
+
+/**
+ * A string that changes exactly when the interval would.
+ *
+ * `toEntryResults` builds a new array out of `sessions` every time the store
+ * hands out a new one, and the store hands out a new one on every write and
+ * every sync -- so a `useMemo` keyed on that array re-ran the whole bootstrap
+ * after a rebuy, after a cash-out, and once on hydrate before the dashboard
+ * had drawn a pixel. None of those change a tournament result.
+ *
+ * A string rather than a numeric hash, because the cost this guards is a
+ * couple of hundred thousand multiply-adds and the cost of the guard is one
+ * pass and one allocation. A hash would be smaller and would, on a collision,
+ * show yesterday's interval and say nothing. This cannot.
+ *
+ * Order is in it: the draw picks by index, so two permutations of the same
+ * entries give the same distribution and not the same seeded answer.
+ */
+export const entriesSignature = (results: readonly EntryResult[]): string =>
+  results.map((result) => `${result.invested}/${result.returned}`).join(',');
+
+/**
  * Fixed, so the same results always produce the same interval.
  *
  * This matters more than it looks. An interval that shifted every time the
@@ -349,8 +404,10 @@ export const bootstrapRoi = (
   options: { level?: ConfidenceLevel; samples?: number; seed?: number } = {},
 ): RoiInterval | null => {
   const level = options.level ?? 95;
-  const samples = options.samples ?? BOOTSTRAP_SAMPLES;
   const count = results.length;
+  // Budgeted rather than taken at face value; see `samplesFor`. An explicit
+  // `samples` is still a ceiling, so a caller asking for fewer gets fewer.
+  const samples = samplesFor(count, options.samples ?? BOOTSTRAP_SAMPLES);
   if (count < MIN_ENTRIES_FOR_INTERVAL || samples < 1) return null;
 
   const invested = results.reduce((sum, result) => sum + result.invested, 0);

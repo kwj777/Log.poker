@@ -4,6 +4,10 @@ import {
   assessRoi,
   assessTournaments,
   bootstrapRoi,
+  BOOTSTRAP_DRAW_BUDGET,
+  entriesSignature,
+  MIN_BOOTSTRAP_SAMPLES,
+  samplesFor,
   formatRoi,
   roiConcentration,
   type EntryResult,
@@ -278,10 +282,51 @@ describe('bootstrapRoi', () => {
     expect(interval!.upper).toBeGreaterThan(interval!.roi);
   });
 
+  it('leaves a realistic entry list at the full sample count', () => {
+    // The budget exists for a log nobody has yet. It must not quietly halve
+    // the resampling of somebody with a hundred tournaments behind them.
+    expect(samplesFor(10)).toBe(BOOTSTRAP_SAMPLES);
+    expect(samplesFor(100)).toBe(BOOTSTRAP_SAMPLES);
+    expect(bootstrapRoi(runs(100, BREAK_EVEN))?.samples).toBe(BOOTSTRAP_SAMPLES);
+  });
+
+  it('and trades resamples for time on a list big enough to be slow', () => {
+    // Samples times entries is the work, and at the full count a thousand
+    // entries was over a second of blocked JavaScript for one stat tile.
+    expect(samplesFor(500)).toBeLessThan(BOOTSTRAP_SAMPLES);
+    expect(samplesFor(200) * 200).toBeLessThanOrEqual(BOOTSTRAP_DRAW_BUDGET);
+    // The floor outranks the budget, which is the point of having one: past
+    // about four hundred entries the trade stops rather than continuing until
+    // there is nothing left to take.
+    expect(samplesFor(500)).toBe(MIN_BOOTSTRAP_SAMPLES);
+    expect(samplesFor(100_000)).toBe(MIN_BOOTSTRAP_SAMPLES);
+  });
+
+  it('still brackets the observed ROI at the reduced count', () => {
+    // The trade is only defensible if the answer is still an answer.
+    const interval = bootstrapRoi(runs(400, BREAK_EVEN))!;
+    expect(interval.lower).toBeLessThan(interval.roi);
+    expect(interval.upper).toBeGreaterThan(interval.roi);
+    expect(interval.samples).toBeLessThan(BOOTSTRAP_SAMPLES);
+  });
+
   it('is the same interval every time, so it cannot twitch between renders', () => {
     const once = bootstrapRoi(runs(40, BREAK_EVEN));
     const twice = bootstrapRoi(runs(40, BREAK_EVEN));
     expect(once).toEqual(twice);
+  });
+
+  it('signs an entry list so a caller can tell when the answer could move', () => {
+    // What the screens key their cache on. It has to change when a result
+    // changes and stay put when the store merely hands out a new array.
+    const a = runs(12, BREAK_EVEN);
+    expect(entriesSignature(a)).toBe(entriesSignature(runs(12, BREAK_EVEN)));
+    expect(entriesSignature(a)).not.toBe(entriesSignature(runs(13, BREAK_EVEN)));
+    expect(entriesSignature(a)).not.toBe(
+      entriesSignature([...a.slice(0, 11), { invested: 11_000, returned: 99_000 }]),
+    );
+    // Order is in it, because the draw picks by index.
+    expect(entriesSignature(a)).not.toBe(entriesSignature([...a].reverse()));
   });
 
   it('actually uses the seed it is given', () => {

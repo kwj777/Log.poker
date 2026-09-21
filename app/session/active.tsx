@@ -38,6 +38,7 @@ export default function ActiveSessionScreen() {
   const session = useLogStore((state) => state.activeSession);
   const hands = useHandsForSession(session?.id ?? null);
   const addRebuy = useLogStore((state) => state.addRebuy);
+  const removeRebuy = useLogStore((state) => state.removeRebuy);
   const endSession = useLogStore((state) => state.endSession);
 
   const [rebuyOpen, setRebuyOpen] = useState(false);
@@ -49,6 +50,8 @@ export default function ActiveSessionScreen() {
   const [entrants, setEntrants] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Which rebuy is a tap away from being removed, if any. */
+  const [confirmingRebuy, setConfirmingRebuy] = useState<string | null>(null);
 
   const elapsed = useElapsed(session?.startedAt ?? null);
   const invested = useMemo(
@@ -99,6 +102,30 @@ export default function ActiveSessionScreen() {
       // the sheet stayed open, the spinner stopped, and nothing said the money
       // had not gone in.
       setFailed(describeFailure(error, `That ${rebuyWord.toLowerCase()} could not be saved.`));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Take a rebuy back out.
+   *
+   * A rebuy is typed into a sheet at a table with a hand going on, and a
+   * misplaced decimal is the easiest mistake on this screen to make: the
+   * amount is pre-filled with the buy-in, so a tap too many puts real money
+   * into the log that never left anybody's pocket. It is part of
+   * `totalInvested`, so until now that mistake moved the session's result and
+   * the only way out of it was deleting the session.
+   */
+  const dropRebuy = async (rebuyId: string) => {
+    if (busy) return;
+    setBusy(true);
+    setFailed(null);
+    try {
+      await removeRebuy(rebuyId);
+      setConfirmingRebuy(null);
+    } catch (error) {
+      setFailed(describeFailure(error, `That ${rebuyWord.toLowerCase()} could not be removed.`));
     } finally {
       setBusy(false);
     }
@@ -222,7 +249,12 @@ export default function ActiveSessionScreen() {
         ) : (
           <View>
             {hands.map((hand) => (
-              <HandRow key={hand.id} hand={hand} currency={currency} />
+              <HandRow
+                key={hand.id}
+                hand={hand}
+                currency={currency}
+                onPress={() => router.push(`/session/hand?id=${hand.id}`)}
+              />
             ))}
           </View>
         )}
@@ -233,13 +265,43 @@ export default function ActiveSessionScreen() {
             <Card>
               {session.rebuys.map((rebuy, index) => (
                 <View key={rebuy.id} style={styles.rebuyRow}>
-                  <Text color={colors.textSecondary}>
+                  <Text color={colors.textSecondary} style={styles.rebuyLabel}>
                     {tournament ? 'Re-entry' : 'Rebuy'} {index + 1} ·{' '}
                     {formatDuration(rebuy.at - session.startedAt)} in
                   </Text>
-                  <Text variant="bodyStrong">{formatMoney(rebuy.amount, { currency })}</Text>
+                  {confirmingRebuy === rebuy.id ? (
+                    <View style={styles.rebuyActions}>
+                      <Button
+                        label="Keep"
+                        variant="secondary"
+                        size="small"
+                        onPress={() => setConfirmingRebuy(null)}
+                      />
+                      <Button
+                        label="Remove"
+                        variant="danger"
+                        size="small"
+                        loading={busy}
+                        onPress={() => void dropRebuy(rebuy.id)}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.rebuyActions}>
+                      <Text variant="bodyStrong">{formatMoney(rebuy.amount, { currency })}</Text>
+                      <Button
+                        label="Remove"
+                        accessibilityLabel={`Remove ${
+                          tournament ? 're-entry' : 'rebuy'
+                        } ${index + 1}, ${formatMoney(rebuy.amount, { currency })}`}
+                        variant="ghost"
+                        size="small"
+                        onPress={() => setConfirmingRebuy(rebuy.id)}
+                      />
+                    </View>
+                  )}
                 </View>
               ))}
+              <ErrorNote message={confirmingRebuy === null ? null : failed} />
             </Card>
           </>
         ) : null}
@@ -394,7 +456,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
+  },
+  rebuyLabel: {
+    flexShrink: 1,
+  },
+  rebuyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   sheetHint: {
     marginBottom: spacing.md,

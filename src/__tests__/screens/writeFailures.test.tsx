@@ -27,9 +27,17 @@ import ActiveSessionScreen from '../../../app/session/active';
 import SessionDetailScreen from '../../../app/session/[id]';
 import { useLogStore } from '../../store/useLogStore';
 
+/**
+ * Two screens in this file read the route, and they read different things out
+ * of it: session detail wants the session's id, and the hand screen treats an
+ * `id` as a hand to edit. One fixed object would put the hand screen into edit
+ * mode on a session id, so the params are set per test instead.
+ */
+const params: { id?: string } = {};
+
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
-  useLocalSearchParams: () => ({ id: 's1' }),
+  useLocalSearchParams: () => params,
 }));
 
 const replace = jest.requireMock('expo-router').router.replace as jest.Mock;
@@ -43,6 +51,7 @@ const full = () => new Error('The database is full.');
 
 const ready = (over: Partial<ReturnType<typeof useLogStore.getState>> = {}) => {
   replace.mockClear();
+  delete params.id;
   return useLogStore.setState({
     status: 'ready',
     activeSession: session('s1'),
@@ -135,6 +144,7 @@ describe('a cash-out that will not save', () => {
 describe('session notes that will not save', () => {
   it('says so, rather than leaving the text on screen looking saved', async () => {
     ready({ updateSessionNotes: (async () => { throw full(); }) as never });
+    params.id = 's1';
     await renderScreen(<SessionDetailScreen />);
 
     const notes = screen.getByLabelText('Session notes');
@@ -151,6 +161,7 @@ describe('session notes that will not save', () => {
 
   it('and keeps what was typed, so it can be copied out', async () => {
     ready({ updateSessionNotes: (async () => { throw full(); }) as never });
+    params.id = 's1';
     await renderScreen(<SessionDetailScreen />);
 
     const notes = screen.getByLabelText('Session notes');
@@ -167,6 +178,7 @@ describe('session notes that will not save', () => {
 describe('a session that will not delete', () => {
   it('says so rather than sending the player to History', async () => {
     ready({ deleteSession: (async () => { throw full(); }) as never });
+    params.id = 's1';
     await renderScreen(<SessionDetailScreen />);
 
     await userEvent.press(screen.getByText('Delete session'));
@@ -180,12 +192,59 @@ describe('a session that will not delete', () => {
 
   it('and goes to History when it does delete', async () => {
     ready({ deleteSession: (async () => undefined) as never });
+    params.id = 's1';
     await renderScreen(<SessionDetailScreen />);
 
     await userEvent.press(screen.getByText('Delete session'));
     await userEvent.press(screen.getByText('Delete'));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/history'));
+  });
+});
+
+describe('a rebuy taken back out', () => {
+  it('asks before removing it', async () => {
+    // A rebuy is part of `totalInvested`, so a mistyped one moves the result of
+    // the session. Until this existed the only way out was deleting the night.
+    const withRebuy = session('s1', {
+      rebuys: [
+        { id: 'r1', sessionId: 's1', amount: 20_000, at: 0, createdAt: 0, updatedAt: 0 },
+      ],
+    });
+    const removed: string[] = [];
+    ready({
+      activeSession: withRebuy,
+      sessions: [withRebuy],
+      removeRebuy: (async (id: string) => {
+        removed.push(id);
+      }) as never,
+    });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByLabelText('Remove rebuy 1, $200'));
+    expect(removed).toHaveLength(0);
+
+    await userEvent.press(screen.getByText('Remove'));
+    expect(removed).toEqual(['r1']);
+  });
+
+  it('and says so when it will not go', async () => {
+    const withRebuy = session('s1', {
+      rebuys: [
+        { id: 'r1', sessionId: 's1', amount: 20_000, at: 0, createdAt: 0, updatedAt: 0 },
+      ],
+    });
+    ready({
+      activeSession: withRebuy,
+      sessions: [withRebuy],
+      removeRebuy: (async () => { throw full(); }) as never,
+    });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByLabelText('Remove rebuy 1, $200'));
+    await userEvent.press(screen.getByText('Remove'));
+
+    expect(await screen.findByText('The database is full.')).toBeTruthy();
   });
 });
 

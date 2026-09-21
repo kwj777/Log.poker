@@ -4,6 +4,14 @@
  * Cards first and largest -- that is what a player scans for when looking back
  * at a night. The note is truncated to one line here; the full text lives in
  * the hand itself.
+ *
+ * ## The row opens the hand
+ *
+ * `onPress` was on this component's props from the start, and set an
+ * `accessibilityRole` of "button" when given -- but no caller passed it, and
+ * nothing here was pressable anyway, so the prop was a plan rather than a
+ * feature. A hand logged with the wrong cards stayed wrong, because the row
+ * showing it was the only place anybody would think to tap and it did nothing.
  */
 
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -19,6 +27,7 @@ import { colors, radius, resultColor, spacing, typography } from '../../theme';
 
 interface HandRowProps {
   hand: Hand;
+  /** Opens the hand. A row without one is a record rather than a control. */
   onPress?: () => void;
   currency?: string;
   /**
@@ -34,9 +43,9 @@ export const HandRow = ({
   onPress,
   currency = 'USD',
   showDrillLink = false,
-}: HandRowProps) => (
-  <View>
-   <View style={styles.row} accessibilityRole={onPress ? 'button' : undefined}>
+}: HandRowProps) => {
+  const body = (
+    <>
     <View style={styles.cards}>
       <Text variant="bodyStrong" style={styles.notation}>
         {formatNotation(hand.holeCards)}
@@ -86,11 +95,37 @@ export const HandRow = ({
         {formatMoney(hand.amount, { currency, signed: true })}
       </Text>
     ) : null}
-   </View>
+    </>
+  );
 
-    {showDrillLink && hand.tags.includes('misplayed') ? <DrillLink hand={hand} /> : null}
-  </View>
-);
+  return (
+    <View>
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          // The cards, which is what a player scans the list by and the one
+          // part of a row that is always there. The note and the tags are read
+          // after it by the elements that hold them.
+          accessibilityLabel={`${describeHand(hand)}. Opens the hand.`}
+          onPress={onPress}
+          style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
+        >
+          {body}
+        </Pressable>
+      ) : (
+        <View style={styles.row}>{body}</View>
+      )}
+
+      {showDrillLink && hand.tags.includes('misplayed') ? <DrillLink hand={hand} /> : null}
+    </View>
+  );
+};
+
+/** What a row is, in a phrase, for the label on the control that opens it. */
+const describeHand = (hand: Hand): string => {
+  const cards = hand.holeCards === null ? 'Hand with no cards' : formatNotation(hand.holeCards);
+  return hand.position === null ? cards : `${cards} from ${hand.position}`;
+};
 
 /**
  * The "misplayed?" → TiltProof hand-off. A link out for now; the seam for the
@@ -121,6 +156,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+  },
+  rowPressed: {
+    opacity: 0.6,
   },
   cards: {
     minWidth: 64,

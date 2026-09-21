@@ -22,7 +22,12 @@ import { useLogStore } from '../../store/useLogStore';
 
 const mockLogged: unknown[] = [];
 
-jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));
+jest.mock('expo-router', () => ({
+  router: { back: jest.fn(), push: jest.fn() },
+  // No id: this suite is about logging a hand. Editing one is
+  // `editHand.test.tsx`, which sets it.
+  useLocalSearchParams: () => ({}),
+}));
 
 jest.mock('../../data', () => ({
   getRepository: async () => ({}),

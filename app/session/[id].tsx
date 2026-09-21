@@ -246,7 +246,13 @@ export default function SessionDetailScreen() {
       ) : (
         <Card style={styles.handsCard}>
           {hands.map((hand) => (
-            <HandRow key={hand.id} hand={hand} currency={currency} showDrillLink />
+            <HandRow
+              key={hand.id}
+              hand={hand}
+              currency={currency}
+              showDrillLink
+              onPress={() => router.push(`/session/hand?id=${hand.id}`)}
+            />
           ))}
         </Card>
       )}

@@ -12,11 +12,28 @@
  * done something to somebody, so the save is followed by an offer of a reset
  * rather than by the way out -- once per session, and never in front of the
  * write. See `features/family/tableOffer.ts` for which tags and why those.
+ *
+ * ## The same screen edits one
+ *
+ * With an `id` it opens on a hand that already exists and writes over it. One
+ * screen rather than two, because the form is the whole screen: cards, seat,
+ * tags, a line, a pot swing and a runout, with every one of them optional.
+ * Duplicating that to change a card somebody typed wrong would be duplicating
+ * the entire thing, and the copy that got fixed would be whichever one anybody
+ * happened to be looking at.
+ *
+ * Editing differs in four places and nowhere else. It reads its session from
+ * the hand rather than from the store's live one, because a hand being fixed
+ * is usually from a night that ended weeks ago. It has a Delete. It never
+ * offers a reset -- the offer is for the moment a hand happened, and this is
+ * not that moment. And the tagline says which it is, since the two screens are
+ * otherwise identical and a form that silently overwrites is worse than one
+ * that says it will.
  */
 
 import { useState } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { AmountInput } from '../../src/components/AmountInput';
 import { Button } from '../../src/components/Button';
@@ -42,7 +59,7 @@ import { MAX_BOARD, isBoard } from '../../src/domain/handNotation';
 import { openHandOff } from '../../src/features/family/hooks';
 import { tableHandOff } from '../../src/features/family/links';
 import { tableOfferCopy, wantsTableReset } from '../../src/features/family/tableOffer';
-import { useLogStore } from '../../src/store/useLogStore';
+import { useHandById, useLogStore, useSessionById } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
 
@@ -50,10 +67,28 @@ const POSITION_OPTIONS = POSITIONS.map((value) => ({ value, label: value }));
 const TAG_OPTIONS = HAND_TAGS.map((value) => ({ value, label: HAND_TAG_LABELS[value] }));
 
 export default function LogHandScreen() {
-  const session = useLogStore((state) => state.activeSession);
+  /** Present when this screen is opened on a hand that already exists. */
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const editingId = id ?? null;
+  const editing = editingId !== null;
+
+  const activeSession = useLogStore((state) => state.activeSession);
   const logHand = useLogStore((state) => state.logHand);
+  const updateHand = useLogStore((state) => state.updateHand);
+  const removeHand = useLogStore((state) => state.deleteHand);
   const tableOfferMadeAt = useLogStore((state) => state.tableOfferMadeAt);
   const markTableOffer = useLogStore((state) => state.markTableOffer);
+
+  const existing = useHandById(editingId);
+  /**
+   * The session this hand belongs to, which is not always the live one.
+   *
+   * It decides two things on this screen: how many hole cards the picker deals
+   * (PLO has four) and what currency the pot swing is in. A hand from a PLO
+   * night being edited during a hold'em session has to keep asking for four.
+   */
+  const handSession = useSessionById(existing == null ? null : existing.sessionId);
+  const session = editing ? handSession : activeSession;
 
   const [holeCards, setHoleCards] = useState<string | null>(null);
   const [board, setBoard] = useState<string | null>(null);
@@ -64,6 +99,8 @@ export default function LogHandScreen() {
   const [amount, setAmount] = useState('');
   const [showAmount, setShowAmount] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   /**
    * Whether the hand that was just written is one worth offering a reset for.
@@ -75,10 +112,65 @@ export default function LogHandScreen() {
    */
   const [offered, setOffered] = useState(false);
 
-  if (!session) {
+  /**
+   * The form filled in from the hand, once, when it arrives.
+   *
+   * Adjusted during render rather than synced in an effect, the way session
+   * detail seeds its notes draft: an effect would render the empty form first
+   * and then fill it, so a hand being edited would flash as a blank one. The
+   * id it was seeded from is remembered rather than a boolean, so a screen
+   * that moves to a different hand re-seeds and one that merely re-renders
+   * does not throw away what is being typed.
+   */
+  const [seededFrom, setSeededFrom] = useState<string | null>(null);
+  if (existing != null && seededFrom !== existing.id) {
+    setSeededFrom(existing.id);
+    setHoleCards(existing.holeCards);
+    setBoard(existing.board);
+    setShowBoard(existing.board !== null);
+    setPosition(existing.position);
+    setTags(existing.tags);
+    setNote(existing.note ?? '');
+    setAmount(existing.amount === null ? '' : String(existing.amount / 100));
+    setShowAmount(existing.amount !== null);
+  }
+
+  const title = editing ? 'Edit hand' : 'Log a hand';
+  const pageTitle = `${title} · Log`;
+
+  if (editing && existing === null) {
+    // Deleted here in another tab, or on another device and synced away while
+    // this was open. Said plainly rather than shown as an empty form that
+    // would write the hand back.
     return (
       <Screen>
-        <PageMeta title="Log a hand · Log" />
+        <PageMeta title={pageTitle} />
+        <View style={styles.empty}>
+          <Text variant="heading" center>
+            Hand not found
+          </Text>
+          <Text color={colors.textSecondary} center>
+            It may have been deleted.
+          </Text>
+          <Button label="Close" onPress={() => router.back()} style={styles.emptyAction} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!session) {
+    // While editing this is the read not having landed, which is a beat; the
+    // form would be empty and seed itself a frame later, so nothing is drawn.
+    if (editing) {
+      return (
+        <Screen>
+          <PageMeta title={pageTitle} />
+        </Screen>
+      );
+    }
+    return (
+      <Screen>
+        <PageMeta title={pageTitle} />
         <View style={styles.empty}>
           <Text variant="heading" center>
             No session running
@@ -106,22 +198,32 @@ export default function LogHandScreen() {
    */
   const partialBoard = showBoard && board !== null && !isBoard(board);
 
+  /** What the form says, in the shape both writes take. */
+  const entered = () => ({
+    holeCards,
+    // Only what is on screen: collapsing the section leaves what was typed
+    // in place, and a board nobody can see is not one they chose to log.
+    board: showBoard ? board : null,
+    position,
+    tags,
+    note: note.trim() === '' ? null : note.trim(),
+    amount: showAmount ? parseAmount(amount) : null,
+  });
+
   const save = async () => {
     if (!hasSomething || partialBoard || saving) return;
     setSaving(true);
     setFailed(null);
     try {
-      await logHand({
-        sessionId: session.id,
-        holeCards,
-        // Only what is on screen: collapsing the section leaves what was typed
-        // in place, and a board nobody can see is not one they chose to log.
-        board: showBoard ? board : null,
-        position,
-        tags,
-        note: note.trim() === '' ? null : note.trim(),
-        amount: showAmount ? parseAmount(amount) : null,
-      });
+      if (editing && editingId !== null) {
+        await updateHand(editingId, entered());
+        successFeedback();
+        // Straight back, with no offer: see the header. The reset is for the
+        // minute after a hand happened and this is not it.
+        router.back();
+        return;
+      }
+      await logHand({ sessionId: session.id, ...entered() });
       successFeedback();
       /*
         The write is done and nothing below may undo it or stand in front of
@@ -146,11 +248,24 @@ export default function LogHandScreen() {
     }
   };
 
+  const remove = async () => {
+    if (editingId === null || deleting) return;
+    setDeleting(true);
+    setFailed(null);
+    try {
+      await removeHand(editingId);
+      router.back();
+    } catch (error) {
+      setFailed(describeFailure(error, 'That hand could not be deleted.'));
+      setDeleting(false);
+    }
+  };
+
   if (offered) {
     const offer = tableHandOff();
     return (
       <Screen>
-        <PageMeta title="Log a hand · Log" />
+        <PageMeta title={pageTitle} />
         <Card style={styles.offer}>
           <Text variant="bodyStrong">That one is logged.</Text>
           <Text variant="caption" color={colors.textTertiary} style={styles.offerHint}>
@@ -180,7 +295,7 @@ export default function LogHandScreen() {
       footer={
         <View style={styles.footer}>
           <Button
-            label="Save hand"
+            label={editing ? 'Save changes' : 'Save hand'}
             onPress={() => void save()}
             disabled={!hasSomething || partialBoard}
             loading={saving}
@@ -189,11 +304,13 @@ export default function LogHandScreen() {
         </View>
       }
     >
-      <PageMeta title="Log a hand · Log" />
+      <PageMeta title={pageTitle} />
       <View style={styles.header}>
-        <Text variant="title">Log a hand</Text>
+        <Text variant="title">{title}</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>
-          Everything here is optional. Tap what matters and save.
+          {editing
+            ? 'Change what was wrong. Everything here is still optional.'
+            : 'Everything here is optional. Tap what matters and save.'}
         </Text>
       </View>
 
@@ -298,6 +415,45 @@ export default function LogHandScreen() {
       )}
 
       <ErrorNote message={failed} />
+
+      {/*
+        Only on a hand that exists, and behind a confirmation, the way session
+        detail asks before dropping a night. A hand is a smaller thing to lose
+        than a session and still not one a stray tap should take.
+      */}
+      {editing ? (
+        <View style={styles.dangerZone}>
+          {confirmingDelete ? (
+            <View style={styles.confirmRow}>
+              <Text color={colors.textSecondary} style={styles.confirmText}>
+                Delete this hand? This can’t be undone.
+              </Text>
+              <View style={styles.confirmActions}>
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  size="small"
+                  onPress={() => setConfirmingDelete(false)}
+                />
+                <Button
+                  label="Delete"
+                  variant="danger"
+                  size="small"
+                  loading={deleting}
+                  onPress={() => void remove()}
+                />
+              </View>
+            </View>
+          ) : (
+            <Button
+              label="Delete hand"
+              variant="danger"
+              size="medium"
+              onPress={() => setConfirmingDelete(true)}
+            />
+          )}
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -341,6 +497,21 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: spacing.sm,
+  },
+  dangerZone: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.xl,
+  },
+  confirmRow: {
+    gap: spacing.md,
+  },
+  confirmText: {
+    lineHeight: 22,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
   },
   empty: {
     paddingTop: spacing.xxxl,

@@ -590,6 +590,46 @@ export const useHandsForSession = (sessionId: string | null): Hand[] | null => {
   return answer !== null && answer.sessionId === sessionId ? answer.hands : null;
 };
 
+/**
+ * One hand, read by id, for the screen that edits it.
+ *
+ * Three answers rather than two, which is why this does not simply return
+ * `Hand | null` the way the list above does. A list has no third state: it has
+ * arrived or it has not, and an empty one is an answer. A single record can
+ * also be *absent* -- a hand deleted on another device and synced away while
+ * its screen is open -- and "still reading" and "there is no such hand" want
+ * opposite things on screen. So `undefined` is the read that has not landed,
+ * and `null` is the answer that there is nothing there.
+ *
+ * Re-read on `handsVersion` like the list, so editing a hand and coming back
+ * to it does not show the version before the edit.
+ */
+export const useHandById = (id: string | null): Hand | null | undefined => {
+  const version = useLogStore((state) => state.handsVersion);
+  const [answer, setAnswer] = useState<{ id: string; hand: Hand | null } | null>(null);
+
+  useEffect(() => {
+    if (id === null) return;
+    let live = true;
+    void (async () => {
+      try {
+        const repository = await getRepository();
+        const row = await repository.getHand(id);
+        if (live) setAnswer({ id, hand: row });
+      } catch {
+        // As above: a failed read is the database being unavailable, which the
+        // root layout already has a screen for.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [id, version]);
+
+  if (id === null) return null;
+  return answer !== null && answer.id === id ? answer.hand : undefined;
+};
+
 export const useMoodForSession = (sessionId: string | null): MoodEntry[] => {
   const entries = useLogStore((state) => state.moodEntries);
   return useMemo(

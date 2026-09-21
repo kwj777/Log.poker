@@ -1067,11 +1067,11 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 83 passed
-Tests:       2008 passed
+Tests:       2011 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
-  bundle             68   what ships to each platform, against the real output
+  bundle             71   what ships to each platform, against the real output
   sessionImport      63   reading a session-summary export
   site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes

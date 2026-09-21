@@ -10,11 +10,11 @@
  * The card itself is not rendered here -- these tests run on plain ts-jest in
  * Node, with no React Native. What can be checked without a renderer is the
  * copy, which is where the rules are, and whether the card is wired up behind
- * the flag that keeps it out of production, which is a fact about a source
- * file. Both are checked, and neither needs a screen.
+ * the flag that keeps it off the screen, which is a fact about source files.
+ * Both are checked, and neither needs a screen.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CALLER_WINDOW_MS } from '../../../auth/signinEndpoint';
@@ -40,6 +40,18 @@ import {
 
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
+
+/** Every `.ts`/`.tsx` file under a directory, as paths relative to the root. */
+const sourcesUnder = (...parts: string[]): string[] => {
+  const walk = (dir: string): string[] =>
+    readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+      return /\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+
+  return walk(parts.join('/'));
+};
 
 const FAILURES: SignInFailure[] = ['rejected', 'throttled', 'unreachable'];
 
@@ -285,12 +297,25 @@ describe('where the card is wired up', () => {
     expect(config).not.toMatch(/ALLOW_SIGN_IN = IS_DEV/);
   });
 
-  it('and the flag is a build-time constant, so turning it off strips the card', () => {
-    // Which is the difference between a kill switch and a hidden feature: a
-    // `false` here removes the card from the bundle rather than rendering it
-    // and declining to show it.
+  it('and the flag is the whole of what stands between a player and the form', () => {
+    // This used to be named for stripping, and checked neither. `IS_DEV` and
+    // the flags do fold to literals inside `src/config.ts`, but they leave it
+    // through getters and the minifier will not fold a use site across that,
+    // so a `false` here hides the card rather than removing it: a production
+    // bundle carries `SignInCard` and never draws it.
+    //
+    // What makes the switch a kill switch is the line below instead. Exactly
+    // one file renders the card, and that render is behind the flag, so there
+    // is no second way in for a `false` to miss. A new render site elsewhere
+    // is the thing that would make this claim false, so that is what is
+    // asserted -- not the word "strips", which was never true.
     expect(config).toContain('export const IS_DEV: boolean');
     expect(config).toMatch(/export const ALLOW_SIGN_IN = (true|false|IS_DEV);/);
+
+    const renders = [...sourcesUnder('app'), ...sourcesUnder('src')].filter((path) =>
+      /<SignInCard\s*\/>/.test(read(path)),
+    );
+    expect(renders).toEqual(['app/(tabs)/settings.tsx']);
   });
 
   it('signs out without touching the log', () => {

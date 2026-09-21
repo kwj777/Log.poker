@@ -3,8 +3,15 @@
  * worth looking at and the variance view has enough history to say something.
  *
  * Deterministic: the same seed always produces the same data, which keeps
- * screenshots stable and lets a test assert on the result. Gated behind a dev
- * flag (`src/config.ts`) and never reachable from a production build.
+ * screenshots stable and lets a test assert on the result.
+ *
+ * Gated behind a dev flag (`ALLOW_DEMO_SEED`, `src/config.ts`), which hides the
+ * Settings card rather than stripping it: this module ships in a production
+ * bundle, venue names and all, and a `false` there only means nothing on screen
+ * calls it. That is why the caller in Settings also refuses on a device whose
+ * repository syncs, and why `clear` is spelled out below rather than assumed.
+ * The flag keeps a player from finding this; the guards are what keep it from
+ * running on a log somebody cares about.
  */
 
 import { makeRandom } from '../domain/random';

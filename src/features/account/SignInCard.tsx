@@ -16,9 +16,11 @@
  *
  * It is not that any more. `ALLOW_SIGN_IN` is `true`, and the flag stays for
  * the other reason: `/api/signin` mails a code to anybody who types an
- * address, and a door like that wants a switch. Turning it off strips this
- * card from the build rather than hiding it, and the endpoint's own limits
- * hold in the meantime.
+ * address, and a door like that wants a switch. Turning it off takes this card
+ * off `app/(tabs)/settings.tsx`, which is the only file that renders it and so
+ * the whole of what a player can reach. The card's code still ships either way
+ * -- the flag hides rather than strips, see `src/config.ts` -- and the
+ * endpoint's own limits hold in the meantime.
  *
  * What the flag bought while it was off was the one thing nothing else could
  * do: proving the whole chain end to end against the live endpoint. Both

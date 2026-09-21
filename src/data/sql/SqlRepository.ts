@@ -274,6 +274,48 @@ const number = (value: unknown, fallback: number): number =>
 const maybeNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 
+/**
+ * How many ids one `IN (...)` may carry.
+ *
+ * SQLite refuses a statement with more host parameters than
+ * `SQLITE_MAX_VARIABLE_NUMBER` and says "too many SQL variables". The builds
+ * this app runs against set it to 32766; older ones, which is what an old
+ * Android system library or an older expo-sqlite can be, set it to 999. So the
+ * chunk is under the smaller number rather than under the one that happens to
+ * be true here, because the device that hits this is the device that cannot be
+ * tested from here.
+ *
+ * It was reachable. `attachChildren` builds one placeholder per session it was
+ * handed, and `listSessions()` hands it the whole log, so a log past the limit
+ * made the sessions list throw -- every session on the device intact and the
+ * screen that shows them permanently empty. Reproduced at exactly 32767
+ * sessions against node:sqlite. Nobody plays that many live sessions; an
+ * imported tracker history is another matter, and this is the kind of ceiling
+ * that is only ever met by the person with the most to lose behind it.
+ */
+const MAX_IDS_PER_STATEMENT = 900;
+
+/**
+ * Run an id query in as many statements as the ids need, and join the answers.
+ *
+ * Ordering within one id is preserved because every row belonging to an id
+ * comes from the chunk that id is in. Ordering *across* ids is not, so callers
+ * that need it sort after grouping rather than leaning on the query.
+ */
+const inChunks = async <Row>(
+  driver: SqlDriver,
+  ids: readonly string[],
+  sql: (placeholders: string) => string,
+): Promise<Row[]> => {
+  const rows: Row[] = [];
+  for (let from = 0; from < ids.length; from += MAX_IDS_PER_STATEMENT) {
+    const slice = ids.slice(from, from + MAX_IDS_PER_STATEMENT);
+    const got = await driver.all<Row>(sql(slice.map(() => '?').join(',')), [...slice]);
+    for (const row of got) rows.push(row);
+  }
+  return rows;
+};
+
 export class SqlRepository implements Repository {
   private readonly driver: SqlDriver;
   private readonly ctx: RepositoryContext;
@@ -772,18 +814,20 @@ export class SqlRepository implements Repository {
     const sessionIds = sessions.map((session) => session.id);
     const venueIds = Array.from(new Set(sessions.map((session) => session.venueId)));
 
-    const rebuyRows = await this.driver.all<RebuyRow>(
-      `SELECT * FROM rebuys
-       WHERE session_id IN (${sessionIds.map(() => '?').join(',')}) AND deleted_at IS NULL
-       ORDER BY at ASC`,
+    const rebuyRows = await inChunks<RebuyRow>(
+      this.driver,
       sessionIds,
+      (placeholders) => `SELECT * FROM rebuys
+       WHERE session_id IN (${placeholders}) AND deleted_at IS NULL
+       ORDER BY at ASC`,
     );
-    const venueRows = await this.driver.all<VenueRow>(
-      `SELECT v.*, (SELECT COUNT(*) FROM sessions s
+    const venueRows = await inChunks<VenueRow>(
+      this.driver,
+      venueIds,
+      (placeholders) => `SELECT v.*, (SELECT COUNT(*) FROM sessions s
                      WHERE s.venue_id = v.id AND s.deleted_at IS NULL) AS session_count
        FROM venues v
-       WHERE v.id IN (${venueIds.map(() => '?').join(',')}) AND v.deleted_at IS NULL`,
-      venueIds,
+       WHERE v.id IN (${placeholders}) AND v.deleted_at IS NULL`,
     );
 
     const rebuysBySession = new Map<string, Rebuy[]>();
@@ -792,6 +836,11 @@ export class SqlRepository implements Repository {
       if (list) list.push(toRebuy(row));
       else rebuysBySession.set(row.session_id, [toRebuy(row)]);
     }
+    // After grouping rather than off the query, the same way the IndexedDB
+    // repository does it. The `ORDER BY` above holds inside one statement and
+    // there can be several now, so the sort is what makes the order a property
+    // of this method rather than of how many sessions it was handed.
+    for (const list of rebuysBySession.values()) list.sort((a, b) => a.at - b.at);
     const venuesById = new Map(venueRows.map((row) => [row.id, toVenue(row)]));
 
     return sessions.map((session) => ({
@@ -819,10 +868,11 @@ export class SqlRepository implements Repository {
     const venueIds = Array.from(new Set(inputs.map((input) => input.venueId)));
     const known = new Set(
       (
-        await this.driver.all<{ id: string }>(
-          `SELECT id FROM venues
-           WHERE id IN (${venueIds.map(() => '?').join(',')}) AND deleted_at IS NULL`,
+        await inChunks<{ id: string }>(
+          this.driver,
           venueIds,
+          (placeholders) => `SELECT id FROM venues
+           WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
         )
       ).map((row) => row.id),
     );

@@ -1067,7 +1067,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 83 passed
-Tests:       2017 passed
+Tests:       2020 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1084,8 +1084,8 @@ Tests:       2017 passed
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   variance           41   win rate, σ, confidence bands, verdicts
+  values             39   money, dates, durations, stakes, formats, counts
   blog               38   the post grammar, the share cards, and what it refuses
-  values             36   money, dates, durations, stakes, formats, counts
   merge              33   two devices disagreeing, and who wins
   mood               33   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not

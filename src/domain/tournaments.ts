@@ -183,6 +183,24 @@ export interface TournamentAssessment {
 const percent = (fraction: number): string => `${Math.round(fraction * 100)}%`;
 
 /**
+ * The odds of a dry run, in words, carrying their own qualifier.
+ *
+ * `percent` rounds, so anything under half a percent comes out as `0%`, and the
+ * one place that reaches is here: a player 19 entries into a drought read
+ * "missing 19 in a row comes up about 0% of the time", a sentence denying the
+ * thing it describes while they are living through it, on the one card in this
+ * file whose job is to settle somebody down. `formatRoi` already makes this
+ * move for an ROI that is only zero because it was rounded; the odds never got
+ * it.
+ *
+ * Under half a percent the exact figure is not the point, so it says which side
+ * of the line the run is on instead, and takes the qualifier with it: "about"
+ * belongs to a rounded number and not to a bound.
+ */
+const dryRunOdds = (fraction: number): string =>
+  fraction > 0 && fraction < 0.005 ? 'less than 1%' : `about ${percent(fraction)}`;
+
+/**
  * What to say to a tournament player about their own numbers.
  *
  * Written to the same rule as the cash-game copy: true first, calming second,
@@ -225,7 +243,7 @@ export const assessTournaments = (totals: TournamentTotals): TournamentAssessmen
         : 'it is the ordinary shape of the game, not a sign anything has changed';
     return {
       headline: `${dry} without a cash`,
-      body: `You cash ${percent(rate)} of the time, so missing ${dry} in a row comes up about ${percent(
+      body: `You cash ${percent(rate)} of the time, so missing ${dry} in a row comes up ${dryRunOdds(
         odds,
       )} of the time -- ${reading}.${typical}`,
       suggestsUntilt: odds < 0.1,
@@ -529,13 +547,48 @@ export const assessRoi = (
       : null;
 
   if (interval === null) {
-    const short = Math.max(0, MIN_ENTRIES_FOR_INTERVAL - entries);
+    const short = MIN_ENTRIES_FOR_INTERVAL - entries;
+    if (short <= 0) {
+      // Entries enough and still no interval, which leaves one way in: every
+      // entry cost nothing, so there is no stake to divide a return by. Worth
+      // its own line because the one below would otherwise ask the player to
+      // log 0 more, a shortfall that is not there.
+      return {
+        headline: 'Nothing to put a range around yet',
+        body: `Your ${entries} entries cost nothing to get into, so there is no stake here for a return to be measured against and no ROI to put a range on. The first entry with a buy-in on it is what gives this page something to resample.`,
+        concentrationNote: null,
+        verdict: 'insufficient_data',
+      };
+    }
     return {
       headline: 'Not enough entries to put a range on it',
       body: `An ROI over ${entries} entr${
         entries === 1 ? 'y' : 'ies'
       } is a record of what happened, not an estimate of anything. Log ${short} more and this page will start resampling your own results to say how wide the honest range around it is.`,
       concentrationNote: null,
+      verdict: 'insufficient_data',
+    };
+  }
+
+  // A range with no width is not a range, and every line below would turn it
+  // into a promise.
+  //
+  // `bootstrapRoi` reports the resample faithfully, and a resample of entries
+  // that are all alike is a point: it can only ever draw outcomes already in
+  // the sample, so a player who has not cashed yet resamples to -100% every
+  // single time. That is a fact about what they have logged. Read through the
+  // copy below it became "Losing, somewhere between -100% and -100%", over a
+  // sentence saying that is where their true ROI lies 95% of the time, which
+  // is the claim that they will never cash again -- printed directly under a
+  // card already telling them that 10 entries says very little. The number is
+  // right; calling it an interval was the mistake.
+  if (interval.lower === interval.upper) {
+    return {
+      headline: 'Nothing to put a range around yet',
+      body: `Every one of your ${interval.entries} entries has come back the same way, so every resample lands on ${formatRoi(
+        interval.roi,
+      )} and the range around it has no width at all. A resample can only draw outcomes that are already in your results, which makes this a reading on how alike they are rather than on how you play. One entry that finishes differently is all it takes.`,
+      concentrationNote: note,
       verdict: 'insufficient_data',
     };
   }

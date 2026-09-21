@@ -189,6 +189,27 @@ describe('assessTournaments', () => {
     }
   });
 
+  it('never says a run the player is living through comes up 0% of the time', () => {
+    // `percent` rounds, so anything under half a percent used to print as 0%,
+    // and the sentence denied the thing it was describing to the one player in
+    // the app most in need of it holding together. Ten cashes in eighty entries
+    // and forty-three straight blanks on the end is about 1 in 310, which is a
+    // state a long tournament career actually reaches.
+    const blanks = Array.from({ length: 40 }, (_, index) =>
+      entry({ prize: 0, endedAt: T0 + (40 + index) * HOUR }),
+    );
+    const assessment = assessTournaments(tournamentTotals([...many(40, 4), ...blanks]));
+    expect(assessment.body).not.toContain('0% of the time');
+    expect(assessment.body).toContain('comes up less than 1% of the time');
+  });
+
+  it('keeps the qualifier on a figure that was rounded to get there', () => {
+    // "about" belongs to a rounded number and not to a bound, so the two
+    // readings do not share one.
+    const assessment = assessTournaments(tournamentTotals(many(20, 4)));
+    expect(assessment.body).toMatch(/comes up about \d+% of the time/);
+  });
+
   it('offers Untilt only when the run is genuinely unusual', () => {
     const ordinary = assessTournaments(tournamentTotals(many(8, 4)));
     expect(ordinary.suggestsUntilt).toBe(false);
@@ -485,9 +506,33 @@ describe('assessRoi', () => {
   });
 
   it('tells a losing player what the reading is of, without a verdict on them', () => {
-    const assessment = assess(runs(30, [0]));
+    // A pattern rather than a flat run of blanks: results that are all alike
+    // resample to a point, and a point is not a range. See the case below.
+    const assessment = assess(runs(60, [0, 0, 0, 0, 0, 0, 0, 0, 0, 5_500]));
     expect(assessment.verdict).toBe('losing');
     expect(assessment.body).toContain('games you have actually been playing');
+  });
+
+  it('refuses to call a run of blanks a range, however many of them there are', () => {
+    // The player who has not cashed yet. Every resample draws nothing back, so
+    // both ends of the interval are exactly -100%, and read through the losing
+    // copy that became "Losing, somewhere between -100% and -100%" over a
+    // sentence putting their true ROI in that range 95% of the time: the claim
+    // that they will never cash, made out of the fact that they have not yet.
+    const assessment = assess(runs(30, [0]));
+    expect(assessment.verdict).toBe('insufficient_data');
+    expect(assessment.headline).not.toContain('%');
+    expect(`${assessment.headline} ${assessment.body}`).not.toContain('-100% and -100%');
+    expect(assessment.body).toContain('has come back the same way');
+  });
+
+  it('says the same of entries that are alike for any other reason', () => {
+    // Not only the never-cashed case: every entry returning double is a point
+    // too, and "Winning, somewhere between +100% and +100%" is the same lie
+    // wearing the other hat.
+    const assessment = assess(runs(30, [22_000]));
+    expect(assessment.verdict).toBe('insufficient_data');
+    expect(assessment.body).toContain('+100%');
   });
 
   it('never tells the player they are broken or that anything is owed', () => {

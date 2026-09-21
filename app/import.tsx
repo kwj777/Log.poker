@@ -76,14 +76,22 @@ export default function ImportScreen() {
     setFileName(name);
     setSummary(null);
     setFailure(null);
-    // Only the file itself can say which way its dates run; a toggle left over
-    // from the last file would silently misread this one.
-    setDayFirst(false);
   };
 
   const choose = async () => {
     const picked = await pickCsvFile();
-    if (picked) replaceText(picked.text, picked.name);
+    if (picked) {
+      replaceText(picked.text, picked.name);
+      // Only the file itself can say which way its dates run; a toggle left
+      // over from the last file would silently misread this one.
+      //
+      // Here rather than in `replaceText`, which the paste box calls on every
+      // keystroke: editing a row already on screen threw away the date order
+      // the player had just told the screen about, and both the preview and
+      // the write that follows it reverted to month-first. A new file is the
+      // thing that invalidates the answer, and typing into one is not that.
+      setDayFirst(false);
+    }
   };
 
   const runImport = async () => {

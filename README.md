@@ -82,10 +82,12 @@ conversion moment rather than a hostage situation.
 That argument lost to a simpler one. Every tracker worth using syncs for free,
 so the only paid thing in this app would also have been the one thing a player
 could get elsewhere for nothing, and *free in its entirety* would have carried a
-footnote forever. It is unbuilt today, it is roadmap item 2, and when it lands it
-lands free; [SYNC.md](SYNC.md) scopes what building it takes and names the one
-thing still in the way, which is that Untilt's sign-in only mails a code to an
-address that has bought something.
+footnote forever. **It landed, and it landed free.** See
+[Cross-device history](#cross-device-history) for what ships and
+[SYNC.md](SYNC.md) for how it is built. The one thing that used to be in the way
+was that Untilt's sign-in only mails a code to an address that has bought
+something; Log has its own door now, in `netlify/functions/signin.mts`, and it
+mails a code to anybody and mints a free-tier token at the end of it.
 
 The numbers themselves live in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
@@ -761,15 +763,20 @@ Four things fall out of that and are asserted in the conformance suite:
   laptop with it.
 
 `listChangedSince(cursor)` is the only read that can see a tombstone, and the
-seam the sync engine plugs into. Nothing calls it yet. It exists because an
-invariant nothing can read is an invariant nothing can test.
+seam the sync engine plugs into. `SyncingRepository` is what calls it, once at
+the top of every push. It was written before there was an engine to call it,
+because an invariant nothing can read is an invariant nothing can test.
 
 The merge rules themselves are pure functions in `src/domain/merge.ts`: per
 record last-write-wins, a clock clamp, and the three cases where the thing in
 conflict is a constraint rather than a field, so both devices are right and the
-pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
-something sweeps them, which is phase 2 work, and until then a heavy deleter's
-database grows where it used to shrink.
+pair is wrong. **Tombstones are collected on both sides now.** The device
+sweeps its own once a sync has settled, in `src/data/index.ts` and at the foot
+of a completed pull, and the server sweeps the bundle's in `collect`, never
+further back than the least advanced cursor it has heard. Collecting one too
+early is what resurrects a record, so the rule for how far back is safe is the
+careful part; see [Deletes are tombstones](#deletes-are-tombstones) and
+SYNC.md.
 
 ### Signing in, and what it is for
 
@@ -779,8 +786,9 @@ do with it**: Log is free in its entirety and stays completely usable by
 somebody who never types an email address. There is no signed-out state to
 handle, because signed out is the state every screen already runs in.
 
-The token is minted by Untilt's sign-in and is the same string in all three
-apps. It has to be a bearer string rather than a cookie: `log.poker`,
+The token is the same string in all three apps. Log mints its own, at its own
+door, and always at the free tier; Untilt's sign-in mints the same shape for
+somebody who has bought the pass. It has to be a bearer string rather than a cookie: `log.poker`,
 `untilt.poker` and `tiltproof.poker` are three registrable domains, so no cookie
 crosses them, and on iOS and Android there is no cookie jar at all.
 
@@ -1078,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 84 passed
-Tests:       2029 passed
+Tests:       2031 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1148,6 +1156,7 @@ Tests:       2029 passed
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
   tokenStore.web      8   the browser token store
+  venuePicker         8   typing a room you already have, rather than adding a second
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   mergeVenues         7   folding one room into another, and the order it does it in
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
@@ -1157,7 +1166,6 @@ Tests:       2029 passed
   readme              6   the test table adds up and says what each suite is for
   scale               6   how much of the plot the data actually gets
   settingsHelp        6   the privacy link, the support address, the build
-  venuePicker         6   typing a room you already have, rather than adding a second
   errorBoundary       5   a render that throws, and the way back from it
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved

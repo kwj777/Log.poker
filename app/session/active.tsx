@@ -27,7 +27,7 @@ import { formatEntry, formatMoney, formatStakes, parseAmount } from '../../src/d
 import { formatSessionDate, formatTimeOfDay } from '../../src/features/sessions/format';
 import { parseCount } from '../../src/domain/import/values';
 import { formatDuration, rebuyTotal, totalInvested } from '../../src/domain/stats';
-import { fromHoursAndMinutes } from '../../src/domain/clock';
+import { fromHoursAndMinutes, isAhead } from '../../src/domain/clock';
 import type { MoodScore } from '../../src/domain/types';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn';
@@ -123,6 +123,18 @@ export default function ActiveSessionScreen() {
   const correctingLength = playedHours.trim() !== '' || playedMinutes.trim() !== '';
   const lengthInvalid = correctingLength && played === null;
   const correctedEnd = played === null ? null : session.startedAt + played;
+  /**
+   * A length that finishes the session after now, which is the typo this field
+   * exists to catch a different half of.
+   *
+   * 40 in the hours box for 4 is the mistake, and it was only caught when it
+   * made the text unreadable. Written through, it goes into the hourly rate at
+   * a tenth of the truth and sits at the end of the variance window as the
+   * most recently ended session. The edit screen has refused exactly this
+   * since it grew the same control, with the same hint; `isAhead` is in
+   * `domain/clock` for it.
+   */
+  const endAhead = correctedEnd !== null && isAhead(correctedEnd);
 
   const commitRebuy = async () => {
     const amount = parseAmount(rebuyAmount);
@@ -169,7 +181,7 @@ export default function ActiveSessionScreen() {
   };
 
   const commitCashOut = async () => {
-    if (cashOutCents === null || cashOutCents < 0 || busy || lengthInvalid) return;
+    if (cashOutCents === null || cashOutCents < 0 || busy || lengthInvalid || endAhead) return;
     setBusy(true);
     setFailed(null);
     try {
@@ -462,15 +474,17 @@ export default function ActiveSessionScreen() {
               minutes={playedMinutes}
               onChangeHours={setPlayedHours}
               onChangeMinutes={setPlayedMinutes}
-              invalid={lengthInvalid}
+              invalid={lengthInvalid || endAhead}
               hint={
                 lengthInvalid
                   ? 'Hours and minutes, or leave both empty to use the clock.'
-                  : correctedEnd === null
-                    ? `Leave it empty and the clock stands: ${formatDuration(elapsed)}.`
-                    : `Finishing ${formatSessionDate(correctedEnd)} at ${formatTimeOfDay(
-                        correctedEnd,
-                      )}.`
+                  : endAhead
+                    ? 'That length runs past now. Check the hours.'
+                    : correctedEnd === null
+                      ? `Leave it empty and the clock stands: ${formatDuration(elapsed)}.`
+                      : `Finishing ${formatSessionDate(correctedEnd)} at ${formatTimeOfDay(
+                          correctedEnd,
+                        )}.`
               }
             />
           </>
@@ -485,7 +499,7 @@ export default function ActiveSessionScreen() {
           label={tournament ? 'End tournament' : 'End session'}
           onPress={() => void commitCashOut()}
           style={styles.sheetAction}
-          disabled={cashOutCents === null || cashOutCents < 0 || lengthInvalid}
+          disabled={cashOutCents === null || cashOutCents < 0 || lengthInvalid || endAhead}
           loading={busy}
         />
         <ErrorNote message={failed} />

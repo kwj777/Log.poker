@@ -259,8 +259,30 @@ export default function DashboardScreen() {
         <EmptyState
           title="No sessions yet"
           body="Log your first session and Log starts building your bankroll graph, your true hourly rate, and the variance picture that tells you whether a bad week is actually a bad week."
+          /*
+            Three ways in, because there are three kinds of person on this
+            screen and only one of them is about to sit down. The other two --
+            somebody who has been keeping a spreadsheet, and somebody entering
+            last night before they forget -- had to find Settings and the
+            Sessions tab respectively to discover that this app does what they
+            came for. The primary one is still the player at the table.
+          */
           action={
-            <Button label="Start a session" onPress={() => router.push('/session/new')} />
+            <View style={styles.emptyActions}>
+              <Button label="Start a session" onPress={() => router.push('/session/new')} />
+              <Button
+                label="Add a session you already played"
+                variant="ghost"
+                size="medium"
+                onPress={() => router.push('/session/past')}
+              />
+              <Button
+                label="Import from a spreadsheet"
+                variant="ghost"
+                size="medium"
+                onPress={() => router.push('/import')}
+              />
+            </View>
           }
         />
       </Screen>
@@ -412,6 +434,10 @@ const styles = StyleSheet.create({
   brandHeader: {
     paddingTop: spacing.xl,
     gap: spacing.xs,
+  },
+  emptyActions: {
+    alignSelf: 'stretch',
+    gap: spacing.sm,
   },
   currencyRow: {
     paddingTop: spacing.xl,

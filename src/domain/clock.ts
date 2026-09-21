@@ -71,6 +71,30 @@ export const parseDateTime = (date: string, time: string): Timestamp | null => {
   return built.getTime();
 };
 
+/**
+ * How far ahead of now a typed moment may be before it is read as a typo.
+ *
+ * Not zero, because a session being logged as it starts is the ordinary case
+ * and a device clock that is a minute fast should not refuse it. Small enough
+ * that a year typed wrong, which is the mistake this exists for, never lands
+ * inside it.
+ */
+export const FUTURE_TOLERANCE_MS = 5 * 60_000;
+
+/**
+ * Whether a moment is far enough ahead of now to be a mistake.
+ *
+ * `2062-09-19` for `2026-09-19` parses, is a real date, and used to be
+ * accepted in silence -- and one of them is expensive out of proportion to
+ * the typo. `deriveDefaults` takes the session with the newest `startedAt` as
+ * the template every later session opens with, `assessRecentStretch` takes the
+ * most recent by end time so the mistake is permanently "recent", and the
+ * bankroll curve gets a point decades out that flattens everything real into
+ * the left edge.
+ */
+export const isAhead = (at: Timestamp, now: number = Date.now()): boolean =>
+  at > now + FUTURE_TOLERANCE_MS;
+
 /** Milliseconds as the two fields a player thinks in. */
 export const toHoursAndMinutes = (ms: number): { hours: string; minutes: string } => {
   const total = Math.max(0, Math.round(ms / 60_000));

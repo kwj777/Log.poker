@@ -244,7 +244,25 @@ export default function HistoryScreen() {
             }
             action={
               all.length === 0 ? (
-                <Button label="Start a session" onPress={() => router.push('/session/new')} />
+                // The same three as the dashboard's empty state: the header's
+                // "Add a past session" is above the fold on a full list and
+                // easy to miss on an empty one, and the importer is otherwise
+                // only in Settings.
+                <View style={styles.emptyActions}>
+                  <Button label="Start a session" onPress={() => router.push('/session/new')} />
+                  <Button
+                    label="Add a session you already played"
+                    variant="ghost"
+                    size="medium"
+                    onPress={() => router.push('/session/past')}
+                  />
+                  <Button
+                    label="Import from a spreadsheet"
+                    variant="ghost"
+                    size="medium"
+                    onPress={() => router.push('/import')}
+                  />
+                </View>
               ) : undefined
             }
           />
@@ -272,6 +290,10 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
+  emptyActions: {
+    alignSelf: 'stretch',
+    gap: spacing.sm,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

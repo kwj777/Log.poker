@@ -63,6 +63,19 @@ describe('the session list', () => {
     expect(mockPush).toHaveBeenCalledWith('/session/s-tapped');
   });
 
+  it('offers the two other ways in, for somebody who is not about to sit down', async () => {
+    // A player with a year in a spreadsheet and one entering last night both
+    // land here, and both used to have to go looking: the importer is in
+    // Settings and the past-session form is in the header above the fold.
+    load({ sessions: [] });
+    await renderScreen(<HistoryScreen />);
+    await userEvent.press(screen.getByText('Import from a spreadsheet'));
+    expect(mockPush).toHaveBeenCalledWith('/import');
+
+    await userEvent.press(screen.getByText('Add a session you already played'));
+    expect(mockPush).toHaveBeenCalledWith('/session/past');
+  });
+
   it('offers to start one when there is nothing logged at all', async () => {
     await renderScreen(<HistoryScreen />);
     expect(screen.getByText('Nothing logged yet')).toBeTruthy();

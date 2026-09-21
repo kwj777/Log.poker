@@ -242,3 +242,48 @@ describe('a session that is still running', () => {
     expect(edits[0].patch).not.toHaveProperty('endedAt');
   });
 });
+
+/**
+ * A correction that would put the session in the future.
+ *
+ * The edit screen is where a wrong year is most likely to be typed, because
+ * it is the screen somebody opens *to* retype a date -- and a date that parses
+ * and is real gets no complaint from `parseDateTime`. What one costs is out of
+ * proportion to the typo: every later session defaults from the newest start.
+ */
+describe('a correction dated in the future', () => {
+  it('will not save, and says which field is wrong', async () => {
+    load();
+    await renderScreen(<EditSessionScreen />);
+
+    const field = screen.getByLabelText('Start date');
+    await userEvent.clear(field);
+    await userEvent.type(field, '2062-09-19');
+
+    expect(screen.getByText('That is in the future. Check the year.')).toBeTruthy();
+    await userEvent.press(screen.getByText('Save changes'));
+    expect(edits).toHaveLength(0);
+  });
+
+  it('nor a length that runs past now, which the start field cannot show', async () => {
+    // 400 hours for 4, on a session that started this week.
+    load({ startedAt: Date.now() - 3 * 86_400_000, endedAt: Date.now() - 3 * 86_400_000 + HOUR });
+    await renderScreen(<EditSessionScreen />);
+
+    const field = screen.getByLabelText('Hours played');
+    await userEvent.clear(field);
+    await userEvent.type(field, '400');
+
+    expect(screen.getByText('That length runs past now. Check the hours.')).toBeTruthy();
+    await userEvent.press(screen.getByText('Save changes'));
+    expect(edits).toHaveLength(0);
+  });
+
+  it('but a live session keeps saving, since it has no length to be wrong about', async () => {
+    // Its end is open: only the start is checked, and that one is in the past.
+    load({ endedAt: null, cashOut: null });
+    await renderScreen(<EditSessionScreen />);
+    await userEvent.press(screen.getByText('Save changes'));
+    expect(edits).toHaveLength(1);
+  });
+});

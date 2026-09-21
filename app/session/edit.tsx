@@ -59,6 +59,7 @@ import {
   formatDateInput,
   formatTimeInput,
   fromHoursAndMinutes,
+  isAhead,
   parseDateTime,
   toHoursAndMinutes,
 } from '../../src/domain/clock';
@@ -138,16 +139,37 @@ export default function EditSessionScreen() {
 
   const startInvalid = startedAt === null;
   const lengthInvalid = !live && length === null;
-  const canSave =
-    !startInvalid && !lengthInvalid && buyIn !== null && buyIn > 0 && !saving;
 
   /** What the length works out to, so the arithmetic is on screen. */
   const endsAt = startedAt !== null && length !== null ? startedAt + length : null;
+
+  /**
+   * A session cannot have happened later than now.
+   *
+   * The start applies to a live session too -- one that started in an hour's
+   * time is the same typo. The end only applies to a finished one, where a
+   * mistyped length (40 hours for 4) is a mistake the start field cannot show.
+   */
+  const startAhead = startedAt !== null && isAhead(startedAt);
+  const endAhead = !live && !startAhead && endsAt !== null && isAhead(endsAt);
+
+  const startHint = startAhead ? 'That is in the future. Check the year.' : undefined;
   const lengthHint = lengthInvalid
     ? 'How long did you actually play? Hours and minutes.'
-    : endsAt === null
-      ? 'How long you played, rather than when the app stopped counting.'
-      : `Finishing ${formatSessionDate(endsAt)} at ${formatTimeOfDay(endsAt)}.`;
+    : endAhead
+      ? 'That length runs past now. Check the hours.'
+      : endsAt === null
+        ? 'How long you played, rather than when the app stopped counting.'
+        : `Finishing ${formatSessionDate(endsAt)} at ${formatTimeOfDay(endsAt)}.`;
+
+  const canSave =
+    !startInvalid &&
+    !lengthInvalid &&
+    !startAhead &&
+    !endAhead &&
+    buyIn !== null &&
+    buyIn > 0 &&
+    !saving;
 
   const save = async () => {
     if (!canSave || startedAt === null || buyIn === null) return;
@@ -277,7 +299,8 @@ export default function EditSessionScreen() {
         time={form.time}
         onChangeDate={(value) => set('date', value)}
         onChangeTime={(value) => set('time', value)}
-        invalid={startInvalid}
+        invalid={startInvalid || startAhead}
+        hint={startHint}
       />
 
       {live ? null : (
@@ -289,7 +312,7 @@ export default function EditSessionScreen() {
             onChangeHours={(value) => set('hours', value)}
             onChangeMinutes={(value) => set('minutes', value)}
             hint={lengthHint}
-            invalid={lengthInvalid}
+            invalid={lengthInvalid || endAhead}
           />
 
           <SectionHeader title={tournament ? 'Prize' : 'Cashed out'} />

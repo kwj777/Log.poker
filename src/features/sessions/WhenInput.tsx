@@ -46,6 +46,12 @@ interface StartedAtInputProps {
   onChangeTime: (value: string) => void;
   /** Said under the fields when what is typed cannot be read as a moment. */
   invalid?: boolean;
+  /**
+   * What to say instead of the default complaint, when the fields parse but
+   * the moment they make is wrong in some other way -- a start in the future
+   * being the one this exists for.
+   */
+  hint?: string;
 }
 
 export const StartedAtInput = ({
@@ -54,6 +60,7 @@ export const StartedAtInput = ({
   onChangeDate,
   onChangeTime,
   invalid = false,
+  hint,
 }: StartedAtInputProps) => (
   <View>
     <View style={styles.row}>
@@ -76,9 +83,10 @@ export const StartedAtInput = ({
       color={invalid ? colors.loss : colors.textTertiary}
       style={styles.hint}
     >
-      {invalid
-        ? 'That is not a date and a time. Use 2026-09-21 and 19:45.'
-        : 'Year-month-day, then the clock time you sat down.'}
+      {hint ??
+        (invalid
+          ? 'That is not a date and a time. Use 2026-09-21 and 19:45.'
+          : 'Year-month-day, then the clock time you sat down.')}
     </Text>
   </View>
 );

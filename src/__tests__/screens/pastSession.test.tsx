@@ -19,6 +19,7 @@ import { screen, userEvent } from '@testing-library/react-native';
 import { renderScreen } from '../support/screen';
 import { session, venue } from '../support/sessions';
 import PastSessionScreen from '../../../app/session/past';
+import { formatDateInput } from '../../domain/clock';
 import { useLogStore } from '../../store/useLogStore';
 
 jest.mock('expo-router', () => ({
@@ -223,5 +224,54 @@ describe('a tournament played last week', () => {
       finishPosition: 40,
       entrants: 312,
     });
+  });
+});
+
+/**
+ * The night that has not happened yet.
+ *
+ * `2062-09-19` for `2026-09-19` parses, is a real date, and used to save in
+ * silence. What it costs is out of proportion to the typo: `deriveDefaults`
+ * takes the newest start as the template every later session opens with, the
+ * recent-stretch verdict is computed over a set that permanently contains it,
+ * and the bankroll curve gets a point decades out.
+ */
+describe('a session dated in the future', () => {
+  it('will not save, and says which field is wrong', async () => {
+    load();
+    await renderScreen(<PastSessionScreen />);
+    await enterWhenAndResult('2062-09-19', '19:00', '4', '450');
+
+    expect(screen.getByText('That is in the future. Check the year.')).toBeTruthy();
+    await userEvent.press(screen.getByText(/^Add session/));
+    expect(logged).toHaveLength(0);
+  });
+
+  it('nor one whose length runs past now, which the start field cannot show', async () => {
+    // 40 hours for 4. A sound start and an end in the middle of next week.
+    load();
+    await renderScreen(<PastSessionScreen />);
+    await userEvent.clear(screen.getByLabelText('Start date'));
+    // Three days back, so the start itself is unarguably in the past and the
+    // only thing ahead of now is where the length lands.
+    await userEvent.type(
+      screen.getByLabelText('Start date'),
+      formatDateInput(Date.now() - 3 * 86_400_000),
+    );
+    await userEvent.type(screen.getByLabelText('Start time'), '09:00');
+    await userEvent.type(screen.getByLabelText('Hours played'), '400');
+    await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
+
+    expect(screen.getByText('That length runs past now. Check the hours.')).toBeTruthy();
+    await userEvent.press(screen.getByText(/^Add session/));
+    expect(logged).toHaveLength(0);
+  });
+
+  it('and still saves a night that actually happened', async () => {
+    load();
+    await renderScreen(<PastSessionScreen />);
+    await enterWhenAndResult('2026-09-19', '19:00', '4', '450');
+    await userEvent.press(screen.getByText(/^Add session/));
+    expect(logged).toHaveLength(1);
   });
 });

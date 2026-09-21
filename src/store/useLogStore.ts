@@ -847,12 +847,28 @@ export const useHandsForSession = (sessionId: string | null): Hand[] | null => {
  * `null` while the first read is outstanding, so a screen can tell "no hands
  * logged" from "not yet known" -- an empty list drawn during the read is an
  * empty state that flashes and then fills, which reads as a bug.
+ *
+ * ## `enabled`, and why the paragraph above needed it
+ *
+ * "While it is open" was true of the screen this was written for, which is
+ * pushed and popped, and not of the other caller. The Variance tab is a bottom
+ * tab: react-navigation mounts it on first focus and keeps it mounted, so from
+ * a player's first visit onward this hook was subscribed for the rest of the
+ * session. `handsVersion` moves on every `logHand`, `updateHand` and
+ * `deleteHand`, so every hand written at the table paid for a full read of the
+ * journal on a screen nobody was looking at -- the most expensive read in the
+ * app, at the one moment the app should be doing least.
+ *
+ * A caller that can be off screen passes whether it is on it. Going from false
+ * back to true re-runs the effect, so a screen that was away while hands moved
+ * reads once when it comes back rather than not at all.
  */
-export const useAllHands = (): Hand[] | null => {
+export const useAllHands = (enabled = true): Hand[] | null => {
   const version = useLogStore((state) => state.handsVersion);
   const [hands, setHands] = useState<Hand[] | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let live = true;
     void (async () => {
       try {
@@ -868,7 +884,7 @@ export const useAllHands = (): Hand[] | null => {
     return () => {
       live = false;
     };
-  }, [version]);
+  }, [version, enabled]);
 
   return hands;
 };

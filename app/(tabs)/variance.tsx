@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
@@ -93,7 +93,12 @@ const VERDICT_COLORS: Record<StretchVerdict, string> = {
 export default function VarianceScreen() {
   const all = useLogStore((state) => state.sessions);
   const moodEntries = useLogStore((state) => state.moodEntries);
-  const allHands = useAllHands();
+  // A bottom tab stays mounted once it has been visited, so this hook would
+  // otherwise re-read the whole journal on every hand written at the table,
+  // for a screen nobody is looking at. Focus is what "while this screen is
+  // open" actually means here.
+  const focused = useIsFocused();
+  const allHands = useAllHands(focused);
   const [picked, setPicked] = useState<string | null>(null);
 
   /**

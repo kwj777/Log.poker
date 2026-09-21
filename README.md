@@ -1085,11 +1085,11 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 85 passed
-Tests:       2041 passed
+Test Suites: 86 passed
+Tests:       2047 passed
 
-  dexieRepository   135   the IndexedDB path, against real IndexedDB
-  sqlRepository     135   the SQLite path, against real SQLite
+  dexieRepository   137   the IndexedDB path, against real IndexedDB
+  sqlRepository     137   the SQLite path, against real SQLite
   bundle             71   what ships to each platform, against the real output
   sessionImport      63   reading a session-summary export
   site               62   the marketing/app split, the PWA, the sitemap
@@ -1173,6 +1173,7 @@ Tests:       2041 passed
   varianceCurrency    5   the variance page stops adding euros to dollars
   midSessionCheckIn   3   whether a check-in that failed says it was logged
   notFound            3   where a link that names nothing lands
+  allHands            2   who pays for a read of the whole journal
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

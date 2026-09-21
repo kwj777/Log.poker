@@ -22,6 +22,7 @@ import type { SessionWithChildren } from '../../domain/types';
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn() },
+  useIsFocused: () => true,
 }));
 
 const mockRepository = { listHands: jest.fn(async () => []) };

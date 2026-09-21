@@ -1066,16 +1066,16 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 82 passed
-Tests:       2001 passed
+Test Suites: 83 passed
+Tests:       2008 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
   bundle             68   what ships to each platform, against the real output
+  sessionImport      63   reading a session-summary export
   site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
-  sessionImport      61   reading a session-summary export
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
   stats              54   P/L, rebuys, duration, win rate, groupings
@@ -1149,6 +1149,7 @@ Tests:       2001 passed
   venuePicker         6   typing a room you already have, rather than adding a second
   errorBoundary       5   a render that throws, and the way back from it
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
+  stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars
   notFound            3   where a link that names nothing lands
 ```

@@ -80,6 +80,10 @@ export default function NewSessionScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  // Whether there is a last session to have been filled in from, which is the
+  // same question `deriveDefaults` answers: it returns `STARTER_DEFAULTS` for
+  // an empty log and a copy of the newest session otherwise.
+  const fromHistory = sessions.length > 0;
   const tournament = format === 'tournament';
   const buyInCents = parseAmount(buyIn);
   // A freeroll is a real thing, so an empty or unreadable fee is zero rather
@@ -153,8 +157,24 @@ export default function NewSessionScreen() {
       <PageMeta title="New session · Log" />
       <View style={styles.header}>
         <Text variant="title">New session</Text>
+        {/*
+          Said only where it is true. `deriveDefaults` returns
+          `STARTER_DEFAULTS` for an empty log -- $1/$2 NLHE, $300, USD -- and
+          this sentence presented those constants to a first-time player as
+          their own history, on the first screen behind the empty state's
+          primary button. `defaults.ts` draws the distinction outright in its
+          header ("only a first-time user sees generic ones") and the screen
+          did not carry it.
+
+          Nobody was one tap from starting an unfamiliar buy-in: the button
+          reads "Start session" and stays disabled until a venue is chosen.
+          What it cost was the sentence, and the four presets under it that
+          nothing marks as guesses.
+        */}
         <Text color={colors.textSecondary} style={styles.subtitle}>
-          Everything below is set to your last session. Change what’s different, then start.
+          {fromHistory
+            ? 'Everything below is set to your last session. Change what’s different, then start.'
+            : 'Everything below is set to a common live game. Change what’s different, then start.'}
         </Text>
       </View>
 

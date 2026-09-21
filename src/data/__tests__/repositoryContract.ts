@@ -1468,6 +1468,40 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(await repository.listImportKeys()).toEqual(['csv|9']);
       });
 
+      it('keeps the hand count true when a tombstone arrives from somewhere else', async () => {
+        // A delete made here and a delete arriving from a sync are the same
+        // state and are written by different code: `deleteHand` modifies the
+        // row in place, `applyChanges` puts a whole record with the server's
+        // `deletedAt` on it. The count has to see both, and on the IndexedDB
+        // side it now reads an index rather than the rows, which is exactly the
+        // kind of difference a count answered from one write path and not the
+        // other would hide.
+        const session = await newSession();
+        const here = await repository.createHand({ sessionId: session.id, at: T0 });
+        const there = {
+          id: 'h-elsewhere', sessionId: session.id, holeCards: null, board: null,
+          position: null, note: null, tags: [], amount: null,
+          at: T0, createdAt: T0, updatedAt: T0 + HOUR,
+        };
+        await repository.applyChanges(set({ hands: [change(there)] }));
+        expect(await repository.countHands()).toBe(2);
+
+        // Tombstoned over there, and the count follows.
+        await repository.applyChanges(
+          set({ hands: [change({ ...there, updatedAt: T0 + 2 * HOUR }, T0 + 2 * HOUR)] }),
+        );
+        expect(await repository.countHands()).toBe(1);
+        expect((await repository.listHands()).map((hand) => hand.id)).toEqual([here.id]);
+
+        // And back, which a later edit on a device that never saw the delete
+        // really does produce. A count that read a stale tombstone would be
+        // one short for good.
+        await repository.applyChanges(
+          set({ hands: [change({ ...there, updatedAt: T0 + 3 * HOUR })] }),
+        );
+        expect(await repository.countHands()).toBe(2);
+      });
+
       it('is safe to apply the same change twice', async () => {
         const changes = set({ venues: [change(foreignVenue('v-remote', T0))] });
         await repository.applyChanges(changes);

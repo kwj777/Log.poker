@@ -241,24 +241,45 @@ export class DexieRepository implements Repository {
 
   // ------------------------------------------------------------------ sync
 
+  /**
+   * What has moved since the cursor, off the index rather than out of the whole
+   * table.
+   *
+   * This is the read that runs after every write, and it used to pull every
+   * venue, session, rebuy, hand and mood entry into memory and filter them in
+   * JavaScript -- a structured clone per record, to answer with nothing nearly
+   * every time. `updatedAt` has been an index since v5 and `above` walks it
+   * from the cursor forward, so the cost is the size of the answer rather than
+   * the size of the log.
+   *
+   * The order is the index's, which is `updatedAt` ascending, and that is the
+   * order the sync layer needs: a batch cut short has to leave a cursor that
+   * nothing before it is still waiting behind.
+   */
   async listChangedSince(since: Timestamp): Promise<ChangeSet> {
-    const counts = await this.sessionCounts();
     const changed = <Record extends { updatedAt: number; deletedAt?: DeletedAt }, T>(
       records: readonly Record[],
       map: (record: Record) => T,
     ): Change<T>[] =>
-      records
-        .filter((record) => record.updatedAt > since)
-        .sort((a, b) => a.updatedAt - b.updatedAt)
-        .map((record) => ({ record: map(record), deletedAt: deletedAt(record) }));
+      records.map((record) => ({ record: map(record), deletedAt: deletedAt(record) }));
+
+    const from = <Record>(table: {
+      where(index: string): { above(key: number): { toArray(): Promise<Record[]> } };
+    }): Promise<Record[]> => table.where('updatedAt').above(since).toArray();
 
     const [venues, sessions, rebuys, hands, moodEntries] = await Promise.all([
-      this.db.venues.toArray(),
-      this.db.sessions.toArray(),
-      this.db.rebuys.toArray(),
-      this.db.hands.toArray(),
-      this.db.moodEntries.toArray(),
+      from<VenueRecord>(this.db.venues),
+      from<SessionRecord>(this.db.sessions),
+      from<RebuyRecord>(this.db.rebuys),
+      from<HandRecord>(this.db.hands),
+      from<MoodRecord>(this.db.moodEntries),
     ]);
+
+    // Only when a venue is in the answer. The count is a pass over every
+    // session, and the sync layer reads it off the record it is sending rather
+    // than asking for it, so paying for it on a push that carries no venue --
+    // which is nearly all of them -- was a scan for a number nobody read.
+    const counts = venues.length === 0 ? new Map<string, number>() : await this.sessionCounts();
 
     return {
       venues: changed(venues, (record) => toVenue(record, counts.get(record.id) ?? 0)),

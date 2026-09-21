@@ -292,12 +292,45 @@ describe('IndexedDB: a v2 database upgraded to the current version', () => {
   });
 });
 
+describe('the read that runs after every write', () => {
+  let driver: NodeSqliteDriver;
+
+  beforeEach(async () => {
+    driver = new NodeSqliteDriver(':memory:');
+    for (const migration of MIGRATIONS) {
+      for (const statement of migration.statements) await driver.execute(statement);
+    }
+  });
+
+  afterEach(() => driver.close());
+
+  it('goes to an index on every table it asks, rather than reading all of them', async () => {
+    // `listChangedSince` asks five tables `updated_at > ?` after every write,
+    // and answers with nothing nearly every time. Unindexed, each of those was
+    // a scan of a whole table and a sort of everything in it, and the cost
+    // went up with the size of the log rather than the size of the answer.
+    //
+    // The query planner is the only thing that can say which of the two is
+    // happening. It says SCAN for the one and SEARCH ... USING INDEX for the
+    // other, on the same SQL.
+    for (const table of ['venues', 'sessions', 'rebuys', 'hands', 'mood_entries']) {
+      const plan = await driver.all<{ detail: string }>(
+        `EXPLAIN QUERY PLAN
+         SELECT * FROM ${table} WHERE updated_at > 0 ORDER BY updated_at ASC`,
+      );
+      const detail = plan.map((row) => row.detail).join(' ');
+      expect(detail).toContain('USING INDEX');
+      expect(detail).not.toContain('SCAN');
+    }
+  });
+});
+
 describe('the migration list', () => {
   it('is append only, and every shipped version still says what it said', () => {
     // A device that ran version 3 last month will never run it again, so
     // editing one changes nothing there and everything on a fresh install, and
     // the two stop agreeing without anything erroring.
-    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(MIGRATIONS[1].statements).toEqual([
       'ALTER TABLE sessions ADD COLUMN import_key TEXT',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_import_key ON sessions(import_key)',
@@ -322,6 +355,18 @@ describe('the migration list', () => {
     for (const table of ['venues', 'sessions', 'rebuys', 'hands', 'mood_entries']) {
       expect(tombstones).toContain(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
     }
+  });
+
+  it('and an updated_at index on the same five, because that is what sync reads on', () => {
+    // The tables that sync are the tables `listChangedSince` asks about, and
+    // it asks one question: `updated_at > ?`. The two lists have to be the
+    // same list, and `preferences` is out of both for the same reason.
+    const indexes = MIGRATIONS[6].statements;
+    expect(indexes).toHaveLength(5);
+    for (const table of ['venues', 'sessions', 'rebuys', 'hands', 'mood_entries']) {
+      expect(indexes.some((sql) => sql.includes(`ON ${table}(updated_at)`))).toBe(true);
+    }
+    expect(indexes.some((sql) => sql.includes('preferences'))).toBe(false);
   });
 });
 

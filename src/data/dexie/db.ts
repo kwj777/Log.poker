@@ -225,5 +225,25 @@ export const createDatabase = (name: string = DATABASE_NAME): LogDatabase => {
     moodEntries: 'id, sessionId, phase, at',
     preferences: 'key',
   });
+  // v5 indexes the column every sync reads on. `listChangedSince` runs after
+  // every write and asks one question of five tables -- `updatedAt > since`,
+  // in that order -- and without an index the only way to answer it was to
+  // read every row of every table into memory and filter in JavaScript. On
+  // this engine that is a structured clone per record, to answer with nothing
+  // nearly every time.
+  //
+  // Nothing to upgrade: Dexie builds the index from the rows already there,
+  // and `updatedAt` is on every record of every syncing table by construction.
+  // `preferences` gains nothing because it has no `updatedAt` and does not
+  // sync; `deletedAt` stays out for the reason `schema.ts` gives at its
+  // version 4, which is that it is null on almost every row.
+  db.version(5).stores({
+    venues: 'id, name, createdAt, updatedAt',
+    sessions: 'id, venueId, format, gameType, startedAt, endedAt, updatedAt, &importKey',
+    rebuys: 'id, sessionId, at, updatedAt',
+    hands: 'id, sessionId, at, updatedAt',
+    moodEntries: 'id, sessionId, phase, at, updatedAt',
+    preferences: 'key',
+  });
   return db;
 };

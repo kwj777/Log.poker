@@ -1067,7 +1067,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 81 passed
-Tests:       1981 passed
+Tests:       1991 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1075,19 +1075,19 @@ Tests:       1981 passed
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
   site               61   the marketing/app split, the PWA, the sitemap
+  sessionImport      58   reading a session-summary export
   content            55   every figure in the guides, re-derived and read back
-  sessionImport      55   reading a session-summary export
   signinEndpoint     55   the free door, and every bound on it
   stats              54   P/L, rebuys, duration, win rate, groupings
   verify             52   checking a token, and every way past it that must not work
-  copy               50   what the sign-in and the sync are allowed to say
+  copy               51   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   variance           41   win rate, σ, confidence bands, verdicts
   blog               38   the post grammar, the share cards, and what it refuses
   values             36   money, dates, durations, stakes, formats, counts
+  merge              33   two devices disagreeing, and who wins
   mood               33   what tilt costs, and when to say nothing
-  merge              32   two devices disagreeing, and who wins
   signinSweep        31   what the sign-in store may collect, and what it must not
   migrations         29   a filled v2 database walked forward, both engines
   token              29   the family token grammar, against signed fixtures
@@ -1104,10 +1104,10 @@ Tests:       1981 passed
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
   clock              18   a typed date, a typed length, and what neither will accept
+  editSession        18   correcting a session, including the one nobody cashed out
   history            18   the session list, its filters, and how much of it mounts
   money              18   cents arithmetic, parsing, formatting
   seed               18   the demo dataset stays coherent
-  editSession        17   correcting a session, including the one nobody cashed out
   pastSession        17   logging a night that was played before it was logged
   writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
@@ -1118,6 +1118,7 @@ Tests:       1981 passed
   settingsExport     15   the export card, and what it refuses to write
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
+  bankrollHeadline   13   the word over the headline figure, and what it has to be true of
   editHand           13   fixing or deleting a hand that was logged wrong
   rateLimit          13   how often one person may ask, and what a refusal costs
   sessionDetail      13   one session and the hands that belong to it
@@ -1128,7 +1129,6 @@ Tests:       1981 passed
   columns            10   header matching
   search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
-  bankrollHeadline    9   the word over the headline figure, and what it has to be true of
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit

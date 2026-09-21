@@ -17,6 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { CALLER_WINDOW_MS } from '../../../auth/signinEndpoint';
 import type { SignInFailure } from '../../../auth/signin';
 import { SUBJECT_PASSCODE, type Claim } from '../../../auth/token';
 import type { HandoffFailure } from '../../../auth/handoff';
@@ -146,8 +147,18 @@ describe('what it says when something fails', () => {
   });
 
   it('reads a rate limit as a wait rather than as a wrong answer', () => {
-    expect(messageFor('throttled', 'code')).toMatch(/minute|wait/i);
+    expect(messageFor('throttled', 'code')).toMatch(/hour|wait/i);
     expect(messageFor('throttled', 'code')).not.toMatch(/wrong|incorrect|invalid/i);
+  });
+
+  it('names a wait the endpoint will actually honor', () => {
+    // `CALLER_LIMIT` per `CALLER_WINDOW_MS`, and that window is an hour. The
+    // copy said "give it a minute", which is wrong in the direction that costs
+    // the player: they wait, ask again, are refused by the same sentence, and
+    // have no way to learn the real bound.
+    expect(CALLER_WINDOW_MS).toBe(60 * 60 * 1000);
+    expect(messageFor('throttled', 'code')).not.toMatch(/minute/i);
+    expect(messageFor('throttled', 'code')).toContain('an hour');
   });
 
   it('blames the connection for a network failure, not the person', () => {

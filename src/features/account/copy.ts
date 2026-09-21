@@ -72,7 +72,15 @@ export const messageFor = (failure: SignInFailure, stage: Stage): string => {
     case 'rejected':
       return REJECTED[stage];
     case 'throttled':
-      return 'That is a lot of tries. Give it a minute and ask again.';
+      // An hour, because that is the window that actually binds.
+      // `CALLER_LIMIT` is 20 per `CALLER_WINDOW_MS`, which is an hour, and
+      // both 429s a player can reach come from it. "Give it a minute" named a
+      // wait guaranteed not to be long enough: a card room shares one address,
+      // so the tenth person to sign in that hour waits a minute, is refused
+      // with the same sentence, and concludes the sign-in is broken. The one
+      // other 429 is the server giving up on a write race, where an hour is
+      // longer than it needs and nobody is misled by being early.
+      return 'That is a lot of tries. Give it an hour and ask again.';
     case 'unreachable':
       return 'Could not reach the sign-in. Check your connection and try again.';
   }

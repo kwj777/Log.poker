@@ -311,6 +311,16 @@ export const parseSessionCsv = (
 
     // A cash-out column is the direct measurement; a result column is derived
     // from one, so it only fills in where the first is absent.
+    //
+    // **The entry fee is part of what the result was measured against.** A
+    // file reporting a profit has already taken the fee off it, so a cash-out
+    // rebuilt as buy-in plus result leaves the fee to be subtracted a second
+    // time by `netResult`, which is `cashOut - (buyIn + fee + rebuys)`. Every
+    // tournament row from a results-only export landed short by exactly its
+    // fee: a $100+$10 that the file says made $50 stored as +$40. The losing
+    // rows were worse, since `buyIn + result` goes negative and books a prize
+    // nobody was ever paid.
+    const entryFee = tournament ? (feeCell?.cents ?? 0) : 0;
     let buyIn = buyInCell?.cents ?? 0;
     let cashOut: number | null;
     if (cashOutCell !== null) {
@@ -320,11 +330,13 @@ export const parseSessionCsv = (
         // Nothing says what went on the table, but a loss entails at least as
         // much as was lost -- that is entailed, not invented. Booking it keeps
         // the net exact and both figures readable: a cash-out of minus forty
-        // is not a thing that happens.
-        buyIn = -resultCell.cents;
+        // is not a thing that happens. The fee is part of that cost where the
+        // file named one, so it comes out of the buy-in rather than being
+        // added on top of a total the result already fixes.
+        buyIn = Math.max(0, -resultCell.cents - entryFee);
         cashOut = 0;
       } else {
-        cashOut = buyIn + resultCell.cents;
+        cashOut = buyIn + entryFee + resultCell.cents;
       }
     } else {
       cashOut = null;

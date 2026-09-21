@@ -484,3 +484,45 @@ describe('what a row will be worth', () => {
     expect(draftNet(draft)).toBe(landed);
   });
 });
+
+
+describe('a tournament file that reports a profit rather than a prize', () => {
+  const parse = (rows: string[]) =>
+    parseSessionCsv(
+      ['Date,Game,Buy-in,Entry fee,Entrants,Finish,Profit', ...rows].join('\n'),
+    );
+
+  /** What the app will actually call this session's result once it is stored. */
+  const landed = (draft: ImportedSessionDraft) =>
+    draft.cashOut - totalInvested({ buyIn: draft.buyIn, fee: draft.fee } as Session, []);
+
+  it('stores the profit the file states, fee and all', () => {
+    // The result column has already had the fee taken off it, so rebuilding
+    // the cash-out as buy-in plus result left `netResult` to subtract the fee
+    // a second time: the file said +$50 and the dashboard said +$40.
+    const [row] = parse(['2026-03-14 19:30,NLHE,100.00,10.00,120,7,50.00']).sessions;
+    expect(row.draft.format).toBe('tournament');
+    expect(row.draft.buyIn).toBe(10_000);
+    expect(row.draft.fee).toBe(1_000);
+    expect(landed(row.draft)).toBe(5_000);
+  });
+
+  it('and never books a prize nobody was paid to do it', () => {
+    // A busted entry: `buyIn + result` is negative, which is a cash-out that
+    // does not happen. Adding the fee back keeps the arithmetic where it
+    // belongs, on the cost side.
+    const [row] = parse(['2026-03-15 19:30,NLHE,100.00,10.00,120,90,-110.00']).sessions;
+    expect(row.draft.cashOut).toBe(0);
+    expect(landed(row.draft)).toBe(-11_000);
+  });
+
+  it('leaves the derived cash-out of a cash game exactly where it was', () => {
+    const [row] = parseSessionCsv(
+      ['Date,Game,Stakes,Buy-in,Profit', '2026-03-14 19:30,NLHE,$1/$2,300.00,150.00'].join('\n'),
+    ).sessions;
+    expect(row.draft.format).toBe('cash');
+    expect(row.draft.fee).toBeNull();
+    expect(row.draft.cashOut).toBe(45_000);
+    expect(landed(row.draft)).toBe(15_000);
+  });
+});

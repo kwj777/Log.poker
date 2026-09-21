@@ -170,10 +170,32 @@ export default function SettingsScreen() {
       return `Moved ${moved} session${moved === 1 ? '' : 's'} to ${into.name}.`;
     }, 'Could not merge those venues.');
 
+  /**
+   * The demo set, onto a device that has nothing to lose.
+   *
+   * Refused on one that syncs, because the wipe it opens with is not a wipe
+   * there: `clearAll` rewinds the cursors, the real log is pulled straight
+   * back down alongside the demo, and every fabricated session goes up into
+   * the account's own bucket and out to every other device. Undoing that is
+   * row by row.
+   *
+   * This card is developer-only, so the person it costs is a developer signed
+   * into their own account while testing sync -- which is precisely who is
+   * going to press it.
+   */
   const seed = async () => {
     setBusy(true);
     setReport(null);
     try {
+      if (await getSyncingRepository()) {
+        say(
+          'seed',
+          'Not onto a device that syncs: the reset this starts with pulls your real log back, ' +
+            'and the demo would go up with it. Sign out first.',
+          true,
+        );
+        return;
+      }
       const repository = await getRepository();
       const result = await seedDemoData(repository);
       await refresh();

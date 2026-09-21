@@ -159,7 +159,15 @@ export interface SeedOptions {
   now?: number;
   /** Change to get a different (but still repeatable) set of hands. */
   seed?: number;
-  /** Wipe existing data first. Defaults to true. */
+  /**
+   * Empty the log first. Defaults to true.
+   *
+   * **Only on a repository that is not syncing.** Through the syncing one
+   * `clearAll` is not a wipe: it rewinds the cursors so the real log is pulled
+   * back down, and every seeded row then goes up through `touched` into the
+   * account's own bucket and out to every other device. The caller in Settings
+   * refuses on a device that syncs for that reason.
+   */
   clear?: boolean;
 }
 

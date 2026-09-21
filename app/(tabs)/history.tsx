@@ -147,6 +147,16 @@ export default function HistoryScreen() {
     <>
       <View style={styles.header}>
         <Text variant="title">Sessions</Text>
+        {/*
+          Where somebody notices a night is missing, which is why the way to
+          add one belongs here rather than only behind "Start a session".
+        */}
+        <Button
+          label="Add a past session"
+          variant="ghost"
+          size="small"
+          onPress={() => router.push('/session/past')}
+        />
       </View>
 
       <View style={styles.filters}>
@@ -263,8 +273,14 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: spacing.xl,
     marginBottom: spacing.lg,
+    // The ghost button carries its own padding, so it is pulled back out to
+    // the edge the title sits on.
+    marginRight: -spacing.md,
   },
   filters: {
     gap: spacing.sm,

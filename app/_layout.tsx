@@ -118,6 +118,14 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="session/past"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+              title: 'Add a past session · Log',
+            }}
+          />
+          <Stack.Screen
             name="session/hand"
             options={{
               presentation: 'modal',

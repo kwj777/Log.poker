@@ -136,6 +136,18 @@ export default function NewSessionScreen() {
             loading={starting}
             accessibilityHint="Begins timing the session and records your buy-in"
           />
+          {/*
+            For the player who opened this meaning to log last night. Replace
+            rather than push: the two screens are alternatives, and stacking
+            them would put a "start a session now" screen behind a finished
+            one for the Back gesture to land on.
+          */}
+          <Button
+            label="I already played this one"
+            variant="ghost"
+            size="medium"
+            onPress={() => router.replace('/session/past')}
+          />
           <Button label="Cancel" variant="ghost" size="medium" onPress={() => router.back()} />
         </View>
       }

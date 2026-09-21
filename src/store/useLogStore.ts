@@ -57,6 +57,31 @@ export interface StartSessionInput {
 }
 
 /**
+ * A session that was played before it was logged.
+ *
+ * Everything `StartSessionInput` takes plus the two things only a finished
+ * session has: how long it ran and what came back off the table. It is one
+ * input rather than a start followed by an end because it is one write -- see
+ * `logPastSession` for why that matters.
+ */
+export interface PastSessionInput {
+  venueId: string;
+  format?: SessionFormat;
+  gameType: GameType;
+  stakes?: Stakes | null;
+  currency?: string;
+  buyIn: number;
+  fee?: number | null;
+  /** When the player sat down. */
+  startedAt: number;
+  /** When they racked up. */
+  endedAt: number;
+  cashOut: number;
+  entrants?: number | null;
+  finishPosition?: number | null;
+}
+
+/**
  * What a finished session can be corrected to.
  *
  * Every field the storage layer has always been able to patch except the
@@ -173,6 +198,7 @@ interface LogState {
   deleteVenue: (id: string) => Promise<void>;
 
   startSession: (input: StartSessionInput) => Promise<Session>;
+  logPastSession: (input: PastSessionInput) => Promise<Session>;
   addRebuy: (sessionId: string, amount: number) => Promise<Rebuy>;
   removeRebuy: (id: string) => Promise<void>;
   endSession: (
@@ -411,6 +437,28 @@ export const useLogStore = create<LogState>((set, get) => ({
     set({ lastMidSessionPromptAt: null, tableOfferMadeAt: null });
     // Venues, because `sessionCount` is derived at read time and this changed it.
     await get().refresh(mood == null ? ['sessions', 'venues'] : ['sessions', 'venues', 'moodEntries']);
+    return session;
+  },
+
+  /**
+   * Log a session that was played before it was logged.
+   *
+   * One write rather than a start and then an end. A session that is created
+   * live and cashed out later is two writes because those are two moments
+   * hours apart; this one is a single form submitted once, and splitting it
+   * would open a window where the second write failing leaves a session
+   * running that nobody is playing -- exactly the state the "Still playing?"
+   * correction on the live screen exists to clean up.
+   *
+   * No mood: the pre-session score is asked for at the table because it is
+   * about how somebody feels right then, and a score remembered a week later
+   * is a different measurement wearing the same name.
+   */
+  logPastSession: async (input) => {
+    const repository = await getRepository();
+    const session = await repository.createSession(input);
+    // Venues, because `sessionCount` is derived at read time and this changed it.
+    await get().refresh(['sessions', 'venues']);
     return session;
   },
 

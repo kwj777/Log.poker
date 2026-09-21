@@ -24,6 +24,7 @@ const repository = {
   countHands: jest.fn(),
   listMoodEntries: jest.fn(),
   getActiveSession: jest.fn(),
+  getPreferences: jest.fn(),
   createVenue: jest.fn(),
   updateVenue: jest.fn(),
   createSession: jest.fn(),
@@ -49,6 +50,7 @@ const stubReads = () => {
   repository.countHands.mockImplementation(async () => 1);
   repository.listMoodEntries.mockImplementation(async () => [{ id: 'm1', sessionId: 's1' }]);
   repository.getActiveSession.mockImplementation(async () => null);
+  repository.getPreferences.mockImplementation(async () => ({ startingBalance: null }));
 };
 
 const readCounts = () => ({

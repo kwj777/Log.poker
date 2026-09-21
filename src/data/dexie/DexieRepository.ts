@@ -25,11 +25,13 @@ import {
   type Change,
   type ChangeSet,
   type HandPatch,
+  type Preferences,
   type Repository,
   type SessionFilter,
   type SessionPatch,
   type VenuePatch,
 } from '../repository';
+import { patchedKeys, toPreferences } from '../preferences';
 import {
   applyPatch,
   assertImportKeysAvailable,
@@ -735,12 +737,43 @@ export class DexieRepository implements Repository {
       });
   }
 
+  // ---------------------------------------------------------- preferences
+
+  /**
+   * Stored structured, unlike the SQLite side, which has to JSON it through a
+   * text column. Validated by the same reader either way, so a value that has
+   * stopped being a setting means the same thing on both engines.
+   */
+  async getPreferences(): Promise<Preferences> {
+    const rows = await this.db.preferences.toArray();
+    return toPreferences(new Map(rows.map((row) => [row.key, row.value])));
+  }
+
+  async setPreferences(patch: Partial<Preferences>): Promise<Preferences> {
+    const keys = patchedKeys(patch);
+    if (keys.length > 0) {
+      await this.db.transaction('rw', [this.db.preferences], async () => {
+        await this.db.preferences.bulkPut(
+          keys.map((key) => ({ key, value: patch[key] ?? null })),
+        );
+      });
+    }
+    return this.getPreferences();
+  }
+
   // ----------------------------------------------------------- maintenance
 
   async clearAll(): Promise<void> {
     await this.db.transaction(
       'rw',
-      [this.db.venues, this.db.sessions, this.db.rebuys, this.db.hands, this.db.moodEntries],
+      [
+        this.db.venues,
+        this.db.sessions,
+        this.db.rebuys,
+        this.db.hands,
+        this.db.moodEntries,
+        this.db.preferences,
+      ],
       async () => {
         await Promise.all([
           this.db.moodEntries.clear(),
@@ -748,6 +781,8 @@ export class DexieRepository implements Repository {
           this.db.rebuys.clear(),
           this.db.sessions.clear(),
           this.db.venues.clear(),
+          // A device with no sessions on it has no starting balance either.
+          this.db.preferences.clear(),
         ]);
       },
     );

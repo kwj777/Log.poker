@@ -36,11 +36,13 @@ import {
   type Change,
   type ChangeSet,
   type HandPatch,
+  type Preferences,
   type Repository,
   type SessionFilter,
   type SessionPatch,
   type VenuePatch,
 } from '../repository';
+import { patchedKeys, toPreferences } from '../preferences';
 import {
   applyPatch,
   assertImportKeysAvailable,
@@ -1058,6 +1060,45 @@ export class SqlRepository implements Repository {
     );
   }
 
+  // ---------------------------------------------------------- preferences
+
+  /**
+   * JSON in a text column, because the column has to hold a number today and
+   * whatever the next setting is afterwards. `toPreferences` validates what
+   * comes back, so a row that is no longer the shape of a setting reads as
+   * unasked rather than as a crash on launch.
+   */
+  async getPreferences(): Promise<Preferences> {
+    const rows = await this.driver.all<{ key: string; value: string }>(
+      `SELECT key, value FROM preferences`,
+    );
+    const stored = new Map<string, unknown>();
+    for (const row of rows) {
+      try {
+        stored.set(row.key, JSON.parse(row.value));
+      } catch {
+        // Left out, which `toPreferences` reads as unasked.
+      }
+    }
+    return toPreferences(stored);
+  }
+
+  async setPreferences(patch: Partial<Preferences>): Promise<Preferences> {
+    const keys = patchedKeys(patch);
+    if (keys.length > 0) {
+      await this.driver.transaction(async () => {
+        for (const key of keys) {
+          await this.driver.run(
+            `INSERT INTO preferences (key, value) VALUES (?, ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+            [key, JSON.stringify(patch[key] ?? null)],
+          );
+        }
+      });
+    }
+    return this.getPreferences();
+  }
+
   // ----------------------------------------------------------- maintenance
 
   async clearAll(): Promise<void> {
@@ -1067,6 +1108,8 @@ export class SqlRepository implements Repository {
       await this.driver.run(`DELETE FROM rebuys`);
       await this.driver.run(`DELETE FROM sessions`);
       await this.driver.run(`DELETE FROM venues`);
+      // A phone with no sessions on it has no starting balance either.
+      await this.driver.run(`DELETE FROM preferences`);
     });
   }
 }

@@ -12,6 +12,7 @@
  */
 
 import type {
+  Cents,
   GameType,
   SessionFormat,
   Hand,
@@ -39,6 +40,47 @@ export interface SessionFilter {
   /** `active` = still running, `completed` = cashed out. Defaults to `all`. */
   status?: 'all' | 'active' | 'completed';
   limit?: number;
+}
+
+/**
+ * The player's own settings, which are facts about them rather than about a night.
+ *
+ * One field so far. It is here rather than in a file beside the auth token
+ * because it belongs to the log -- `clearAll` should take it, and a phone with
+ * no sessions on it has no starting balance either -- and because both engines
+ * already have a database and neither platform has a key-value store this app
+ * ships without adding a dependency for.
+ *
+ * **Not synced.** Adding a sixth table to `SYNC_TABLES` means a bundle format,
+ * tombstones, and a merge rule for a singleton, which is a great deal of the
+ * riskiest machinery in this repository for one number somebody types once.
+ * The cost is that a second device shows profit until the number is entered
+ * there too, which the field says plainly. It is a thing to revisit the next
+ * time the sync layer is open for its own reasons, not before.
+ */
+export interface StartingBalance {
+  /** What the player had behind them before the first logged session. */
+  cents: Cents;
+  /**
+   * Which money that is.
+   *
+   * Carried with the amount for the same reason a session carries one: a log
+   * can hold more than one currency, every total on the dashboard is scoped to
+   * a single one, and a balance in dollars added to a euro column would be the
+   * currency bug this app has already had once.
+   */
+  currency: string;
+}
+
+export interface Preferences {
+  /**
+   * The balance behind the first logged session, or null for never asked.
+   *
+   * Null is unasked; `{ cents: 0 }` is a player who started from nothing and
+   * is a real answer. Everything that reads this has to tell those apart,
+   * because the difference is whether the dashboard says "bankroll" at all.
+   */
+  startingBalance: StartingBalance | null;
 }
 
 export type VenuePatch = Partial<NewVenue>;
@@ -132,6 +174,10 @@ export interface Repository {
    * worse than an uncollected one.
    */
   collectTombstones(before: Timestamp): Promise<number>;
+
+  getPreferences(): Promise<Preferences>;
+  /** Merges the patch and answers the settings as they now are. */
+  setPreferences(patch: Partial<Preferences>): Promise<Preferences>;
 
   listVenues(): Promise<Venue[]>;
   getVenue(id: string): Promise<Venue | null>;

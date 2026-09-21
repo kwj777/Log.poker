@@ -7,14 +7,33 @@
  * has two answers: on this device, and on the server too if the card below
  * this one has been used. The copy has to carry both, because the paragraph
  * saying otherwise sat directly above that card for the length of one deploy.
+ *
+ * ## Why the result of an action is tagged with the card it happened on
+ *
+ * Four things here report back: a venue removal, an export, a reset and the
+ * demo seeder. They used to share one `message` string rendered in exactly one
+ * place -- inside the developer card, which is gated on `ALLOW_DEMO_SEED` and
+ * therefore on `__DEV__`. So in a real build an export said nothing, a failed
+ * export said nothing, and clearing the entire log said nothing: the spinner
+ * stopped and the screen sat there, which from a foot away is what success and
+ * failure both look like. A screen test covered it and passed, because
+ * `jest-expo` defines `__DEV__`.
+ *
+ * `Report` carries which card it belongs to, and each card renders its own. A
+ * single banner at the top would have been less code and worse: this screen is
+ * several times longer than a phone, and Reset is at the bottom of it. Tagging
+ * is also what makes the dev-only render impossible to reintroduce, since a
+ * section that never draws is a section whose report is never seen missing.
  */
 
 import { useState } from 'react';
 import { Linking, Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
+import { AmountInput } from '../../src/components/AmountInput';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
+import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
@@ -32,37 +51,120 @@ import {
   type ExportKind,
 } from '../../src/domain/export/sessionExport';
 import { saveCsv } from '../../src/features/export/saveCsv';
+import { formatMoney, fromCents, parseAmount } from '../../src/domain/money';
+import { primaryCurrency } from '../../src/domain/stats';
 import { seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
+import { VenueRow } from '../../src/features/venues/VenueRow';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { releaseLabel } from '../../src/version';
 import { PageMeta } from '../../src/components/PageMeta';
 
+/** Which card an action reports under. */
+type ReportSection = 'venues' | 'bankroll' | 'export' | 'reset' | 'seed';
+
+interface Report {
+  section: ReportSection;
+  text: string;
+  /** Failures get `ErrorNote`, which is bordered and announced as an alert. */
+  failed: boolean;
+}
+
+/**
+ * The result of the last action, under the button that caused it.
+ *
+ * Successes are a caption rather than a note, because a caption is what a
+ * confirmation should look like -- and live so that somebody who cannot see it
+ * appear is still told, which is the whole point of saying anything at all.
+ */
+const ReportNote = ({ report, section }: { report: Report | null; section: ReportSection }) => {
+  if (report === null || report.section !== section) return null;
+  if (report.failed) return <ErrorNote message={report.text} />;
+  return (
+    <Text
+      variant="caption"
+      color={colors.accent}
+      style={styles.message}
+      accessibilityLiveRegion="polite"
+    >
+      {report.text}
+    </Text>
+  );
+};
+
 export default function SettingsScreen() {
   const venues = useLogStore((state) => state.venues);
   const sessions = useLogStore((state) => state.sessions);
   const handCount = useLogStore((state) => state.handCount);
   const moodEntries = useLogStore((state) => state.moodEntries);
+  const startingBalance = useLogStore((state) => state.startingBalance);
+  const setStartingBalance = useLogStore((state) => state.setStartingBalance);
   const deleteVenue = useLogStore((state) => state.deleteVenue);
+  const renameVenue = useLogStore((state) => state.renameVenue);
+  const mergeVenues = useLogStore((state) => state.mergeVenues);
   const refresh = useLogStore((state) => state.refresh);
   const clearAll = useLogStore((state) => state.clearAll);
 
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const say = (section: ReportSection, text: string, failed = false) =>
+    setReport({ section, text, failed });
+
+  /**
+   * Run one venue write, report what it did, and say whether the row may close.
+   *
+   * Awaited and caught rather than fired off, which is what removal was: a
+   * `void deleteVenue(id)` with no catch at all, so a delete that threw left
+   * the row on screen and the rejection unhandled. The boolean is what the row
+   * needs and the only thing it needs -- a failed write leaves the editor open
+   * with what was typed still in it.
+   */
+  const venueWrite = async (run: () => Promise<string>, whenItFails: string) => {
+    setBusy(true);
+    setReport(null);
+    try {
+      say('venues', await run());
+      return true;
+    } catch (error) {
+      say('venues', describeFailure(error, whenItFails), true);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeVenue = (id: string) =>
+    venueWrite(async () => {
+      await deleteVenue(id);
+      return 'Venue removed.';
+    }, 'Could not remove that venue.');
+
+  const rename = (id: string, name: string) =>
+    venueWrite(async () => {
+      await renameVenue(id, name);
+      return `Renamed to ${name}.`;
+    }, 'Could not rename that venue.');
+
+  const merge = (fromId: string, into: { id: string; name: string }) =>
+    venueWrite(async () => {
+      const moved = await mergeVenues(fromId, into.id);
+      return `Moved ${moved} session${moved === 1 ? '' : 's'} to ${into.name}.`;
+    }, 'Could not merge those venues.');
 
   const seed = async () => {
     setBusy(true);
-    setMessage(null);
+    setReport(null);
     try {
       const repository = await getRepository();
       const result = await seedDemoData(repository);
       await refresh();
-      setMessage(`Seeded ${result.sessions} sessions, ${result.hands} hands.`);
+      say('seed', `Seeded ${result.sessions} sessions, ${result.hands} hands.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Seeding failed');
+      say('seed', describeFailure(error, 'Seeding failed'), true);
     } finally {
       setBusy(false);
     }
@@ -78,7 +180,7 @@ export default function SettingsScreen() {
    */
   const exportCsv = async (kind: ExportKind) => {
     setBusy(true);
-    setMessage(null);
+    setReport(null);
     try {
       const repository = await getRepository();
       const all = await repository.listSessions();
@@ -94,10 +196,64 @@ export default function SettingsScreen() {
       if (result.saved) {
         const noun = kind === 'sessions' ? 'session' : kind === 'hands' ? 'hand' : 'mood entry';
         const plural = kind === 'moods' ? 'mood entries' : `${noun}s`;
-        setMessage(`Exported ${rows.length} ${rows.length === 1 ? noun : plural}.`);
+        say('export', `Exported ${rows.length} ${rows.length === 1 ? noun : plural}.`);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Export failed');
+      say('export', describeFailure(error, 'Export failed'), true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * What the player had behind them before the first logged session.
+   *
+   * Seeded from what is stored and adjusted during render rather than synced
+   * in an effect, the way session detail seeds its notes: an effect would
+   * render an empty field first and then fill it, so somebody opening this
+   * screen would watch their own balance appear.
+   */
+  const [balanceDraft, setBalanceDraft] = useState('');
+  const [seededFrom, setSeededFrom] = useState<number | null | undefined>(undefined);
+  if (seededFrom !== (startingBalance?.cents ?? null)) {
+    setSeededFrom(startingBalance?.cents ?? null);
+    setBalanceDraft(startingBalance === null ? '' : String(fromCents(startingBalance.cents)));
+  }
+
+  /**
+   * The money a balance would be in: whatever the log is mostly in.
+   *
+   * Not a picker. A player with two currencies has one bankroll they think in,
+   * and a screen that asked them to choose would be asking a question to avoid
+   * making an assumption that is right almost every time. The dashboard shows
+   * profit rather than a bankroll for the currency this is not in, which is
+   * the honest behavior either way.
+   */
+  const balanceCurrency = primaryCurrency(sessions);
+  const draftCents = parseAmount(balanceDraft);
+
+  const saveBalance = async () => {
+    if (draftCents === null) return;
+    setBusy(true);
+    setReport(null);
+    try {
+      await setStartingBalance({ cents: draftCents, currency: balanceCurrency });
+      say('bankroll', `Starting balance set to ${formatMoney(draftCents, { currency: balanceCurrency })}.`);
+    } catch (error) {
+      say('bankroll', describeFailure(error, 'Could not save that.'), true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearBalance = async () => {
+    setBusy(true);
+    setReport(null);
+    try {
+      await setStartingBalance(null);
+      say('bankroll', 'Cleared. The dashboard shows your profit again.');
+    } catch (error) {
+      say('bankroll', describeFailure(error, 'Could not clear that.'), true);
     } finally {
       setBusy(false);
     }
@@ -105,10 +261,13 @@ export default function SettingsScreen() {
 
   const reset = async () => {
     setBusy(true);
+    setReport(null);
     try {
       await clearAll();
       setConfirmingReset(false);
-      setMessage('All data cleared.');
+      say('reset', 'All data cleared.');
+    } catch (error) {
+      say('reset', describeFailure(error, 'Could not clear your data.'), true);
     } finally {
       setBusy(false);
     }
@@ -130,27 +289,68 @@ export default function SettingsScreen() {
           </Text>
         ) : (
           venues.map((venue) => (
-            <View key={venue.id} style={styles.venueRow}>
-              <View style={styles.venueBody}>
-                <Text variant="bodyStrong" numberOfLines={1}>
-                  {venue.name}
-                </Text>
-                <Text variant="caption" color={colors.textTertiary}>
-                  {venue.isHomeGame ? 'Home game · ' : ''}
-                  {venue.sessionCount} session{venue.sessionCount === 1 ? '' : 's'}
-                </Text>
-              </View>
-              {venue.sessionCount === 0 ? (
-                <Button
-                  label="Remove"
-                  variant="ghost"
-                  size="small"
-                  onPress={() => void deleteVenue(venue.id)}
-                />
-              ) : null}
-            </View>
+            <VenueRow
+              key={venue.id}
+              venue={venue}
+              others={venues.filter((other) => other.id !== venue.id)}
+              busy={busy}
+              onRename={rename}
+              onMerge={merge}
+              onRemove={removeVenue}
+            />
           ))
         )}
+        <ReportNote report={report} section="venues" />
+      </Card>
+
+      {/*
+        The number that makes the dashboard headline true.
+
+        It said "Bankroll" over cumulative profit from zero, which is not a
+        bankroll: it differs from one by whatever the player sat down with, and
+        for somebody down over their logged sessions it was negative, which no
+        bankroll has ever been. The app ships a guide about how big a bankroll
+        should be and had nowhere to put the number that guide is about.
+
+        Optional, and the dashboard says "Profit" without it, which is what it
+        has been showing all along.
+      */}
+      <SectionHeader title="Bankroll" />
+      <Card>
+        <Text color={colors.textSecondary} style={styles.body}>
+          What you had behind you before your first logged session. With it, the dashboard
+          shows your bankroll and what you have won or lost since. Without it, it shows what
+          you have won or lost, which is what it showed before.
+        </Text>
+        <AmountInput
+          value={balanceDraft}
+          onChangeText={setBalanceDraft}
+          currency={balanceCurrency}
+          accessibilityLabel="Starting balance"
+        />
+        <View style={styles.balanceRow}>
+          {startingBalance === null ? null : (
+            <Button
+              label="Clear"
+              variant="ghost"
+              size="small"
+              disabled={busy}
+              onPress={() => void clearBalance()}
+            />
+          )}
+          <View style={styles.spacer} />
+          <Button
+            label="Save"
+            variant="secondary"
+            size="small"
+            disabled={busy || draftCents === null}
+            onPress={() => void saveBalance()}
+          />
+        </View>
+        <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>
+          Kept on this device, and not carried to your other ones even when you are signed in.
+        </Text>
+        <ReportNote report={report} section="bankroll" />
       </Card>
 
       <SectionHeader title="Import" />
@@ -207,6 +407,7 @@ export default function SettingsScreen() {
           Moods carry every score you have given a session, which is what the mood cost on the
           Variance tab is built from.
         </Text>
+        <ReportNote report={report} section="export" />
       </Card>
 
       <SectionHeader title="Your data" />
@@ -253,11 +454,7 @@ export default function SettingsScreen() {
               onPress={() => void seed()}
               loading={busy}
             />
-            {message ? (
-              <Text variant="caption" color={colors.accent} style={styles.message}>
-                {message}
-              </Text>
-            ) : null}
+            <ReportNote report={report} section="seed" />
           </Card>
         </>
       ) : null}
@@ -288,6 +485,7 @@ export default function SettingsScreen() {
             onPress={() => setConfirmingReset(true)}
           />
         )}
+        <ReportNote report={report} section="reset" />
       </Card>
 
       <FamilyCrossPromo exclude={['log']} style={styles.family} />
@@ -355,19 +553,18 @@ const styles = StyleSheet.create({
   venues: {
     paddingVertical: spacing.xs,
   },
-  venueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  venueBody: {
-    flex: 1,
-    gap: 2,
-  },
   body: {
     lineHeight: 23,
     marginBottom: spacing.lg,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  spacer: {
+    flex: 1,
   },
   exportRow: {
     flexDirection: 'row',

@@ -135,12 +135,26 @@ type LegacySessionRecord = Omit<SessionRecord, 'stakes'> & {
   stakes?: (Stakes & { currency?: string }) | null;
 };
 
+/**
+ * One of the player's own settings, as a row.
+ *
+ * Key and value rather than a store with a column per setting, so the second
+ * one is a row rather than a version bump. The value is whatever was stored,
+ * which IndexedDB keeps structured -- unlike the SQLite side, which has to
+ * JSON it through a text column. The reader validates either way.
+ */
+export interface PreferenceRecord {
+  key: string;
+  value: unknown;
+}
+
 export type LogDatabase = Dexie & {
   venues: EntityTable<VenueRecord, 'id'>;
   sessions: EntityTable<SessionRecord, 'id'>;
   rebuys: EntityTable<RebuyRecord, 'id'>;
   hands: EntityTable<HandRecord, 'id'>;
   moodEntries: EntityTable<MoodRecord, 'id'>;
+  preferences: EntityTable<PreferenceRecord, 'key'>;
 };
 
 /**
@@ -200,5 +214,16 @@ export const createDatabase = (name: string = DATABASE_NAME): LogDatabase => {
               : null;
         }),
     );
+  // v4 adds the player's own settings, which are not part of the log and do
+  // not sync. Nothing to upgrade: a device that has never had one reads the
+  // absence as unasked, which is what it is.
+  db.version(4).stores({
+    venues: 'id, name, createdAt',
+    sessions: 'id, venueId, format, gameType, startedAt, endedAt, &importKey',
+    rebuys: 'id, sessionId, at',
+    hands: 'id, sessionId, at',
+    moodEntries: 'id, sessionId, phase, at',
+    preferences: 'key',
+  });
   return db;
 };

@@ -13,11 +13,13 @@
  * and they are one frame apart.
  */
 
-import { screen } from '@testing-library/react-native';
+import { screen, userEvent } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
 import type { Hand } from '../../domain/types';
+import { router } from 'expo-router';
+
 import SessionDetailScreen from '../../../app/session/[id]';
 import { useLogStore } from '../../store/useLogStore';
 
@@ -114,6 +116,13 @@ describe('a session and its hands', () => {
     await renderScreen(<SessionDetailScreen />);
     expect(screen.getByText('No hands logged for this session.')).toBeTruthy();
     expect(screen.getByText('Hands (0)')).toBeTruthy();
+  });
+
+  it('offers to add one, which a session that has ended could not before', async () => {
+    load([]);
+    await renderScreen(<SessionDetailScreen />);
+    await userEvent.press(screen.getByText('Log a hand'));
+    expect(router.push).toHaveBeenCalledWith('/session/hand?sessionId=s1');
   });
 });
 

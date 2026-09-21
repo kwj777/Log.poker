@@ -54,6 +54,7 @@ export default function DashboardScreen() {
   const all = useLogStore((state) => state.sessions);
   const venues = useLogStore((state) => state.venues);
   const activeSession = useLogStore((state) => state.activeSession);
+  const startingBalance = useLogStore((state) => state.startingBalance);
   const [breakdown, setBreakdown] = useState<Breakdown>('stakes');
   const [picked, setPicked] = useState<string | null>(null);
 
@@ -89,7 +90,47 @@ export default function DashboardScreen() {
    */
   const entries = useEntryResults(sessions);
   const roiInterval = useRoiInterval(entries);
-  const curve = useMemo(() => bankrollCurve(sessions), [sessions]);
+
+  /**
+   * The starting balance, but only when it is in the money being shown.
+   *
+   * The headline is scoped to one currency, so a balance in dollars has
+   * nothing to say about a euro column -- adding it would be the currency bug
+   * this screen has already had once. A player looking at their second
+   * currency sees profit, correctly labeled, which is what this screen showed
+   * everybody before.
+   *
+   * Null rather than zero for "does not apply", because the rest of this
+   * screen turns on the difference: zero is a real balance somebody entered,
+   * and it is still a bankroll.
+   */
+  const balance = useMemo(
+    () =>
+      startingBalance !== null && startingBalance.currency === currency
+        ? startingBalance.cents
+        : null,
+    [startingBalance, currency],
+  );
+
+  const curve = useMemo(() => bankrollCurve(sessions, balance ?? 0), [sessions, balance]);
+
+  /**
+   * The word and the figure under it, which have to agree.
+   *
+   * A balance is shown unsigned, because a bankroll is an amount rather than a
+   * movement; profit keeps its sign, because a movement is the whole point of
+   * it.
+   */
+  const headline = useMemo(
+    () => ({
+      label: balance === null ? 'Profit' : 'Bankroll',
+      value: formatMoney(balance === null ? summary.net : balance + summary.net, {
+        currency,
+        signed: balance === null,
+      }),
+    }),
+    [balance, summary.net, currency],
+  );
 
   /**
    * A player who has never entered a tournament is not offered a buy-in
@@ -320,13 +361,39 @@ export default function DashboardScreen() {
         </View>
       ) : null}
 
+      {/*
+        The headline, and the word over it has to be true.
+
+        It said "Bankroll" over cumulative profit from zero for as long as this
+        screen has existed. A bankroll is a balance: for a winning player the
+        two differ by whatever they sat down with, and for a losing one the
+        figure was negative, which no bankroll has ever been. The app even
+        ships a guide about how big a bankroll should be, for a number it did
+        not have.
+
+        With a starting balance it is a balance and says so, with the profit
+        underneath because that is the number the player is actually tracking.
+        Without one it says Profit, which is what it has been showing all
+        along.
+      */}
       <View style={styles.brandHeader}>
         <Text variant="overline" color={colors.textTertiary}>
-          Bankroll
+          {headline.label}
         </Text>
-        <Text variant="display" color={resultColor(summary.net)}>
-          {formatMoney(summary.net, { currency, signed: true })}
+        <Text
+          variant="display"
+          color={balance === null ? resultColor(summary.net) : colors.text}
+          // Labeled, so the word and the figure are read as one thing rather
+          // than as an unexplained number after a heading.
+          accessibilityLabel={`${headline.label}: ${headline.value}`}
+        >
+          {headline.value}
         </Text>
+        {balance === null ? null : (
+          <Text variant="bodyStrong" color={resultColor(summary.net)}>
+            {formatMoney(summary.net, { currency, signed: true })} logged
+          </Text>
+        )}
         <Text color={colors.textSecondary}>
           {summary.sessionCount} session{summary.sessionCount === 1 ? '' : 's'} ·{' '}
           {Math.round(summary.hours)} hours played

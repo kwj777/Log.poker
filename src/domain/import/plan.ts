@@ -8,6 +8,7 @@
  * exist inside a Zustand action are rules nothing can test.
  */
 
+import { venueNameKey } from '../venues';
 import type { ImportedSession } from './sessionImport';
 
 /**
@@ -15,8 +16,12 @@ import type { ImportedSession } from './sessionImport';
  * venue already called "PokerStars" are one room; importing into a second venue
  * that differs only in case would split a bankroll across two rows of the
  * dashboard and look like a bug in the totals, which it would be.
+ *
+ * Re-exported rather than defined here now that the venue picker folds names
+ * too: the rule is the same rule, and two copies of it would be two rules the
+ * day somebody changed one. It lives in `domain/venues`.
  */
-export const venueNameKey = (name: string): string => name.trim().toLowerCase();
+export { venueNameKey };
 
 export interface ImportPlan {
   /** Rows to write, in file order. */

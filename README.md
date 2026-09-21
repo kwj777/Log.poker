@@ -1066,11 +1066,11 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 74 passed
-Tests:       1888 passed
+Test Suites: 81 passed
+Tests:       1968 passed
 
-  dexieRepository   124   the IndexedDB path, against real IndexedDB
-  sqlRepository     124   the SQLite path, against real SQLite
+  dexieRepository   133   the IndexedDB path, against real IndexedDB
+  sqlRepository     133   the SQLite path, against real SQLite
   bundle             68   what ships to each platform, against the real output
   handOffs           61   where a hand-off goes, and what the four offer cards say
   site               61   the marketing/app split, the PWA, the sitemap
@@ -1078,9 +1078,9 @@ Tests:       1888 passed
   content            55   every figure in the guides, re-derived and read back
   sessionImport      55   reading a session-summary export
   signinEndpoint     55   the free door, and every bound on it
+  stats              54   P/L, rebuys, duration, win rate, groupings
   verify             52   checking a token, and every way past it that must not work
   copy               50   what the sign-in and the sync are allowed to say
-  stats              50   P/L, rebuys, duration, win rate, groupings
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   variance           40   win rate, σ, confidence bands, verdicts
@@ -1090,9 +1090,9 @@ Tests:       1888 passed
   mood               32   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   token              29   the family token grammar, against signed fixtures
+  migrations         27   a filled v2 database walked forward, both engines
   palette            27   the theme matches BRAND.md
   sessionExport      27   the log written out, and read back by the importer
-  migrations         26   a filled v2 database walked forward, both engines
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
@@ -1115,30 +1115,37 @@ Tests:       1888 passed
   client             15   the sync client, against a fake fetch
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
+  settingsExport     15   the export card, and what it refuses to write
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   editHand           13   fixing or deleting a hand that was logged wrong
   rateLimit          13   how often one person may ask, and what a refusal costs
+  sessionDetail      13   one session and the hands that belong to it
   useLogStore        13   what a write reads back, and what it leaves alone
   logHand            12   logging a hand, the optional board, and the reset after a bad one
-  sessionDetail      12   one session and the hands that belong to it
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching
   search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
-  settingsExport     10   the export card, and what it refuses to write
+  bankrollHeadline    9   the word over the headline figure, and what it has to be true of
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
   varianceHands       9   the hand breakdown, and the sentence that must precede it
+  pastHand            8   adding a hand to a session that is not running
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
   tokenStore.web      8   the browser token store
   cursorStore         7   which cursors survive a launch, and what a lost one costs
+  mergeVenues         7   folding one room into another, and the order it does it in
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
+  settingsBankroll    7   entering what you had behind you before the log started
+  settingsVenues      7   renaming a venue, and merging two that are one room
+  venues              7   which spellings of a room name are the same room
   readme              6   the test table adds up and says what each suite is for
   settingsHelp        6   the privacy link, the support address, the build
+  venuePicker         6   typing a room you already have, rather than adding a second
   errorBoundary       5   a render that throws, and the way back from it
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   varianceCurrency    5   the variance page stops adding euros to dollars
@@ -1758,6 +1765,10 @@ Ordered roughly by how much each is worth against how much it costs.
    [`design/tree-review.md`](design/tree-review.md).
 5. **Bankroll goals** -- target roll, stop-loss and stop-win per session, and a
    move-up/move-down prompt driven by the variance model that is already here.
+   The starting balance this needs exists now, in Settings, and is what the
+   dashboard headline is built on. It does not sync: it is a local preference
+   rather than a sixth table in the bundle, which is a trade worth revisiting
+   the next time the sync layer is open anyway.
 
 Also wanted, smaller: session photos of the chip stack,
 Apple Health style weekly summaries, an Apple Watch companion for the timer, and

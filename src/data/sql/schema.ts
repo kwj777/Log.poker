@@ -146,6 +146,27 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 5,
     statements: [`ALTER TABLE hands ADD COLUMN board TEXT`],
   },
+  {
+    // The player's own settings, starting with what they had behind them
+    // before the first logged session.
+    //
+    // Key and value rather than a column per setting, so the second one is a
+    // row rather than a migration. Values are JSON, which is how a number, a
+    // null and a string can share a column without the reader having to know
+    // which it is looking at before it parses it.
+    //
+    // No tombstone column and no `updated_at`: this table does not sync. A
+    // sixth entry in `SYNC_TABLES` means a bundle format, a retention rule and
+    // a merge rule for a singleton, which is a lot of the riskiest code in
+    // this repository for one number somebody types once. See `Preferences`.
+    version: 6,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS preferences (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -24,15 +24,28 @@ import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { successFeedback, warningFeedback } from '../../src/components/haptics';
 import { formatEntry, formatMoney, formatStakes, parseAmount } from '../../src/domain/money';
+import { formatSessionDate, formatTimeOfDay } from '../../src/features/sessions/format';
 import { parseCount } from '../../src/domain/import/values';
 import { formatDuration, rebuyTotal, totalInvested } from '../../src/domain/stats';
+import { fromHoursAndMinutes } from '../../src/domain/clock';
 import type { MoodScore } from '../../src/domain/types';
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MidSessionCheckIn } from '../../src/features/sessions/MidSessionCheckIn';
+import { DurationInput } from '../../src/features/sessions/WhenInput';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
 import { colors, radius, resultColor, spacing, typography } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
+
+/**
+ * How long a session has to have run before the app stops believing the clock.
+ *
+ * Twelve hours is past a long live session and well short of a phone that went
+ * in a pocket. The point is not to catch every forgotten cash-out -- it is to
+ * stop the app writing an elapsed time it has no reason to trust, silently,
+ * into a rate that divides by hours played.
+ */
+export const IMPLAUSIBLE_SESSION_MS = 12 * 60 * 60 * 1000;
 
 export default function ActiveSessionScreen() {
   const session = useLogStore((state) => state.activeSession);
@@ -52,6 +65,13 @@ export default function ActiveSessionScreen() {
   const [busy, setBusy] = useState(false);
   /** Which rebuy is a tap away from being removed, if any. */
   const [confirmingRebuy, setConfirmingRebuy] = useState<string | null>(null);
+  /**
+   * How long the player says they actually played, when the clock is not
+   * worth believing. Empty means "the clock is right", which is the ordinary
+   * case and the one that must stay one tap.
+   */
+  const [playedHours, setPlayedHours] = useState('');
+  const [playedMinutes, setPlayedMinutes] = useState('');
 
   const elapsed = useElapsed(session?.startedAt ?? null);
   const invested = useMemo(
@@ -86,6 +106,23 @@ export default function ActiveSessionScreen() {
   const rebuyWord = tournament ? 'Re-entry' : 'Rebuy';
   const cashOutCents = parseAmount(cashOutAmount);
   const projected = cashOutCents === null ? null : cashOutCents - invested;
+
+  /**
+   * A session the clock can no longer be trusted about.
+   *
+   * The commonest mistake in live logging is not cashing out: you rack up, you
+   * drive home, you go to bed, and you remember the next morning. Until now
+   * the app wrote whatever the clock said -- eleven hours -- and that number
+   * divides straight into the hourly rate and into `estimatePlayer`, which
+   * models a win rate per hour of play. One forgotten session moves the
+   * variance verdict this app exists to give.
+   */
+  const implausible = elapsed >= IMPLAUSIBLE_SESSION_MS;
+  const played = fromHoursAndMinutes(playedHours, playedMinutes);
+  // Empty leaves the clock alone, which keeps the ordinary cash-out one tap.
+  const correctingLength = playedHours.trim() !== '' || playedMinutes.trim() !== '';
+  const lengthInvalid = correctingLength && played === null;
+  const correctedEnd = played === null ? null : session.startedAt + played;
 
   const commitRebuy = async () => {
     const amount = parseAmount(rebuyAmount);
@@ -132,13 +169,16 @@ export default function ActiveSessionScreen() {
   };
 
   const commitCashOut = async () => {
-    if (cashOutCents === null || cashOutCents < 0 || busy) return;
+    if (cashOutCents === null || cashOutCents < 0 || busy || lengthInvalid) return;
     setBusy(true);
     setFailed(null);
     try {
       await endSession(session.id, cashOutCents, endMood, {
         finishPosition: parseCount(finishPosition),
         entrants: parseCount(entrants),
+        // Left out unless the player said otherwise, so the ordinary cash-out
+        // is stamped now exactly as it always was.
+        ...(correctedEnd === null ? {} : { endedAt: correctedEnd }),
       });
       warningFeedback();
       setCashOutOpen(false);
@@ -164,6 +204,11 @@ export default function ActiveSessionScreen() {
             onPress={() => {
               setCashOutAmount('');
               setEndMood(null);
+              // Left empty, always. Empty means "the clock is right", which
+              // keeps the ordinary cash-out exactly what it was: one number
+              // and a tap, stamped now.
+              setPlayedHours('');
+              setPlayedMinutes('');
               setCashOutOpen(true);
             }}
             accessibilityHint="Records your final stack and closes the session"
@@ -233,6 +278,25 @@ export default function ActiveSessionScreen() {
             onPress={() => router.push('/session/hand')}
           />
         </View>
+
+        {/*
+          Said on the screen rather than only inside the cash-out sheet,
+          because somebody who left a session running will often open the app,
+          see a number that is wrong, and not know the app can be told. It is
+          a line of text and no buttons: the correction belongs at cash-out,
+          where the player is already saying how the session went.
+        */}
+        {implausible ? (
+          <Card style={styles.longRunning}>
+            <Text variant="bodyStrong">Still playing?</Text>
+            <Text color={colors.textSecondary} style={styles.longRunningBody}>
+              This has been running since {formatSessionDate(session.startedAt)} at{' '}
+              {formatTimeOfDay(session.startedAt)}. If you finished earlier, cash out and say
+              how long you actually played, so your hourly rate is not measured against the
+              clock.
+            </Text>
+          </Card>
+        ) : null}
 
         <MidSessionCheckIn session={session} elapsedMs={elapsed} />
 
@@ -388,6 +452,30 @@ export default function ActiveSessionScreen() {
           </Text>
         ) : null}
 
+        {implausible ? (
+          <>
+            <Text variant="overline" color={colors.textTertiary} style={styles.sheetLabel}>
+              How long did you actually play?
+            </Text>
+            <DurationInput
+              hours={playedHours}
+              minutes={playedMinutes}
+              onChangeHours={setPlayedHours}
+              onChangeMinutes={setPlayedMinutes}
+              invalid={lengthInvalid}
+              hint={
+                lengthInvalid
+                  ? 'Hours and minutes, or leave both empty to use the clock.'
+                  : correctedEnd === null
+                    ? `Leave it empty and the clock stands: ${formatDuration(elapsed)}.`
+                    : `Finishing ${formatSessionDate(correctedEnd)} at ${formatTimeOfDay(
+                        correctedEnd,
+                      )}.`
+              }
+            />
+          </>
+        ) : null}
+
         <Text variant="overline" color={colors.textTertiary} style={styles.sheetLabel}>
           How are you leaving? (optional)
         </Text>
@@ -397,7 +485,7 @@ export default function ActiveSessionScreen() {
           label={tournament ? 'End tournament' : 'End session'}
           onPress={() => void commitCashOut()}
           style={styles.sheetAction}
-          disabled={cashOutCents === null || cashOutCents < 0}
+          disabled={cashOutCents === null || cashOutCents < 0 || lengthInvalid}
           loading={busy}
         />
         <ErrorNote message={failed} />
@@ -458,6 +546,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
+  },
+  longRunning: {
+    marginTop: spacing.lg,
+    borderColor: colors.accentDim,
+  },
+  longRunningBody: {
+    marginTop: spacing.xs,
+    lineHeight: 22,
   },
   rebuyLabel: {
     flexShrink: 1,

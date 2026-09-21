@@ -134,6 +134,7 @@ export default function RootLayout() {
           <Stack.Screen name="claim" options={{ title: 'Signing you in · Log' }} />
           <Stack.Screen name="session/active" options={{ title: 'Live session · Log' }} />
           <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
+          <Stack.Screen name="session/edit" options={{ title: 'Edit session · Log' }} />
         </Stack>
       ) : (
         status === 'error' ? (

@@ -248,6 +248,77 @@ describe('a rebuy taken back out', () => {
   });
 });
 
+describe('cashing out a session that was left running', () => {
+  const HOUR = 3_600_000;
+  /** Started last night, still running this afternoon: the pocket case. */
+  const overnight = () =>
+    session('s1', { startedAt: Date.now() - 16 * HOUR, endedAt: null, cashOut: null });
+
+  it('asks how long it actually was, rather than believing the clock', async () => {
+    ready({ activeSession: overnight(), sessions: [overnight()] });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Cash out & end session'));
+    expect(screen.getByLabelText('Hours played')).toBeTruthy();
+  });
+
+  it('and stamps the end from what was said, not from now', async () => {
+    // Sixteen hours the player did not play. `durationMs` feeds `hourlyRate`
+    // and `estimatePlayer`, and both divide by hours.
+    const running = overnight();
+    const ended: unknown[] = [];
+    ready({
+      activeSession: running,
+      sessions: [running],
+      endSession: (async (...args: unknown[]) => {
+        ended.push(args);
+      }) as never,
+    });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Cash out & end session'));
+    await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
+    await userEvent.type(screen.getByLabelText('Hours played'), '5');
+    await userEvent.press(screen.getByText('End session'));
+
+    const [, , , result] = ended[0] as [string, number, unknown, { endedAt?: number }];
+    expect(result.endedAt).toBe(running.startedAt + 5 * HOUR);
+  });
+
+  it('but leaves the clock alone when the field is left empty', async () => {
+    const running = overnight();
+    const ended: unknown[] = [];
+    ready({
+      activeSession: running,
+      sessions: [running],
+      endSession: (async (...args: unknown[]) => {
+        ended.push(args);
+      }) as never,
+    });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Cash out & end session'));
+    await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
+    await userEvent.press(screen.getByText('End session'));
+
+    const [, , , result] = ended[0] as [string, number, unknown, { endedAt?: number }];
+    expect(result.endedAt).toBeUndefined();
+  });
+
+  it('and never asks at all on a session of ordinary length', async () => {
+    // The whole point of the threshold: the common cash-out stays one number
+    // and a tap. Started three hours ago, which is a live session rather than
+    // the fixture's fixed date, so the clock reads as something believable.
+    const tonight = session('s1', { startedAt: Date.now() - 3 * HOUR, endedAt: null });
+    ready({ activeSession: tonight, sessions: [tonight] });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Cash out & end session'));
+    expect(screen.queryByLabelText('Hours played')).toBeNull();
+    expect(screen.queryByText('Still playing?')).toBeNull();
+  });
+});
+
 describe('when nothing has gone wrong', () => {
   it('there is no note on the screen at all', async () => {
     ready({ logHand: (async () => ({ id: 'h1' })) as never });

@@ -56,10 +56,48 @@ export interface StartSessionInput {
   mood?: MoodScore | null;
 }
 
+/**
+ * What a finished session can be corrected to.
+ *
+ * Every field the storage layer has always been able to patch except the
+ * format, which is left out on purpose: cash and tournament are different
+ * records, not a setting -- one has blinds and the other a fee, a field and a
+ * finish -- and turning one into the other is a different operation from
+ * fixing a number that was typed wrong.
+ *
+ * `undefined` leaves a field alone and `null` clears it, which is why the
+ * nullable ones are spelled out rather than being `Partial<Session>`: a
+ * cash-out of null is a session put back to running, and that has to be
+ * sayable.
+ */
+export interface EditSessionInput {
+  venueId?: string;
+  gameType?: GameType;
+  stakes?: Stakes | null;
+  currency?: string;
+  buyIn?: number;
+  fee?: number | null;
+  cashOut?: number | null;
+  entrants?: number | null;
+  finishPosition?: number | null;
+  startedAt?: number;
+  endedAt?: number | null;
+}
+
 /** What a tournament knows at the end that a cash game does not. */
 export interface EndSessionResult {
   entrants?: number | null;
   finishPosition?: number | null;
+  /**
+   * When the session actually finished, when that is not now.
+   *
+   * For the session somebody forgot to cash out. `Date.now()` is right for a
+   * player racking up at the table with the app open, and wrong for the one
+   * who drove home, slept, and remembered the next morning -- and the gap goes
+   * straight into the hourly rate and into the win-rate estimate, both of
+   * which divide by hours played.
+   */
+  endedAt?: number;
 }
 
 /** What an import did, for the message the screen shows afterwards. */
@@ -144,6 +182,7 @@ interface LogState {
     result?: EndSessionResult,
   ) => Promise<void>;
   updateSessionNotes: (sessionId: string, notes: string | null) => Promise<void>;
+  editSession: (sessionId: string, patch: EditSessionInput) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
 
   importSessions: (sessions: readonly ImportedSession[]) => Promise<ImportSummary>;
@@ -391,7 +430,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   endSession: async (sessionId, cashOut, mood, result) => {
     const repository = await getRepository();
-    const endedAt = Date.now();
+    const endedAt = result?.endedAt ?? Date.now();
     await repository.endSession(sessionId, cashOut, endedAt);
     // A second write rather than a wider `endSession`: cashing out is the same
     // operation for both formats, and only a tournament has anywhere it came.
@@ -412,6 +451,20 @@ export const useLogStore = create<LogState>((set, get) => ({
     const repository = await getRepository();
     await repository.updateSession(sessionId, { notes });
     await get().refresh(['sessions']);
+  },
+
+  /**
+   * Correct a session that was logged wrong.
+   *
+   * Only what the caller named: the screen sends the fields it owns, and a
+   * field left out keeps whatever is stored. Venues are reloaded as well as
+   * sessions, because moving a session to another room changes the
+   * `sessionCount` on both of them and that number is derived at read time.
+   */
+  editSession: async (sessionId, patch) => {
+    const repository = await getRepository();
+    await repository.updateSession(sessionId, patch);
+    await get().refresh(['sessions', 'venues']);
   },
 
   deleteSession: async (sessionId) => {

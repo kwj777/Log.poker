@@ -140,6 +140,18 @@ export default function SessionDetailScreen() {
           leading={<Ionicons name="chevron-back" size={16} color={colors.textSecondary} />}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/history'))}
         />
+        {/*
+          Beside the way out rather than down beside Delete, because they are
+          not the same kind of action and a mistyped cash-out should not lead
+          anybody past a destructive button to fix it.
+        */}
+        <Button
+          label="Edit"
+          variant="ghost"
+          size="small"
+          leading={<Ionicons name="create-outline" size={16} color={colors.textSecondary} />}
+          onPress={() => router.push(`/session/edit?id=${session.id}`)}
+        />
       </View>
 
       <View style={styles.header}>
@@ -311,8 +323,10 @@ export default function SessionDetailScreen() {
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: spacing.md,
-    marginLeft: -spacing.md,
+    marginHorizontal: -spacing.md,
   },
   header: {
     paddingTop: spacing.md,

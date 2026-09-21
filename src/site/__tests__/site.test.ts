@@ -24,6 +24,15 @@ const functions = ['signin.mts', 'sync.mts', 'signin-sweep.mts', 'chip-scan.mjs'
   .map((name) => read('netlify', 'functions', name))
   .join('\n');
 const manifest = JSON.parse(read('public', 'manifest.webmanifest'));
+
+/**
+ * The two characters house style bans, built rather than written out.
+ *
+ * `check-prose.mjs` exempts itself because it has to name what it bans; this
+ * file would rather stay checked, and an en dash and an em dash assembled from
+ * their code points are the same test with nothing for the checker to find.
+ */
+const DASHES = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
 const buildScript = read('scripts', 'build-web.mjs');
 
 /**
@@ -243,6 +252,30 @@ describe('the installed app is the app', () => {
 
   it('and so is every shortcut', () => {
     for (const shortcut of manifest.shortcuts) expect(shortcut.url).toMatch(/^\/app\//);
+  });
+
+  it('and the name a browser draws keeps house style, escapes and all', () => {
+    // `check-prose.mjs` ran its dash rule over raw lines, and JSON is the one
+    // tracked format that writes a character as a six-character escape. So the
+    // manifest name reported clean while the install dialog, and Android's app
+    // info, drew an em dash. The checker decodes now; this reads the strings
+    // from the other side, after parsing, because they are the copy that rule
+    // is most for and the least likely to be looked at again.
+    for (const text of [manifest.name, manifest.short_name, manifest.description]) {
+      expect(text).not.toMatch(DASHES);
+    }
+    for (const shortcut of manifest.shortcuts) {
+      expect(`${shortcut.name} ${shortcut.short_name}`).not.toMatch(DASHES);
+    }
+  });
+
+  it('and the checker reads an escape as the character it is', () => {
+    // The hole itself, rather than only the one file that fell through it. A
+    // rule blind to an encoding is a rule with a way around it, so what is
+    // pinned is the decode rather than this one manifest line.
+    const checker = read('scripts', 'check-prose.mjs');
+    expect(checker).toContain('const line = decoded(raw);');
+    expect(checker).toContain('String.fromCharCode(parseInt(hex, 16))');
   });
 });
 

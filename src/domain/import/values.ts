@@ -324,8 +324,29 @@ export const cashOutNamesAPrize = (header: string): boolean =>
 
 // ------------------------------------------------------------------- stakes
 
-const STAKES_PAIR = /(\d[\d.,]*)\s*\/\s*[$€£¥₹\s]*(\d[\d.,]*)/;
-const ANTE = /(?:ante|straddle|bring[- ]?in)\D{0,3}(\d[\d.,]*)/i;
+/**
+ * An amount, which may open on its own decimal separator.
+ *
+ * `.50` is how half a dollar is written on half the sites there are, and a
+ * group that has to start on a digit steps over the point and captures `50` --
+ * which `parseMoney` reads as fifty dollars. `$.50/$1` came out as `$50/$1`
+ * and `.5/1` as `$5/$1`, stored, displayed and keyed that way, with no warning
+ * anywhere: the importer complains about a stakes cell it could not read, and
+ * this one read.
+ *
+ * The asymmetry is what hid it. `$.25/$.50`, with both blinds dotted, fails
+ * the second group as well and comes back null, so it warns. It is the mixed
+ * form that people actually write which misread.
+ */
+const AMOUNT = String.raw`(?:\d|[.,]\d)[\d.,]*`;
+
+const STAKES_PAIR = new RegExp(String.raw`(${AMOUNT})\s*/\s*[$€£¥₹\s]*(${AMOUNT})`);
+// `[^\d.,]` rather than `\D` for the gap, so a greedy run of non-digits cannot
+// swallow the point that belongs to the amount after it.
+const ANTE = new RegExp(
+  String.raw`(?:ante|straddle|bring[- ]?in)[^\d.,]{0,3}(${AMOUNT})`,
+  'i',
+);
 
 /**
  * Read a stakes cell: `$0.25/$0.50`, `1/2`, `0,25/0,50`, `50/100 ante 12`.
@@ -346,6 +367,12 @@ export const parseStakes = (input: string): Stakes | null => {
   const bigBlind = parseMoney(pair[2]);
   if (smallBlind === null || bigBlind === null) return null;
   if (smallBlind.cents <= 0 || bigBlind.cents <= 0) return null;
+  // A small blind above the big blind is not a game anybody plays, so whatever
+  // produced it was a misread rather than a stake. Refusing the pair sends it
+  // down the same path as a cell with no blinds in it, which the importer
+  // already warns about -- and it covers the class rather than the one shape
+  // above, since any future hole in the pattern lands here too.
+  if (smallBlind.cents > bigBlind.cents) return null;
 
   const anteMatch = ANTE.exec(text);
   const ante = anteMatch ? parseMoney(anteMatch[1]) : null;

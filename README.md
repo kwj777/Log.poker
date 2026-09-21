@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 94 passed
-Tests:       2127 passed
+Tests:       2129 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1152,6 +1152,7 @@ Tests:       2127 passed
   selectors          10   store reads and filters
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
+  settingsVenues      9   renaming a venue, and merging two that are one room
   varianceHands       9   the hand breakdown, and the sentence that must precede it
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
@@ -1162,7 +1163,6 @@ Tests:       2127 passed
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   settingsBankroll    7   entering what you had behind you before the log started
   settingsHelp        7   the privacy link, the support address, the build
-  settingsVenues      7   renaming a venue, and merging two that are one room
   venues              7   which spellings of a room name are the same room
   claimHandoff        6   what a hand-off link may do without asking
   readme              6   the test table adds up and says what each suite is for

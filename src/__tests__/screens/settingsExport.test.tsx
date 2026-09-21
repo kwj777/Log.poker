@@ -61,6 +61,9 @@ const mockRepository = {
 jest.mock('../../data', () => ({
   getRepository: async () => mockRepository,
   onSyncApplied: () => () => undefined,
+  // No syncing repository, so this device is signed out and the reset copy
+  // says the log does not come back.
+  getSyncingRepository: async () => null,
   STORAGE_ENGINE: 'SQLite',
 }));
 

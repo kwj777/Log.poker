@@ -270,6 +270,30 @@ export const ERASE_CONFIRM =
   'This deletes your account and the copy Log is holding for you, and signs this device out. It cannot be undone, and no device will put it back. The log on this device is untouched, and so is the one on every other device you have signed in on.';
 
 /**
+ * What clearing this device actually clears, which depends on whether it syncs.
+ *
+ * "This cannot be undone" was said either way, and on a signed-in device it is
+ * undone immediately and by the app itself: `SyncingRepository.clearAll`
+ * rewinds the cursors and starts a push of its own, so the sessions, hands,
+ * rebuys, mood entries and venues are back within a round. That is deliberate
+ * and documented -- reset means this device, not every device -- and the
+ * sentence in front of it said the opposite.
+ *
+ * The starting balance is the half the old wording left out, and it is the one
+ * thing the reset really does destroy for good: preferences are not in
+ * `SYNC_TABLES`, so nothing anywhere holds a copy to send back.
+ *
+ * Two strings rather than one with a clause bolted on, because they describe
+ * two different acts. On a device that does not sync this is the end of that
+ * log; on one that does it is closer to a reload.
+ */
+export const RESET_CONFIRM =
+  'Delete every session, hand, mood entry and venue on this device, and the starting balance with them. This cannot be undone.';
+
+export const RESET_CONFIRM_SYNCING =
+  'Delete every session, hand, mood entry and venue on this device. They come back from the server the next time this device syncs, which is straight away: sign out first if you want them off this device. Your starting balance does not sync, so that one goes for good.';
+
+/**
  * The label on the button, which is a separate string for a separate reason.
  *
  * Everything above is written for the person holding the phone. This one is

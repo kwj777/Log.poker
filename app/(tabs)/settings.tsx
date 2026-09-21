@@ -26,7 +26,7 @@
  * section that never draws is a section whose report is never seen missing.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
@@ -38,7 +38,7 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { Text } from '../../src/components/Text';
 import { ALLOW_DEMO_SEED, ALLOW_SIGN_IN, PRIVACY_POLICY, SUPPORT_EMAIL } from '../../src/config';
-import { getRepository, STORAGE_ENGINE } from '../../src/data';
+import { getRepository, getSyncingRepository, STORAGE_ENGINE } from '../../src/data';
 import { toCsvFile } from '../../src/domain/export/csv';
 import {
   HAND_HEADERS,
@@ -54,6 +54,7 @@ import { saveCsv } from '../../src/features/export/saveCsv';
 import { formatMoney, fromCents, parseAmount } from '../../src/domain/money';
 import { primaryCurrency } from '../../src/domain/stats';
 import { DEMO_SESSION_COUNT, seedDemoData } from '../../src/data/seed';
+import { RESET_CONFIRM, RESET_CONFIRM_SYNCING } from '../../src/features/account/copy';
 import { SignInCard } from '../../src/features/account/SignInCard';
 import { VenueRow } from '../../src/features/venues/VenueRow';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
@@ -111,6 +112,19 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  /**
+   * Whether this device syncs, which decides what a reset means.
+   *
+   * Read once, like the session the sign-in card reads: the only thing in the
+   * app that can change it is that card, on this screen. Null until the answer
+   * arrives, and the copy treats not-yet-known as not-syncing -- the stricter
+   * of the two sentences, which is the right way round for a warning.
+   */
+  const [syncs, setSyncs] = useState(false);
+
+  useEffect(() => {
+    void getSyncingRepository().then((repository) => setSyncs(repository !== null));
+  }, []);
 
   const say = (section: ReportSection, text: string, failed = false) =>
     setReport({ section, text, failed });
@@ -476,8 +490,7 @@ export default function SettingsScreen() {
         {confirmingReset ? (
           <>
             <Text color={colors.textSecondary} style={styles.body}>
-              Delete every session, hand, mood entry and venue on this device. This cannot
-              be undone.
+              {syncs ? RESET_CONFIRM_SYNCING : RESET_CONFIRM}
             </Text>
             <View style={styles.confirmActions}>
               <Button

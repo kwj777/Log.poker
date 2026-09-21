@@ -22,6 +22,9 @@ import { useLogStore } from '../../store/useLogStore';
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
+/** Null when this device does not sync, which decides what a reset means. */
+const mockSyncing: { repository: object | null } = { repository: null };
+
 jest.mock('../../config', () => ({
   ...jest.requireActual('../../config'),
   ALLOW_DEMO_SEED: false,
@@ -37,6 +40,7 @@ jest.mock('../../features/export/saveCsv', () => ({
 jest.mock('../../data', () => ({
   getRepository: async () => ({}),
   onSyncApplied: () => () => undefined,
+  getSyncingRepository: async () => mockSyncing.repository,
   STORAGE_ENGINE: 'SQLite',
 }));
 
@@ -155,5 +159,45 @@ describe('merging one venue into another', () => {
     load([venue('v1', 'Aria', 4)]);
     await openEditor('Aria');
     expect(screen.queryByText('Or fold this room into another one:')).toBeNull();
+  });
+});
+
+/**
+ * What a reset says it does, which is not the same on both kinds of device.
+ *
+ * "This cannot be undone" was said either way, and on a signed-in device it is
+ * undone immediately and by the app itself: `SyncingRepository.clearAll`
+ * rewinds the cursors and starts a push of its own, so the log is back within a
+ * round. That is deliberate -- reset means this device, not every device -- and
+ * the sentence in front of it said the opposite.
+ *
+ * The starting balance is the half both wordings left out, and it is the one
+ * thing a reset really does destroy for good: preferences are not in
+ * `SYNC_TABLES`, so nothing anywhere holds a copy to send back.
+ */
+describe('what clearing this device says it clears', () => {
+  beforeEach(() => {
+    mockSyncing.repository = null;
+  });
+
+  it('on a device that does not sync, says it cannot be undone, and names the balance', async () => {
+    load([]);
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Clear all data'));
+
+    expect(screen.getByText(/cannot be undone/)).toBeTruthy();
+    expect(screen.getByText(/starting balance/)).toBeTruthy();
+  });
+
+  it('and on one that does, says the log comes back and only the balance does not', async () => {
+    mockSyncing.repository = {};
+    load([]);
+    await renderScreen(<SettingsScreen />);
+    await userEvent.press(screen.getByText('Clear all data'));
+
+    expect(screen.getByText(/come back from the server/)).toBeTruthy();
+    expect(screen.getByText(/starting balance does not sync/)).toBeTruthy();
+    // The claim that was false on this device.
+    expect(screen.queryByText(/cannot be undone/)).toBeNull();
   });
 });

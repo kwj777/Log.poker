@@ -26,11 +26,37 @@ interface StakesPickerProps {
   currency?: string;
 }
 
+/** A blind as the field holding it would read. */
+const asField = (cents: number): string => String(cents / 100);
+
 export const StakesPicker = ({ value, onChange, currency }: StakesPickerProps) => {
   const matchesPreset = STAKES_PRESETS.some((preset) => stakesEqual(preset, value));
   const [custom, setCustom] = useState(!matchesPreset);
-  const [small, setSmall] = useState(String(value.smallBlind / 100));
-  const [big, setBig] = useState(String(value.bigBlind / 100));
+  /**
+   * The two fields, seeded once and then kept in step with the chips.
+   *
+   * They have to be their own state, because half-typed input is the point: a
+   * field reading "1." is not stakes and `commit` refuses to store it, which
+   * is what stops a keystroke briefly writing $1/$0. What they must not do is
+   * drift from what is stored, and they did: neither chip touched them, so
+   * tapping a preset left them holding the blinds they had before it, and
+   * tapping Custom put those stale numbers back on screen over stakes that
+   * were something else entirely.
+   *
+   * Then it got worse on the next keystroke, because each field commits itself
+   * alongside the other one's current text. Correcting only the big blind
+   * wrote the stale small blind back into the session with it, so a player
+   * going from the $1/$2 chip to a custom $1/$10 saved $3/$10, with both
+   * numbers on screen looking right.
+   */
+  const [small, setSmall] = useState(asField(value.smallBlind));
+  const [big, setBig] = useState(asField(value.bigBlind));
+
+  /** Put the fields where the stakes are, whenever a chip moves the stakes. */
+  const fill = (stakes: { smallBlind: number; bigBlind: number }) => {
+    setSmall(asField(stakes.smallBlind));
+    setBig(asField(stakes.bigBlind));
+  };
 
   const commit = (nextSmall: string, nextBig: string) => {
     const smallBlind = parseAmount(nextSmall);
@@ -51,11 +77,19 @@ export const StakesPicker = ({ value, onChange, currency }: StakesPickerProps) =
             selected={!custom && stakesEqual(preset, value)}
             onPress={() => {
               setCustom(false);
+              fill(preset);
               onChange({ ...preset });
             }}
           />
         ))}
-        <Chip label="Custom" selected={custom} onPress={() => setCustom(true)} />
+        <Chip
+          label="Custom"
+          selected={custom}
+          onPress={() => {
+            fill(value);
+            setCustom(true);
+          }}
+        />
       </View>
 
       {custom ? (

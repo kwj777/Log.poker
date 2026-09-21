@@ -415,13 +415,26 @@ export default function DashboardScreen() {
           // Read instead of the drawing. The figure is the one above it; what
           // this adds is the shape, which is the only thing a curve says that
           // the headline does not.
+          //
+          // The curve's own last point, not `summary.net`: with a starting
+          // balance set they are different numbers, and this one is the only
+          // thing a screen reader is given in place of the line. It said
+          // "ending at +$300" under a headline reading "Bankroll $5,300", and
+          // the line really does end at 5,300.
           label={`Bankroll over ${summary.sessionCount} session${
             summary.sessionCount === 1 ? '' : 's'
-          }, ending at ${formatMoney(summary.net, { currency, signed: true })}.`}
+          }, ending at ${formatMoney(curve[curve.length - 1]?.cumulative ?? summary.net, {
+            currency,
+            signed: balance === null,
+          })}.`}
         />
         <View style={styles.chartAxis}>
           <Text variant="caption" color={colors.textTertiary}>
-            {curve.length > 0 ? formatMoneyCompact(0, currency) : ''}
+            {/* Where the line starts, which is the starting balance and not
+                always zero. Hard-coded, it put $0 under the left end of a
+                curve based at $5,000 while the caption at the other end read
+                $5.3k: two captions on one axis, disagreeing. */}
+            {curve.length > 0 ? formatMoneyCompact(balance ?? 0, currency) : ''}
           </Text>
           <Text variant="caption" color={colors.textTertiary}>
             {curve.length > 0

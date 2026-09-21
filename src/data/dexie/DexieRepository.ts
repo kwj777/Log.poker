@@ -1,7 +1,7 @@
 /**
  * IndexedDB-backed repository -- the web implementation.
  *
- * Behaviourally identical to `SqlRepository`; the shared conformance suite in
+ * Behaviorally identical to `SqlRepository`; the shared conformance suite in
  * `src/data/__tests__/repositoryContract.ts` runs against both to keep it that way.
  */
 

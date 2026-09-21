@@ -3,7 +3,7 @@
  *
  * Deliberately subtle: an inline card, never a modal, never a notification, and
  * it appears at most once per session after two hours of play. The brief is
- * "subtle prompt" and the reason is behavioural -- a check-in that interrupts a
+ * "subtle prompt" and the reason is behavioral -- a check-in that interrupts a
  * hand is one the player learns to dismiss, and a dismissed prompt collects no
  * data and defuses no tilt.
  *

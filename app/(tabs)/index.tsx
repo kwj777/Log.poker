@@ -23,7 +23,7 @@ import { Text } from '../../src/components/Text';
 import { BarBreakdown } from '../../src/components/chart/BarBreakdown';
 import { LineChart } from '../../src/components/chart/LineChart';
 import { GUIDES } from '../../src/config';
-import { formatMoney, formatMoneyCompact } from '../../src/domain/money';
+import { currencyLabel, formatMoney, formatMoneyCompact } from '../../src/domain/money';
 import {
   bankrollCurve,
   byBuyIn,
@@ -32,19 +32,17 @@ import {
   byStakes,
   byVenue,
   cashWinRate,
+  currenciesUsed,
   formatDuration,
+  inCurrency,
   totals,
 } from '../../src/domain/stats';
-import {
-  bootstrapRoi,
-  formatRoi,
-  toEntryResults,
-  tournamentTotals,
-} from '../../src/domain/tournaments';
+import { formatRoi, tournamentTotals } from '../../src/domain/tournaments';
 import { openHandOff } from '../../src/features/family/hooks';
 import { ReviewFlagged } from '../../src/features/family/ReviewFlagged';
 import { reviewPrompt } from '../../src/features/family/reviewPrompt';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
+import { useEntryResults, useRoiInterval } from '../../src/features/sessions/useRoiInterval';
 import { useElapsed } from '../../src/features/sessions/LiveTimer';
 import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
@@ -53,15 +51,44 @@ import { APP_DESCRIPTION, PageMeta } from '../../src/components/PageMeta';
 type Breakdown = 'stakes' | 'buyIn' | 'format' | 'venue' | 'game';
 
 export default function DashboardScreen() {
-  const sessions = useLogStore((state) => state.sessions);
+  const all = useLogStore((state) => state.sessions);
   const venues = useLogStore((state) => state.venues);
   const activeSession = useLogStore((state) => state.activeSession);
   const [breakdown, setBreakdown] = useState<Breakdown>('stakes');
+  const [picked, setPicked] = useState<string | null>(null);
+
+  /**
+   * Everything on this screen is in one currency, and says which.
+   *
+   * A bankroll is a sum, and a sum of euros and dollars is neither. The log
+   * stores a currency per session and nothing above it was reading the field,
+   * so a player who flew to a EPT stop came home to a dashboard that had added
+   * their euro results to their dollar ones and drawn a dollar sign in front
+   * of the answer.
+   *
+   * Scoped rather than converted, deliberately: converting needs a rate, a
+   * rate needs a date and a source, and a bankroll that quietly moves because
+   * the pound did is not what anybody is asking this screen for. So the
+   * numbers stay in the money they were won in, and a player with two
+   * currencies gets a chip to say which one they are looking at.
+   */
+  const currencies = useMemo(() => currenciesUsed(all), [all]);
+  const currency = picked !== null && currencies.includes(picked) ? picked : currencies[0] ?? 'USD';
+  const sessions = useMemo(
+    () => (currencies.length > 1 ? inCurrency(all, currency) : all),
+    [all, currencies.length, currency],
+  );
 
   const summary = useMemo(() => totals(sessions), [sessions]);
   const winRate = useMemo(() => cashWinRate(sessions), [sessions]);
   const tourneys = useMemo(() => tournamentTotals(sessions), [sessions]);
-  const roiInterval = useMemo(() => bootstrapRoi(toEntryResults(sessions)), [sessions]);
+  /**
+   * Keyed on the entries rather than on `sessions`, which the store replaces
+   * on every write and every sync. See `useRoiInterval`: this used to resample
+   * the whole entry list after a rebuy.
+   */
+  const entries = useEntryResults(sessions);
+  const roiInterval = useRoiInterval(entries);
   const curve = useMemo(() => bankrollCurve(sessions), [sessions]);
 
   /**
@@ -118,7 +145,7 @@ export default function DashboardScreen() {
     const tiles: StatTileProps[] = [
       {
         label: 'Hourly',
-        value: summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true }),
+        value: summary.hourly === null ? '--' : formatMoney(summary.hourly, { currency, signed: true }),
         valueColor: resultColor(summary.hourly),
         hint: 'all sessions',
       },
@@ -155,13 +182,13 @@ export default function DashboardScreen() {
     tiles.push(
       {
         label: 'Best session',
-        value: summary.biggestWin === null ? '--' : formatMoney(summary.biggestWin, { signed: true }),
+        value: summary.biggestWin === null ? '--' : formatMoney(summary.biggestWin, { currency, signed: true }),
         valueColor: resultColor(summary.biggestWin),
       },
       {
         label: 'Worst session',
         value:
-          summary.biggestLoss === null ? '--' : formatMoney(summary.biggestLoss, { signed: true }),
+          summary.biggestLoss === null ? '--' : formatMoney(summary.biggestLoss, { currency, signed: true }),
         valueColor: resultColor(summary.biggestLoss),
       },
     );
@@ -169,7 +196,7 @@ export default function DashboardScreen() {
     return Array.from({ length: Math.ceil(tiles.length / 2) }, (_, index) =>
       tiles.slice(index * 2, index * 2 + 2),
     );
-  }, [summary, winRate, tourneys, roiInterval]);
+  }, [summary, winRate, tourneys, roiInterval, currency]);
 
   const recent = useMemo(
     () => sessions.filter((session) => session.endedAt !== null).slice(0, 5),
@@ -221,7 +248,7 @@ export default function DashboardScreen() {
     [curve, summary.net],
   );
 
-  if (sessions.length === 0) {
+  if (all.length === 0) {
     return (
       <Screen>
         <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
@@ -255,12 +282,28 @@ export default function DashboardScreen() {
       }
     >
       <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
+      {/*
+        Only when there is a choice to make. One currency is every player this
+        app has had until now, and a row of chips offering it to them would be
+        a control with one button on it.
+      */}
+      {currencies.length > 1 ? (
+        <View style={styles.currencyRow}>
+          <ChipGroup
+            options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
+            value={currency}
+            onChange={setPicked}
+            scroll
+          />
+        </View>
+      ) : null}
+
       <View style={styles.brandHeader}>
         <Text variant="overline" color={colors.textTertiary}>
           Bankroll
         </Text>
         <Text variant="display" color={resultColor(summary.net)}>
-          {formatMoney(summary.net, { signed: true })}
+          {formatMoney(summary.net, { currency, signed: true })}
         </Text>
         <Text color={colors.textSecondary}>
           {summary.sessionCount} session{summary.sessionCount === 1 ? '' : 's'} ·{' '}
@@ -277,14 +320,23 @@ export default function DashboardScreen() {
       <ReviewFlagged prompt={prompt} />
 
       <Card style={styles.chartCard}>
-        <LineChart series={chartSeries} height={170} />
+        <LineChart
+          series={chartSeries}
+          height={170}
+          // Read instead of the drawing. The figure is the one above it; what
+          // this adds is the shape, which is the only thing a curve says that
+          // the headline does not.
+          label={`Bankroll over ${summary.sessionCount} session${
+            summary.sessionCount === 1 ? '' : 's'
+          }, ending at ${formatMoney(summary.net, { currency, signed: true })}.`}
+        />
         <View style={styles.chartAxis}>
           <Text variant="caption" color={colors.textTertiary}>
-            {curve.length > 0 ? formatMoneyCompact(0) : ''}
+            {curve.length > 0 ? formatMoneyCompact(0, currency) : ''}
           </Text>
           <Text variant="caption" color={colors.textTertiary}>
             {curve.length > 0
-              ? formatMoneyCompact(curve[curve.length - 1].cumulative)
+              ? formatMoneyCompact(curve[curve.length - 1].cumulative, currency)
               : ''}
           </Text>
         </View>
@@ -327,7 +379,7 @@ export default function DashboardScreen() {
         }
       />
       <Card>
-        <BarBreakdown groups={groups} />
+        <BarBreakdown groups={groups} currency={currency} />
       </Card>
 
       <SectionHeader title="Recent sessions" />
@@ -360,6 +412,11 @@ const styles = StyleSheet.create({
   brandHeader: {
     paddingTop: spacing.xl,
     gap: spacing.xs,
+  },
+  currencyRow: {
+    paddingTop: spacing.xl,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   chartCard: {
     marginTop: spacing.lg,

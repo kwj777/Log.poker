@@ -4,7 +4,7 @@
  * every number on screen is reproducible in a unit test.
  */
 
-import { formatEntry, formatStakes, stakesKey } from './money';
+import { DEFAULT_CURRENCY, formatEntry, formatStakes, stakesKey } from './money';
 import {
   SESSION_FORMAT_LABELS,
   type Cents,
@@ -13,6 +13,7 @@ import {
   type Session,
   type SessionWithChildren,
   type Stakes,
+  type Timestamp,
   type Venue,
 } from './types';
 
@@ -95,6 +96,49 @@ export const summarize = (
     hourly: net !== null && hours > 0 ? Math.round(net / hours) : null,
   };
 };
+
+/**
+ * Every currency the log has money in, commonest first.
+ *
+ * Log stores a currency per session, because a session has exactly one and a
+ * player who flies to a EPT stop has two. Nothing above this ever asked which
+ * ones were in play, so `totals` added euros to dollars and the dashboard
+ * printed the sum with a dollar sign in front of it.
+ *
+ * Ties go to the more recent, which is the one a player is likelier to be
+ * thinking in: somebody who has moved to London and has three hundred dollar
+ * sessions behind them and three hundred pound ones is now a pound player.
+ */
+export const currenciesUsed = (sessions: readonly SessionWithChildren[]): string[] => {
+  const seen = new Map<string, { count: number; latest: Timestamp }>();
+  for (const session of sessions) {
+    const held = seen.get(session.currency);
+    if (held === undefined) {
+      seen.set(session.currency, { count: 1, latest: session.startedAt });
+    } else {
+      held.count += 1;
+      held.latest = Math.max(held.latest, session.startedAt);
+    }
+  }
+  return [...seen.entries()]
+    .sort((a, b) => b[1].count - a[1].count || b[1].latest - a[1].latest)
+    .map(([currency]) => currency);
+};
+
+/**
+ * The currency a total should be read in, and the one the screens scope to.
+ *
+ * Falls back to the default with nothing logged, because a screen with no
+ * sessions still has to put a symbol in front of a zero.
+ */
+export const primaryCurrency = (sessions: readonly SessionWithChildren[]): string =>
+  currenciesUsed(sessions)[0] ?? DEFAULT_CURRENCY;
+
+/** Only the sessions whose money is in `currency`. */
+export const inCurrency = (
+  sessions: readonly SessionWithChildren[],
+  currency: string,
+): SessionWithChildren[] => sessions.filter((session) => session.currency === currency);
 
 export interface Totals {
   sessionCount: number;

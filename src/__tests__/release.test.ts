@@ -10,7 +10,7 @@
  * What is asserted is only the part an app store refuses a build over. Taste
  * lives in the files; this is the floor under them.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -120,6 +120,20 @@ describe('the dependencies a native build needs and a web build does not', () =>
       'package.json',
     );
     expect(router.peerDependencies['expo-linking']).toBeDefined();
+  });
+});
+
+describe('the links the app has told the operating system it answers', () => {
+  it('declares a scheme, which is what makes a logpoker:// link reach the app', () => {
+    expect(app.scheme).toBe('logpoker');
+  });
+
+  it('and has somewhere for a link that names nothing to land', () => {
+    // Without this file the framework's own unmatched screen answers -- a
+    // debugging aid in its default styling, saying "Unmatched Route" to
+    // somebody who tapped a link a friend sent them. The scheme means any
+    // `logpoker://` URL at all arrives here, whether or not it is one of ours.
+    expect(existsSync(join(ROOT, 'app', '+not-found.tsx'))).toBe(true);
   });
 });
 

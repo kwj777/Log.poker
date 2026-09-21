@@ -17,9 +17,15 @@ import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
-import { formatMoney } from '../../src/domain/money';
-import { totals } from '../../src/domain/stats';
-import { GAME_TYPES, type GameType } from '../../src/domain/types';
+import { currencyLabel, formatMoney } from '../../src/domain/money';
+import { currenciesUsed, inCurrency, totals } from '../../src/domain/stats';
+import {
+  GAME_TYPES,
+  SESSION_FORMATS,
+  SESSION_FORMAT_LABELS,
+  type GameType,
+  type SessionFormat,
+} from '../../src/domain/types';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { filterSessions, useLogStore } from '../../src/store/useLogStore';
 import { colors, radius, resultColor, spacing } from '../../src/theme';
@@ -39,15 +45,48 @@ const GAME_OPTIONS = [
   ...GAME_TYPES.map((value) => ({ value, label: value === 'OTHER' ? 'Other' : value })),
 ];
 
+/**
+ * Cash or tournament, which the rest of the app treats as two different games
+ * and this screen could not tell apart.
+ *
+ * It matters more than the game-type filter beside it: the totals strip above
+ * the list pools a tournament's result with a cash game's, and "how do I
+ * actually run in the Tuesday tournament" was the one question two taps could
+ * not answer. `SESSION_FORMAT_LABELS` rather than the bare values, because
+ * "cash" as a chip beside "NLHE" reads like a stake.
+ */
+const FORMAT_OPTIONS = [
+  { value: null, label: 'All formats' },
+  ...SESSION_FORMATS.map((value) => ({ value, label: SESSION_FORMAT_LABELS[value] })),
+];
+
 const DAY = 86_400_000;
 
 export default function HistoryScreen() {
-  const sessions = useLogStore((state) => state.sessions);
+  const all = useLogStore((state) => state.sessions);
   const venues = useLogStore((state) => state.venues);
 
   const [period, setPeriod] = useState<Period>('all');
   const [gameType, setGameType] = useState<GameType | null>(null);
+  const [format, setFormat] = useState<SessionFormat | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  /**
+   * The totals strip is a sum, so it has to be a sum of one currency.
+   *
+   * Same reasoning as the dashboard's: a log with a trip abroad in it was
+   * adding euros to dollars and printing the answer with a dollar sign. The
+   * list itself shows every session in the money it was played for, because a
+   * row is one session and a session knows its own currency; it is only the
+   * three tiles above it that had to pick.
+   */
+  const currencies = useMemo(() => currenciesUsed(all), [all]);
+  const currency = picked !== null && currencies.includes(picked) ? picked : currencies[0] ?? 'USD';
+  const sessions = useMemo(
+    () => (currencies.length > 1 ? inCurrency(all, currency) : all),
+    [all, currencies.length, currency],
+  );
 
   /**
    * The clock is read once, on mount, rather than during render: a "last 30
@@ -69,12 +108,30 @@ export default function HistoryScreen() {
     return filterSessions(sessions, {
       ...(from === undefined ? {} : { from }),
       ...(gameType === null ? {} : { gameType }),
+      ...(format === null ? {} : { format }),
       ...(venueId === null ? {} : { venueId }),
     });
-  }, [sessions, period, gameType, venueId, openedAt]);
+  }, [sessions, period, gameType, format, venueId, openedAt]);
 
   const summary = useMemo(() => totals(filtered), [filtered]);
-  const filtersActive = period !== 'all' || gameType !== null || venueId !== null;
+  const filtersActive =
+    period !== 'all' || gameType !== null || format !== null || venueId !== null;
+
+  /**
+   * The format row is offered only to somebody who plays both, for the reason
+   * the dashboard offers its own format breakdown conditionally: a chip that
+   * can only ever filter to everything or to nothing is a chip in the way.
+   */
+  const mixedFormats = useMemo(() => {
+    let cash = false;
+    let tournament = false;
+    for (const session of sessions) {
+      if (session.format === 'cash') cash = true;
+      else tournament = true;
+      if (cash && tournament) return true;
+    }
+    return false;
+  }, [sessions]);
 
   const last = filtered.length - 1;
 
@@ -90,25 +147,50 @@ export default function HistoryScreen() {
     <>
       <View style={styles.header}>
         <Text variant="title">Sessions</Text>
+        {/*
+          Where somebody notices a night is missing, which is why the way to
+          add one belongs here rather than only behind "Start a session".
+        */}
+        <Button
+          label="Add a past session"
+          variant="ghost"
+          size="small"
+          onPress={() => router.push('/session/past')}
+        />
       </View>
 
       <View style={styles.filters}>
         <ChipGroup options={PERIOD_OPTIONS} value={period} onChange={setPeriod} scroll />
         <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} scroll />
+        {mixedFormats ? (
+          <ChipGroup options={FORMAT_OPTIONS} value={format} onChange={setFormat} scroll />
+        ) : null}
         {venues.length > 1 ? (
           <ChipGroup options={venueOptions} value={venueId} onChange={setVenueId} scroll />
+        ) : null}
+        {currencies.length > 1 ? (
+          <ChipGroup
+            options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
+            value={currency}
+            onChange={setPicked}
+            scroll
+          />
         ) : null}
       </View>
 
       <View style={styles.tiles}>
         <StatTile
           label="Profit"
-          value={formatMoney(summary.net, { signed: true })}
+          value={formatMoney(summary.net, { currency, signed: true })}
           valueColor={resultColor(summary.net)}
         />
         <StatTile
           label="Hourly"
-          value={summary.hourly === null ? '--' : formatMoney(summary.hourly, { signed: true })}
+          value={
+            summary.hourly === null
+              ? '--'
+              : formatMoney(summary.hourly, { currency, signed: true })
+          }
           valueColor={resultColor(summary.hourly)}
         />
         <StatTile label="Hours" value={String(Math.round(summary.hours))} />
@@ -125,6 +207,7 @@ export default function HistoryScreen() {
               onPress={() => {
                 setPeriod('all');
                 setGameType(null);
+                setFormat(null);
                 setVenueId(null);
               }}
             />
@@ -153,14 +236,14 @@ export default function HistoryScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           <EmptyState
-            title={sessions.length === 0 ? 'Nothing logged yet' : 'No sessions match'}
+            title={all.length === 0 ? 'Nothing logged yet' : 'No sessions match'}
             body={
-              sessions.length === 0
+              all.length === 0
                 ? 'Your sessions will appear here once you log one.'
                 : 'Try widening the filters, or go play some poker.'
             }
             action={
-              sessions.length === 0 ? (
+              all.length === 0 ? (
                 <Button label="Start a session" onPress={() => router.push('/session/new')} />
               ) : undefined
             }
@@ -190,8 +273,14 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: spacing.xl,
     marginBottom: spacing.lg,
+    // The ghost button carries its own padding, so it is pulled back out to
+    // the edge the title sits on.
+    marginRight: -spacing.md,
   },
   filters: {
     gap: spacing.sm,

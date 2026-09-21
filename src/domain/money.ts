@@ -15,6 +15,34 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   AUD: '$',
 };
 
+/**
+ * The currencies a player can pick, in the order the picker offers them.
+ *
+ * The same five this file has always known how to draw. Until there was a
+ * picker they were reachable only by importing a file that named one, so a
+ * player in London installed Log and watched it put a dollar sign on every
+ * number they had ever won at a pound game.
+ *
+ * `currency` is a plain string on the record rather than a union of these,
+ * deliberately: an import reads whatever a file says, and a session that came
+ * in as CHF should keep saying CHF rather than being rewritten to the nearest
+ * thing this list has. `currencySymbol` already falls back to the code itself,
+ * so such a session reads "CHF 240" and is wrong about nothing.
+ */
+export const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'] as const;
+
+/**
+ * `$ USD`, for a chip narrow enough to sit five across.
+ *
+ * Both halves, because three of the five draw the same symbol: a row of chips
+ * reading $, EUR, GBP, $, $ would be asking somebody to guess which dollar is
+ * theirs.
+ */
+export const currencyLabel = (currency: string): string =>
+  CURRENCY_SYMBOLS[currency] === undefined
+    ? currency
+    : `${CURRENCY_SYMBOLS[currency]} ${currency}`;
+
 export const currencySymbol = (currency: string): string =>
   CURRENCY_SYMBOLS[currency] ?? `${currency} `;
 

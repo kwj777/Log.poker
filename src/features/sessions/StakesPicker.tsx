@@ -16,9 +16,17 @@ import { STAKES_PRESETS, stakesEqual } from './defaults';
 interface StakesPickerProps {
   value: Stakes;
   onChange: (stakes: Stakes) => void;
+  /**
+   * What the preset chips are priced in. Defaulted, because the blinds are the
+   * point of this control and most callers are in one currency -- but passed by
+   * the screens that let a player pick one, since a row of chips reading $1/$2
+   * on a session somebody has just marked as pounds is the picker contradicting
+   * the screen it sits on.
+   */
+  currency?: string;
 }
 
-export const StakesPicker = ({ value, onChange }: StakesPickerProps) => {
+export const StakesPicker = ({ value, onChange, currency }: StakesPickerProps) => {
   const matchesPreset = STAKES_PRESETS.some((preset) => stakesEqual(preset, value));
   const [custom, setCustom] = useState(!matchesPreset);
   const [small, setSmall] = useState(String(value.smallBlind / 100));
@@ -39,7 +47,7 @@ export const StakesPicker = ({ value, onChange }: StakesPickerProps) => {
         {STAKES_PRESETS.map((preset) => (
           <Chip
             key={formatStakes(preset)}
-            label={formatStakes(preset)}
+            label={formatStakes(preset, currency)}
             selected={!custom && stakesEqual(preset, value)}
             onPress={() => {
               setCustom(false);

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
+import { ErrorNote, describeFailure } from '../../src/components/ErrorNote';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
@@ -48,6 +49,17 @@ export default function SessionDetailScreen() {
   const deleteSession = useLogStore((state) => state.deleteSession);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  /**
+   * A write on this screen that did not work, said out loud.
+   *
+   * The live-session screens learned this the hard way -- see
+   * `__tests__/screens/writeFailures.test.tsx`, which exists because a write
+   * that failed silently reads as a write that worked. Both writes on this
+   * screen were still silent: the notes were fired off on blur and forgotten,
+   * and the delete navigated away before it knew whether it had happened.
+   */
+  const [failed, setFailed] = useState<string | null>(null);
 
   /**
    * The notes field is a draft seeded from the stored value. It is re-seeded
@@ -85,10 +97,36 @@ export default function SessionDetailScreen() {
   const elapsed = durationMs(session);
   const live = session.endedAt === null;
 
-  const saveNotes = () => {
+  /**
+   * Save on blur, and say so when it does not save.
+   *
+   * What the player typed stays in the draft either way, which is the whole
+   * reason this is worth catching: the text is still on screen looking saved,
+   * so without a word here the only thing that ever says otherwise is coming
+   * back to the session tomorrow and finding it empty.
+   */
+  const saveNotes = async () => {
     const trimmed = notes.trim();
     if (trimmed === (session.notes ?? '')) return;
-    void updateNotes(session.id, trimmed === '' ? null : trimmed);
+    setFailed(null);
+    try {
+      await updateNotes(session.id, trimmed === '' ? null : trimmed);
+    } catch (error) {
+      setFailed(describeFailure(error, 'Those notes could not be saved.'));
+    }
+  };
+
+  const remove = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setFailed(null);
+    try {
+      await deleteSession(session.id);
+      router.replace('/history');
+    } catch (error) {
+      setFailed(describeFailure(error, 'That session could not be deleted.'));
+      setDeleting(false);
+    }
   };
 
   return (
@@ -101,6 +139,18 @@ export default function SessionDetailScreen() {
           size="small"
           leading={<Ionicons name="chevron-back" size={16} color={colors.textSecondary} />}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/history'))}
+        />
+        {/*
+          Beside the way out rather than down beside Delete, because they are
+          not the same kind of action and a mistyped cash-out should not lead
+          anybody past a destructive button to fix it.
+        */}
+        <Button
+          label="Edit"
+          variant="ghost"
+          size="small"
+          leading={<Ionicons name="create-outline" size={16} color={colors.textSecondary} />}
+          onPress={() => router.push(`/session/edit?id=${session.id}`)}
         />
       </View>
 
@@ -208,7 +258,13 @@ export default function SessionDetailScreen() {
       ) : (
         <Card style={styles.handsCard}>
           {hands.map((hand) => (
-            <HandRow key={hand.id} hand={hand} currency={currency} showDrillLink />
+            <HandRow
+              key={hand.id}
+              hand={hand}
+              currency={currency}
+              showDrillLink
+              onPress={() => router.push(`/session/hand?id=${hand.id}`)}
+            />
           ))}
         </Card>
       )}
@@ -217,7 +273,7 @@ export default function SessionDetailScreen() {
       <TextInput
         value={notes}
         onChangeText={setNotes}
-        onBlur={saveNotes}
+        onBlur={() => void saveNotes()}
         placeholder="Anything worth remembering about this session"
         placeholderTextColor={colors.textTertiary}
         multiline
@@ -242,10 +298,11 @@ export default function SessionDetailScreen() {
                 label="Delete"
                 variant="danger"
                 size="small"
-                onPress={() => {
-                  void deleteSession(session.id);
-                  router.replace('/history');
-                }}
+                loading={deleting}
+                // Awaited before leaving. Navigating first meant a delete that
+                // threw put the player in History with the session still in
+                // it and nothing anywhere saying why.
+                onPress={() => void remove()}
               />
             </View>
           </View>
@@ -257,6 +314,7 @@ export default function SessionDetailScreen() {
             onPress={() => setConfirmingDelete(true)}
           />
         )}
+        <ErrorNote message={failed} />
       </View>
     </Screen>
   );
@@ -265,8 +323,10 @@ export default function SessionDetailScreen() {
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: spacing.md,
-    marginLeft: -spacing.md,
+    marginHorizontal: -spacing.md,
   },
   header: {
     paddingTop: spacing.md,

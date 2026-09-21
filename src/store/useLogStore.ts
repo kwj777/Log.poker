@@ -56,10 +56,73 @@ export interface StartSessionInput {
   mood?: MoodScore | null;
 }
 
+/**
+ * A session that was played before it was logged.
+ *
+ * Everything `StartSessionInput` takes plus the two things only a finished
+ * session has: how long it ran and what came back off the table. It is one
+ * input rather than a start followed by an end because it is one write -- see
+ * `logPastSession` for why that matters.
+ */
+export interface PastSessionInput {
+  venueId: string;
+  format?: SessionFormat;
+  gameType: GameType;
+  stakes?: Stakes | null;
+  currency?: string;
+  buyIn: number;
+  fee?: number | null;
+  /** When the player sat down. */
+  startedAt: number;
+  /** When they racked up. */
+  endedAt: number;
+  cashOut: number;
+  entrants?: number | null;
+  finishPosition?: number | null;
+}
+
+/**
+ * What a finished session can be corrected to.
+ *
+ * Every field the storage layer has always been able to patch except the
+ * format, which is left out on purpose: cash and tournament are different
+ * records, not a setting -- one has blinds and the other a fee, a field and a
+ * finish -- and turning one into the other is a different operation from
+ * fixing a number that was typed wrong.
+ *
+ * `undefined` leaves a field alone and `null` clears it, which is why the
+ * nullable ones are spelled out rather than being `Partial<Session>`: a
+ * cash-out of null is a session put back to running, and that has to be
+ * sayable.
+ */
+export interface EditSessionInput {
+  venueId?: string;
+  gameType?: GameType;
+  stakes?: Stakes | null;
+  currency?: string;
+  buyIn?: number;
+  fee?: number | null;
+  cashOut?: number | null;
+  entrants?: number | null;
+  finishPosition?: number | null;
+  startedAt?: number;
+  endedAt?: number | null;
+}
+
 /** What a tournament knows at the end that a cash game does not. */
 export interface EndSessionResult {
   entrants?: number | null;
   finishPosition?: number | null;
+  /**
+   * When the session actually finished, when that is not now.
+   *
+   * For the session somebody forgot to cash out. `Date.now()` is right for a
+   * player racking up at the table with the app open, and wrong for the one
+   * who drove home, slept, and remembered the next morning -- and the gap goes
+   * straight into the hourly rate and into the win-rate estimate, both of
+   * which divide by hours played.
+   */
+  endedAt?: number;
 }
 
 /** What an import did, for the message the screen shows afterwards. */
@@ -135,6 +198,7 @@ interface LogState {
   deleteVenue: (id: string) => Promise<void>;
 
   startSession: (input: StartSessionInput) => Promise<Session>;
+  logPastSession: (input: PastSessionInput) => Promise<Session>;
   addRebuy: (sessionId: string, amount: number) => Promise<Rebuy>;
   removeRebuy: (id: string) => Promise<void>;
   endSession: (
@@ -144,6 +208,7 @@ interface LogState {
     result?: EndSessionResult,
   ) => Promise<void>;
   updateSessionNotes: (sessionId: string, notes: string | null) => Promise<void>;
+  editSession: (sessionId: string, patch: EditSessionInput) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
 
   importSessions: (sessions: readonly ImportedSession[]) => Promise<ImportSummary>;
@@ -375,6 +440,28 @@ export const useLogStore = create<LogState>((set, get) => ({
     return session;
   },
 
+  /**
+   * Log a session that was played before it was logged.
+   *
+   * One write rather than a start and then an end. A session that is created
+   * live and cashed out later is two writes because those are two moments
+   * hours apart; this one is a single form submitted once, and splitting it
+   * would open a window where the second write failing leaves a session
+   * running that nobody is playing -- exactly the state the "Still playing?"
+   * correction on the live screen exists to clean up.
+   *
+   * No mood: the pre-session score is asked for at the table because it is
+   * about how somebody feels right then, and a score remembered a week later
+   * is a different measurement wearing the same name.
+   */
+  logPastSession: async (input) => {
+    const repository = await getRepository();
+    const session = await repository.createSession(input);
+    // Venues, because `sessionCount` is derived at read time and this changed it.
+    await get().refresh(['sessions', 'venues']);
+    return session;
+  },
+
   addRebuy: async (sessionId, amount) => {
     const repository = await getRepository();
     // Rebuys are children of the session, so the sessions read carries them.
@@ -391,7 +478,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   endSession: async (sessionId, cashOut, mood, result) => {
     const repository = await getRepository();
-    const endedAt = Date.now();
+    const endedAt = result?.endedAt ?? Date.now();
     await repository.endSession(sessionId, cashOut, endedAt);
     // A second write rather than a wider `endSession`: cashing out is the same
     // operation for both formats, and only a tournament has anywhere it came.
@@ -412,6 +499,20 @@ export const useLogStore = create<LogState>((set, get) => ({
     const repository = await getRepository();
     await repository.updateSession(sessionId, { notes });
     await get().refresh(['sessions']);
+  },
+
+  /**
+   * Correct a session that was logged wrong.
+   *
+   * Only what the caller named: the screen sends the fields it owns, and a
+   * field left out keeps whatever is stored. Venues are reloaded as well as
+   * sessions, because moving a session to another room changes the
+   * `sessionCount` on both of them and that number is derived at read time.
+   */
+  editSession: async (sessionId, patch) => {
+    const repository = await getRepository();
+    await repository.updateSession(sessionId, patch);
+    await get().refresh(['sessions', 'venues']);
   },
 
   deleteSession: async (sessionId) => {
@@ -588,6 +689,46 @@ export const useHandsForSession = (sessionId: string | null): Hand[] | null => {
   // schedule and a frame of the previous session's hands to get through first.
   if (sessionId === null) return [];
   return answer !== null && answer.sessionId === sessionId ? answer.hands : null;
+};
+
+/**
+ * One hand, read by id, for the screen that edits it.
+ *
+ * Three answers rather than two, which is why this does not simply return
+ * `Hand | null` the way the list above does. A list has no third state: it has
+ * arrived or it has not, and an empty one is an answer. A single record can
+ * also be *absent* -- a hand deleted on another device and synced away while
+ * its screen is open -- and "still reading" and "there is no such hand" want
+ * opposite things on screen. So `undefined` is the read that has not landed,
+ * and `null` is the answer that there is nothing there.
+ *
+ * Re-read on `handsVersion` like the list, so editing a hand and coming back
+ * to it does not show the version before the edit.
+ */
+export const useHandById = (id: string | null): Hand | null | undefined => {
+  const version = useLogStore((state) => state.handsVersion);
+  const [answer, setAnswer] = useState<{ id: string; hand: Hand | null } | null>(null);
+
+  useEffect(() => {
+    if (id === null) return;
+    let live = true;
+    void (async () => {
+      try {
+        const repository = await getRepository();
+        const row = await repository.getHand(id);
+        if (live) setAnswer({ id, hand: row });
+      } catch {
+        // As above: a failed read is the database being unavailable, which the
+        // root layout already has a screen for.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [id, version]);
+
+  if (id === null) return null;
+  return answer !== null && answer.id === id ? answer.hand : undefined;
 };
 
 export const useMoodForSession = (sessionId: string | null): MoodEntry[] => {

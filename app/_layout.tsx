@@ -118,6 +118,14 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="session/past"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+              title: 'Add a past session · Log',
+            }}
+          />
+          <Stack.Screen
             name="session/hand"
             options={{
               presentation: 'modal',
@@ -134,6 +142,7 @@ export default function RootLayout() {
           <Stack.Screen name="claim" options={{ title: 'Signing you in · Log' }} />
           <Stack.Screen name="session/active" options={{ title: 'Live session · Log' }} />
           <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
+          <Stack.Screen name="session/edit" options={{ title: 'Edit session · Log' }} />
         </Stack>
       ) : (
         status === 'error' ? (

@@ -186,8 +186,7 @@ export default function SettingsScreen() {
           />
         </View>
         <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>
-          Hands carry your cards, seat, tags and note. Log does not record the board, so there
-          is no column for it.
+          Hands carry your cards, the board where you logged one, your seat, tags and note.
         </Text>
       </Card>
 

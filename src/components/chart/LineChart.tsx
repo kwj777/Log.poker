@@ -5,6 +5,18 @@
  * Android, so one implementation covers all three targets -- which is the reason
  * for hand-rolling this rather than pulling in a charting library that is
  * web-only or native-only.
+ *
+ * ## It has to say what it draws
+ *
+ * A chart is a picture and a picture read by a screen reader is silence. The
+ * bankroll curve is the largest thing on the dashboard and it carried no text
+ * at all, so somebody using VoiceOver went from the headline figure straight
+ * past it to the tiles, with nothing in between.
+ *
+ * `label` is required rather than optional, and it is the caller's to write:
+ * only the screen knows what its own series mean. The shape stays hidden
+ * underneath it -- a list of path elements read one by one would be worse than
+ * the silence it replaced.
  */
 
 import { useState } from 'react';
@@ -40,6 +52,13 @@ export interface Band {
 
 interface LineChartProps {
   series: readonly Series[];
+  /**
+   * What this chart says, in a sentence. Read in place of the drawing.
+   *
+   * Required, because a chart nobody can hear is the bug this prop exists to
+   * fix and an optional prop is one a caller forgets.
+   */
+  label: string;
   band?: Band;
   height?: number;
   /** Draws a horizontal rule at y = 0 -- break-even. */
@@ -53,6 +72,7 @@ const PADDING = { top: 12, right: 6, bottom: 12, left: 6 };
 
 export const LineChart = ({
   series,
+  label,
   band,
   height = 180,
   showZeroLine = true,
@@ -80,7 +100,16 @@ export const LineChart = ({
     : null;
 
   return (
-    <View style={[styles.root, { height }]} onLayout={onLayout}>
+    <View
+      style={[styles.root, { height }]}
+      onLayout={onLayout}
+      accessible
+      accessibilityRole="image"
+      // The empty state has its own words on screen; announcing the caller's
+      // summary of a chart that is not drawn would describe data that is not
+      // there.
+      accessibilityLabel={hasData ? label : emptyMessage}
+    >
       {width > 0 && hasData ? (
         <Svg width={width} height={height}>
           {band ? (

@@ -27,6 +27,7 @@
  * alternative is asking a player which zone their poker game was in.
  */
 
+import { toNumeric } from './money';
 import type { Timestamp } from './types';
 
 /** `2026-09-21`, which is what the date field holds. */
@@ -102,6 +103,30 @@ export const toHoursAndMinutes = (ms: number): { hours: string; minutes: string 
 };
 
 /**
+ * One of the two fields, read the way `parseAmount` reads a money field.
+ *
+ * `Number` was the whole of it, and `Number('3,5')` is `NaN`. The hours box
+ * opens a `decimal-pad` (`WhenInput.tsx`), and on a phone set to a
+ * comma-decimal locale that keypad draws a comma as its decimal key -- which
+ * is the case `money.ts` documents at length, having been bitten by it, and
+ * routes through `toNumeric` so that a number typed in and the same number in
+ * a file read alike. Duration never did.
+ *
+ * So on a French phone the Edit screen took `3,5` in Buy-in as three fifty and
+ * answered `3,5` in Hours played with a dead Save button and "How long did you
+ * actually play?" over a field holding a perfectly good number. Two readings
+ * of one keystroke, on one screen. `parseDurationMs` already agreed with money
+ * about it; only the typed path did not.
+ */
+const fieldValue = (text: string): number => {
+  const cleaned = text.replace(/[^0-9.,-]/g, '');
+  // A separator on its own is not a number, and `toNumeric` answers 0 for some
+  // of them: `,` strips to an empty string, which `Number` reads as zero.
+  if (!/[0-9]/.test(cleaned)) return NaN;
+  return toNumeric(cleaned) ?? NaN;
+};
+
+/**
  * Two fields back to milliseconds, or null if either is not a number.
  *
  * An empty field is zero rather than a refusal, so "3 hours" can be typed as
@@ -112,8 +137,8 @@ export const fromHoursAndMinutes = (hours: string, minutes: string): number | nu
   const h = hours.trim();
   const m = minutes.trim();
   if (h === '' && m === '') return null;
-  const hoursValue = h === '' ? 0 : Number(h);
-  const minutesValue = m === '' ? 0 : Number(m);
+  const hoursValue = h === '' ? 0 : fieldValue(h);
+  const minutesValue = m === '' ? 0 : fieldValue(m);
   if (!Number.isFinite(hoursValue) || !Number.isFinite(minutesValue)) return null;
   if (hoursValue < 0 || minutesValue < 0) return null;
   return Math.round(hoursValue * 3_600_000 + minutesValue * 60_000);

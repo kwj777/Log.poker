@@ -95,6 +95,26 @@ describe('a session’s length, as fields', () => {
   it('accepts a decimal hour, because somebody will type 3.5', () => {
     expect(fromHoursAndMinutes('3.5', '')).toBe(3 * 3_600_000 + 30 * 60_000);
   });
+
+  it('and a comma is that decimal point, because on half the world it is the key', () => {
+    // The hours box opens a `decimal-pad`, which on a comma-decimal locale
+    // draws a comma. `Number('3,5')` is NaN, so this returned null, so Edit
+    // read `lengthInvalid` and went dead under "How long did you actually
+    // play?" -- over a field holding a good number, on the same screen where
+    // `3,5` in Buy-in is three fifty. `parseDurationMs` agreed with money
+    // about the comma all along; only what a player typed did not.
+    expect(fromHoursAndMinutes('3,5', '')).toBe(3 * 3_600_000 + 30 * 60_000);
+    expect(fromHoursAndMinutes('3,5', '')).toBe(fromHoursAndMinutes('3.5', ''));
+    expect(fromHoursAndMinutes('', '2,5')).toBe(fromHoursAndMinutes('', '2.5'));
+  });
+
+  it('but a separator on its own is still nothing, rather than zero', () => {
+    // `toNumeric(',')` strips to an empty string, which `Number` reads as 0. A
+    // cleared field is already zero by the rule above; a field holding one
+    // comma is a half-typed number and must not save as no time at all.
+    expect(fromHoursAndMinutes(',', '')).toBeNull();
+    expect(fromHoursAndMinutes('.', '')).toBeNull();
+  });
 });
 
 /**

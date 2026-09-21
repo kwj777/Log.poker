@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 96 passed
-Tests:       2150 passed
+Tests:       2152 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1118,6 +1118,7 @@ Tests:       2150 passed
   handNotation       23   parse, round-trip, hand classes
   money              22   cents arithmetic, parsing, formatting
   writeFailures      21   what the player sees when a write does not work
+  clock              20   a typed date, a typed length, and what neither will accept
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1126,7 +1127,6 @@ Tests:       2150 passed
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
   history            19   the session list, its filters, and how much of it mounts
-  clock              18   a typed date, a typed length, and what neither will accept
   seed               18   the demo dataset stays coherent
   signin             18   the sign-in client, against a fake fetch
   client             17   the sync client, against a fake fetch

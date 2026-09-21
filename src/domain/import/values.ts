@@ -14,7 +14,7 @@
  * one engine and another way somewhere else.
  */
 
-import { toCents } from '../money';
+import { toCents, toNumeric } from '../money';
 import type { Cents, GameType, SessionFormat, Stakes } from '../types';
 
 // ------------------------------------------------------------------- money
@@ -51,39 +51,6 @@ export interface ParsedMoney {
   currency: string | null;
 }
 
-/**
- * Work out which of `.` and `,` is the decimal separator, then strip the other.
- *
- * With both present the last one wins -- `1.234,50` is European, `1,234.50` is
- * not. With only commas, one comma trailed by one or two digits is a decimal
- * (`1,50`); anything else is a thousands separator (`1,234` and `1,234,567`).
- * With only dots, more than one means thousands (`1.234.567`).
- */
-const toNumeric = (digits: string): number | null => {
-  const lastDot = digits.lastIndexOf('.');
-  const lastComma = digits.lastIndexOf(',');
-
-  let cleaned: string;
-  if (lastDot >= 0 && lastComma >= 0) {
-    const decimalAt = Math.max(lastDot, lastComma);
-    cleaned = `${digits.slice(0, decimalAt).replace(/[.,]/g, '')}.${digits.slice(decimalAt + 1)}`;
-  } else if (lastComma >= 0) {
-    const commas = (digits.match(/,/g) ?? []).length;
-    const decimals = digits.length - lastComma - 1;
-    cleaned =
-      commas === 1 && decimals >= 1 && decimals <= 2
-        ? digits.replace(',', '.')
-        : digits.replace(/,/g, '');
-  } else if (lastDot >= 0) {
-    const dots = (digits.match(/\./g) ?? []).length;
-    cleaned = dots > 1 ? digits.replace(/\./g, '') : digits;
-  } else {
-    cleaned = digits;
-  }
-
-  const value = Number(cleaned);
-  return Number.isFinite(value) ? value : null;
-};
 
 /**
  * Read a money cell.
@@ -119,8 +86,19 @@ export const parseMoney = (input: string): ParsedMoney | null => {
 /** Which of the first two numbers in `03/04/2024` is the day. */
 export type DateOrder = 'dmy' | 'mdy';
 
+/**
+ * The fraction is matched and thrown away, which is the point of matching it.
+ *
+ * `.000Z` is what `Date.prototype.toISOString` writes, so it is the single
+ * commonest machine-generated stamp there is. Stopping at whole seconds left
+ * `.000Z` in the trailing text, which then failed `ZONE`, so the cell was read
+ * as local time: the same instant one way with the fraction and another way
+ * without it, five hours apart in New York, and looking like a quirk of one
+ * file rather than a bug in the parser. Swallowed here, the trailing text is
+ * the zone alone and the zone branch runs.
+ */
 const DATE_TIME =
-  /^(\d{1,4})([-/.])(\d{1,2})\2(\d{1,4})(?:[T ]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]\.?m\.?)?)?/i;
+  /^(\d{1,4})([-/.])(\d{1,2})\2(\d{1,4})(?:[T ]+(\d{1,2}):(\d{2})(?::(\d{2})(?:[.,]\d+)?)?\s*([ap]\.?m\.?)?)?/i;
 
 const ZONE = /^(Z|[+-]\d{2}:?\d{2})$/i;
 
@@ -258,17 +236,40 @@ export const parseDurationMs = (input: string, unit: DurationUnit = 'hours'): nu
     );
   }
 
-  const spelled = /^(?:(\d+(?:[.,]\d+)?)\s*h(?:ours?|rs?)?)?\s*(?:(\d+(?:[.,]\d+)?)\s*m(?:in(?:ute)?s?)?)?$/.exec(
-    text,
-  );
-  if (spelled && (spelled[1] !== undefined || spelled[2] !== undefined)) {
+  // Seconds too, because a cell that spells them out is readable and was not
+  // being read: `3h 45m 20s` fell past this to the bare-number fallback below.
+  const spelled =
+    /^(?:(\d+(?:[.,]\d+)?)\s*h(?:ours?|rs?)?)?\s*(?:(\d+(?:[.,]\d+)?)\s*m(?:in(?:ute)?s?)?)?\s*(?:(\d+(?:[.,]\d+)?)\s*s(?:ec(?:ond)?s?)?)?$/.exec(
+      text,
+    );
+  if (
+    spelled &&
+    (spelled[1] !== undefined || spelled[2] !== undefined || spelled[3] !== undefined)
+  ) {
     const hours = spelled[1] === undefined ? 0 : Number(spelled[1].replace(',', '.'));
     const minutes = spelled[2] === undefined ? 0 : Number(spelled[2].replace(',', '.'));
-    if (Number.isFinite(hours) && Number.isFinite(minutes)) {
-      return Math.round(hours * HOUR_MS + minutes * MINUTE_MS);
+    const seconds = spelled[3] === undefined ? 0 : Number(spelled[3].replace(',', '.'));
+    if (Number.isFinite(hours) && Number.isFinite(minutes) && Number.isFinite(seconds)) {
+      return Math.round(hours * HOUR_MS + minutes * MINUTE_MS + seconds * 1000);
     }
   }
 
+  // A bare number, and only a bare number.
+  //
+  // This stripped every non-digit and read whatever was left, which turns a
+  // cell the two patterns above could not parse into a number four orders of
+  // magnitude too large rather than into the null the header of this file
+  // promises. The spelled form has no seconds part, so `3h 45m 20s` became
+  // `34520` and then 34,520 hours; `1h30` became 130 hours; and `-1:30` became
+  // 130 hours, because the minus went with the colon. `sessionImport` takes
+  // that as the length of the night, so a session ends years after it began,
+  // its hourly rate collapses to nothing, and the number goes into the variance
+  // estimate with no warning anywhere, because a duration that parsed is a
+  // duration nothing complains about.
+  //
+  // Null instead, which is what the importer's "had no duration" warning is
+  // for. A leading minus is refused outright: a session cannot run backwards.
+  if (!/^[\d.,\s]+$/.test(text)) return null;
   const bare = toNumeric(text.replace(/[^\d.,]/g, ''));
   if (bare === null || !/\d/.test(text)) return null;
   if (unit === 'seconds') return Math.round(bare * 1000);

@@ -153,15 +153,41 @@ const pageOf = <T>(items: Item<T>[], floor: Timestamp, cap: number): Page<T> => 
     // at the same place forever. The mark stayed where it was, the next round
     // rebuilt the identical page, and nothing ever moved again.
     //
-    // **So a single stamp is atomic, and the budget cannot cut inside one.**
-    // The mark is a stamp, so records sharing one cannot be told apart by it:
-    // every record at the floor goes in one answer or the loop cannot advance.
-    // When a block at one stamp is itself over the cap it goes anyway, and the
-    // answer is that much bigger than the budget. That is a property of a
-    // timestamp cursor rather than a bug here, and it is bounded by how much
-    // one merge can write at one stamp -- which is why `readBundle` no longer
-    // restamps a whole bundle on a version change, and why a push is capped
-    // before it arrives.
+    // **So the block at the floor is atomic.** The mark is a stamp, so records
+    // sharing one cannot be told apart by it: every record at the floor goes in
+    // one answer or the loop cannot advance. When that block is itself over the
+    // cap it goes anyway, and the answer is that much bigger than the budget.
+    // That is a property of a timestamp cursor rather than a bug here, and it
+    // is bounded by how much one merge can write at one stamp -- which is why
+    // `readBundle` no longer restamps a whole bundle on a version change, and
+    // why a push is capped before it arrives.
+    //
+    // **The floor block and no other**, which is worth saying because the
+    // obvious reading is stronger and is wrong. Once the mark has moved to a
+    // new stamp T, `sent > floor` is satisfied and the very next record -- also
+    // at T -- can end the page, so the answer goes back saying T with part of T
+    // still here. Delivery survives it: a device is served everything at or
+    // *after* the number it sends, so it gets the rest of T on the next round.
+    //
+    // `collect` does not. It takes the horizon as `min(acked) + 1` on the
+    // stated ground that "a cursor of C is proof of having applied C, not
+    // merely of having applied everything below it", and after a cut inside C
+    // that is false: a tombstone at C held back from the page that issued the
+    // cursor C can be swept before the device ever hears about it, and the row
+    // it deletes comes back from that device for good. It needs a device more
+    // than the retention window behind and a multi-record stamp straddling the
+    // budget, which is narrow, and it is a real hole rather than a theoretical
+    // one.
+    //
+    // **And it cannot be closed here.** Every record written by one merge
+    // carries that merge's stamp, so a "stamp" is a whole push, bounded only by
+    // the 2MB body cap the endpoint enforces. Making a block atomic makes a
+    // bundle built from one push unpageable at any budget below it, which is
+    // the failure this file exists to prevent and which the
+    // "a history too big for one answer" case in
+    // `src/data/__tests__/syncingRepository.test.ts` catches immediately. A
+    // timestamp cursor cannot say "half of T", so the fix belongs on the side
+    // that reads the cursor as proof, not on the side that issues it.
     //
     // Measured against the mark instead, a page always contains at least one
     // record the mark can move past, so every round makes progress. The cost is

@@ -58,6 +58,9 @@ const FROM = process.env.SIGNIN_FROM || 'Log <signin@log.poker>';
  * front of them does not, and a mail that trains somebody to tap links is worse
  * than a mail that annoys them.
  */
+/** How long the mailer gets, well inside what the platform gives the function. */
+const MAILER_TIMEOUT_MS = 6_000;
+
 const send = async (to: string, code: string): Promise<boolean> => {
   const key = process.env.RESEND_API_KEY || '';
   if (!key) {
@@ -80,6 +83,22 @@ const send = async (to: string, code: string): Promise<boolean> => {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: FROM, to, subject: `Log sign-in code: ${code}`, text }),
+      // A deadline inside the function's own, which every other outbound
+      // request in this repository already carries and this one did not.
+      //
+      // The order matters here more than it does elsewhere. `askFor` writes
+      // the pending record *before* the mail goes, so by the time this call
+      // is made one of the address's five daily mails is already spent and
+      // the cooldown has already started, and the only thing that gives
+      // either back is the rollback that runs when this answers false. A
+      // mailer that holds the connection open until the platform kills the
+      // function never reaches that rollback: no mail, no code, a day's
+      // allowance gone, and a player told to go and check their email.
+      //
+      // Six seconds is well inside the budget and far outside a healthy
+      // send, and a timeout lands in the catch below, which is where the
+      // rollback is already wired.
+      signal: AbortSignal.timeout(MAILER_TIMEOUT_MS),
     });
     // The status only, never the body: it echoes the address back and this is
     // a deploy log that says how many people signed in and nothing about who.

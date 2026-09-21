@@ -53,7 +53,7 @@ import {
 import { saveCsv } from '../../src/features/export/saveCsv';
 import { formatMoney, fromCents, parseAmount } from '../../src/domain/money';
 import { primaryCurrency } from '../../src/domain/stats';
-import { seedDemoData } from '../../src/data/seed';
+import { DEMO_SESSION_COUNT, seedDemoData } from '../../src/data/seed';
 import { SignInCard } from '../../src/features/account/SignInCard';
 import { VenueRow } from '../../src/features/venues/VenueRow';
 import { FamilyCrossPromo } from '../../src/features/family/FamilyCrossPromo';
@@ -446,7 +446,7 @@ export default function SettingsScreen() {
           <SectionHeader title="Developer" />
           <Card>
             <Text color={colors.textSecondary} style={styles.body}>
-              Load a demo dataset: 20 mixed-result sessions with hands and mood entries,
+              Load a demo dataset: {DEMO_SESSION_COUNT} mixed-result sessions with hands and mood entries,
               enough to populate the dashboard and the variance view.
             </Text>
             <Button

@@ -1,5 +1,5 @@
 /**
- * Demo dataset -- 20 mixed-result sessions, so a fresh install has a dashboard
+ * Demo dataset -- 32 mixed-result sessions, so a fresh install has a dashboard
  * worth looking at and the variance view has enough history to say something.
  *
  * Deterministic: the same seed always produces the same data, which keeps

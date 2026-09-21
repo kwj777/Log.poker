@@ -245,6 +245,22 @@ describe('grouping', () => {
     ]);
   });
 
+  it('names a stakes bucket without an ante only some of its nights had', () => {
+    // `stakesKey` pools anted and unanted games of the same blinds on purpose,
+    // and the suite in `money.test.ts` asserts that. `groupBy` names a bucket
+    // after whichever session reached it first, so the bar could read
+    // "$1/$2 ($2 ante)" over nights that had no ante at all, depending on
+    // which one was newest. The label now says what the key says.
+    const anted = completed({
+      stakes: { ...STAKES_1_2, ante: 200 },
+      gameType: 'NLHE', venueId: 'v1', venue: aria, hours: 3, buyIn: 100, cashOut: 400,
+    });
+    const groups = byStakes([anted, ...sessions]);
+    expect(groups.map((group) => group.label)).toEqual(['$1/$2', '$2/$5']);
+    // And they really are one bucket, which is the decision this preserves.
+    expect(groups[0].sessionCount).toBe(3);
+  });
+
   it('groups identical stakes together regardless of session count', () => {
     const groups = byStakes(sessions);
     expect(groups.find((group) => group.label === '$1/$2')?.sessionCount).toBe(2);

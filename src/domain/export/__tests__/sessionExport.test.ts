@@ -24,7 +24,27 @@ import {
 } from '../sessionExport';
 import type { Hand, MoodEntry, SessionWithChildren } from '../../types';
 
-const T0 = Date.UTC(2026, 2, 14, 19, 30);
+/**
+ * Built in local time, because that is the clock the file is written against.
+ *
+ * `stamp` and `exportFileName` format with `getFullYear`, `getMonth`,
+ * `getDate` and `getHours`, deliberately: a player who sat down at half past
+ * seven wants a row that says half past seven, not the same instant renamed.
+ * A fixture built at offset zero only lines up with that on a machine set to
+ * offset zero, and nothing pins one -- no `TZ` in the test script, the jest
+ * config or the workflow -- so the suite was red on a clean checkout anywhere
+ * but UTC, and further out it moved the date: four failures at
+ * `TZ=Pacific/Kiritimati`, one of them a file name a day late.
+ *
+ * Local both sides keeps the assertions about the formatter rather than about
+ * the machine, and keeps the formatter's own locality under test, which
+ * pinning `TZ=UTC` would have hidden.
+ */
+const T0 = new Date(2026, 2, 14, 19, 30).getTime();
+/** The same, for the one-off moments the file-name cases use. */
+const at = (
+  year: number, month: number, day: number, hour = 12,
+): number => new Date(year, month, day, hour).getTime();
 const HOUR = 3_600_000;
 
 const session = (over: Partial<SessionWithChildren> = {}): SessionWithChildren => ({
@@ -347,17 +367,17 @@ describe('the moods file', () => {
 
 describe('what the file is called', () => {
   it('says what it holds and when it was taken', () => {
-    expect(exportFileName('sessions', Date.UTC(2026, 2, 14, 12))).toBe(
+    expect(exportFileName('sessions', at(2026, 2, 14))).toBe(
       'log-sessions-2026-03-14.csv',
     );
-    expect(exportFileName('hands', Date.UTC(2026, 11, 1, 12))).toBe('log-hands-2026-12-01.csv');
-    expect(exportFileName('moods', Date.UTC(2026, 11, 1, 12))).toBe('log-moods-2026-12-01.csv');
+    expect(exportFileName('hands', at(2026, 11, 1))).toBe('log-hands-2026-12-01.csv');
+    expect(exportFileName('moods', at(2026, 11, 1))).toBe('log-moods-2026-12-01.csv');
   });
 
   it('pads the month and the day, so the names sort', () => {
     const names = [
-      exportFileName('sessions', Date.UTC(2026, 10, 2, 12)),
-      exportFileName('sessions', Date.UTC(2026, 1, 20, 12)),
+      exportFileName('sessions', at(2026, 10, 2)),
+      exportFileName('sessions', at(2026, 1, 20)),
     ].sort();
     expect(names[0]).toContain('2026-02-20');
   });

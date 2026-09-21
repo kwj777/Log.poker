@@ -1545,8 +1545,18 @@ describe('the token it sends', () => {
     current = null;
     tick(HOUR);
     await wrapper.push(true);
+    // The point of the case: nothing goes to the server without a token.
     expect(bearers).toHaveLength(1);
-    expect(wrapper.current().problem).toBeNull();
+
+    // And it says which kind of stopped it is, because `problem: null` is what
+    // `describeSync` reads as nothing wrong: with `lastSyncedAt` still holding
+    // the last success, the card printed "Up to date on this device." over a
+    // sync that had stopped for the life of the process. Invisible after a
+    // real sign-out, where the card stops drawing that line at all, and wrong
+    // in the state this branch is actually reached in: an expired session,
+    // whose token `SessionManager.current` clears out from under a tab that
+    // has been open past the thirty days.
+    expect(wrapper.current().problem).toBe('unauthorized');
   });
 });
 

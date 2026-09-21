@@ -59,72 +59,94 @@ export const sync = async (
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  let response: Response;
+  /**
+   * The whole request inside the timeout, rather than only the fetch.
+   *
+   * `fetch` resolves when the headers arrive and the body is read further down,
+   * so clearing the timer as soon as the fetch settled disarmed the abort
+   * before the part that actually carries the megabyte. A server that answered
+   * 200 and then stalled its body -- a half-open connection, an edge node
+   * dropping mid-stream -- left `response.json()` pending with nothing left to
+   * cancel it.
+   *
+   * That is not one lost sync. `SyncingRepository.push` holds the run in
+   * `inFlight` and every later call awaits it, so a promise that never settles
+   * stops every write, every foreground resume and every retry for the rest of
+   * the process's life, with no failure announced and the card still showing
+   * the last good state.
+   *
+   * The signal is already on the request, so an abort during the body read
+   * rejects `json()` into the catch below, which answers `unreachable` and
+   * lets the loop back off and come again.
+   */
   try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal,
-    });
-  } catch {
-    return { ok: false, reason: 'unreachable' };
-  } finally {
-    clearTimeout(timer);
-  }
-
-  // Ahead of the two below, because 402 is the one refusal that signing in
-  // again cannot mend and the copy for it says something different.
-  if (response.status === 402) {
-    return { ok: false, reason: 'unpaid' };
-  }
-  if (response.status === 401 || response.status === 403) {
-    return { ok: false, reason: 'unauthorized' };
-  }
-  if (!response.ok) {
-    // 4xx is this device's fault and retrying unchanged will not fix it; 5xx
-    // might fix itself. The loop treats them differently, so they are told
-    // apart here rather than at the call site.
-    return { ok: false, reason: response.status < 500 ? 'refused' : 'unreachable' };
-  }
-
-  try {
-    const body: unknown = await response.json();
-    const { cursor, changes, more, collectedThrough } = (body ?? {}) as {
-      cursor?: unknown;
-      changes?: unknown;
-      more?: unknown;
-      collectedThrough?: unknown;
-    };
-    if (typeof cursor !== 'number' || !Number.isFinite(cursor)) {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+    } catch {
       return { ok: false, reason: 'unreachable' };
     }
-    return {
-      ok: true,
-      response: {
-        cursor,
-        changes: shapedLikeAChangeSet(changes) ? changes : emptyChangeSet(),
-        // Absent reads as nothing held back, which is what a server that does
-        // not page means and is the safe reading either way: the device asks
-        // again on its next write rather than looping.
-        more: more === true,
-        // Absent reads as nothing collected, which makes this device keep its
-        // tombstones. Keeping one too long costs a few hundred bytes; dropping
-        // one too early costs a resurrected session.
-        collectedThrough:
-          typeof collectedThrough === 'number' && Number.isFinite(collectedThrough)
-            ? collectedThrough
-            : 0,
-      },
-    };
-  } catch {
-    // A 200 that is not the shape promised is a server that changed under us,
-    // and reading it as unreachable is safer than acting on half of it.
-    return { ok: false, reason: 'unreachable' };
+
+    // Ahead of the two below, because 402 is the one refusal that signing in
+    // again cannot mend and the copy for it says something different.
+    if (response.status === 402) {
+      return { ok: false, reason: 'unpaid' };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, reason: 'unauthorized' };
+    }
+    if (!response.ok) {
+      // 4xx is this device's fault and retrying unchanged will not fix it; 5xx
+      // might fix itself. The loop treats them differently, so they are told
+      // apart here rather than at the call site.
+      return { ok: false, reason: response.status < 500 ? 'refused' : 'unreachable' };
+    }
+
+    try {
+      const body: unknown = await response.json();
+      const { cursor, changes, more, collectedThrough } = (body ?? {}) as {
+        cursor?: unknown;
+        changes?: unknown;
+        more?: unknown;
+        collectedThrough?: unknown;
+      };
+      if (typeof cursor !== 'number' || !Number.isFinite(cursor)) {
+        return { ok: false, reason: 'unreachable' };
+      }
+      return {
+        ok: true,
+        response: {
+          cursor,
+          changes: shapedLikeAChangeSet(changes) ? changes : emptyChangeSet(),
+          // Absent reads as nothing held back, which is what a server that does
+          // not page means and is the safe reading either way: the device asks
+          // again on its next write rather than looping.
+          more: more === true,
+          // Absent reads as nothing collected, which makes this device keep its
+          // tombstones. Keeping one too long costs a few hundred bytes; dropping
+          // one too early costs a resurrected session.
+          collectedThrough:
+            typeof collectedThrough === 'number' && Number.isFinite(collectedThrough)
+              ? collectedThrough
+              : 0,
+        },
+      };
+    } catch {
+      // A 200 that is not the shape promised is a server that changed under us,
+      // and reading it as unreachable is safer than acting on half of it.
+      return { ok: false, reason: 'unreachable' };
+    }
+  } finally {
+    clearTimeout(timer);
   }
 };
 

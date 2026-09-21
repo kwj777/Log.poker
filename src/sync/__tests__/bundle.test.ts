@@ -212,6 +212,78 @@ describe('a device whose clock was wrong once', () => {
   });
 });
 
+describe('a device that was away longer than the retention window', () => {
+  const DAY = 24 * HOUR;
+  const FOUR_MONTHS_AGO = T0 - 120 * DAY;
+  const LAST_NIGHT = NOW - 12 * HOUR;
+
+  /** A bundle that has already collected everything older than three months. */
+  const swept = (): Bundle => {
+    const bundle = after(changeSet({ venues: [venue('vOther')] }));
+    bundle.collectedThrough = T0 - 90 * DAY;
+    return bundle;
+  };
+
+  it('keeps last night at a venue whose own stamp is four months old', () => {
+    // The cascade. The backstop refuses a never-seen record below the
+    // collection horizon, because that is the shape of a row whose tombstone
+    // was thrown away. Venues merge before sessions and sessions before their
+    // children, so a venue refused that way left every session on it with a
+    // parent the bundle does not have, which the parent rule refuses in turn,
+    // and the hands under those went with them. A player who added a room
+    // while offline and kept logging at it lost every night there, including
+    // the ones from this week, and the client marks the push as sent.
+    const { bundle } = mergeIntoBundle(
+      swept(),
+      changeSet({
+        venues: [venue('aria', FOUR_MONTHS_AGO)],
+        sessions: [session('s1', LAST_NIGHT, { venueId: 'aria' })],
+        hands: [hand('h1', 's1', LAST_NIGHT)],
+      }),
+      0,
+      NOW,
+    );
+    expect(bundle.records.venues.aria).toBeDefined();
+    expect(bundle.records.sessions.s1).toBeDefined();
+    expect(bundle.records.hands.h1).toBeDefined();
+  });
+
+  it('and reaches a venue two levels down, through a session as old as it is', () => {
+    // The session is below the horizon too, so only the hand is evidence. It
+    // keeps the session, and the session then keeps the venue.
+    const { bundle } = mergeIntoBundle(
+      swept(),
+      changeSet({
+        venues: [venue('aria', FOUR_MONTHS_AGO)],
+        sessions: [session('s1', FOUR_MONTHS_AGO, { venueId: 'aria' })],
+        hands: [hand('h1', 's1', LAST_NIGHT)],
+      }),
+      0,
+      NOW,
+    );
+    expect(bundle.records.venues.aria).toBeDefined();
+    expect(bundle.records.sessions.s1).toBeDefined();
+    expect(bundle.records.hands.h1).toBeDefined();
+  });
+
+  it('still refuses one with nothing live hanging off it', () => {
+    // The backstop itself is unchanged, and so is the trade it names: a write
+    // that never left a device gone longer than the retention window is the
+    // rarer loss and the one this server cannot tell from a resurrection.
+    const { bundle } = mergeIntoBundle(
+      swept(),
+      changeSet({
+        venues: [venue('ghost', FOUR_MONTHS_AGO)],
+        sessions: [session('s2', FOUR_MONTHS_AGO, { venueId: 'ghost' })],
+      }),
+      0,
+      NOW,
+    );
+    expect(bundle.records.venues.ghost).toBeUndefined();
+    expect(bundle.records.sessions.s2).toBeUndefined();
+  });
+});
+
 describe('what it refuses to store', () => {
   it('refuses a record whose parent it does not have', () => {
     // The backstop can refuse an old venue while accepting the session that

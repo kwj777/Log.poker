@@ -141,6 +141,33 @@ describe('a cash-out that will not save', () => {
   });
 });
 
+describe('a cash-out whose night closed and whose extras did not', () => {
+  it('still says so, on the screen the player is actually looking at', async () => {
+    // `endSession` writes the cash-out first and the tournament result and the
+    // end mood after it, and re-reads the log on both paths so the store
+    // cannot go on drawing a session the database has finished. That means a
+    // throw from one of the later writes arrives with `activeSession` already
+    // gone, and this screen has re-rendered through its "No session running"
+    // branch before the catch sets anything: the message went into state that
+    // branch did not draw, so the player was left on an empty screen with the
+    // result written and nothing said.
+    ready({
+      endSession: (async () => {
+        useLogStore.setState({ activeSession: null });
+        throw full();
+      }) as never,
+    });
+    await renderScreen(<ActiveSessionScreen />);
+
+    await userEvent.press(screen.getByText('Cash out & end session'));
+    await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
+    await userEvent.press(screen.getByText('End session'));
+
+    expect(await screen.findByText('No session running')).toBeTruthy();
+    expect(screen.getByText('The database is full.')).toBeTruthy();
+  });
+});
+
 describe('session notes that will not save', () => {
   it('says so, rather than leaving the text on screen looking saved', async () => {
     ready({ updateSessionNotes: (async () => { throw full(); }) as never });

@@ -354,6 +354,70 @@ const lastActivity = (bundle: Bundle, now: Timestamp): Map<string, Timestamp> =>
   return activity;
 };
 
+/**
+ * The parents in a push that the push itself is evidence for.
+ *
+ * The backstop in `mergeIntoBundle` refuses a record this server has never seen
+ * whose stamp is below everything it has collected, because such a row is the
+ * shape of one whose tombstone was thrown away, and taking it would put a
+ * deleted session back on every device.
+ *
+ * **A venue with this week's sessions hanging off it is not that shape.** A
+ * venue whose tombstone was collected has no live children arriving beside it;
+ * one a player has been logging at all along does. Without this the refusal
+ * cascaded, and it cascaded onto records the backstop has no argument with at
+ * all: venues are merged before sessions and sessions before their children, so
+ * a venue refused here left every session on it with a parent that is not in
+ * the bundle, which the rule below refuses in turn, and every rebuy, hand and
+ * mood entry under those went the same way. One venue stamped four months ago
+ * took last night's session down with it.
+ *
+ * So a record at or above the horizon rescues the parent it names, and a parent
+ * rescued that way rescues its own. Two levels is the whole depth of this
+ * schema: children hang off sessions and sessions hang off venues.
+ *
+ * It does not widen what the backstop lets through on its own. A record with no
+ * live relation in the same push is refused exactly as before, which is the
+ * documented trade: a write that never left a device that was away longer than
+ * the retention window is the rarer loss and the one this server cannot tell
+ * from a resurrection.
+ */
+const rescuedParents = (
+  sent: Record<string, unknown>,
+  now: Timestamp,
+  collectedThrough: Timestamp,
+): Set<string> => {
+  const rescued = new Set<string>();
+  const sane = (table: SyncTable): Sanitized[] => {
+    const list = sent[table];
+    if (!Array.isArray(list)) return [];
+    const out: Sanitized[] = [];
+    for (const item of list) {
+      const one = sanitize(item, now);
+      if (one !== null) out.push(one);
+    }
+    return out;
+  };
+
+  // Leaves inward, so a session kept by one of its hands can go on to keep the
+  // venue it is at.
+  for (const table of ['rebuys', 'hands', 'moodEntries'] as const) {
+    for (const { change } of sane(table)) {
+      if (change.record.updatedAt < collectedThrough) continue;
+      const parent = change.record.sessionId;
+      if (typeof parent === 'string' && parent !== '') rescued.add(parent);
+    }
+  }
+  for (const { change } of sane('sessions')) {
+    const live =
+      change.record.updatedAt >= collectedThrough || rescued.has(change.record.id);
+    if (!live) continue;
+    const parent = change.record.venueId;
+    if (typeof parent === 'string' && parent !== '') rescued.add(parent);
+  }
+  return rescued;
+};
+
 const settleActiveSessions = (
   bundle: Bundle,
   at: Timestamp,
@@ -614,6 +678,17 @@ const collect = (bundle: Bundle, now: Timestamp): void => {
     // applied C, not merely of having applied everything below it, and without
     // the step the newest thing in the bundle could never be collected at all:
     // every device would sit acknowledging exactly it, forever.
+    //
+    // **The step is one the pager does not always earn.** An answer may be cut
+    // inside a single stamp, and then the cursor C it issues covers only part
+    // of C: a tombstone at C held back from that answer is swept here before
+    // the device has ever been handed it, and the row it deletes comes back
+    // from that device for good. It takes a device further behind than the
+    // retention window and a stamp whose records straddle the answer budget.
+    // `pageOf` in `src/sync/batch.ts` says why it cannot be closed there --
+    // one merge writes one stamp, so an atomic stamp is an unpageable push --
+    // and so why the honest fix is on this side, in what a mark is allowed to
+    // claim.
     acked.length === 0
       ? Number.MAX_SAFE_INTEGER
       : acked.reduce((least, mark) => (mark < least ? mark : least), Infinity) + 1,
@@ -774,6 +849,9 @@ export const mergeIntoBundle = (
   if (namesADevice(device)) bundle.devices[device] = { acked: from, seen: now };
 
   const sent = (incoming ?? {}) as Record<string, unknown>;
+  // Worked out before anything is written, because the tables are walked
+  // parents first and a venue's fate is decided before its sessions are read.
+  const rescued = rescuedParents(sent, now, bundle.collectedThrough);
   for (const table of SYNC_TABLES) {
     const list = sent[table];
     if (!Array.isArray(list)) continue;
@@ -808,7 +886,17 @@ export const mergeIntoBundle = (
       // that device really did create and never sent, which is the worse thing
       // to lose but the rarer one: it needs three months offline and a write
       // that never left. See SYNC.md.
-      if (!held && change.record.updatedAt < bundle.collectedThrough) continue;
+      //
+      // Unless this same push is carrying something live that hangs off it, in
+      // which case it is not the shape of a collected row at all. See
+      // `rescuedParents`, and the cascade it stops.
+      if (
+        !held &&
+        change.record.updatedAt < bundle.collectedThrough &&
+        !rescued.has(change.record.id)
+      ) {
+        continue;
+      }
 
       // A record whose parent this server does not have is refused rather than
       // stored. The tables are walked parents first, so a parent arriving in

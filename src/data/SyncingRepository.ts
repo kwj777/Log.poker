@@ -458,10 +458,27 @@ export class SyncingRepository implements Repository {
     // backlog first.
     const token = await this.token();
     if (token === null) {
-      // Signed out from under this run. Not a failure to back off from and not
-      // a thing to retry: there is nobody to sync for any more.
+      // No token to sync with. Not a failure to back off from and not a thing
+      // to retry: nothing here can produce one, so the loop stops until
+      // somebody signs in.
+      //
+      // **Said as `unauthorized`, which is what it is.** This read `problem:
+      // null`, and a null problem is what `describeSync` treats as nothing
+      // wrong: with `lastSyncedAt` still holding the last success it printed
+      // "Up to date on this device." over a sync that had stopped for the life
+      // of the process. The branch called that state signed out, and for a
+      // sign-out it is invisible anyway, because the card only draws this line
+      // while it is holding a session. The state it is actually reached in is
+      // the other one: `SessionManager.current` clears a token that has run
+      // out, so a tab left open past the thirty days -- which the constructor
+      // above names as the ordinary way to use the web build -- lands here
+      // with a card still on screen saying everything is fine.
+      //
+      // `unauthorized` is the same answer the 401 path gives two dozen lines
+      // down for the same situation, and the copy behind it is the one that
+      // says the thing a player can act on.
       this.halted = true;
-      this.announce({ running: false, problem: null });
+      this.announce({ running: false, problem: 'unauthorized' });
       return;
     }
 

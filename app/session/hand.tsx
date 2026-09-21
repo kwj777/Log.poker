@@ -113,7 +113,20 @@ export default function LogHandScreen() {
   const handSession = useSessionById(existing == null ? null : existing.sessionId);
   /** The session named by the route, for a hand being added to a finished night. */
   const namedSession = useSessionById(editing ? null : (sessionId ?? null));
-  const session = editing ? handSession : (namedSession ?? activeSession);
+  /**
+   * The live session only when the route named nothing.
+   *
+   * It was `namedSession ?? activeSession`, and that fallback fires as readily
+   * for a session that was named and is gone as for one that was never named.
+   * The screen already knows the difference and says so, but the branch that
+   * says it cannot be reached while a live session exists, because `session`
+   * is never null. So opening last Tuesday from History, tapping Log a hand,
+   * and having a sync delete that session from another device while the form
+   * is open swapped the screen to tonight's table without a word: `atTheTable`
+   * then matched, and Save wrote the hand to the session the player is sitting
+   * at, stamped now.
+   */
+  const session = editing ? handSession : sessionId != null ? namedSession : activeSession;
 
   /**
    * Whether this is a hand at the table the player is sitting at right now.

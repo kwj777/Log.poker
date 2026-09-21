@@ -111,3 +111,56 @@ describe('a room that is not', () => {
     expect(mockCreated).toEqual(['Aria']);
   });
 });
+
+describe('a venue that will not save', () => {
+  it('says so, rather than stopping the spinner and leaving it at that', async () => {
+    // There was no catch, so the write failed in the one way that looks like
+    // success from a foot away: the spinner stopped, the typed name stayed,
+    // and no chip appeared. Both call sites are `void submit()`, so it was an
+    // unhandled rejection too. The player cannot start the session either,
+    // because there is no venue id, and nothing on screen says why.
+    await render(
+      <VenuePicker
+        venues={VENUES}
+        value={null}
+        onChange={(id) => mockChosen.push(id)}
+        onCreate={async () => {
+          throw new Error('The database is full.');
+        }}
+      />,
+    );
+
+    await userEvent.press(screen.getByText('+ New venue'));
+    await userEvent.type(screen.getByLabelText('New venue name'), 'Bellagio Two');
+    await userEvent.press(screen.getByText('Add'));
+
+    expect(await screen.findByText('The database is full.')).toBeTruthy();
+    expect(mockChosen).toEqual([]);
+  });
+
+  it('and clears the note once a different room is picked', async () => {
+    // `matched` had the same shape of problem in the other direction: a note
+    // about the last selection outlived the selection it described.
+    await render(
+      <VenuePicker
+        venues={VENUES}
+        value={null}
+        onChange={(id) => mockChosen.push(id)}
+        onCreate={async () => {
+          throw new Error('The database is full.');
+        }}
+      />,
+    );
+
+    await userEvent.press(screen.getByText('+ New venue'));
+    await userEvent.type(screen.getByLabelText('New venue name'), 'Bellagio Two');
+    await userEvent.press(screen.getByText('Add'));
+    await screen.findByText('The database is full.');
+
+    await userEvent.press(screen.getByText('Cancel'));
+    await userEvent.press(screen.getByText('Aria'));
+
+    expect(screen.queryByText('The database is full.')).toBeNull();
+    expect(mockChosen).toEqual(['v1']);
+  });
+});

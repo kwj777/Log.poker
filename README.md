@@ -82,10 +82,12 @@ conversion moment rather than a hostage situation.
 That argument lost to a simpler one. Every tracker worth using syncs for free,
 so the only paid thing in this app would also have been the one thing a player
 could get elsewhere for nothing, and *free in its entirety* would have carried a
-footnote forever. It is unbuilt today, it is roadmap item 2, and when it lands it
-lands free; [SYNC.md](SYNC.md) scopes what building it takes and names the one
-thing still in the way, which is that Untilt's sign-in only mails a code to an
-address that has bought something.
+footnote forever. **It landed, and it landed free.** See
+[Cross-device history](#cross-device-history) for what ships and
+[SYNC.md](SYNC.md) for how it is built. The one thing that used to be in the way
+was that Untilt's sign-in only mails a code to an address that has bought
+something; Log has its own door now, in `netlify/functions/signin.mts`, and it
+mails a code to anybody and mints a free-tier token at the end of it.
 
 The numbers themselves live in
 [FAMILY-PRICING.md](https://github.com/kwj777/Untilt/blob/main/FAMILY-PRICING.md)
@@ -159,7 +161,7 @@ operational check rather than a test of the change in front of it.
 
 ### Demo data
 
-Settings → **Load demo data** seeds 20 mixed-result sessions with hands and mood
+Settings → **Load demo data** seeds 32 mixed-result sessions with hands and mood
 entries -- enough to fill the dashboard and give the variance view something to
 say. The control is gated behind `__DEV__`, so it is stripped from production
 builds entirely rather than merely hidden.
@@ -761,15 +763,20 @@ Four things fall out of that and are asserted in the conformance suite:
   laptop with it.
 
 `listChangedSince(cursor)` is the only read that can see a tombstone, and the
-seam the sync engine plugs into. Nothing calls it yet. It exists because an
-invariant nothing can read is an invariant nothing can test.
+seam the sync engine plugs into. `SyncingRepository` is what calls it, once at
+the top of every push. It was written before there was an engine to call it,
+because an invariant nothing can read is an invariant nothing can test.
 
 The merge rules themselves are pure functions in `src/domain/merge.ts`: per
 record last-write-wins, a clock clamp, and the three cases where the thing in
 conflict is a constraint rather than a field, so both devices are right and the
-pair is wrong. **Not built yet: collecting tombstones.** They accumulate until
-something sweeps them, which is phase 2 work, and until then a heavy deleter's
-database grows where it used to shrink.
+pair is wrong. **Tombstones are collected on both sides now.** The device
+sweeps its own once a sync has settled, in `src/data/index.ts` and at the foot
+of a completed pull, and the server sweeps the bundle's in `collect`, never
+further back than the least advanced cursor it has heard. Collecting one too
+early is what resurrects a record, so the rule for how far back is safe is the
+careful part; see [Deletes are tombstones](#deletes-are-tombstones) and
+SYNC.md.
 
 ### Signing in, and what it is for
 
@@ -779,8 +786,9 @@ do with it**: Log is free in its entirety and stays completely usable by
 somebody who never types an email address. There is no signed-out state to
 handle, because signed out is the state every screen already runs in.
 
-The token is minted by Untilt's sign-in and is the same string in all three
-apps. It has to be a bearer string rather than a cookie: `log.poker`,
+The token is the same string in all three apps. Log mints its own, at its own
+door, and always at the free tier; Untilt's sign-in mints the same shape for
+somebody who has bought the pass. It has to be a bearer string rather than a cookie: `log.poker`,
 `untilt.poker` and `tiltproof.poker` are three registrable domains, so no cookie
 crosses them, and on iOS and Android there is no cookie jar at all.
 
@@ -1036,6 +1044,17 @@ the worse thing to lose and much the rarer: it takes six months offline and a
 write that never left. The alternative is a deleted session reappearing on every
 device, which takes only the six months.
 
+**Unless the same push is carrying something live that hangs off it.** A venue
+whose tombstone was collected has no fresh sessions arriving beside it; a room
+somebody added while offline and has been playing at ever since does. Without
+that exception the refusal cascaded, and it cascaded onto records the backstop
+has no argument with: tables merge parents first, so a refused venue leaves
+every session on it naming a parent the bundle does not have, which the parent
+rule refuses in turn, and the hands under those go the same way. One venue
+stamped four months ago took last night down with it. So a record at or above
+the horizon keeps the parent it names, and a parent kept that way keeps its
+own.
+
 A device that never signs in collects on the window alone, having nothing to
 disagree with. One that does sync never collects further back than the server
 says it has: the server draws that line from every device, and this one only
@@ -1066,26 +1085,26 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 83 passed
-Tests:       2008 passed
+Test Suites: 84 passed
+Tests:       2031 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
-  bundle             68   what ships to each platform, against the real output
+  bundle             71   what ships to each platform, against the real output
   sessionImport      63   reading a session-summary export
   site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
-  stats              54   P/L, rebuys, duration, win rate, groupings
+  stats              55   P/L, rebuys, duration, win rate, groupings
   verify             52   checking a token, and every way past it that must not work
   copy               51   what the sign-in and the sync are allowed to say
   syncingRepository  48   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   variance           41   win rate, σ, confidence bands, verdicts
+  values             39   money, dates, durations, stakes, formats, counts
   blog               38   the post grammar, the share cards, and what it refuses
-  values             36   money, dates, durations, stakes, formats, counts
   merge              33   two devices disagreeing, and who wins
   mood               33   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
@@ -1096,6 +1115,7 @@ Tests:       2008 passed
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
+  money              22   cents arithmetic, parsing, formatting
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1106,37 +1126,37 @@ Tests:       2008 passed
   clock              18   a typed date, a typed length, and what neither will accept
   editSession        18   correcting a session, including the one nobody cashed out
   history            18   the session list, its filters, and how much of it mounts
-  money              18   cents arithmetic, parsing, formatting
   seed               18   the demo dataset stays coherent
+  writeFailures      18   what the player sees when a write does not work
+  client             17   the sync client, against a fake fetch
   pastSession        17   logging a night that was played before it was logged
-  writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
-  client             15   the sync client, against a fake fetch
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
   settingsExport     15   the export card, and what it refuses to write
+  useLogStore        15   what a write reads back, and what it leaves alone
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   bankrollHeadline   13   the word over the headline figure, and what it has to be true of
   editHand           13   fixing or deleting a hand that was logged wrong
   rateLimit          13   how often one person may ask, and what a refusal costs
   sessionDetail      13   one session and the hands that belong to it
-  useLogStore        13   what a write reads back, and what it leaves alone
   logHand            12   logging a hand, the optional board, and the reset after a bad one
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching
+  pastHand           10   adding a hand to a session that is not running
   search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
   varianceHands       9   the hand breakdown, and the sentence that must precede it
-  pastHand            8   adding a hand to a session that is not running
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
   tokenStore.web      8   the browser token store
+  venuePicker         8   typing a room you already have, rather than adding a second
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   mergeVenues         7   folding one room into another, and the order it does it in
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
@@ -1146,11 +1166,11 @@ Tests:       2008 passed
   readme              6   the test table adds up and says what each suite is for
   scale               6   how much of the plot the data actually gets
   settingsHelp        6   the privacy link, the support address, the build
-  venuePicker         6   typing a room you already have, rather than adding a second
   errorBoundary       5   a render that throws, and the way back from it
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars
+  midSessionCheckIn   3   whether a check-in that failed says it was logged
   notFound            3   where a link that names nothing lands
 ```
 

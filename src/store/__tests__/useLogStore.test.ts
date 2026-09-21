@@ -32,6 +32,7 @@ const repository = {
   createHand: jest.fn(),
   addRebuy: jest.fn(),
   createMoodEntry: jest.fn(),
+  endSession: jest.fn(),
 };
 
 jest.mock('../../data', () => ({
@@ -70,6 +71,7 @@ beforeEach(async () => {
   repository.createMoodEntry.mockImplementation(async () => undefined);
   repository.createSession.mockImplementation(async () => ({ id: 's2', venueId: 'v1' }));
   repository.deleteSession.mockImplementation(async () => undefined);
+  repository.endSession.mockImplementation(async () => undefined);
   useLogStore.setState({ status: 'idle', error: null });
   await useLogStore.getState().hydrate();
   jest.clearAllMocks();
@@ -201,5 +203,45 @@ describe('two reloads in flight at once', () => {
 
     expect(useLogStore.getState().handCount).toBe(1);
     expect(useLogStore.getState().venues).toEqual([{ id: 'v-from-the-slow-read' }]);
+  });
+});
+
+describe('a write that lands and then a second one that does not', () => {
+  it('still learns about the session the database is now holding', async () => {
+    // `createSession` commits and `createMoodEntry` throws after it. The
+    // refresh used to sit below both, so it never ran: the store went on
+    // showing no session while the database held a live one, and the screen
+    // caught the rejection, said the session could not be started and put the
+    // Start button back. Pressing it wrote a second live session, and
+    // `getActiveSession` reads the newest open one, so the first became a row
+    // that is invisible and permanently open.
+    repository.createMoodEntry.mockImplementationOnce(async () => {
+      throw new Error('out of space');
+    });
+    repository.getActiveSession.mockImplementation(async () => ({ id: 's2', rebuys: [] }));
+
+    const session = await useLogStore.getState().startSession({
+      venueId: 'v1', gameType: 'NLHE', buyIn: 30_000, mood: 3,
+    });
+
+    // The session started, because it did.
+    expect(session.id).toBe('s2');
+    expect(useLogStore.getState().activeSession).toEqual({ id: 's2', rebuys: [] });
+  });
+
+  it('and reads the log back after a cash-out whose extras threw', async () => {
+    // The other end, where the throw is kept: what failed there is a
+    // tournament's field and finish rather than one optional tap. The session
+    // is closed either way, so the store has to stop drawing it as live.
+    repository.createMoodEntry.mockImplementationOnce(async () => {
+      throw new Error('out of space');
+    });
+    const before = readCounts().sessions;
+
+    await expect(
+      useLogStore.getState().endSession('s1', 45_000, 3),
+    ).rejects.toThrow('out of space');
+
+    expect(readCounts().sessions).toBeGreaterThan(before);
   });
 });

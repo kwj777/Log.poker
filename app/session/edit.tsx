@@ -194,8 +194,21 @@ export default function EditSessionScreen() {
           : {}),
         startedAt,
         // A live session keeps its open end. Only a finished one has a length
-        // to be wrong about.
-        ...(live ? {} : { endedAt: startedAt + (length as number) }),
+        // to be wrong about -- and only while it still has a result, because
+        // clearing the cash-out is the screen offering to put the night back
+        // to running and `endedAt` is the half that decides whether it is.
+        //
+        // It sent the length regardless, so the promise in the hint under that
+        // field went unkept in the quietest way available: the session came
+        // back with `cashOut` null and `endedAt` still set, which is neither
+        // running (`getActiveSession` wants an open end) nor complete
+        // (`isComplete` wants both), so it dropped out of the totals, the
+        // bankroll curve and the variance sample and rendered in History as an
+        // ordinary +$0 night with no Live badge. The one thing it was not was
+        // back to running.
+        ...(live
+          ? {}
+          : { endedAt: cashOut === null ? null : startedAt + (length as number) }),
       });
       successFeedback();
       router.back();

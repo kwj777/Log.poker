@@ -526,3 +526,34 @@ describe('a tournament file that reports a profit rather than a prize', () => {
     expect(landed(row.draft)).toBe(15_000);
   });
 });
+
+
+describe('a row that ends exactly where it starts', () => {
+  it('is counted as having no duration, which is what it has', () => {
+    // Date-only Start and End columns are the ordinary shape of a hand-kept
+    // spreadsheet, and a duration cell of 0 reads as zero rather than as
+    // nothing. Counted only when the end was missing or backwards, these rows
+    // landed with no hours and no warning: the profit went into the dashboard
+    // and the hours did not, and the sentence that would have explained the
+    // hourly rate moving never appeared.
+    const reading = parseSessionCsv(
+      [
+        'Date,End,Buy-in,Cash-out',
+        '2026-03-14,2026-03-14,100,150',
+        '2026-03-15,2026-03-15,100,60',
+      ].join('\n'),
+    );
+    expect(reading.sessions).toHaveLength(2);
+    for (const row of reading.sessions) {
+      expect(row.draft.endedAt).toBe(row.draft.startedAt);
+    }
+    expect(messages(reading)).toContain('2 sessions had no duration');
+  });
+
+  it('and a row with real hours on it is not', () => {
+    const reading = parseSessionCsv(
+      ['Date,End,Buy-in,Cash-out', '2026-03-14 19:00,2026-03-14 23:00,100,150'].join('\n'),
+    );
+    expect(messages(reading)).not.toContain('no duration');
+  });
+});

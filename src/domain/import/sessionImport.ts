@@ -356,12 +356,19 @@ export const parseSessionCsv = (
     }
     if (endedAt === null) {
       endedAt = startedAt;
-      noDuration += 1;
     } else if (endedAt < startedAt) {
       warn(row.line, 'The end time is before the start time; this session was given no duration.');
       endedAt = startedAt;
-      noDuration += 1;
     }
+    // Counted on the outcome rather than inside the two branches above, so the
+    // third way of getting here is counted too: an end that parses to exactly
+    // the start. That is the ordinary shape of a spreadsheet whose date
+    // columns carry no time of day, and of any duration cell holding 0 or
+    // 0:00, since `parseDurationMs` reads those as zero rather than as
+    // nothing. Those rows landed with no hours and no warning, so their profit
+    // went into the dashboard while their hours did not, and the one sentence
+    // that would have explained the hourly rate moving never appeared.
+    if (endedAt <= startedAt) noDuration += 1;
 
     // A tournament has no blinds, so an unreadable stakes cell is only worth
     // counting against a cash game -- where it is the difference between

@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 87 passed
-Tests:       2064 passed
+Tests:       2065 passed
 
   dexieRepository   137   the IndexedDB path, against real IndexedDB
   sqlRepository     137   the SQLite path, against real SQLite
@@ -1105,8 +1105,8 @@ Tests:       2064 passed
   variance           41   win rate, σ, confidence bands, verdicts
   blog               39   the post grammar, the share cards, and what it refuses
   values             39   money, dates, durations, stakes, formats, counts
+  mood               34   what tilt costs, and when to say nothing
   merge              33   two devices disagreeing, and who wins
-  mood               33   what tilt costs, and when to say nothing
   signinSweep        31   what the sign-in store may collect, and what it must not
   migrations         29   a filled v2 database walked forward, both engines
   session            29   holding a token, and stores that fail as real ones do

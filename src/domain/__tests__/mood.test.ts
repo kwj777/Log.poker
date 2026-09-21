@@ -176,6 +176,34 @@ describe('which sessions count', () => {
     const observations = toMoodObservations([played('a', 25, 4)], [mood('a', 'start', 2)]);
     expect(observations[0].resultBb).toBeCloseTo(25, 6);
   });
+
+  it('reads the journal of moods once, not once per session', () => {
+    // The join used to ask `startScoreOf` per session, and that walks every
+    // entry, so the cost went up with the square of the log -- on the JS
+    // thread, memoized on an array the store replaces every time anybody logs
+    // a hand. A count of walks rather than a stopwatch: this is about the
+    // shape of the work, and a stopwatch on a shared machine says nothing
+    // about that.
+    const sessions = Array.from({ length: 50 }, (_, i) =>
+      played(`s${i}`, 10, 4, T0 + i * 24 * HOUR),
+    );
+    const entries = sessions.flatMap((_, i) => [
+      mood(`s${i}`, 'start', 2, T0 + i * 24 * HOUR),
+      mood(`s${i}`, 'end', 4, T0 + i * 24 * HOUR + HOUR),
+    ]);
+
+    let walks = 0;
+    const iterate = entries[Symbol.iterator].bind(entries);
+    Object.defineProperty(entries, Symbol.iterator, {
+      value: () => {
+        walks += 1;
+        return iterate();
+      },
+    });
+
+    expect(toMoodObservations(sessions, entries)).toHaveLength(50);
+    expect(walks).toBe(1);
+  });
 });
 
 /* ------------------------------------------------------------- the grouping */

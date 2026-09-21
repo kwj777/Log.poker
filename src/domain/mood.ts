@@ -107,6 +107,32 @@ export const startScoreOf = (
 };
 
 /**
+ * The same answer for every session at once, in one pass over the entries.
+ *
+ * `startScoreOf` walks the whole list to answer about one session, which is
+ * the right shape for a caller asking once and the wrong one for a caller
+ * asking per session. `toMoodObservations` is the second kind, and there are
+ * about three entries per session, so it was three reads of the journal per
+ * session and the cost went up with the square of the log.
+ *
+ * It is not a background cost. `startMoodComparison` is memoized on the
+ * sessions array, and the store replaces that array on every write and every
+ * sync, so this ran on the JS thread each time somebody logged a hand with the
+ * Variance tab mounted -- which a bottom tab is, from the first visit onward.
+ * The tie-break is the one above, kept exactly: strictly earlier wins, so a
+ * correction typed in the same second does not displace the first answer.
+ */
+const earliestStarts = (moodEntries: readonly MoodEntry[]): Map<string, MoodEntry> => {
+  const earliest = new Map<string, MoodEntry>();
+  for (const entry of moodEntries) {
+    if (entry.phase !== 'start') continue;
+    const held = earliest.get(entry.sessionId);
+    if (held === undefined || entry.at < held.at) earliest.set(entry.sessionId, entry);
+  }
+  return earliest;
+};
+
+/**
  * Sessions reduced to (result in bb, hours, start mood), oldest first.
  *
  * `toObservations` does the hard filtering and its exclusions carry over
@@ -117,13 +143,15 @@ export const startScoreOf = (
 export const toMoodObservations = (
   sessions: readonly SessionWithChildren[],
   moodEntries: readonly MoodEntry[],
-): MoodObservation[] =>
-  toObservations(sessions)
+): MoodObservation[] => {
+  const earliest = earliestStarts(moodEntries);
+  return toObservations(sessions)
     .map((observation) => {
-      const startScore = startScoreOf(observation.sessionId, moodEntries);
-      return startScore === null ? null : { ...observation, startScore };
+      const start = earliest.get(observation.sessionId);
+      return start === undefined ? null : { ...observation, startScore: start.score };
     })
     .filter((observation): observation is MoodObservation => observation !== null);
+};
 
 export interface MoodGroup {
   sessions: number;

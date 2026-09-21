@@ -64,6 +64,7 @@ export default function NewSessionScreen() {
   const sessions = useLogStore((state) => state.sessions);
   const createVenue = useLogStore((state) => state.createVenue);
   const startSession = useLogStore((state) => state.startSession);
+  const refresh = useLogStore((state) => state.refresh);
 
   const defaults = useMemo(() => deriveDefaults(sessions), [sessions]);
 
@@ -79,6 +80,8 @@ export default function NewSessionScreen() {
   const [mood, setMood] = useState<MoodScore | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  /** Started, and the store could not be read back, so there is nowhere to go yet. */
+  const [stranded, setStranded] = useState(false);
 
   // Whether there is a last session to have been filled in from, which is the
   // same question `deriveDefaults` answers: it returns `STARTER_DEFAULTS` for
@@ -108,6 +111,24 @@ export default function NewSessionScreen() {
         mood,
       });
       successFeedback();
+      // **Only where the store came back with it.**
+      //
+      // `startSession` cannot fail on a re-read, deliberately: the session is
+      // committed before the refresh runs, and failing the call is what used
+      // to put the Start button back and let somebody write a second live one.
+      // So a read that never landed arrives here as a resolved promise and an
+      // empty store, and replacing this screen on that lands on one that says
+      // "No session running" about a session that is running -- from which the
+      // one obvious move is to come back and press Start again.
+      if (useLogStore.getState().activeSession === null) {
+        setStranded(true);
+        setStarting(false);
+        setFailed(
+          'Your session started. The log could not be read back just now, so it is not on ' +
+            'screen yet.',
+        );
+        return;
+      }
       // Replace rather than push: backing out of a live session into the "start
       // a session" screen would be a dead end.
       router.replace('/session/active');
@@ -119,39 +140,71 @@ export default function NewSessionScreen() {
     }
   };
 
+  /**
+   * Try the read again, and go if it lands.
+   *
+   * The one thing worth offering here, and the only one that is safe: Start is
+   * gone from this footer because pressing it would write the night a second
+   * time, which is the outcome all of this exists to avoid.
+   */
+  const reopen = async () => {
+    setStarting(true);
+    const landed = await refresh(['sessions', 'venues']);
+    setStarting(false);
+    if (landed && useLogStore.getState().activeSession !== null) {
+      router.replace('/session/active');
+      return;
+    }
+    setFailed(
+      'Still cannot read the log back. Your session is running and nothing about it is lost.',
+    );
+  };
+
   return (
     <Screen
       footer={
-        <View style={styles.footer}>
-          <Button
-            label={
-              !canStart
-                ? 'Start session'
-                : tournament
-                  ? `Start ${formatEntry(buyInCents ?? 0, feeCents, currency)}`
-                  : `Start ${formatStakes(stakes, currency)} · ${formatMoney(buyInCents ?? 0, {
-                      currency,
-                    })}`
-            }
-            onPress={() => void start()}
-            disabled={!canStart}
-            loading={starting}
-            accessibilityHint="Begins timing the session and records your buy-in"
-          />
-          {/*
-            For the player who opened this meaning to log last night. Replace
-            rather than push: the two screens are alternatives, and stacking
-            them would put a "start a session now" screen behind a finished
-            one for the Back gesture to land on.
-          */}
-          <Button
-            label="I already played this one"
-            variant="ghost"
-            size="medium"
-            onPress={() => router.replace('/session/past')}
-          />
-          <Button label="Cancel" variant="ghost" size="medium" onPress={() => router.back()} />
-        </View>
+        stranded ? (
+          <View style={styles.footer}>
+            <Button
+              label="Open your session"
+              onPress={() => void reopen()}
+              loading={starting}
+              accessibilityHint="Reads the log again and opens the session that is running"
+            />
+            <Button label="Cancel" variant="ghost" size="medium" onPress={() => router.back()} />
+          </View>
+        ) : (
+          <View style={styles.footer}>
+            <Button
+              label={
+                !canStart
+                  ? 'Start session'
+                  : tournament
+                    ? `Start ${formatEntry(buyInCents ?? 0, feeCents, currency)}`
+                    : `Start ${formatStakes(stakes, currency)} · ${formatMoney(buyInCents ?? 0, {
+                        currency,
+                      })}`
+              }
+              onPress={() => void start()}
+              disabled={!canStart}
+              loading={starting}
+              accessibilityHint="Begins timing the session and records your buy-in"
+            />
+            {/*
+              For the player who opened this meaning to log last night. Replace
+              rather than push: the two screens are alternatives, and stacking
+              them would put a "start a session now" screen behind a finished
+              one for the Back gesture to land on.
+            */}
+            <Button
+              label="I already played this one"
+              variant="ghost"
+              size="medium"
+              onPress={() => router.replace('/session/past')}
+            />
+            <Button label="Cancel" variant="ghost" size="medium" onPress={() => router.back()} />
+          </View>
+        )
       }
     >
       <PageMeta title="New session · Log" />

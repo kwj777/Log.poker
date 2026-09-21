@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2172 passed
+Tests:       2178 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1114,10 +1114,10 @@ Tests:       2172 passed
   palette             27   the theme matches BRAND.md
   sessionExport       27   the log written out, and read back by the importer
   editSession         24   correcting a session, including the one nobody cashed out
+  writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price
   handNotation        23   parse, round-trip, hand classes
   money               22   cents arithmetic, parsing, formatting
-  writeFailures       21   what the player sees when a write does not work
   clock               20   a typed date, a typed length, and what neither will accept
   compose             20   which repository a device gets, and the unsafe sweep
   glossary            20   the shorthand on screen still matches its explanation
@@ -1127,6 +1127,7 @@ Tests:       2172 passed
   csv                 19   quoting, delimiters, line endings
   gateCheck           19   the key-on-the-site script, run rather than read
   history             19   the session list, its filters, and how much of it mounts
+  useLogStore         19   what a write reads back, and what it leaves alone
   seed                18   the demo dataset stays coherent
   signin              18   the sign-in client, against a fake fetch
   client              17   the sync client, against a fake fetch
@@ -1134,7 +1135,6 @@ Tests:       2172 passed
   pastSession         17   logging a night that was played before it was logged
   settingsExport      17   the export card, and what it refuses to write
   sessionDetail       16   one session and the hands that belong to it
-  useLogStore         16   what a write reads back, and what it leaves alone
   handsList           15   browsing every hand, and finding one of them
   reviewPrompt        15   which flagged hands still want a review, and what the offer says
   hands               14   what a pile of logged hands adds up to, and the caveat on it

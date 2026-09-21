@@ -202,8 +202,15 @@ interface LogState {
   tableOfferMadeAt: number | null;
 
   hydrate: () => Promise<void>;
-  /** Defaults to every slice; a write names only what it could have changed. */
-  refresh: (parts?: readonly Slice[]) => Promise<void>;
+  /**
+   * Defaults to every slice; a write names only what it could have changed.
+   *
+   * Resolves to whether the read landed. It never rejects, because a write
+   * that has already committed must not be reported as failed -- see
+   * `startSession`, where doing that wrote the session twice -- but a caller
+   * that navigates on the strength of the re-read needs to be able to ask.
+   */
+  refresh: (parts?: readonly Slice[]) => Promise<boolean>;
 
   /** Null clears it, which puts the dashboard back to showing profit. */
   setStartingBalance: (balance: StartingBalance | null) => Promise<void>;
@@ -431,8 +438,22 @@ export const useLogStore = create<LogState>((set, get) => ({
         error: null,
         handsVersion: 'handCount' in patch ? state.handsVersion + 1 : state.handsVersion,
       }));
+      return true;
     } catch (error) {
+      // Recorded and reported, which used to be only the first of those. The
+      // `error` written here is drawn by `StaleDataNote` in the root layout,
+      // so the app says the data on screen may be behind; that is the right
+      // answer for a screen that is merely showing stale rows.
+      //
+      // It is not the right answer for a caller that is about to act on the
+      // re-read. `startSession` awaits this in a `finally` and returns the
+      // committed session either way, so a read that never landed arrived at
+      // `app/session/new.tsx` as a resolved promise and an empty store, and
+      // the screen replaced itself with one that says "No session running"
+      // about a session that is running. The only obvious move from there
+      // writes a second live session.
       set({ error: describeError(error) });
+      return false;
     }
   },
 

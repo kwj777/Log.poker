@@ -21,8 +21,9 @@
 import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
-import { session } from '../support/sessions';
+import { session, venue } from '../support/sessions';
 import LogHandScreen from '../../../app/session/hand';
+import NewSessionScreen from '../../../app/session/new';
 import ActiveSessionScreen from '../../../app/session/active';
 import SessionDetailScreen from '../../../app/session/[id]';
 import { useLogStore } from '../../store/useLogStore';
@@ -45,6 +46,18 @@ const replace = jest.requireMock('expo-router').router.replace as jest.Mock;
 jest.mock('../../data', () => ({
   getRepository: async () => ({ listHands: async () => [] }),
   onSyncApplied: () => () => undefined,
+}));
+
+/**
+ * Signed out, which is what the offers on these screens read.
+ *
+ * `PreSessionWarmUp` and `PostSessionReset` both ask the token store on mount,
+ * and the real one has nothing behind it here. Nothing in this file is about
+ * the pass; it just has to answer.
+ */
+jest.mock('../../auth', () => ({
+  getSession: async () => null,
+  hasPass: () => false,
 }));
 
 const full = () => new Error('The database is full.');
@@ -429,5 +442,62 @@ describe('when nothing has gone wrong', () => {
     ready({ logHand: (async () => ({ id: 'h1' })) as never });
     await renderScreen(<LogHandScreen />);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('a session that started and could not be read back', () => {
+  /**
+   * The write lands, the re-read after it does not.
+   *
+   * `startSession` will not fail the call for that, deliberately: the session
+   * is committed before the refresh runs, and failing it is what used to put
+   * the Start button back and let somebody write the night a second time. So
+   * this arrives at the screen as a resolved promise and an empty store.
+   */
+  const stranded = (refresh = jest.fn(async () => false)) =>
+    ready({
+      venues: [venue('v1', 'Aria')],
+      sessions: [],
+      activeSession: null,
+      startSession: (async () => session('s2')) as never,
+      refresh: refresh as never,
+    });
+
+  it('stays put rather than opening a screen that says it is not running', async () => {
+    stranded();
+    await renderScreen(<NewSessionScreen />);
+
+    await userEvent.press(screen.getByText(/^Start \$/));
+
+    // `/session/active` reads `activeSession` from the store, so replacing
+    // this screen would land on "No session running" about a session that is
+    // running -- from which the one obvious move writes a second live one.
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not be read back/)).toBeTruthy();
+  });
+
+  it('and takes Start away, because pressing it again is the whole disaster', async () => {
+    stranded();
+    await renderScreen(<NewSessionScreen />);
+
+    await userEvent.press(screen.getByText(/^Start \$/));
+
+    expect(screen.queryByText(/^Start \$/)).toBeNull();
+    expect(screen.getByText('Open your session')).toBeTruthy();
+  });
+
+  it('and opens it once the read lands', async () => {
+    const refresh = jest.fn(async () => {
+      useLogStore.setState({ activeSession: session('s2') });
+      return true;
+    });
+    stranded(refresh);
+    await renderScreen(<NewSessionScreen />);
+    await userEvent.press(screen.getByText(/^Start \$/));
+
+    await userEvent.press(screen.getByText('Open your session'));
+
+    expect(refresh).toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith('/session/active');
   });
 });

@@ -455,6 +455,28 @@ export const assessRecentStretch = (
  * the red a meaningful share of the time over any stretch short of hundreds of
  * hours, and seeing that number defuses a lot of tilt.
  */
+/**
+ * A probability in words, carrying its own qualifier.
+ *
+ * Rounding one to a whole percent turns anything under half a percent into
+ * "0%" and anything over 99.5 into "100%", and both are the sentence denying
+ * the thing it describes. `tournaments.ts` learned this first: a player
+ * nineteen entries into a drought read "missing 19 in a row comes up about 0%
+ * of the time", on the one card whose job is to settle somebody down. The
+ * fix lived there, privately, and the cash side -- where the same card says
+ * how often a winning player finishes a stretch in the red -- hand-rolled
+ * `Math.round(p * 100)` and printed the same lie to about one player in fifty.
+ *
+ * Near either bound the exact figure is not the point, so this says which side
+ * of the line the number is on instead, and takes the qualifier with it:
+ * "about" belongs to a rounded number and not to a bound.
+ */
+export const oddsInWords = (fraction: number): string => {
+  if (fraction > 0 && fraction < 0.005) return 'less than 1%';
+  if (fraction < 1 && fraction > 0.995) return 'more than 99%';
+  return `about ${Math.round(fraction * 100)}%`;
+};
+
 export const probabilityOfLoss = (estimate: PlayerEstimate, hours: number): number | null => {
   if (!estimate.reliable || estimate.stdDevBbPerHour <= 0 || hours <= 0) return null;
   const z = (0 - estimate.winRateBbPerHour * hours) / (estimate.stdDevBbPerHour * Math.sqrt(hours));

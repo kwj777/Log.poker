@@ -6,9 +6,9 @@
 
 import { DEFAULT_CURRENCY, formatEntry, formatStakes, stakesKey } from './money';
 import {
+  GAME_TYPE_LABELS,
   SESSION_FORMAT_LABELS,
   type Cents,
-  type GameType,
   type Rebuy,
   type Session,
   type SessionWithChildren,
@@ -354,10 +354,23 @@ export const byFormat = (sessions: readonly SessionWithChildren[]): GroupTotals[
     label: SESSION_FORMAT_LABELS[session.format],
   }));
 
+/**
+ * Profit by game, labeled the way every screen labels it.
+ *
+ * `satisfies` is a type assertion and is erased, so this was the stored value:
+ * a player who picked "Other" from a chip reading Other got a bar headed
+ * OTHER, in capitals, beside NLHE and PLO, and `BarBreakdown` speaks the label
+ * as well as drawing it. Its neighbor `byFormat` has always gone through
+ * `SESSION_FORMAT_LABELS`.
+ *
+ * `GAME_TYPE_LABELS` says of itself "one map now, and it is this one", and
+ * that was written while wiring the six screens -- this line predates them and
+ * was missed. It is the seventh.
+ */
 export const byGameType = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
   groupBy(sessions, (session) => ({
     key: session.gameType,
-    label: session.gameType satisfies GameType,
+    label: GAME_TYPE_LABELS[session.gameType],
   }));
 
 export const byVenue = (

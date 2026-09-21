@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 95 passed
-Tests:       2139 passed
+Tests:       2140 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1095,9 +1095,9 @@ Tests:       2139 passed
   site               62   the marketing/app split, the PWA, the sitemap
   tournaments        62   ROI, its interval, cash rate, dry runs, finishes
   handOffs           61   where a hand-off goes, and what the four offer cards say
+  stats              56   P/L, rebuys, duration, win rate, groupings
   content            55   every figure in the guides, re-derived and read back
   signinEndpoint     55   the free door, and every bound on it
-  stats              55   P/L, rebuys, duration, win rate, groupings
   copy               52   what the sign-in and the sync are allowed to say
   verify             52   checking a token, and every way past it that must not work
   syncingRepository  49   two devices and one server, no fakes in between

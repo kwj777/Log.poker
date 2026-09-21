@@ -23,10 +23,13 @@ import { getRepository, STORAGE_ENGINE } from '../../src/data';
 import { toCsvFile } from '../../src/domain/export/csv';
 import {
   HAND_HEADERS,
+  MOOD_HEADERS,
   SESSION_HEADERS,
   exportFileName,
   handRows,
+  moodRows,
   sessionRows,
+  type ExportKind,
 } from '../../src/domain/export/sessionExport';
 import { saveCsv } from '../../src/features/export/saveCsv';
 import { seedDemoData } from '../../src/data/seed';
@@ -41,6 +44,7 @@ export default function SettingsScreen() {
   const venues = useLogStore((state) => state.venues);
   const sessions = useLogStore((state) => state.sessions);
   const handCount = useLogStore((state) => state.handCount);
+  const moodEntries = useLogStore((state) => state.moodEntries);
   const deleteVenue = useLogStore((state) => state.deleteVenue);
   const refresh = useLogStore((state) => state.refresh);
   const clearAll = useLogStore((state) => state.clearAll);
@@ -72,7 +76,7 @@ export default function SettingsScreen() {
    * all of them are. An export is a deliberate act somebody waits a moment
    * for, so the one full read it costs is the right kind of expensive.
    */
-  const exportCsv = async (kind: 'sessions' | 'hands') => {
+  const exportCsv = async (kind: ExportKind) => {
     setBusy(true);
     setMessage(null);
     try {
@@ -81,12 +85,16 @@ export default function SettingsScreen() {
       const [headers, rows] =
         kind === 'sessions'
           ? [SESSION_HEADERS, sessionRows(all)]
-          : [HAND_HEADERS, handRows(await repository.listHands(), all)];
+          : kind === 'hands'
+            ? [HAND_HEADERS, handRows(await repository.listHands(), all)]
+            : [MOOD_HEADERS, moodRows(await repository.listMoodEntries(), all)];
 
       const result = await saveCsv(exportFileName(kind), toCsvFile(headers, rows));
       // Backing out of a share sheet is not a failure and gets no message.
       if (result.saved) {
-        setMessage(`Exported ${rows.length} ${kind === 'sessions' ? 'session' : 'hand'}${rows.length === 1 ? '' : 's'}.`);
+        const noun = kind === 'sessions' ? 'session' : kind === 'hands' ? 'hand' : 'mood entry';
+        const plural = kind === 'moods' ? 'mood entries' : `${noun}s`;
+        setMessage(`Exported ${rows.length} ${rows.length === 1 ? noun : plural}.`);
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Export failed');
@@ -162,8 +170,9 @@ export default function SettingsScreen() {
       <SectionHeader title="Export" />
       <Card>
         <Text color={colors.textSecondary} style={styles.body}>
-          Your log as a spreadsheet. The sessions file is the one Log reads back, so it is a
-          backup as well as a record: import it here and it lands as the sessions it came from.
+          Your log as spreadsheets. The sessions file is the only one Log reads back: import it
+          here and it lands as the sessions it came from, which makes it a backup as well as a
+          record. The other two are records.
         </Text>
         <View style={styles.exportRow}>
           <Button
@@ -184,9 +193,19 @@ export default function SettingsScreen() {
             disabled={busy || handCount === 0}
             onPress={() => void exportCsv('hands')}
           />
+          <Button
+            label="Moods"
+            variant="secondary"
+            size="medium"
+            style={styles.exportButton}
+            disabled={busy || moodEntries.length === 0}
+            onPress={() => void exportCsv('moods')}
+          />
         </View>
         <Text variant="caption" color={colors.textTertiary} style={styles.exportNote}>
           Hands carry your cards, the board where you logged one, your seat, tags and note.
+          Moods carry every score you have given a session, which is what the mood cost on the
+          Variance tab is built from.
         </Text>
       </Card>
 

@@ -54,6 +54,7 @@ import { successFeedback } from '../../src/components/haptics';
 import {
   formatDateInput,
   fromHoursAndMinutes,
+  isAhead,
   parseDateTime,
 } from '../../src/domain/clock';
 import { parseCount } from '../../src/domain/import/values';
@@ -145,17 +146,36 @@ export default function PastSessionScreen() {
   const lengthInvalid = (hours.trim() !== '' || minutes.trim() !== '') && length === null;
 
   const endedAt = startedAt !== null && length !== null ? startedAt + length : null;
+
+  /**
+   * A session that has not happened yet is a typo, and an expensive one.
+   *
+   * Both ends are checked because they fail differently. A start in the future
+   * is a mistyped year, which is the classic. An end in the future with a
+   * sound start is a mistyped length -- 40 hours for 4 -- and that one is
+   * invisible on the start field.
+   */
+  const startAhead = startedAt !== null && isAhead(startedAt);
+  const endAhead = !startAhead && endedAt !== null && isAhead(endedAt);
+
+  const startHint = startAhead
+    ? 'That is in the future. Check the year.'
+    : undefined;
   const lengthHint = lengthInvalid
     ? 'How long did you play? Hours and minutes.'
-    : endedAt === null
-      ? 'How long you played.'
-      : `Finishing ${formatSessionDate(endedAt)} at ${formatTimeOfDay(endedAt)}.`;
+    : endAhead
+      ? 'That length runs past now. Check the hours.'
+      : endedAt === null
+        ? 'How long you played.'
+        : `Finishing ${formatSessionDate(endedAt)} at ${formatTimeOfDay(endedAt)}.`;
 
   const canSave =
     venueId !== null &&
     startedAt !== null &&
     length !== null &&
     length > 0 &&
+    !startAhead &&
+    !endAhead &&
     buyInCents !== null &&
     buyInCents > 0 &&
     cashOutCents !== null &&
@@ -298,7 +318,8 @@ export default function PastSessionScreen() {
         time={time}
         onChangeDate={setDate}
         onChangeTime={setTime}
-        invalid={startInvalid}
+        invalid={startInvalid || startAhead}
+        hint={startHint}
       />
 
       <SectionHeader title="Played for" />
@@ -308,7 +329,7 @@ export default function PastSessionScreen() {
         onChangeHours={setHours}
         onChangeMinutes={setMinutes}
         hint={lengthHint}
-        invalid={lengthInvalid}
+        invalid={lengthInvalid || endAhead}
       />
 
       <SectionHeader title={tournament ? 'Prize' : 'Cashed out'} />

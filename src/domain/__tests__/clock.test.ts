@@ -12,6 +12,7 @@ import {
   formatDateInput,
   formatTimeInput,
   fromHoursAndMinutes,
+  isAhead,
   parseDateTime,
   toHoursAndMinutes,
 } from '../clock';
@@ -93,5 +94,38 @@ describe('a session’s length, as fields', () => {
 
   it('accepts a decimal hour, because somebody will type 3.5', () => {
     expect(fromHoursAndMinutes('3.5', '')).toBe(3 * 3_600_000 + 30 * 60_000);
+  });
+});
+
+/**
+ * The guard on a moment that has not happened yet.
+ *
+ * `2062-09-19` for `2026-09-19` parses and is a real date, so nothing but a
+ * range check catches it -- and one costs more than the typo deserves: every
+ * later session defaults from the newest start, the recent-stretch verdict is
+ * computed over a set that permanently contains it, and the bankroll curve
+ * gets a point decades out.
+ */
+describe('a moment that has not happened yet', () => {
+  const NOW = Date.UTC(2026, 8, 21, 12, 0);
+
+  it('is ahead when it is a year out, which is the typo this is for', () => {
+    expect(isAhead(Date.UTC(2062, 8, 21, 12, 0), NOW)).toBe(true);
+  });
+
+  it('is not ahead when it is in the past, which is every real session', () => {
+    expect(isAhead(Date.UTC(2026, 8, 20, 12, 0), NOW)).toBe(false);
+  });
+
+  it('and not when it is now, because a session logged as it starts is ordinary', () => {
+    expect(isAhead(NOW, NOW)).toBe(false);
+  });
+
+  it('tolerates a device clock that is a minute fast', () => {
+    expect(isAhead(NOW + 60_000, NOW)).toBe(false);
+  });
+
+  it('but not one that is an hour out, which is no longer a clock drifting', () => {
+    expect(isAhead(NOW + 3_600_000, NOW)).toBe(true);
   });
 });

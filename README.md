@@ -1066,8 +1066,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 69 passed
-Tests:       1806 passed
+Test Suites: 74 passed
+Tests:       1888 passed
 
   dexieRepository   124   the IndexedDB path, against real IndexedDB
   sqlRepository     124   the SQLite path, against real SQLite
@@ -1091,11 +1091,11 @@ Tests:       1806 passed
   signinSweep        31   what the sign-in store may collect, and what it must not
   token              29   the family token grammar, against signed fixtures
   palette            27   the theme matches BRAND.md
+  sessionExport      27   the log written out, and read back by the importer
   migrations         26   a filled v2 database walked forward, both engines
   session            24   holding a token, and stores that fail as real ones do
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
-  sessionExport      22   the log written out, and read back by the importer
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1103,40 +1103,45 @@ Tests:       1806 passed
   batch              19   a backlog split into requests, without orphaning a child
   csv                19   quoting, delimiters, line endings
   gateCheck          19   the key-on-the-site script, run rather than read
+  clock              18   a typed date, a typed length, and what neither will accept
+  history            18   the session list, its filters, and how much of it mounts
   money              18   cents arithmetic, parsing, formatting
+  editSession        17   correcting a session, including the one nobody cashed out
+  pastSession        17   logging a night that was played before it was logged
   seed               17   the demo dataset stays coherent
   writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
   client             15   the sync client, against a fake fetch
+  handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
-  editSession        14   correcting a session, including the one nobody cashed out
+  hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
-  pastSession        14   logging a night that was played before it was logged
-  clock              13   a typed date, a typed length, and what neither will accept
   editHand           13   fixing or deleting a hand that was logged wrong
-  history            13   the session list, its filters, and how much of it mounts
   rateLimit          13   how often one person may ask, and what a refusal costs
   useLogStore        13   what a write reads back, and what it leaves alone
   logHand            12   logging a hand, the optional board, and the reset after a bad one
+  sessionDetail      12   one session and the hands that belong to it
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching
+  search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
+  settingsExport     10   the export card, and what it refuses to write
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
+  varianceHands       9   the hand breakdown, and the sentence that must precede it
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
-  sessionDetail       8   one session and the hands that belong to it
   tokenStore.web      8   the browser token store
   cursorStore         7   which cursors survive a launch, and what a lost one costs
   reviewFlagged       7   the review card on the dashboard, and the nights it stays off
   readme              6   the test table adds up and says what each suite is for
-  settingsExport      6   the export card, and what it refuses to write
   settingsHelp        6   the privacy link, the support address, the build
   errorBoundary       5   a render that throws, and the way back from it
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
+  varianceCurrency    5   the variance page stops adding euros to dollars
   notFound            3   where a link that names nothing lands
 ```
 

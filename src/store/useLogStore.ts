@@ -692,6 +692,45 @@ export const useHandsForSession = (sessionId: string | null): Hand[] | null => {
 };
 
 /**
+ * Every hand, for the screen that browses them.
+ *
+ * Read through the repository rather than held in the store, which is the same
+ * decision `useHandsForSession` makes and for the reason recorded above
+ * `handCount`: keeping the hands in memory cost the most expensive read in the
+ * app on every hand write, to serve screens that each wanted one session's
+ * worth. A screen that genuinely wants all of them pays for them while it is
+ * open, and nothing else pays anything.
+ *
+ * `null` while the first read is outstanding, so a screen can tell "no hands
+ * logged" from "not yet known" -- an empty list drawn during the read is an
+ * empty state that flashes and then fills, which reads as a bug.
+ */
+export const useAllHands = (): Hand[] | null => {
+  const version = useLogStore((state) => state.handsVersion);
+  const [hands, setHands] = useState<Hand[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const repository = await getRepository();
+        const rows = await repository.listHands();
+        if (live) setHands(rows);
+      } catch {
+        // The screen keeps whatever it had, as the two hooks below do: a
+        // failed read here is the local database being unavailable, which the
+        // root layout already reports.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [version]);
+
+  return hands;
+};
+
+/**
  * One hand, read by id, for the screen that edits it.
  *
  * Three answers rather than two, which is why this does not simply return

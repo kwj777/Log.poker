@@ -134,6 +134,7 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen name="import" options={{ title: 'Import sessions · Log' }} />
+          <Stack.Screen name="hands" options={{ title: 'Hands · Log' }} />
           {/* Where a purchase made at another of the family's apps lands. The
               route has to exist under /app, because that is where this site
               serves the app from and a link to /claim would be answered by the

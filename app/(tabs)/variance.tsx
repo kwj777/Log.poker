@@ -12,16 +12,19 @@
  * see that, and pretending otherwise would make the reassurance worthless.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
+import { ChipGroup } from '../../src/components/Chip';
 import { EmptyState } from '../../src/components/EmptyState';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
+import { HandBreakdown } from '../../src/components/chart/HandBreakdown';
 import { LineChart } from '../../src/components/chart/LineChart';
 import { GUIDES } from '../../src/config';
 import {
@@ -31,7 +34,9 @@ import {
   probabilityOfLoss,
   toObservations,
 } from '../../src/domain/variance';
-import { formatMoney } from '../../src/domain/money';
+import { currencyLabel, formatMoney } from '../../src/domain/money';
+import { byPosition, byTag, handTotals } from '../../src/domain/hands';
+import { currenciesUsed, inCurrency } from '../../src/domain/stats';
 import {
   assessRoi,
   assessTournaments,
@@ -51,7 +56,7 @@ import { STAT_HELP } from '../../src/domain/glossary';
 import { startMoodComparison } from '../../src/domain/mood';
 import { openHandOff } from '../../src/features/family/hooks';
 import { untiltHandOff } from '../../src/features/family/links';
-import { useLogStore } from '../../src/store/useLogStore';
+import { useAllHands, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
 import type { StretchVerdict } from '../../src/domain/variance';
 import { PageMeta } from '../../src/components/PageMeta';
@@ -86,8 +91,49 @@ const VERDICT_COLORS: Record<StretchVerdict, string> = {
 };
 
 export default function VarianceScreen() {
-  const sessions = useLogStore((state) => state.sessions);
+  const all = useLogStore((state) => state.sessions);
   const moodEntries = useLogStore((state) => state.moodEntries);
+  const allHands = useAllHands();
+  const [picked, setPicked] = useState<string | null>(null);
+
+  /**
+   * One currency at a time, exactly as the dashboard and Sessions do it.
+   *
+   * This screen was the one that did not, which was worse than the uniform
+   * dollars it replaced: the other two tabs started telling the truth about a
+   * player with two currencies and this one went on adding them, so the app
+   * contradicted itself on the screen whose whole job is to be believed.
+   *
+   * It matters differently in the two halves below. The cash estimate is in
+   * big blinds, so the units at least divide out -- but a euro big blind and
+   * a dollar big blind are not the same money, and a standard deviation over
+   * the mixture is a number about nothing. The tournament totals are raw
+   * cents, so mixing them produced a sum that was simply wrong and an ROI
+   * that was a ratio of two wrong sums.
+   */
+  const currencies = useMemo(() => currenciesUsed(all), [all]);
+  const currency = picked !== null && currencies.includes(picked) ? picked : currencies[0] ?? 'USD';
+  const sessions = useMemo(
+    () => (currencies.length > 1 ? inCurrency(all, currency) : all),
+    [all, currencies.length, currency],
+  );
+
+  /**
+   * The hands, scoped to the sessions on screen so the pot swings are in the
+   * currency the rest of the page is in.
+   *
+   * `useAllHands` reads them while this screen is open rather than holding
+   * them in the store -- see the hook, and `handCount` above it, for why the
+   * store deliberately does not.
+   */
+  const hands = useMemo(() => {
+    if (allHands === null) return [];
+    const ids = new Set(sessions.map((session) => session.id));
+    return allHands.filter((hand) => ids.has(hand.sessionId));
+  }, [allHands, sessions]);
+  const handSummary = useMemo(() => handTotals(hands), [hands]);
+  const tagGroups = useMemo(() => byTag(hands), [hands]);
+  const positionGroups = useMemo(() => byPosition(hands), [hands]);
 
   const observations = useMemo(() => toObservations(sessions), [sessions]);
   const moodComparison = useMemo(
@@ -180,6 +226,24 @@ export default function VarianceScreen() {
    * and with one, because the loss chance printed above it is a number people
    * want to see the working for.
    */
+  /**
+   * Offered only when there is a choice, and in both branches below, because
+   * the empty one is reachable per currency: a player with a season in
+   * dollars and three sessions in euros gets the real screen for one and
+   * "not enough yet" for the other, and needs the way back.
+   */
+  const currencyChips =
+    currencies.length > 1 ? (
+      <View style={styles.currencyRow}>
+        <ChipGroup
+          options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
+          value={currency}
+          onChange={setPicked}
+          scroll
+        />
+      </View>
+    ) : null;
+
   const guide = (
     <Button
       label="Running bad, or playing bad?"
@@ -200,6 +264,7 @@ export default function VarianceScreen() {
     return (
       <Screen>
         <PageMeta title="Variance · Log" />
+        {currencyChips}
         <View style={styles.header}>
           <Text variant="title">Variance</Text>
         </View>
@@ -210,6 +275,7 @@ export default function VarianceScreen() {
             assessment={tournamentAssessment}
             interval={roiInterval}
             roi={roiAssessment}
+            currency={currency}
           />
         ) : null}
         <Card style={styles.explainer}>
@@ -229,6 +295,7 @@ export default function VarianceScreen() {
   return (
     <Screen>
       <PageMeta title="Variance · Log" />
+      {currencyChips}
       <View style={styles.header}>
         <Text variant="title">Variance</Text>
         <Text color={colors.textSecondary} style={styles.subtitle}>
@@ -252,6 +319,7 @@ export default function VarianceScreen() {
             assessment={tournamentAssessment}
             interval={roiInterval}
             roi={roiAssessment}
+            currency={currency}
           />
       ) : null}
 
@@ -334,6 +402,66 @@ export default function VarianceScreen() {
         </>
       ) : null}
 
+      {/*
+        Only to somebody who has logged some. A player who has never written a
+        hand down gets a section explaining an empty chart, which is worse than
+        no section: this page is long already and every card on it is supposed
+        to be about them.
+      */}
+      {handSummary.count > 0 ? (
+        <>
+          <SectionHeader title="The hands you wrote down" />
+          <Card>
+            {/*
+              First, and not in small print at the bottom. Everything under
+              this sentence looks like a positional win rate and is not one,
+              and somebody who reads the bars before the caveat has already
+              drawn the wrong conclusion.
+            */}
+            <Text color={colors.textSecondary} style={styles.handsCaveat}>
+              These are the hands you chose to write down, not the hands you played. A bad beat
+              is memorable and a folded blind is not, so read this as a record of what stuck
+              rather than as a measure of your game. {handSummary.count} hand
+              {handSummary.count === 1 ? '' : 's'} so far.
+            </Text>
+
+            {tagGroups.length > 0 ? (
+              <>
+                <Text variant="bodyStrong" style={styles.handsHeading}>
+                  By tag
+                </Text>
+                <HandBreakdown
+                  groups={tagGroups}
+                  currency={currency}
+                  emptyMessage="None of them carry a tag."
+                />
+              </>
+            ) : null}
+
+            {positionGroups.length > 0 ? (
+              <>
+                <Text variant="bodyStrong" style={styles.handsHeading}>
+                  By seat
+                </Text>
+                <HandBreakdown
+                  groups={positionGroups}
+                  currency={currency}
+                  emptyMessage="None of them recorded a seat."
+                />
+              </>
+            ) : null}
+
+            <Button
+              label="Open your hands"
+              variant="secondary"
+              size="small"
+              onPress={() => router.push('/hands')}
+              style={styles.handsAction}
+            />
+          </Card>
+        </>
+      ) : null}
+
       <MoodCost comparison={moodComparison} />
 
       <FamilyCrossPromo exclude={['log']} style={styles.family} />
@@ -380,11 +508,14 @@ const TournamentCard = ({
   assessment,
   interval,
   roi,
+  currency,
 }: {
   totals: TournamentTotals;
   assessment: TournamentAssessment;
   interval: RoiInterval | null;
   roi: RoiAssessment;
+  /** The money these entries were played for, since the totals are raw cents. */
+  currency: string;
 }) => (
   <>
     <SectionHeader title="Tournaments" />
@@ -422,7 +553,7 @@ const TournamentCard = ({
         />
         <StatTile
           label="Fees paid"
-          value={formatMoney(totals.fees)}
+          value={formatMoney(totals.fees, { currency })}
           hint="never coming back"
         />
       </View>
@@ -446,6 +577,24 @@ const TournamentCard = ({
 );
 
 const styles = StyleSheet.create({
+  handsCaveat: {
+    lineHeight: 22,
+  },
+  handsHeading: {
+    // On both, so the two breakdowns are separated from each other and the
+    // first is separated from the caveat above it, without a style per slot.
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  handsAction: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.lg,
+  },
+  currencyRow: {
+    paddingTop: spacing.xl,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
   header: {
     paddingTop: spacing.xl,
   },

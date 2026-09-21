@@ -63,17 +63,22 @@ const hand = (id: string, over: Partial<Hand> = {}): Hand => ({
   ...over,
 });
 
-const load = (hands: Hand[]) => {
+const load = (
+  hands: Hand[],
+  over: Partial<ReturnType<typeof useLogStore.getState>> = {},
+) => {
   viewing.id = 's1';
   held.hands = hands;
   held.gate = null;
   useLogStore.setState({
     status: 'ready',
-      sessions: [session('s1'), session('s2')],
+    sessions: [session('s1'), session('s2')],
     venues: [],
     moodEntries: [],
+    activeSession: null,
     handCount: hands.length,
     handsVersion: 0,
+    ...over,
   });
 };
 
@@ -173,5 +178,52 @@ describe('moving from one session to another', () => {
 
     open();
     expect(await screen.findByText('Hands (1)')).toBeTruthy();
+  });
+});
+
+/**
+ * The unfinished session the live screen is not showing.
+ *
+ * `getActiveSession` answers with the newest session that has no end, so a
+ * second one can exist and only one of them is reachable -- two devices each
+ * starting a session and syncing is the way it happens. Such a session used to
+ * draw a "Back to live session" button that went to a different night
+ * entirely, which is worse than saying nothing: it is the app quietly changing
+ * the subject.
+ */
+describe('a session that was never finished', () => {
+  it('offers the live screen when it is the one the live screen is showing', async () => {
+    const running = session('s1', { endedAt: null, cashOut: null });
+    load([], { sessions: [running, session('s2')], activeSession: running });
+    await renderScreen(<SessionDetailScreen />);
+
+    expect(screen.getByText('Back to live session')).toBeTruthy();
+    expect(screen.queryByText('This one was never finished')).toBeNull();
+  });
+
+  it('but says so when another session is the live one', async () => {
+    const stranded = session('s1', { endedAt: null, cashOut: null });
+    const running = session('s2', { endedAt: null, cashOut: null });
+    load([], { sessions: [stranded, running], activeSession: running });
+    await renderScreen(<SessionDetailScreen />);
+
+    expect(screen.getByText('This one was never finished')).toBeTruthy();
+    // The button that would have taken them somewhere else entirely.
+    expect(screen.queryByText('Back to live session')).toBeNull();
+  });
+
+  it('and points at the screen that can give it an end', async () => {
+    const stranded = session('s1', { endedAt: null, cashOut: null });
+    const running = session('s2', { endedAt: null, cashOut: null });
+    load([], { sessions: [stranded, running], activeSession: running });
+    await renderScreen(<SessionDetailScreen />);
+    expect(screen.getByText('Edit this session')).toBeTruthy();
+  });
+
+  it('says nothing of the kind about a session that has a result', async () => {
+    const running = session('s2', { endedAt: null, cashOut: null });
+    load([], { sessions: [session('s1'), running], activeSession: running });
+    await renderScreen(<SessionDetailScreen />);
+    expect(screen.queryByText('This one was never finished')).toBeNull();
   });
 });

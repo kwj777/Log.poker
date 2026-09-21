@@ -13,11 +13,13 @@ import { router } from 'expo-router';
 import { Button } from '../../src/components/Button';
 import { ChipGroup } from '../../src/components/Chip';
 import { EmptyState } from '../../src/components/EmptyState';
+import { SearchField } from '../../src/components/SearchField';
 import { Screen } from '../../src/components/Screen';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { StatTile } from '../../src/components/StatTile';
 import { Text } from '../../src/components/Text';
 import { currencyLabel, formatMoney } from '../../src/domain/money';
+import { matchesTerms, searchTerms } from '../../src/domain/search';
 import { currenciesUsed, inCurrency, totals } from '../../src/domain/stats';
 import {
   GAME_TYPES,
@@ -70,6 +72,7 @@ export default function HistoryScreen() {
   const [gameType, setGameType] = useState<GameType | null>(null);
   const [format, setFormat] = useState<SessionFormat | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string | null>(null);
 
   /**
@@ -105,17 +108,32 @@ export default function HistoryScreen() {
 
   const filtered = useMemo(() => {
     const from = period === 'all' ? undefined : openedAt - Number(period) * DAY;
-    return filterSessions(sessions, {
+    const narrowed = filterSessions(sessions, {
       ...(from === undefined ? {} : { from }),
       ...(gameType === null ? {} : { gameType }),
       ...(format === null ? {} : { format }),
       ...(venueId === null ? {} : { venueId }),
     });
-  }, [sessions, period, gameType, format, venueId, openedAt]);
+    /*
+      The room and the note, which are the two things anybody remembers a
+      session by. Not the numbers: somebody searching "300" means a buy-in,
+      a cash-out or a result and the app cannot tell which, and a search that
+      answers the wrong one of the three is worse than no search.
+    */
+    const terms = searchTerms(query);
+    if (terms.length === 0) return narrowed;
+    return narrowed.filter((session) =>
+      matchesTerms(terms, session.venue?.name, session.notes),
+    );
+  }, [sessions, period, gameType, format, venueId, openedAt, query]);
 
   const summary = useMemo(() => totals(filtered), [filtered]);
   const filtersActive =
-    period !== 'all' || gameType !== null || format !== null || venueId !== null;
+    period !== 'all' ||
+    gameType !== null ||
+    format !== null ||
+    venueId !== null ||
+    query.trim() !== '';
 
   /**
    * The format row is offered only to somebody who plays both, for the reason
@@ -148,14 +166,33 @@ export default function HistoryScreen() {
       <View style={styles.header}>
         <Text variant="title">Sessions</Text>
         {/*
-          Where somebody notices a night is missing, which is why the way to
-          add one belongs here rather than only behind "Start a session".
+          The two other things somebody browsing their log wants: the night
+          that is missing, which is why the way to add one belongs here rather
+          than only behind "Start a session", and the hands, which until now
+          could only be reached one session at a time.
         */}
-        <Button
-          label="Add a past session"
-          variant="ghost"
-          size="small"
-          onPress={() => router.push('/session/past')}
+        <View style={styles.headerActions}>
+          <Button
+            label="Hands"
+            variant="ghost"
+            size="small"
+            onPress={() => router.push('/hands')}
+          />
+          <Button
+            label="Add a past session"
+            variant="ghost"
+            size="small"
+            onPress={() => router.push('/session/past')}
+          />
+        </View>
+      </View>
+
+      <View style={styles.search}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search rooms and notes"
+          accessibilityLabel="Search sessions"
         />
       </View>
 
@@ -209,6 +246,7 @@ export default function HistoryScreen() {
                 setGameType(null);
                 setFormat(null);
                 setVenueId(null);
+                setQuery('');
               }}
             />
           ) : undefined
@@ -244,7 +282,25 @@ export default function HistoryScreen() {
             }
             action={
               all.length === 0 ? (
-                <Button label="Start a session" onPress={() => router.push('/session/new')} />
+                // The same three as the dashboard's empty state: the header's
+                // "Add a past session" is above the fold on a full list and
+                // easy to miss on an empty one, and the importer is otherwise
+                // only in Settings.
+                <View style={styles.emptyActions}>
+                  <Button label="Start a session" onPress={() => router.push('/session/new')} />
+                  <Button
+                    label="Add a session you already played"
+                    variant="ghost"
+                    size="medium"
+                    onPress={() => router.push('/session/past')}
+                  />
+                  <Button
+                    label="Import from a spreadsheet"
+                    variant="ghost"
+                    size="medium"
+                    onPress={() => router.push('/import')}
+                  />
+                </View>
               ) : undefined
             }
           />
@@ -272,6 +328,16 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
+  emptyActions: {
+    alignSelf: 'stretch',
+    gap: spacing.sm,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -281,6 +347,9 @@ const styles = StyleSheet.create({
     // The ghost button carries its own padding, so it is pulled back out to
     // the edge the title sits on.
     marginRight: -spacing.md,
+  },
+  search: {
+    marginBottom: spacing.md,
   },
   filters: {
     gap: spacing.sm,

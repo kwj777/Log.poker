@@ -19,9 +19,10 @@ import {
   SESSION_HEADERS,
   exportFileName,
   handRows,
+  moodRows,
   sessionRows,
 } from '../sessionExport';
-import type { Hand, SessionWithChildren } from '../../types';
+import type { Hand, MoodEntry, SessionWithChildren } from '../../types';
 
 const T0 = Date.UTC(2026, 2, 14, 19, 30);
 const HOUR = 3_600_000;
@@ -284,12 +285,73 @@ describe('the hands, which are notes rather than a hand history', () => {
   });
 });
 
+/**
+ * How the sessions felt, which neither of the other two files carried.
+ *
+ * Log asks for a score at the start of a session, two hours in and at
+ * cash-out, and the mood-cost comparison is built on the answers. Somebody who
+ * exported, cleared the app and re-imported used to get their sessions back
+ * and lose every one of these without being told.
+ */
+describe('the moods file', () => {
+  const mood = (over: Partial<MoodEntry> = {}): MoodEntry => ({
+    id: 'm1',
+    sessionId: 's1',
+    phase: 'start',
+    score: 4,
+    at: T0,
+    createdAt: T0,
+    updatedAt: T0,
+    ...over,
+  });
+
+  it('names the session by its start and its room, the way the hands file does', () => {
+    const rows = moodRows([mood()], [session()]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0][1]).toBe('2026-03-14 19:30');
+    expect(rows[0][2]).toBe('Aria');
+  });
+
+  it('carries the phase and the score, which is the whole of the record', () => {
+    const rows = moodRows([mood({ phase: 'end', score: 2 })], [session()]);
+    expect(rows[0][3]).toBe('end');
+    expect(rows[0][4]).toBe('2');
+  });
+
+  it('keeps all three of a session, which is why it is not columns on the sessions file', () => {
+    const rows = moodRows(
+      [
+        mood({ id: 'a', phase: 'start', at: T0 }),
+        mood({ id: 'b', phase: 'mid', at: T0 + 2 * HOUR }),
+        mood({ id: 'c', phase: 'end', at: T0 + 4 * HOUR }),
+      ],
+      [session()],
+    );
+    expect(rows).toHaveLength(3);
+  });
+
+  it('writes oldest first', () => {
+    const rows = moodRows(
+      [mood({ id: 'late', at: T0 + 5 * HOUR }), mood({ id: 'early', at: T0 })],
+      [session()],
+    );
+    expect(rows[0][0] < rows[1][0]).toBe(true);
+  });
+
+  it('survives an entry whose session is gone, rather than writing nothing', () => {
+    const rows = moodRows([mood({ sessionId: 'missing' })], [session()]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0][2]).toBe('');
+  });
+});
+
 describe('what the file is called', () => {
   it('says what it holds and when it was taken', () => {
     expect(exportFileName('sessions', Date.UTC(2026, 2, 14, 12))).toBe(
       'log-sessions-2026-03-14.csv',
     );
     expect(exportFileName('hands', Date.UTC(2026, 11, 1, 12))).toBe('log-hands-2026-12-01.csv');
+    expect(exportFileName('moods', Date.UTC(2026, 11, 1, 12))).toBe('log-moods-2026-12-01.csv');
   });
 
   it('pads the month and the day, so the names sort', () => {

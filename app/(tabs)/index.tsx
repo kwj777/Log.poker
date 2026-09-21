@@ -442,10 +442,16 @@ export default function DashboardScreen() {
                 always zero. Hard-coded, it put $0 under the left end of a
                 curve based at $5,000 while the caption at the other end read
                 $5.3k: two captions on one axis, disagreeing. */}
-            {curve.length > 0 ? formatMoneyCompact(balance ?? 0, currency) : ''}
+            {/* And `> 1` rather than `> 0`, which is the chart's own rule:
+                `LineChart` draws when a series has more than one point,
+                because one point is not a line, and `bankrollCurve` emits one
+                per completed session. With exactly one, the body read "Not
+                enough data yet" and this strip still printed two money figures
+                for a line nobody had drawn. */}
+            {curve.length > 1 ? formatMoneyCompact(balance ?? 0, currency) : ''}
           </Text>
           <Text variant="caption" color={colors.textTertiary}>
-            {curve.length > 0
+            {curve.length > 1
               ? formatMoneyCompact(curve[curve.length - 1].cumulative, currency)
               : ''}
           </Text>

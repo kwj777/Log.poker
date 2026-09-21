@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 96 passed
-Tests:       2153 passed
+Test Suites: 97 passed
+Tests:       2155 passed
 
   dexieRepository   145   the IndexedDB path, against real IndexedDB
   sqlRepository     142   the SQLite path, against real SQLite
@@ -1184,6 +1184,7 @@ Tests:       2153 passed
   settingsSeed        3   the demo set, and the one device it must not be written onto
   varianceHonesty     3   the two sentences on the Variance tab that could deny themselves
   allHands            2   who pays for a read of the whole journal
+  dashboardFirstRun   2   labels on the dashboard with nothing under them yet
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

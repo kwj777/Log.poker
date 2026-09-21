@@ -146,3 +146,33 @@ describe('the live table is unchanged', () => {
     expect(mockLogged[0].at).toBeUndefined();
   });
 });
+
+describe('a named session that is not there any more', () => {
+  it('says so rather than quietly writing the hand to tonight instead', async () => {
+    // The screen has always had the words for this, and could not reach them
+    // while a live session existed: `namedSession ?? activeSession` fell
+    // through to the live one as readily for a session that was named and is
+    // gone as for one that was never named. `atTheTable` then matched, and
+    // Save wrote the hand to the table the player is sitting at, stamped now.
+    //
+    // A sync applying a delete from another device while the form is open is
+    // all it takes.
+    mockParams.sessionId = 'deleted-elsewhere';
+    useLogStore.setState({ activeSession: LIVE, sessions: [LIVE] });
+
+    await renderScreen(<LogHandScreen />);
+
+    expect(screen.getByText('Session not found')).toBeTruthy();
+    expect(screen.getByText('It may have been deleted.')).toBeTruthy();
+    expect(mockLogged).toEqual([]);
+  });
+
+  it('and still offers the live session when the route named nothing at all', async () => {
+    useLogStore.setState({ activeSession: LIVE, sessions: [LIVE] });
+
+    await renderScreen(<LogHandScreen />);
+
+    expect(screen.queryByText('Session not found')).toBeNull();
+    expect(screen.queryByText('No session running')).toBeNull();
+  });
+});

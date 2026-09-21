@@ -1067,7 +1067,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 83 passed
-Tests:       2011 passed
+Tests:       2017 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1108,32 +1108,32 @@ Tests:       2011 passed
   history            18   the session list, its filters, and how much of it mounts
   money              18   cents arithmetic, parsing, formatting
   seed               18   the demo dataset stays coherent
+  client             17   the sync client, against a fake fetch
   pastSession        17   logging a night that was played before it was logged
   writeFailures      17   what the player sees when a write does not work
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
-  client             15   the sync client, against a fake fetch
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
   settingsExport     15   the export card, and what it refuses to write
+  useLogStore        15   what a write reads back, and what it leaves alone
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   bankrollHeadline   13   the word over the headline figure, and what it has to be true of
   editHand           13   fixing or deleting a hand that was logged wrong
   rateLimit          13   how often one person may ask, and what a refusal costs
   sessionDetail      13   one session and the hands that belong to it
-  useLogStore        13   what a write reads back, and what it leaves alone
   logHand            12   logging a hand, the optional board, and the reset after a bad one
   csvWriter          11   writing CSV, and reading back exactly what was written
   tableOffer         11   which tags mean the game did it to you, and what to say about it
   columns            10   header matching
+  pastHand           10   adding a hand to a session that is not running
   search             10   finding one thing in a log with years in it
   selectors          10   store reads and filters
   importIntegration   9   parse → store → read back, against real SQLite
   liveTimer           9   the session clock, across a background and back
   preSessionWarmUp    9   the offer to somebody who says they are rattled before they sit
   varianceHands       9   the hand breakdown, and the sentence that must precede it
-  pastHand            8   adding a hand to a session that is not running
   plan                8   what an import will write, before it writes it
   postSessionReset    8   the offer after cash-out, and who it is talking to
   tokenStore.web      8   the browser token store

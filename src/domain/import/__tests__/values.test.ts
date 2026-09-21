@@ -119,6 +119,24 @@ describe('parseTimestamp', () => {
     expect(parseTimestamp('2024-01-15T20:14:32+0200')).toBe(Date.UTC(2024, 0, 15, 18, 14, 32));
   });
 
+  it('and still honors it when the stamp carries a fraction of a second', () => {
+    // `.000Z` is what `toISOString` writes, so it is the commonest machine
+    // stamp there is, and it was the one shape read in the wrong zone: the
+    // fraction stayed in the trailing text, failed the zone test, and the cell
+    // fell through to local time. Five hours out in New York, and correct the
+    // moment the `.000` was removed, which made it look like a quirk of one
+    // file rather than a bug in the parser.
+    expect(parseTimestamp('2024-01-15T20:14:32.000Z')).toBe(
+      parseTimestamp('2024-01-15T20:14:32Z'),
+    );
+    expect(parseTimestamp('2024-01-15T20:14:32.123Z')).toBe(Date.UTC(2024, 0, 15, 20, 14, 32));
+    expect(parseTimestamp('2024-01-15T20:14:32.500+02:00')).toBe(
+      Date.UTC(2024, 0, 15, 18, 14, 32),
+    );
+    // And a fraction with no zone is still local, which is what it always was.
+    expect(parseTimestamp('2024-01-15T20:14:32.250')).toBe(local(2024, 1, 15, 20, 14, 32));
+  });
+
   it('reads slash dates in the order it is given', () => {
     expect(parseTimestamp('03/04/2024', 'mdy')).toBe(local(2024, 3, 4));
     expect(parseTimestamp('03/04/2024', 'dmy')).toBe(local(2024, 4, 3));
@@ -176,9 +194,32 @@ describe('parseDurationMs', () => {
     expect(parseDurationMs('5400', 'seconds')).toBe(5_400_000);
   });
 
+  it('reads seconds spelled out beside the rest', () => {
+    expect(parseDurationMs('3h 45m 20s')).toBe(3 * HOUR + 45 * 60_000 + 20_000);
+    expect(parseDurationMs('20s')).toBe(20_000);
+    expect(parseDurationMs('2 hrs 5 mins')).toBe(2 * HOUR + 5 * 60_000);
+  });
+
   it('returns null for anything with no number in it', () => {
     expect(parseDurationMs('')).toBeNull();
     expect(parseDurationMs('a while')).toBeNull();
+  });
+
+  it('returns null rather than inventing hours out of a cell it cannot read', () => {
+    // The bare-number fallback stripped every non-digit and read what was
+    // left, so a cell the two patterns above could not parse came back four
+    // orders of magnitude too large instead of null. `sessionImport` takes
+    // that as the length of the night: the session ends years after it began,
+    // its hourly rate collapses to nothing, and it goes into the variance
+    // estimate with no warning, because a duration that parsed is one nothing
+    // complains about.
+    expect(parseDurationMs('1h30')).toBeNull();
+    expect(parseDurationMs('3 to 4')).toBeNull();
+    expect(parseDurationMs('19:00-23:30')).toBeNull();
+    // A night cannot run backwards, so the minus is refused rather than
+    // stripped along with the colon and read as 130 hours.
+    expect(parseDurationMs('-1:30')).toBeNull();
+    expect(parseDurationMs('-2')).toBeNull();
   });
 });
 

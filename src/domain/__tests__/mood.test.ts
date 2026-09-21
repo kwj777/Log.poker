@@ -31,6 +31,7 @@ import {
   wantsReset,
   worthActingOn,
 } from '../mood';
+import { Z_SCORES } from '../variance';
 import { HOUR, STAKES_1_2, T0, completed, session } from './support';
 
 const BUY_IN = 30_000;
@@ -325,6 +326,39 @@ describe('what it says instead of a number', () => {
     if (result.settled) return; // the fixture is only useful while it is not
     expect(result.blocker).toBe('inside-the-noise');
     if (result.hoursNeeded !== null) expect(result.hoursNeeded).toBeGreaterThan(0);
+  });
+
+  it('offers hours to add, not the total to end up with', () => {
+    // The number is rendered as "Another N hours or so on the thinner side", and
+    // it was the total that side has to reach rather than what is left to play.
+    // Always too big by exactly the hours already banked there, and worst right
+    // at the bar, where the card finally has something useful to say: a player
+    // one short session from an answer was told to log another ten.
+    //
+    // Checked against the definition rather than against a number: the standard
+    // error with the thinner group grown by `hoursNeeded` has to put the gap
+    // exactly on the bar.
+    const { sessions, moods } = merge(
+      run('a', { score: 1, count: 30, resultBb: 60, hours: 4, spreadBb: 120 }),
+      run('c', { score: 5, count: 10, resultBb: -10, hours: 4, spreadBb: 120 }),
+    );
+    const result = startMoodComparison(sessions, moods, 90);
+    expect(result.settled).toBe(false);
+    expect(result.hoursNeeded).not.toBeNull();
+
+    const { steady, rattled, differenceBbPerHour, standardError, hoursNeeded } = result;
+    const sigma =
+      standardError! / Math.sqrt(1 / steady.hours + 1 / rattled.hours);
+    const thinner = steady.hours <= rattled.hours ? steady : rattled;
+    const other = thinner === steady ? rattled : steady;
+
+    const grown = sigma * Math.sqrt(1 / other.hours + 1 / (thinner.hours + hoursNeeded!));
+    expect(Math.abs(differenceBbPerHour!) / grown).toBeCloseTo(Z_SCORES[90], 6);
+
+    // And it really is an addition: the hours the player has already put in on
+    // that side are not being asked for a second time.
+    const asTotal = sigma * Math.sqrt(1 / other.hours + 1 / hoursNeeded!);
+    expect(Math.abs(differenceBbPerHour!) / asTotal).toBeLessThan(Z_SCORES[90]);
   });
 
   it('and offers nothing when no amount of the thin side would do it', () => {

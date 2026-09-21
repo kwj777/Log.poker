@@ -234,6 +234,36 @@ describe('assessRecentStretch', () => {
     expect(assessment.suggestsUntilt).toBe(false);
   });
 
+  it('asks only for what is actually missing', () => {
+    // `reliable` wants eight sessions and twenty hours, and a player can clear
+    // one floor without the other. Both shortfalls used to print whatever they
+    // came out at, so nine two-hour sessions read "Log 0 more sessions and
+    // around 2 more hours", and at nineteen hours, "around 1 more hours". This
+    // is the whole body of the Variance tab's empty state.
+    const sessionsButNotHours = repeat(9, 4, 2);
+    const nine = assessRecentStretch(sessionsButNotHours, estimatePlayer(sessionsButNotHours));
+    expect(nine.body).not.toContain('0 more');
+    expect(nine.body).toContain('around 2 more hours');
+    expect(nine.body).not.toContain('more sessions');
+
+    // One hour short, and it is one hour rather than one hours.
+    const oneShort = repeat(9, 4, 19 / 9);
+    const almost = assessRecentStretch(oneShort, estimatePlayer(oneShort));
+    expect(almost.body).toContain('around 1 more hour,');
+
+    // Hours cleared and sessions not: the other half on its own.
+    const hoursButNotSessions = repeat(4, 20, 7);
+    const four = assessRecentStretch(hoursButNotSessions, estimatePlayer(hoursButNotSessions));
+    expect(four.body).toContain('4 more sessions');
+    expect(four.body).not.toContain('more hours');
+
+    // Short of both, which is where the sentence reads as it always did.
+    const thin = repeat(3, 20, 2);
+    expect(assessRecentStretch(thin, estimatePlayer(thin)).body).toContain(
+      '5 more sessions and around 14 more hours',
+    );
+  });
+
   it('refuses a verdict when the stretch is the player’s whole history', () => {
     // The finding this guard exists for. `w` is fitted to these ten sessions,
     // so `actual − w·hours` is zero however they went, and every one of these

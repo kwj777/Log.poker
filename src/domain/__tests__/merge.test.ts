@@ -20,7 +20,7 @@ import {
   type Versioned,
 } from '../merge';
 import type { Session } from '../types';
-import { HOUR, STAKES_1_2, T0 } from './support';
+import { HOUR, STAKES_1_2, STAKES_2_5, T0 } from './support';
 
 const plain = (overrides: Partial<Session> = {}): Session => ({
   id: 'session-1',
@@ -321,5 +321,22 @@ describe('the last tiebreak', () => {
     const mine = { record: { id: 'v1', updatedAt: T0, name: 'Aces' }, deletedAt: null };
     const theirs = { record: { id: 'v1', updatedAt: T0, name: 'Binions' }, deletedAt: null };
     expect(resolve(mine, theirs).record.name).toBe(resolve(theirs, mine).record.name);
+  });
+
+  it('sees a field that is nested, which is where the stakes live', () => {
+    // `JSON.stringify(value, array)` takes an allowlist, not a key order, and
+    // applies it at every depth. None of `smallBlind`, `bigBlind` or `ante` is
+    // a key of a session, so every session serialized with `"stakes":{}` in it
+    // and two sessions differing in nothing but their blinds compared equal.
+    // The tiebreak then fell to `>=`, which answers `mine`, and the server
+    // always passes the stored record as `mine`: the winner was whichever push
+    // arrived first. That is the order dependence this function exists to
+    // remove, on the one field a player is most likely to be correcting on two
+    // devices at once.
+    const atOneTwo = live(plain({ stakes: STAKES_1_2 }));
+    const atTwoFive = live(plain({ stakes: STAKES_2_5 }));
+    expect(resolve(atOneTwo, atTwoFive).record.stakes).toEqual(
+      resolve(atTwoFive, atOneTwo).record.stakes,
+    );
   });
 });

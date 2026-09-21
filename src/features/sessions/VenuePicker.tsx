@@ -25,6 +25,7 @@ import { Platform, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
+import { ErrorNote, describeFailure } from '../../components/ErrorNote';
 import { Text } from '../../components/Text';
 import { findVenueNamed } from '../../domain/venues';
 import type { Venue } from '../../domain/types';
@@ -44,6 +45,18 @@ export const VenuePicker = ({ venues, value, onChange, onCreate }: VenuePickerPr
   const [saving, setSaving] = useState(false);
   /** The room that was already there, said once after picking it. */
   const [matched, setMatched] = useState<string | null>(null);
+  /**
+   * What the write said, when it did not work.
+   *
+   * `onCreate` is the store's `createVenue`, and it rejects on a constraint or
+   * on a device with no room left. There was no catch, so the spinner stopped,
+   * the typed name stayed in the box, no chip appeared and nothing was said --
+   * and both call sites are `void submit()`, so it was an unhandled rejection
+   * as well. From a foot away a write that failed looked like a write that
+   * worked, except that Start stayed disabled, because there is no venue id to
+   * start with and nothing on screen to explain why.
+   */
+  const [failed, setFailed] = useState<string | null>(null);
 
   /** Shown live, so the Add button says what it is about to do before it is pressed. */
   const existing = findVenueNamed(venues, name);
@@ -53,6 +66,13 @@ export const VenuePicker = ({ venues, value, onChange, onCreate }: VenuePickerPr
     setName('');
     setIsHomeGame(false);
     setAdding(false);
+  };
+
+  /** A note about the last selection outlives the selection it describes. */
+  const pick = (id: string) => {
+    setMatched(null);
+    setFailed(null);
+    onChange(id);
   };
 
   const submit = async () => {
@@ -66,8 +86,11 @@ export const VenuePicker = ({ venues, value, onChange, onCreate }: VenuePickerPr
     }
     setSaving(true);
     setMatched(null);
+    setFailed(null);
     try {
       done(await onCreate(trimmed, isHomeGame));
+    } catch (error) {
+      setFailed(describeFailure(error, 'That venue could not be added.'));
     } finally {
       setSaving(false);
     }
@@ -81,11 +104,15 @@ export const VenuePicker = ({ venues, value, onChange, onCreate }: VenuePickerPr
             key={venue.id}
             label={venue.name}
             selected={venue.id === value}
-            onPress={() => onChange(venue.id)}
+            onPress={() => pick(venue.id)}
           />
         ))}
         {adding ? null : (
-          <Chip label="+ New venue" onPress={() => setAdding(true)} />
+          <Chip label="+ New venue" onPress={() => {
+              setMatched(null);
+              setFailed(null);
+              setAdding(true);
+            }} />
         )}
       </View>
 
@@ -126,6 +153,7 @@ export const VenuePicker = ({ venues, value, onChange, onCreate }: VenuePickerPr
               {existing.name} is already in your log.
             </Text>
           ) : null}
+          <ErrorNote message={failed} />
         </View>
       ) : null}
 

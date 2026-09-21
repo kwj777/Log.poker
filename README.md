@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 98 passed
-Tests:       2169 passed
+Test Suites: 99 passed
+Tests:       2172 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1184,6 +1184,7 @@ Tests:       2169 passed
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
   settingsSeed         3   the demo set, and the one device it must not be written onto
+  tapTargets           3   every short control against the 48pt floor
   allHands             2   who pays for a read of the whole journal
   newSessionDefaults   2   where the pre-filled session says its numbers came from
 ```

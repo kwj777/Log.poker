@@ -9,7 +9,7 @@
 
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, layout, radius, spacing, typography } from '../theme';
 import { tapFeedback } from './haptics';
 import { Text } from './Text';
 
@@ -121,7 +121,15 @@ export const ChipMultiGroup = <T,>({
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 44,
+    // From `layout.tapTarget` rather than written out, because the header says
+    // chips are sized to it and this read 44. Four points is not much on its
+    // own; what made it worth taking from the constant is that it is the only
+    // short control in the system that made up none of the shortfall in touch
+    // area -- `Button.slopFor`, `SearchField` and `Explain` all derive theirs
+    // from this same number -- and that `Button`'s own reasoning cites "the
+    // chips ... say so in their own comments" as the authority for treating 48
+    // as the floor at all. A stale docstring holding up a second file.
+    minHeight: layout.tapTarget,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,

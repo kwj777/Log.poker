@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 84 passed
-Tests:       2031 passed
+Test Suites: 85 passed
+Tests:       2041 passed
 
   dexieRepository   135   the IndexedDB path, against real IndexedDB
   sqlRepository     135   the SQLite path, against real SQLite
@@ -1100,7 +1100,7 @@ Tests:       2031 passed
   stats              55   P/L, rebuys, duration, win rate, groupings
   verify             52   checking a token, and every way past it that must not work
   copy               51   what the sign-in and the sync are allowed to say
-  syncingRepository  48   two devices and one server, no fakes in between
+  syncingRepository  49   two devices and one server, no fakes in between
   endpoint           46   the sync endpoint, end to end
   variance           41   win rate, σ, confidence bands, verdicts
   values             39   money, dates, durations, stakes, formats, counts
@@ -1116,6 +1116,7 @@ Tests:       2031 passed
   chip               23   /chip resolves, offline, and never quotes a price
   handNotation       23   parse, round-trip, hand classes
   money              22   cents arithmetic, parsing, formatting
+  writeFailures      21   what the player sees when a write does not work
   compose            20   which repository a device gets, and the unsafe sweep
   glossary           20   the shorthand on screen still matches its explanation
   privacy            20   the policy page, held to the code it describes
@@ -1127,15 +1128,14 @@ Tests:       2031 passed
   editSession        18   correcting a session, including the one nobody cashed out
   history            18   the session list, its filters, and how much of it mounts
   seed               18   the demo dataset stays coherent
-  writeFailures      18   what the player sees when a write does not work
   client             17   the sync client, against a fake fetch
   pastSession        17   logging a night that was played before it was logged
   handoff            16   taking delivery of a purchase made at another app's door
   signin             16   the sign-in client, against a fake fetch
+  useLogStore        16   what a write reads back, and what it leaves alone
   handsList          15   browsing every hand, and finding one of them
   reviewPrompt       15   which flagged hands still want a review, and what the offer says
   settingsExport     15   the export card, and what it refuses to write
-  useLogStore        15   what a write reads back, and what it leaves alone
   hands              14   what a pile of logged hands adds up to, and the caveat on it
   observe            14   how big the bundle was, said without saying whose
   bankrollHeadline   13   the word over the headline figure, and what it has to be true of
@@ -1167,6 +1167,7 @@ Tests:       2031 passed
   scale               6   how much of the plot the data actually gets
   settingsHelp        6   the privacy link, the support address, the build
   errorBoundary       5   a render that throws, and the way back from it
+  lineChart           5   what a chart says before it has been measured
   roiInterval         5   the ROI bootstrap runs once per result set, not per render
   stakesPicker        5   whether the blinds on screen are the blinds saved
   varianceCurrency    5   the variance page stops adding euros to dollars

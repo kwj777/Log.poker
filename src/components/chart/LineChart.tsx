@@ -120,7 +120,15 @@ export const LineChart = ({
       // there.
       accessibilityLabel={hasData ? label : emptyMessage}
     >
-      {width > 0 && hasData ? (
+      {/* Three states, not two. `width` is 0 until `onLayout` has run, which
+          cannot happen before the first render, and conflating "not measured
+          yet" with "no data" put the empty sentence on screen under a chart
+          that has plenty. On web that is not a sub-frame artifact:
+          react-native-web drives `onLayout` from a `ResizeObserver`, whose
+          first callback lands after paint, so "Not enough data yet" is really
+          read and then replaced by the curve. Nothing is drawn while the space
+          is being measured, and the box already holds its height. */}
+      {hasData && width === 0 ? null : width > 0 && hasData ? (
         <Svg width={width} height={height}>
           {band ? (
             <Path d={bandPath(band.upper, band.lower, project)} fill={band.color} />

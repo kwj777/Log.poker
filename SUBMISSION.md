@@ -533,28 +533,67 @@ answers a question this app reliably raises.
 
 ## Screenshots
 
-Required at 6.7" (iPhone 15 Pro Max or similar), and that is the whole set:
-`supportsTablet` is `false`, so no iPad shots are needed. See decision 2.
+**One set, at the 6.9 inch display class, and that is the whole requirement.**
+`supportsTablet` is `false`, so no iPad shots are needed (see decision 2), and
+Apple takes between one and ten per class. Five is the number below.
+
+This file said 6.7 inch until 2026-09-22, which is a size class Apple no longer
+names. Those devices, the iPhone 15 Pro Max among them, were folded into 6.9
+inch along with the current Max phones. **The reliable way to get the
+dimensions right is to shoot on a Max simulator rather than to resize anything
+afterwards**, because a screenshot taken on a device in the class is by
+definition the size that class wants. An iPhone 18 Pro Max simulator, if it is
+not already in the list:
+
+```
+xcrun simctl create "iPhone 18 Pro Max" \
+  com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro-Max \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-0
+```
 
 The screens worth showing, in the order they tell the story: the dashboard with
 a few sessions logged, a live session running, logging a hand, the variance
-view, and the history list.
+view, and the history list. The first two are the ones most people ever see, so
+they carry the argument and the rest are support.
 
-**Take them from a development run, not from the build in step 3.** Four of
-those five want a log with sessions already in it, and the way to get one is
-Settings, then Load demo data. That card is gated on `ALLOW_DEMO_SEED` in
-`src/config.ts`, which is `__DEV__`, and the `simulator` profile sets
-`developmentClient: false`, so step 3 produces a Release build where `__DEV__`
-is false and the card is never drawn. Run this instead, seed, then shoot:
+**Neither of the builds above can take them, which is what the `screenshots`
+profile is for.** Four of those five shots want a log with sessions already in
+it, and the way to get one is Settings, then Load demo data. That card is gated
+on `ALLOW_DEMO_SEED` in `src/config.ts`. A development run has it and also
+draws Expo Go's floating dev menu button over every shot. The `simulator`
+profile in step 3 is clean and sets `developmentClient: false`, so `__DEV__` is
+false, the card is never drawn, and there is no bankroll to put behind the
+screens that exist to show one.
+
+The third combination is a Release build that still offers the seeder. Locally,
+which is faster than a queued build and needs only Xcode:
 
 ```
-npm run ios
+EXPO_PUBLIC_DEMO_SEED=true npx expo run:ios --configuration Release
 ```
 
-The pixels are the same either way. Those flags hide rather than strip, and no
-layout differs between the two configurations. Step 3 answers the icon, the
-splash screen and the bundle identifier, which is a different question from
-what a screen looks like with data behind it.
+or on EAS:
+
+```
+npx eas build --platform ios --profile screenshots
+```
+
+Then Settings, Load demo data, and shoot. **The variable is what arms it, and
+no profile that builds for a store declares any `env` at all**, which
+`release.test.ts` asserts over every store profile rather than over
+`production` by name. Metro inlines `EXPO_PUBLIC_` variables while the bundle
+is built, so an unset one is `undefined` and the card compiles away.
+
+Nothing about the layout differs between configurations, so these shots are the
+app as it ships. Step 3 still answers the icon, the splash screen and the
+bundle identifier, which is a different question from what a screen looks like
+with data behind it.
+
+**Importing a CSV is not a substitute.** The importer reads sessions and,
+deliberately, neither hands nor mood entries -- `src/domain/export/sessionExport.ts`
+says so and the round-trip test holds it to it. A log filled that way leaves
+the Hands screen empty and leaves "What tilt costs you" on the Variance tab
+showing its own refusal, which is two of the five shots.
 
 The seeder refuses on a signed-in device on purpose: it starts with a reset, so
 a device that syncs would pull the real log back and then push the demo up.

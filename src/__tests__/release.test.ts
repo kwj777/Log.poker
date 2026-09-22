@@ -196,7 +196,17 @@ describe('the links the app has told the operating system it answers', () => {
 describe('the build profiles', () => {
   interface Eas {
     cli: { appVersionSource: string };
-    build: Record<string, { distribution?: string; autoIncrement?: boolean; extends?: string }>;
+    build: Record<
+      string,
+      {
+        distribution?: string;
+        autoIncrement?: boolean;
+        extends?: string;
+        developmentClient?: boolean;
+        ios?: { simulator?: boolean };
+        env?: Record<string, string>;
+      }
+    >;
     submit: Record<string, unknown>;
   }
   const eas = json<Eas>('eas.json');
@@ -222,6 +232,35 @@ describe('the build profiles', () => {
     // `--profile production` a valid thing to type.
     expect(eas.submit.production).toBeDefined();
     expect(read('eas.json')).not.toMatch(/appleTeamId|ascAppId/);
+  });
+
+  it('has a profile for screenshots, which neither of the other two could take', () => {
+    // A development run has the seeder and draws Expo Go's floating dev button
+    // over every shot. A Release build is clean and has `__DEV__` false, so the
+    // Load demo data card is never drawn and there is no bankroll to put behind
+    // the screens that exist to show one. This is the third combination.
+    const profile = eas.build.screenshots;
+
+    expect(profile?.developmentClient).toBe(false);
+    expect(profile?.ios?.simulator).toBe(true);
+    expect(profile?.env?.EXPO_PUBLIC_DEMO_SEED).toBe('true');
+  });
+
+  it('and no profile that builds for a store carries that variable', () => {
+    // The whole safety of the flag is here rather than in `config.ts`.
+    // `ALLOW_DEMO_SEED` reads `EXPO_PUBLIC_DEMO_SEED`, Metro inlines it while
+    // the bundle is built, and a profile that declares no `env` leaves it
+    // undefined -- which is what keeps the demo out of a submitted binary.
+    // Asserted over every store profile rather than over `production` by name,
+    // so a second one cannot be added without this looking at it too.
+    const store = Object.entries(eas.build).filter(
+      ([, profile]) => profile.distribution === 'store',
+    );
+
+    expect(store.length).toBeGreaterThan(0);
+    for (const [name, profile] of store) {
+      expect([name, profile.env]).toEqual([name, undefined]);
+    }
   });
 
   it('pins the Node the rest of the project pins', () => {
@@ -265,5 +304,47 @@ describe('the app icon', () => {
     ]) {
       expect(ihdr(path).colorType).toBe(6);
     }
+  });
+});
+
+/**
+ * The seeder flag, which is the one build constant a profile can turn on.
+ *
+ * Read back through a fresh module registry rather than asserted as source
+ * text, because the question is what the constant evaluates to for a given
+ * environment, and a regular expression over `config.ts` would answer a
+ * different one. `src/config.ts` imports nothing, so it loads in plain Node.
+ */
+describe('the demo seeder flag', () => {
+  const evaluate = async (value: string | undefined): Promise<boolean> => {
+    const before = process.env.EXPO_PUBLIC_DEMO_SEED;
+    if (value === undefined) delete process.env.EXPO_PUBLIC_DEMO_SEED;
+    else process.env.EXPO_PUBLIC_DEMO_SEED = value;
+
+    let allowed = false;
+    await jest.isolateModulesAsync(async () => {
+      ({ ALLOW_DEMO_SEED: allowed } = await import('../config'));
+    });
+
+    if (before === undefined) delete process.env.EXPO_PUBLIC_DEMO_SEED;
+    else process.env.EXPO_PUBLIC_DEMO_SEED = before;
+    return allowed;
+  };
+
+  it('is off when nothing asks for it, which is every store build', async () => {
+    await expect(evaluate(undefined)).resolves.toBe(false);
+  });
+
+  it('is on for the build that asks for it by name', async () => {
+    await expect(evaluate('true')).resolves.toBe(true);
+  });
+
+  it('and takes only that one word, so a stray value cannot arm it', async () => {
+    // `1`, `yes` and `false` all read as not asking. A truthiness check would
+    // have armed the demo on two of those, and on any value a profile carried
+    // for some other reason.
+    await expect(evaluate('1')).resolves.toBe(false);
+    await expect(evaluate('yes')).resolves.toBe(false);
+    await expect(evaluate('false')).resolves.toBe(false);
   });
 });

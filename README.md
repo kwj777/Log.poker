@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2192 passed
+Tests:       2196 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1127,6 +1127,7 @@ Tests:       2192 passed
   writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price
   handNotation        23   parse, round-trip, hand classes
+  history             23   the session list, its filters, and how much of it mounts
   money               22   cents arithmetic, parsing, formatting
   compose             21   which repository a device gets, and the unsafe sweep
   release             21   app.json, eas.json and the icon a store refuses over
@@ -1136,7 +1137,6 @@ Tests:       2192 passed
   batch               19   a backlog split into requests, without orphaning a child
   csv                 19   quoting, delimiters, line endings
   gateCheck           19   the key-on-the-site script, run rather than read
-  history             19   the session list, its filters, and how much of it mounts
   useLogStore         19   what a write reads back, and what it leaves alone
   seed                18   the demo dataset stays coherent
   signin              18   the sign-in client, against a fake fetch

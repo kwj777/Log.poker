@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 101 passed
-Tests:       2183 passed
+Test Suites: 102 passed
+Tests:       2187 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1178,6 +1178,7 @@ Tests:       2183 passed
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
   dashboardFirstRun    4   labels on the dashboard with nothing under them yet
+  importPicker         4   opening a file on a phone, and the three answers a picker gives
   importWarnings       4   what the import screen says about a file it could not use
   transactionQueue     4   two writes at once, on a database with no queue of its own
   lintReach            3   which files npm run lint actually looks at

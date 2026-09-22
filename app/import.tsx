@@ -110,8 +110,18 @@ export default function ImportScreen() {
   };
 
   const choose = async () => {
-    const picked = await pickCsvFile();
+    // A picker that throws is a picker that opened, took a choice, and left the
+    // screen exactly as it was. `null` is the player backing out and is the only
+    // silent answer either half of `pickCsvFile` is allowed to give.
+    let picked;
+    try {
+      picked = await pickCsvFile();
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : 'That file could not be read.');
+      return;
+    }
     if (picked) {
+      setFailure(null);
       replaceText(picked.text, picked.name);
       // Only the file itself can say which way its dates run; a toggle left
       // over from the last file would silently misread this one.

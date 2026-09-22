@@ -181,6 +181,19 @@ const plural = (count: number, one: string, many = `${one}s`): string =>
   `${count} ${count === 1 ? one : many}`;
 
 /**
+ * The rest of the sentence `plural` starts.
+ *
+ * Four warnings counted their rows and then disagreed with themselves about
+ * how many there were: "3 rows was read that way", "3 rows gave itself away",
+ * "1 session had no duration. They count toward profit". Each was wrong at one
+ * end of the count and right at the other, which is why none of them reads
+ * oddly in the one case somebody happened to try.
+ */
+const was = (count: number): string => (count === 1 ? 'was' : 'were');
+const they = (count: number): string => (count === 1 ? 'It' : 'They');
+const counts = (count: number): string => (count === 1 ? 'counts' : 'count');
+
+/**
  * Read a CSV or TSV of session summaries.
  *
  * Pure but for the clock, which one guard needs: a date that has not happened
@@ -459,7 +472,11 @@ export const parseSessionCsv = (
   if (noStakes > 0) {
     warn(
       null,
-      `${plural(noStakes, 'cash session')} had no readable stakes. They count toward profit and the bankroll curve, but the variance view skips them: it works in big blinds and cannot place a session without them.`,
+      `${plural(noStakes, 'cash session')} had no readable stakes. ${they(noStakes)} ${counts(
+        noStakes,
+      )} toward profit and the bankroll curve, but the variance view skips ${
+        noStakes === 1 ? 'it' : 'them'
+      }: it works in big blinds and cannot place a session without them.`,
     );
   }
   if (tournaments > 0) {
@@ -473,11 +490,15 @@ export const parseSessionCsv = (
     ];
     if (inferredFromField > 0) {
       sentences.push(
-        `${plural(inferredFromField, 'row')} gave itself away with a field size or a finishing position.`,
+        `${plural(inferredFromField, 'row')} gave ${
+          inferredFromField === 1 ? 'itself' : 'themselves'
+        } away with a field size or a finishing position.`,
       );
     } else if (inferredFromFee > 0) {
       sentences.push(
-        `Nothing in the file says so outright: ${plural(inferredFromFee, 'row')} was read that way because “${
+        `Nothing in the file says so outright: ${plural(inferredFromFee, 'row')} ${was(
+          inferredFromFee,
+        )} read that way because “${
           cashOutIsAPrize ? columns.matched.cashOut : (columns.matched.fee ?? 'fee')
         }” is a tournament column.`,
       );
@@ -492,7 +513,9 @@ export const parseSessionCsv = (
   if (noDuration > 0) {
     warn(
       null,
-      `${plural(noDuration, 'session')} had no duration. They count toward profit, but not toward hours played, hourly rate or variance.`,
+      `${plural(noDuration, 'session')} had no duration. ${they(noDuration)} ${counts(
+        noDuration,
+      )} toward profit, but not toward hours played, hourly rate or variance.`,
     );
   }
   if (columns.duplicates.length > 0) {

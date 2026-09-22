@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2179 passed
+Tests:       2182 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1169,6 +1169,7 @@ Tests:       2179 passed
   rowLabels            6   what a screen reader is told a row in a list is
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
+  settingsSeed         6   the demo set, and the one device it must not be written onto
   crossPromo           5   the family card as drawn, and the link a refusing device gives back
   errorBoundary        5   a render that throws, and the way back from it
   lineChart            5   what a chart says before it has been measured
@@ -1183,7 +1184,6 @@ Tests:       2179 passed
   lintReach            3   which files npm run lint actually looks at
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
-  settingsSeed         3   the demo set, and the one device it must not be written onto
   tapTargets           3   every short control against the 48pt floor
   allHands             2   who pays for a read of the whole journal
   newSessionDefaults   2   where the pre-filled session says its numbers came from

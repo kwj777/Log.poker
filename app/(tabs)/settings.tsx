@@ -26,7 +26,7 @@
  * section that never draws is a section whose report is never seen missing.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
@@ -115,16 +115,36 @@ export default function SettingsScreen() {
   /**
    * Whether this device syncs, which decides what a reset means.
    *
-   * Read once, like the session the sign-in card reads: the only thing in the
-   * app that can change it is that card, on this screen. Null until the answer
-   * arrives, and the copy treats not-yet-known as not-syncing -- the stricter
-   * of the two sentences, which is the right way round for a warning.
+   * **Asked when the warning is about to be read, not once at mount.** It was
+   * read in a `useEffect(..., [])`, defended by the argument that "the only
+   * thing in the app that can change it is that card, on this screen" -- which
+   * is the reason it cannot be read once. `SignInCard` is rendered by this
+   * screen, a few hundred pixels above the Reset card, so signing in or out
+   * flips the answer without ever leaving the screen, let alone unmounting it.
+   * Settings is also a bottom tab, which react-navigation keeps mounted after
+   * the first visit, so the stale value then outlives the visit too.
+   *
+   * Both directions were wrong, and one of them dangerously. Sign out and
+   * reset, and the copy promised the log "comes back from the server the next
+   * time this device syncs" about a device with no account behind it: the
+   * player deletes everything believing it is recoverable.
+   *
+   * Asked at press time, the way `seed()` a hundred lines up already asks it
+   * -- the two cards disagreed in the same render, one refusing correctly
+   * while the other printed the answer captured at mount. A read that cannot
+   * answer counts as not-syncing, which is the stricter sentence and the right
+   * way round for a warning.
    */
   const [syncs, setSyncs] = useState(false);
 
-  useEffect(() => {
-    void getSyncingRepository().then((repository) => setSyncs(repository !== null));
-  }, []);
+  const askToReset = async () => {
+    try {
+      setSyncs((await getSyncingRepository()) !== null);
+    } catch {
+      setSyncs(false);
+    }
+    setConfirmingReset(true);
+  };
 
   const say = (section: ReportSection, text: string, failed = false) =>
     setReport({ section, text, failed });
@@ -529,7 +549,7 @@ export default function SettingsScreen() {
             label="Clear all data"
             variant="danger"
             size="medium"
-            onPress={() => setConfirmingReset(true)}
+            onPress={() => void askToReset()}
           />
         )}
         <ReportNote report={report} section="reset" />

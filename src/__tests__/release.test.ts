@@ -152,7 +152,22 @@ describe('the web block, which is read by less of the toolchain than it looks', 
     // `src/version.ts` calls "the source of truth" that their edit had gone
     // nowhere. The copy that is read lives in `public/manifest.webmanifest`
     // and `app/+html.tsx`.
-    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'favicon', 'output']);
+    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'output']);
+  });
+
+  it('and declares no favicon, because the shell already declares one', () => {
+    // `web.favicon` generated `dist/app/favicon.ico` and a `<link rel="icon">`
+    // appended after the shell's head, so every one of the nineteen exported
+    // /app documents carried two conflicting icon declarations and left the
+    // choice to the browser. In the one file that goes out of its way to
+    // avoid a duplicated head tag -- `+html.tsx` says two `<title>` elements
+    // would be wrong because "the browser reads the first".
+    //
+    // The one that stays is the shell's `/icons/icon-192.png`, which the
+    // manifest, the apple-touch-icon and all nine marketing pages already
+    // agree on. The generated `.ico` topped out at 48px.
+    expect(app.web.favicon).toBeUndefined();
+    expect(read('app', '+html.tsx')).toContain('<link rel="icon" href="/icons/icon-192.png"');
   });
 });
 

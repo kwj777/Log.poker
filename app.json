@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "poker.log.app",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -48,6 +48,12 @@
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/app"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "389b5aef-b108-4dc3-be9e-09d4fbe969f9"
+      }
     }
   }
 }

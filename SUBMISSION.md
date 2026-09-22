@@ -261,15 +261,34 @@ file reads back.
    npx eas submit --platform ios --profile production
    ```
 
-   `eas submit` prompts for the Apple ID, team ID and App Store Connect app ID.
-   The app ID is the number above. The team ID is the App ID Prefix shown on
-   the identifier's own page in Certificates, Identifiers and Profiles.
+   `eas submit` prompts for the Apple ID and the team ID. The team ID is the
+   App ID Prefix shown on the identifier's own page in Certificates,
+   Identifiers and Profiles, and it is also printed by `eas build` on the
+   Apple Team line while it resolves credentials.
 
-   **They stay out of `eas.json` on purpose.** They are account facts rather
-   than project facts, which is why `submit.production` is an empty profile
-   instead of placeholders, and `release.test.ts` fails the suite on an
-   `appleTeamId` or `ascAppId` appearing in that file. Recording the app ID in
-   this file is documentation and does not touch that rule.
+   **It does not prompt for the app ID, and on 2026-09-22 that stopped a
+   submission.** Before uploading anything, `eas submit` looks the app up on
+   App Store Connect, and that lookup is a different Apple endpoint from the
+   one that takes the binary. It answered:
+
+   ```
+   Apple 403 detected -- Access forbidden.
+   This request is forbidden for security reasons -- The API key in use does
+   not allow this request
+   ```
+
+   The fix is the one the command suggests a line earlier: a profile that names
+   the app skips the lookup, so `submit.production.ios.ascAppId` is
+   `6814843842` and `release.test.ts` pins it. If the upload itself 403s after
+   that, the lookup was not the problem and the App Store Connect API key is:
+   regenerate it with `eas credentials` under an Apple ID that holds Admin on
+   the team, which for an individual account is the account holder.
+
+   **The Apple ID and the team ID stay out of `eas.json`, and the app ID is
+   not one of them.** Those two are facts about whoever is submitting; an App
+   Store ID identifies the app itself, is public in every App Store URL, and is
+   what the smart app banner below will carry. `release.test.ts` still fails
+   the suite on an `appleTeamId` or an `appleId` in that file.
 
    That number is also what the marketing site wants the day the app is
    approved: an `apple-itunes-app` smart banner and the App Store badge link

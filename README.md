@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2314 passed
+Tests:       2315 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1199,11 +1199,11 @@ Tests:       2314 passed
   transactionQueue     4   two writes at once, on a database with no queue of its own
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
+  pageMeta             3   the document head, kept off the phone it alerts on
   allHands             2   who pays for a read of the whole journal
   amountField          2   the money field's box, against the font it has to hold
   deadExports          2   API nothing uses: dead exports and props nothing passes
   newSessionDefaults   2   where the pre-filled session says its numbers came from
-  pageMeta             2   the document head, kept off the phone it alerts on
   safeArea             2   the top inset, on a phone with a notch and without
 ```
 

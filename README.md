@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2324 passed
+Tests:       2325 passed
 
   dexieRepository    149   the IndexedDB path, against real IndexedDB
   sqlRepository      146   the SQLite path, against real SQLite
@@ -1168,13 +1168,13 @@ Tests:       2324 passed
   varianceHands        9   the hand breakdown, and the sentence that must precede it
   plan                 8   what an import will write, before it writes it
   postSessionReset     8   the offer after cash-out, and who it is talking to
+  reviewFlagged        8   the review card on the dashboard, and the nights it stays off
   tapTargets           8   every short control against the 48pt floor
   tokenStore.web       8   the browser token store
   venuePicker          8   typing a room you already have, rather than adding a second
   claimHandoff         7   what a hand-off link may do without asking
   cursorStore          7   which cursors survive a launch, and what a lost one costs
   mergeVenues          7   folding one room into another, and the order it does it in
-  reviewFlagged        7   the review card on the dashboard, and the nights it stays off
   settingsBankroll     7   entering what you had behind you before the log started
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room

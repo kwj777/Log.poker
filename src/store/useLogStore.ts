@@ -3,12 +3,18 @@
  *
  * One store rather than several: every screen in Log reads some mixture of
  * sessions, hands and mood, and splitting them would mean coordinating refreshes
- * across stores for no benefit at this size. The whole dataset is held in memory
- * -- a heavy live player logs a few hundred sessions a year, which is trivial --
- * and the repository stays the source of truth: nothing here is patched in
- * memory from what a write returned, it is read back from the database.
+ * across stores for no benefit at this size. The repository stays the source of
+ * truth: nothing here is patched in memory from what a write returned, it is
+ * read back from the database.
  *
- * **Read back, but not all of it.** A write says which of the four tables it
+ * **What is held, and what is not.** Sessions, venues, mood entries, the
+ * player's one preference -- and of the hands, a count rather than the rows.
+ * This used to say the whole dataset was held, on the argument that a few
+ * hundred sessions a year is trivial, and the hands are why that stopped being
+ * true: `useHandsForSession` and `useAllHands` read them per screen now, and
+ * the note over `read` below has the measurements that moved them.
+ *
+ * **Read back, but not all of it.** A write says which of the five slices it
  * could have disturbed and only those are re-read. That is a good deal faster
  * on a log with years in it, and it also stops a write invalidating every
  * memoized view in the app; see `load` and `read` below, which is where both of
@@ -250,7 +256,7 @@ interface LogState {
 }
 
 /**
- * The four reads the store holds, named so a write can say which it disturbed.
+ * The five reads the store holds, named so a write can say which it disturbed.
  *
  * `activeSession` is not one of them. It is a session, it changes exactly when
  * the sessions do, and giving it a name of its own would only create a way for
@@ -269,10 +275,10 @@ const EVERYTHING: readonly Slice[] = [
 /**
  * Read back the slices a write could have changed, and only those.
  *
- * This used to read all four every time, on the argument that it is cheap and
- * it keeps derived views honest. The second half is right and is why the
- * repository is still the source of truth here: nothing below is patched in
- * memory from what a write returned, it is read back from the database.
+ * This used to read all five slices every time, on the argument that it is
+ * cheap and it keeps derived views honest. The second half is right and is why
+ * the repository is still the source of truth here: nothing below is patched
+ * in memory from what a write returned, it is read back from the database.
  *
  * The first half stopped being true as the log grew, which is the case this
  * app is built for. Against five years of a heavy live player -- 600 sessions,
@@ -281,8 +287,8 @@ const EVERYTHING: readonly Slice[] = [
  * holds every hand ever logged so that one screen can count them.
  *
  * There is a second cost that is easier to miss and can be larger. A reload
- * replaced all four arrays, so every `useMemo` downstream of any of them
- * recomputed, whatever had actually changed. Logging a hand re-ran the
+ * replaced every array the store holds, so every `useMemo` downstream of any
+ * of them recomputed, whatever had actually changed. Logging a hand re-ran the
  * tournament bootstrap on the variance tab -- two thousand resamples of every
  * entry -- because the sessions array was a new array, even though it held the
  * same sessions.

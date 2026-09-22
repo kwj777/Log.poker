@@ -1,7 +1,7 @@
 /**
  * What a write reads back, and what it leaves alone.
  *
- * The store used to re-read all four of its tables after every write. That is
+ * The store used to re-read all five of its slices after every write. That is
  * the behavior these tests pin the replacement of, and there are two halves to
  * it. The obvious one is the reading: a rebuy has no business loading every
  * hand ever logged, and on a five-year log that was most of the time it took.
@@ -14,6 +14,9 @@
  * about: they look like they are testing an implementation detail and they are
  * testing that.
  */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import type { Repository } from '../../data/repository';
 
@@ -77,6 +80,31 @@ beforeEach(async () => {
   useLogStore.setState({ status: 'idle', error: null });
   await useLogStore.getState().hydrate();
   jest.clearAllMocks();
+});
+
+describe('how many slices there are', () => {
+  it('is the number the file says it is, in every sentence that says one', () => {
+    // The header claimed the store "holds the whole dataset" and named "the
+    // four tables" for three versions after neither was true: the hands came
+    // out, `preferences` went in, and four other sentences in the same file
+    // already said so in the past tense. The `Slice` union was right the whole
+    // time, which is why nothing broke and why nobody noticed -- so it is the
+    // union that is asked here, out of the same file.
+    //
+    // Spelled-out numbers only, and only where one counts a noun this file
+    // uses for a slice, so an unrelated "five years of a heavy live player"
+    // is left alone.
+    const SPELLED = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+    const source = readFileSync(join(__dirname, '..', 'useLogStore.ts'), 'utf8');
+    const union = /type Slice =([^;]+);/.exec(source) as RegExpExecArray;
+    const slices = union[1].split('|').length;
+    const counts = [
+      ...source.matchAll(/\b(one|two|three|four|five|six|seven|eight)\s+(slices?|reads?|tables?)\b/g),
+    ];
+
+    expect(counts.length).toBeGreaterThan(0);
+    expect(counts.map(([, word]) => word)).toEqual(counts.map(() => SPELLED[slices - 1]));
+  });
 });
 
 describe('what a write reads back', () => {

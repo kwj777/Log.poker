@@ -206,6 +206,45 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(sessions.map((session) => session.id)).toEqual([newest.id, middle.id, oldest.id]);
       });
 
+      it('and settles a tie the same way on both engines', async () => {
+        // `ORDER BY started_at DESC` alone left this to the engine: SQLite
+        // walked ties in rowid order and Dexie's reversed index walked them in
+        // primary-key order, so the same log listed backwards on web against
+        // native -- and with a limit, returned different sessions.
+        //
+        // A tie is the common case, not a corner. `parseTimestamp` gives
+        // midnight to a date-only cell, which is what most tracker exports
+        // carry, so a day's imported sessions all share a stamp. Every
+        // ordering test above this one used distinct stamps, which is why the
+        // suite this file exists to be never caught it.
+        const venue = await newVenue();
+        const first = await newSession({ venueId: venue.id, startedAt: T0 });
+        const second = await newSession({ venueId: venue.id, startedAt: T0 });
+        const third = await newSession({ venueId: venue.id, startedAt: T0 });
+        const later = await newSession({ venueId: venue.id, startedAt: T0 + HOUR });
+
+        const sessions = await repository.listSessions();
+        expect(sessions.map((session) => session.id)).toEqual([
+          later.id,
+          third.id,
+          second.id,
+          first.id,
+        ]);
+      });
+
+      it('and a limit over a tie takes the same rows on both engines', async () => {
+        // The half that is not merely an ordering difference: two engines
+        // disagreeing about a tie return different sessions once the query is
+        // capped, not the same ones rearranged.
+        const venue = await newVenue();
+        await newSession({ venueId: venue.id, startedAt: T0 });
+        const second = await newSession({ venueId: venue.id, startedAt: T0 });
+        const third = await newSession({ venueId: venue.id, startedAt: T0 });
+
+        const sessions = await repository.listSessions({ limit: 2 });
+        expect(sessions.map((session) => session.id)).toEqual([third.id, second.id]);
+      });
+
       it('returns an empty list when nothing is stored', async () => {
         expect(await repository.listSessions()).toEqual([]);
       });

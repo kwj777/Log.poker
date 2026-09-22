@@ -638,6 +638,11 @@ export class DexieRepository implements Repository {
       ? Math.max(0, Math.floor(filter.limit as number))
       : null;
 
+    // Reversing the whole cursor is what settles a tie here: equal `startedAt`
+    // keys sit in primary-key order in the index, so walking it backwards
+    // returns them id-descending. `SqlRepository` says `ORDER BY started_at
+    // DESC, id DESC` for the same reason and to the same answer -- see there
+    // for why a tie is the common case rather than a corner.
     const matching = this.db.sessions.orderBy('startedAt').reverse().filter(wanted);
     const records = await (capped === null ? matching : matching.limit(capped)).toArray();
 

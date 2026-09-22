@@ -109,6 +109,34 @@ sends mail: `netlify/functions/signin.mts` sends from `signin@log.poker` and
 submission.** App Review uses the support address. One that bounces is worse
 than none. A forward to a real inbox is enough.
 
+A Spacemail mailbox was bought for it on 2026-09-22. Spaceship is only where
+the values are read from: log.poker's nameservers are Netlify's
+(`dns1.p02.nsone.net` and its three siblings), so the records go in Netlify
+under Domains, log.poker, DNS records.
+
+| Name | Type | Value |
+| --- | --- | --- |
+| `@` | MX, priority 0 | `mx1.spacemail.com` |
+| `@` | MX, priority 0 | `mx2.spacemail.com` |
+| `@` | TXT | `v=spf1 include:spf.spacemail.com ~all` |
+| `spacemail._domainkey` | TXT | the account's own `v=DKIM1; k=rsa; p=...`, from Spaceship under Launchpad, Advanced DNS, Inactive records |
+
+`_dmarc.log.poker` already publishes `v=DMARC1; p=none;` and wants nothing.
+
+**The apex SPF does not break the signin mailer, and the reason is worth
+writing down rather than rediscovering.** Resend sends as `signin@log.poker`
+but its SPF lives on `send.log.poker`, which is the return path a receiver
+actually checks, and its DKIM is on the `resend` selector. A `spacemail`
+selector and an apex SPF sit beside both without touching either. What would
+break it is a second record at the apex beginning `v=spf1`: two SPF records
+are one permanent error, not a conflict anybody notices. The apex also carries
+a `google-site-verification` TXT that the SPF record goes next to rather than
+over.
+
+Then prove it. Mail the address from somewhere unrelated and watch it arrive,
+because a mailbox that does not receive looks exactly like one that does until
+App Review writes to it.
+
 ---
 
 ## Getting an account and a first build

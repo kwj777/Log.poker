@@ -203,6 +203,15 @@ file reads back.
    answer: the real icon, the splash screen, and the app under its own bundle
    identifier rather than Expo Go's.
 
+   `npx expo prebuild --platform ios` was run against this config on
+   2026-09-22, which is the first thing EAS does on its own machines, and it
+   generates cleanly. It found one thing on the way, worth reading as a pattern
+   rather than as a fixed bug: the splash screen's dark variant was writing
+   `UIUserInterfaceStyle = Automatic` into Info.plist and overriding the
+   `userInterfaceStyle: "dark"` set higher up the same file. Expo Go carries
+   its own Info.plist, so that class of defect cannot appear until exactly this
+   step. Run the build expecting a second round of them.
+
 4. **A device build.** Nothing is waiting on enrollment; see step 1.
 
    ```

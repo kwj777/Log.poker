@@ -1086,7 +1086,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 102 passed
-Tests:       2188 passed
+Tests:       2189 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1117,8 +1117,8 @@ Tests:       2188 passed
   writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price
   handNotation        23   parse, round-trip, hand classes
+  release             23   app.json, eas.json and the icon a store refuses over
   money               22   cents arithmetic, parsing, formatting
-  release             22   app.json, eas.json and the icon a store refuses over
   clock               20   a typed date, a typed length, and what neither will accept
   compose             20   which repository a device gets, and the unsafe sweep
   glossary            20   the shorthand on screen still matches its explanation

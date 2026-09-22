@@ -134,7 +134,11 @@ export interface SessionImportResult {
   columns: ColumnMap | null;
   delimiter: string;
   dateOrder: DateOrder;
-  /** False when the dates could be read two ways and the file never settled it. */
+  /**
+   * False when the dates could be read two ways and the file never settled
+   * it. A column with no two-way reading in it -- ISO, or a day past the
+   * twelfth anywhere in it -- is certain whether or not anything was detected.
+   */
   dateOrderCertain: boolean;
   /** Rows that produced no session. */
   skipped: number;
@@ -249,9 +253,18 @@ export const parseSessionCsv = (
     .map((row) => cellAt(row, indexes.startedAt));
   const detected = detectDateOrder(dateSamples);
   const dateOrder = options.dateOrder ?? (detected === 'unknown' ? 'mdy' : detected);
-  const dateOrderCertain = options.dateOrder !== undefined || detected !== 'unknown';
+  // One reading of the column, used twice, because the toggle and the warning
+  // were answering the same question differently. `detectDateOrder` says
+  // `unknown` for an ISO column -- there is nothing to detect, the year is at
+  // the front -- and that alone used to make the file uncertain. So Log's own
+  // export arrived with no warning, which is right, under a "Dates are
+  // day-first" chip, which is not: the file had already answered, and the
+  // toggle could not change a thing it parsed either way.
+  const ambiguous = hasAmbiguousDateShape(dateSamples);
+  const dateOrderCertain =
+    options.dateOrder !== undefined || detected !== 'unknown' || !ambiguous;
 
-  if (!dateOrderCertain && hasAmbiguousDateShape(dateSamples)) {
+  if (!dateOrderCertain) {
     warn(
       null,
       'Dates like 03/04/2024 could be March 4th or the 3rd of April, and nothing in this file settles it. They are being read month-first.',

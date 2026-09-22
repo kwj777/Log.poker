@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 105 passed
-Tests:       2296 passed
+Tests:       2297 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1122,9 +1122,9 @@ Tests:       2296 passed
   token               31   the family token grammar, against signed fixtures
   session             30   holding a token, and stores that fail as real ones do
   handNotation        29   parse, round-trip, hand classes
+  sessionExport       28   the log written out, and read back by the importer
   money               27   cents arithmetic, parsing, formatting
   palette             27   the theme matches BRAND.md
-  sessionExport       27   the log written out, and read back by the importer
   editSession         24   correcting a session, including the one nobody cashed out
   writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price

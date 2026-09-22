@@ -273,6 +273,29 @@ export default function ActiveSessionScreen() {
         }
       >
         <PageMeta title="Live session · Log" />
+        {/*
+          The way out.
+
+          Every other stack screen in the app draws one; this screen did not,
+          and it is the one screen that is not reachable from the tab bar, so
+          there was no way off it at all. The only control that left was
+          "Cash out & end session", which meant opening the live session to
+          check a number and having to end the night to close it again.
+
+          Leaving does not stop anything: the session keeps running, and the
+          dashboard draws a "Resume session" button with the clock on it for
+          as long as it does.
+        */}
+        <View style={styles.topBar}>
+          <Button
+            label="Back"
+            variant="ghost"
+            size="small"
+            leading={<Ionicons name="chevron-back" size={16} color={colors.textSecondary} />}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            accessibilityHint="Leaves this screen with the session still running"
+          />
+        </View>
         <View style={styles.header}>
           <View style={styles.liveRow}>
             <View style={styles.liveDot} />
@@ -567,8 +590,13 @@ export default function ActiveSessionScreen() {
 }
 
 const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    paddingTop: spacing.md,
+    marginLeft: -spacing.md,
+  },
   header: {
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     gap: spacing.xs,
   },
   liveRow: {

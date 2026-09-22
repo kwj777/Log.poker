@@ -447,9 +447,16 @@ export const parseCount = (input: string): number | null => {
 /**
  * Map a game cell onto Log's three variants.
  *
- * Fixed-limit hold'em lands on `OTHER` rather than `NLHE`: the label on `NLHE`
- * reads "No-Limit Hold'em" on screen, and filing a limit game under it would put
- * a wrong word in front of the player to save a category.
+ * Fixed-limit hold'em lands on `OTHER` rather than `NLHE`, which is why the
+ * "no limit" is stripped before the surviving "limit" is tested for. NLHE is
+ * no-limit by name and by definition, so filing a limit game under it files it
+ * under the wrong game to save a category.
+ *
+ * This used to reason instead from what the `NLHE` label spells out on screen.
+ * It spells out nothing: it reads "NLHE", and `types.ts` says why in as many
+ * words, that the game's full name is "a chip nobody can fit next to a stake".
+ * The classification was right and the reason given for it had been refuted
+ * one file over.
  */
 export const parseGameType = (input: string): GameType | null => {
   const text = input.trim().toLowerCase();

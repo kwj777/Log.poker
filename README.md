@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2313 passed
+Tests:       2314 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1112,7 +1112,7 @@ Tests:       2313 passed
   copy                54   what the sign-in and the sync are allowed to say
   verify              54   checking a token, and every way past it that must not work
   endpoint            49   the sync endpoint, end to end
-  values              46   money, dates, durations, stakes, formats, counts
+  values              47   money, dates, durations, stakes, formats, counts
   variance            46   win rate, σ, confidence bands, verdicts
   blog                40   the post grammar, the share cards, and what it refuses
   migrations          35   a filled v2 database walked forward, both engines

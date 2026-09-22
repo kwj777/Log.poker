@@ -621,6 +621,16 @@ names a table whenever there is a case for it. `sessionCount` is the one that is
 easy to miss: it is derived at read time, so writing a session changes every
 venue.
 
+**And the sync names them too**, which for a while it did not. `onSyncApplied`
+fires far more often than "a pull arrived": a write pushes, and the answer
+always carries back the record just pushed, so on a signed-in device it runs
+after every hand, rebuy and mood entry. Told only that *something* had landed,
+the store re-read everything -- so a hand logged at the table did the scoped
+read above and then, a moment later, a full reload that replaced the sessions,
+venues and mood arrays anyway. Every paragraph here was true of the store alone
+and false of the app the moment somebody signed in. The change set says which
+tables moved; `SyncState.appliedTables` carries it as far as the store.
+
 **Which read owns each table is counted per table.** Two reloads can be in
 flight at once -- a write during a sync, two writes in a row -- and whichever
 resolved last used to win, which on two overlapping reads of one table is the
@@ -1086,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2182 passed
+Tests:       2187 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1099,8 +1109,8 @@ Tests:       2182 passed
   content             55   every figure in the guides, re-derived and read back
   signinEndpoint      55   the free door, and every bound on it
   copy                54   what the sign-in and the sync are allowed to say
+  syncingRepository   53   two devices and one server, no fakes in between
   verify              52   checking a token, and every way past it that must not work
-  syncingRepository   49   two devices and one server, no fakes in between
   endpoint            47   the sync endpoint, end to end
   values              46   money, dates, durations, stakes, formats, counts
   variance            45   win rate, σ, confidence bands, verdicts
@@ -1118,9 +1128,9 @@ Tests:       2182 passed
   chip                23   /chip resolves, offline, and never quotes a price
   handNotation        23   parse, round-trip, hand classes
   money               22   cents arithmetic, parsing, formatting
+  compose             21   which repository a device gets, and the unsafe sweep
   release             21   app.json, eas.json and the icon a store refuses over
   clock               20   a typed date, a typed length, and what neither will accept
-  compose             20   which repository a device gets, and the unsafe sweep
   glossary            20   the shorthand on screen still matches its explanation
   privacy             20   the policy page, held to the code it describes
   batch               19   a backlog split into requests, without orphaning a child

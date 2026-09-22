@@ -37,6 +37,7 @@ import type {
   Venue,
 } from '../domain/types';
 import type { StartingBalance } from '../data/repository';
+import type { SyncTable } from '../sync/protocol';
 
 export type Status = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -398,10 +399,42 @@ const describeError = (error: unknown): string =>
  */
 let listening = false;
 
-const listen = (refresh: () => void): void => {
+/**
+ * Which slices a synced table could have disturbed.
+ *
+ * The same reasoning the writes below use, pointed the other way. A venue
+ * carries into every session row that names it, and a session changes the
+ * `sessionCount` derived on every venue at read time, so those two travel
+ * together exactly as `renameVenue` and `startSession` already send them.
+ * Rebuys are children of the session and arrive inside it. `preferences` is
+ * not in `SYNC_TABLES` and so is never in this map.
+ */
+const SLICES_FOR_TABLE: Record<SyncTable, readonly Slice[]> = {
+  venues: ['venues', 'sessions'],
+  sessions: ['sessions', 'venues'],
+  rebuys: ['sessions'],
+  hands: ['hands'],
+  moodEntries: ['moodEntries'],
+};
+
+const slicesFor = (tables: readonly SyncTable[]): readonly Slice[] => {
+  const parts = new Set<Slice>();
+  for (const table of tables) for (const slice of SLICES_FOR_TABLE[table]) parts.add(slice);
+  return [...parts];
+};
+
+const listen = (refresh: (parts: readonly Slice[]) => void): void => {
   if (listening) return;
   listening = true;
-  onSyncApplied(refresh);
+  // **Named, not everything.** This fires after every local write on a
+  // signed-in device, not only when a pull brings something new: `touched`
+  // pushes after each write and the answer always carries the record just
+  // pushed back down. Given no names, this re-read all five slices, so logging
+  // a hand did the scoped `refresh(['hands'])` above and then, a moment later,
+  // replaced the sessions, venues and mood arrays as well -- invalidating
+  // every memo keyed on them, which on a five-year log is the expensive half.
+  // The answer says which tables moved. `slicesFor` reads it.
+  onSyncApplied((tables) => refresh(slicesFor(tables)));
 };
 
 export const useLogStore = create<LogState>((set, get) => ({
@@ -422,7 +455,7 @@ export const useLogStore = create<LogState>((set, get) => ({
     set({ status: 'loading', error: null });
     try {
       set({ ...(await read(EVERYTHING)), status: 'ready', error: null });
-      listen(() => void get().refresh());
+      listen((parts) => void get().refresh(parts));
     } catch (error) {
       set({ status: 'error', error: describeError(error) });
     }

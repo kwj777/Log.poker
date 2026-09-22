@@ -216,7 +216,21 @@ describe('the store listening for it', () => {
 
   it('subscribes when it hydrates, and reloads the log when told', () => {
     expect(store).toContain('onSyncApplied');
-    expect(store).toContain('listen(() => void get().refresh());');
+    expect(store).toContain('listen((parts) => void get().refresh(parts));');
+  });
+
+  it('and reloads only the slices the answer says moved', () => {
+    // This wire fires after every local write on a signed-in device, not only
+    // when a pull brings something down: `touched` pushes after each write,
+    // and the answer always carries the record just pushed back. Handed no
+    // names, the store re-read all five slices -- so a hand logged at the
+    // table did the scoped `refresh(['hands'])` and then, a moment later, a
+    // full reload that replaced the sessions, venues and mood arrays too.
+    //
+    // Read rather than run, like everything else in this file, and anchored to
+    // both ends of the wire: the name has to be carried and it has to be used.
+    expect(source).toContain('watcher(state.appliedTables)');
+    expect(store).toMatch(/onSyncApplied\(\(tables\) => refresh\(slicesFor\(tables\)\)\)/);
   });
 
   it('and only once, however many times the app hydrates', () => {

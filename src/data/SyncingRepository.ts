@@ -33,7 +33,13 @@ import { readClaim } from '../auth/token';
 import type { Timestamp } from '../domain/types';
 import { batchFor } from '../sync/batch';
 import { backoffMs, sync, type SyncOptions } from '../sync/client';
-import { SYNC_TABLES, countChanges, isEmptyChangeSet, type SyncFailure } from '../sync/protocol';
+import {
+  SYNC_TABLES,
+  countChanges,
+  isEmptyChangeSet,
+  type SyncFailure,
+  type SyncTable,
+} from '../sync/protocol';
 import { TOMBSTONE_RETENTION_MS } from './repository';
 import type {
   ChangeSet,
@@ -167,6 +173,24 @@ export interface SyncState {
    * has just been signed in on, it looks exactly like sync not working.
    */
   applied: number;
+  /**
+   * Which tables the answer behind the last `applied` bump actually moved.
+   *
+   * Beside the counter rather than derived from it, because by the time
+   * anything reacts the change set is gone. Empty until a round applies
+   * something.
+   *
+   * It exists because the count on its own throws away the one fact the reader
+   * needs. `onSyncApplied` fires after every local write -- `touched` pushes,
+   * and the answer always carries back the record just pushed -- and the store
+   * above, told only that *something* landed, re-read all five of its slices.
+   * So logging a hand did `refresh(['hands'])`, which is the scoped read this
+   * whole design is for, and then a full reload a moment later that replaced
+   * the sessions, venues and mood arrays too and invalidated every memo over
+   * them. The server had just said, in the change set, that only `hands` had
+   * moved.
+   */
+  appliedTables: readonly SyncTable[];
 }
 
 export class SyncingRepository implements Repository {
@@ -207,6 +231,7 @@ export class SyncingRepository implements Repository {
     problem: null,
     running: false,
     applied: 0,
+    appliedTables: [],
   };
   private listeners = new Set<(state: SyncState) => void>();
   private applied = 0;
@@ -580,16 +605,22 @@ export class SyncingRepository implements Repository {
     // feature exists for.
     if (outcome.response.more === true) this.dirty = true;
 
+    // Named as well as counted, so a reader can re-read the tables that moved
+    // rather than all of them. See `SyncState.appliedTables`.
+    let appliedTables: readonly SyncTable[] = this.state.appliedTables;
     if (!isEmptyChangeSet(outcome.response.changes)) {
       await this.local.applyChanges(outcome.response.changes);
       // Counted here rather than after the fence below, because the rows are
       // in the local database either way and what reads them has to know. A
       // run that is fenced still applied what it applied.
       this.applied += 1;
+      appliedTables = SYNC_TABLES.filter(
+        (table) => outcome.response.changes[table].length > 0,
+      );
     }
 
     if (epoch !== this.epoch) {
-      this.announce({ running: false, problem: null, applied: this.applied });
+      this.announce({ running: false, problem: null, applied: this.applied, appliedTables });
       return;
     }
 
@@ -646,6 +677,7 @@ export class SyncingRepository implements Repository {
       pending: batch.more ? countChanges(pending) - countChanges(batch.changes) : 0,
       lastSyncedAt: this.clock(),
       applied: this.applied,
+      appliedTables,
     });
   }
 

@@ -32,15 +32,29 @@ const twelve = (): SessionWithChildren[] =>
   Array.from({ length: 12 }, (_, i) => entry(`t${i}`, i % 4 === 0 ? 40_000 : 0));
 
 describe('the interval the dashboard and the variance screen share', () => {
-  const render = (initial: SessionWithChildren[]) =>
-    renderHook(
+  /**
+   * Every value the hook returned, in order, including the ones React threw
+   * away.
+   *
+   * `renderHook` writes `result.current` from an effect, so it only ever holds
+   * committed renders -- which is the one thing the last test in this file
+   * needs to see past. See there.
+   */
+  let returned: (ReturnType<typeof useRoiInterval>)[] = [];
+
+  const render = (initial: SessionWithChildren[]) => {
+    returned = [];
+    return renderHook(
       ({ sessions }: { sessions: SessionWithChildren[] }) => {
         // Exactly what a screen does, both hooks together.
         const results = useEntryResults(sessions);
-        return useRoiInterval(results);
+        const interval = useRoiInterval(results);
+        returned.push(interval);
+        return interval;
       },
       { initialProps: { sessions: initial } },
     );
+  };
 
   it('is an interval at all, so the rest of these mean something', async () => {
     const view = await render(twelve());
@@ -80,11 +94,22 @@ describe('the interval the dashboard and the variance screen share', () => {
   it('and the new answer is there in that render, not the one after it', async () => {
     // The cache is state adjusted during render, so there is a re-render in
     // here. Showing the previous interval for a frame while the new one lands
-    // would be its own bug.
+    // would be its own bug, and it is invisible to `result.current`:
+    // `renderHook` assigns that from an effect, so it holds only committed
+    // renders and reads the same either way. This asserted on it, which made
+    // it a weaker restatement of the test above rather than a check on the
+    // `return next.value` in the hook.
+    //
+    // So: every value the hook handed back across the rerender, the discarded
+    // render included. Returning `cache.value` there puts the old interval in
+    // that list.
     const view = await render(twelve());
-    const before = view.result.current?.roi;
+    const before = view.result.current;
 
+    returned.length = 0;
     await view.rerender({ sessions: [...twelve(), entry('t99', 250_000)] });
-    expect(view.result.current?.roi).not.toBe(before);
+
+    expect(returned.length).toBeGreaterThan(0);
+    expect(returned).not.toContain(before);
   });
 });

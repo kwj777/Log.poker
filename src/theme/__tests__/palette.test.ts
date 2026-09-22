@@ -129,8 +129,13 @@ describe('the generated icons draw the family mark', () => {
   it('lights exactly one ring per app, and none for the family', () => {
     expect(iconScript).toContain("export const RINGS = { ground: 0, observe: 1, learn: 2 };");
     // Log is Observe, so every icon this script writes lights the middle ring.
+    // Counted against the output list rather than against a number typed here,
+    // which is what a file that drops an icon leaves stale: this said 10 and
+    // the list is as long as it is.
     expect(iconScript).toContain('const LOG = RINGS.observe;');
-    expect(iconScript.match(/lit: LOG/g)?.length).toBe(10);
+    const drawn = iconScript.match(/^ {2}\['[^']+', \{/gm) ?? [];
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(iconScript.match(/lit: LOG/g)?.length).toBe(drawn.length);
   });
 });
 

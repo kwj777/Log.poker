@@ -32,15 +32,9 @@ interface ErrorScreenProps {
   /** What went wrong, in whatever words are available. */
   detail: string;
   onRetry: () => void;
-  retryLabel?: string;
 }
 
-export const ErrorScreen = ({
-  title,
-  detail,
-  onRetry,
-  retryLabel = 'Try again',
-}: ErrorScreenProps) => (
+export const ErrorScreen = ({ title, detail, onRetry }: ErrorScreenProps) => (
   <View style={styles.root}>
     <Text variant="heading" center>
       {title}
@@ -48,7 +42,7 @@ export const ErrorScreen = ({
     <Text color={colors.textSecondary} center style={styles.message}>
       {detail}
     </Text>
-    <Button label={retryLabel} onPress={onRetry} style={styles.retry} />
+    <Button label="Try again" onPress={onRetry} style={styles.retry} />
   </View>
 );
 

@@ -18,6 +18,7 @@ import { screen, userEvent } from '@testing-library/react-native';
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
 import EditSessionScreen from '../../../app/session/edit';
+import { formatDateInput, formatTimeInput, parseDateTime } from '../../domain/clock';
 import { useLogStore } from '../../store/useLogStore';
 import type { SessionWithChildren } from '../../domain/types';
 
@@ -411,5 +412,93 @@ describe('a session with no buy-in on it', () => {
     await userEvent.press(screen.getByText('Save changes'));
 
     expect(edits).toEqual([]);
+  });
+});
+
+describe('what Save does to a start nobody typed', () => {
+  it('leaves it exactly where it was, seconds and all', async () => {
+    // Re-parsing what was just printed is not a round trip. The two fields
+    // carry a date and `HH:MM`, so anything finer than a minute is lost the
+    // moment Save re-reads them -- and the end moves with the start, because
+    // the end is recomputed as start plus length. A session imported from a
+    // file with seconds on its timestamps was silently rounded by opening the
+    // edit screen and saving without touching a thing.
+    const startedAt = new Date(2026, 8, 19, 19, 0, 37).getTime();
+    load({ startedAt, endedAt: startedAt + 4 * HOUR });
+    await renderScreen(<EditSessionScreen />);
+
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits).toHaveLength(1);
+    expect(edits[0].patch.startedAt).toBe(startedAt);
+    expect(edits[0].patch.endedAt).toBe(startedAt + 4 * HOUR);
+  });
+
+  it('and still reads the fields when one of them was typed', async () => {
+    const startedAt = new Date(2026, 8, 19, 19, 0, 37).getTime();
+    load({ startedAt, endedAt: startedAt + 4 * HOUR });
+    await renderScreen(<EditSessionScreen />);
+
+    await userEvent.clear(screen.getByLabelText('Start time'));
+    await userEvent.type(screen.getByLabelText('Start time'), '21:15');
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits).toHaveLength(1);
+    expect(edits[0].patch.startedAt).toBe(new Date(2026, 8, 19, 21, 15).getTime());
+  });
+});
+
+describe('the one hour a year that happens twice', () => {
+  /**
+   * In a DST-observing zone, the morning the clocks go back has two 01:30s.
+   * `formatTimeInput` prints the same "01:30" for both and `parseDateTime` has
+   * to pick one, so re-parsing what was just printed silently moved the second
+   * one back an hour -- and moved the session's end with it, since the end is
+   * recomputed as the start plus the length. On Save, with nothing touched.
+   *
+   * Only runs where there is a repeated hour to test, which is a property of
+   * the runner's zone rather than of the code.
+   */
+  const repeated = (): number | null => {
+    // Any instant the two fields cannot name uniquely, found by asking rather
+    // than by naming a zone: half hourly over the two years behind now, which
+    // covers both hemispheres' changeovers. Behind, because the screen refuses
+    // a session that has not happened yet, which is its own rule and a
+    // different one.
+    // Floored to the hour, or every `at` carries seconds the fields do not
+    // print and every one of them looks ambiguous.
+    const until = Math.floor((Date.now() - 2 * 24 * HOUR) / HOUR) * HOUR;
+    for (let at = until; at > until - 2 * 365 * 24 * HOUR; at -= HOUR / 2) {
+      if (parseDateTime(formatDateInput(at), formatTimeInput(at)) !== at) return at;
+    }
+    return null;
+  };
+
+  const ambiguous = repeated();
+  const maybe = ambiguous === null ? it.skip : it;
+
+  maybe('keeps the instant a session already had when nothing was typed', async () => {
+    const startedAt = ambiguous as number;
+    load({ startedAt, endedAt: startedAt + 4 * HOUR });
+    await renderScreen(<EditSessionScreen />);
+
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits).toHaveLength(1);
+    expect(edits[0].patch.startedAt).toBe(startedAt);
+    expect(edits[0].patch.endedAt).toBe(startedAt + 4 * HOUR);
+  });
+
+  maybe('and still takes a new one when a field really was typed', async () => {
+    const startedAt = ambiguous as number;
+    load({ startedAt, endedAt: startedAt + 4 * HOUR });
+    await renderScreen(<EditSessionScreen />);
+
+    await userEvent.clear(screen.getByLabelText('Start time'));
+    await userEvent.type(screen.getByLabelText('Start time'), '21:15');
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(edits).toHaveLength(1);
+    expect(new Date(edits[0].patch.startedAt as number).getHours()).toBe(21);
   });
 });

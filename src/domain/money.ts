@@ -123,7 +123,13 @@ export const formatMoney = (
   options: { currency?: string; signed?: boolean; showCents?: boolean } = {},
 ): string => {
   const { currency = DEFAULT_CURRENCY, signed = false, showCents } = options;
-  const negative = cents < 0;
+  // `-0` counts as negative, and it is not a curiosity: `hourlyRate` is
+  // `Math.round(net / hours)`, so a session that lost a few cents over several
+  // hours arrives here as exactly that. `-0 < 0` is false, so the session read
+  // `+$0` -- a claim of profit on a losing night. Same rule as `formatRoi`:
+  // zero keeps no sign, a number that is only zero because it was rounded
+  // keeps the one it had.
+  const negative = cents < 0 || Object.is(cents, -0);
   const abs = Math.abs(cents);
   const withCents = showCents ?? abs % 100 !== 0;
   const value = (abs / 100).toLocaleString('en-US', {
@@ -137,15 +143,36 @@ export const formatMoney = (
 const CENTS_PER_THOUSAND = 100_000;
 const CENTS_PER_MILLION = 100_000_000;
 
-/** Compact form for chart axes and dense tiles: `$1.2k`, `-$840`. */
+/**
+ * Compact form for chart axes and dense tiles: `$1.2k`, `-$840`.
+ *
+ * The unit is chosen from the rounded figure rather than from the raw one,
+ * which is the whole of the arithmetic here. Choosing first and rounding
+ * after printed `$1000k` for anything from $999,995 to a million -- not a
+ * money string anybody writes -- and `$1000` for the fifty cents below $1k,
+ * where $1,000.00 half a cent later drew `$1k`. So each band asks whether its
+ * own answer has grown out of it, and hands up if it has.
+ *
+ * And a sign only where there is a figure to sign. A cumulative bankroll of
+ * -$0.25 rounds to nothing and used to draw `-$0`, which reads as a negative
+ * bankroll rather than as zero. Unlike `formatMoney`, this is an axis caption
+ * with no claim to make about which side of zero a rounded-away number was
+ * on.
+ */
 export const formatMoneyCompact = (cents: Cents, currency = DEFAULT_CURRENCY): string => {
   const abs = Math.abs(cents);
-  const sign = cents < 0 ? '-' : '';
   const symbol = currencySymbol(currency);
   const oneDecimal = (divisor: number): number => Math.round(abs / (divisor / 10)) / 10;
-  if (abs >= CENTS_PER_MILLION) return `${sign}${symbol}${oneDecimal(CENTS_PER_MILLION)}M`;
-  if (abs >= CENTS_PER_THOUSAND) return `${sign}${symbol}${oneDecimal(CENTS_PER_THOUSAND)}k`;
-  return `${sign}${symbol}${Math.round(abs / 100)}`;
+  const whole = Math.round(abs / 100);
+  const thousands = oneDecimal(CENTS_PER_THOUSAND);
+  const [figure, unit] =
+    abs >= CENTS_PER_MILLION || thousands >= 1_000
+      ? ([oneDecimal(CENTS_PER_MILLION), 'M'] as const)
+      : abs >= CENTS_PER_THOUSAND || whole >= 1_000
+        ? ([thousands, 'k'] as const)
+        : ([whole, ''] as const);
+  const sign = cents < 0 && figure !== 0 ? '-' : '';
+  return `${sign}${symbol}${figure}${unit}`;
 };
 
 /** `$1/$2`, or `$1/$2 ($2 ante)` when the game has a mandatory ante. */

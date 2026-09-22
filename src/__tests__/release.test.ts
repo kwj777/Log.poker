@@ -10,7 +10,8 @@
  * What is asserted is only the part an app store refuses a build over. Taste
  * lives in the files; this is the floor under them.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -152,7 +153,60 @@ describe('the web block, which is read by less of the toolchain than it looks', 
     // `src/version.ts` calls "the source of truth" that their edit had gone
     // nowhere. The copy that is read lives in `public/manifest.webmanifest`
     // and `app/+html.tsx`.
-    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'favicon', 'output']);
+    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'output']);
+  });
+
+  it('and declares no favicon, because the shell already declares one', () => {
+    // `web.favicon` generated `dist/app/favicon.ico` and a `<link rel="icon">`
+    // appended after the shell's head, so every one of the nineteen exported
+    // /app documents carried two conflicting icon declarations and left the
+    // choice to the browser. In the one file that goes out of its way to
+    // avoid a duplicated head tag -- `+html.tsx` says two `<title>` elements
+    // would be wrong because "the browser reads the first".
+    //
+    // The one that stays is the shell's `/icons/icon-192.png`, which the
+    // manifest, the apple-touch-icon and all nine marketing pages already
+    // agree on. The generated `.ico` topped out at 48px.
+    expect(app.web.favicon).toBeUndefined();
+    expect(read('app', '+html.tsx')).toContain('<link rel="icon" href="/icons/icon-192.png"');
+  });
+});
+
+describe('the images checked in beside the app', () => {
+  it('are each named by something that is not the script that draws them', () => {
+    // `android-icon-background.png` was 17.5 KB of nothing: no
+    // `adaptiveIcon.backgroundImage` key in app.json, no line in
+    // `generate-icons.mjs`, no mention anywhere in the tree. Expo never read
+    // it, so it shipped nowhere and broke nothing -- it just sat in the
+    // repository at 512x512 RGBA beside two 432x432 layers it was supposed to
+    // go behind, drifting from the palette `palette.test.ts` pins.
+    //
+    // The script is excluded from counting as a reader on purpose. A file it
+    // draws and nothing consumes is the same dead weight one step later,
+    // which is what `favicon.png` became the day `app.json` stopped naming
+    // it.
+    // Tests are not readers. This one names both of the files it was written
+    // for, a few lines up, and would otherwise vouch for them itself.
+    const script = read('scripts', 'generate-icons.mjs');
+    const readers = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n')
+      .filter(
+        (path) =>
+          path !== '' &&
+          !path.startsWith('assets/') &&
+          !path.includes('__tests__') &&
+          path !== 'scripts/generate-icons.mjs',
+      );
+
+    const orphans = readdirSync(join(ROOT, 'assets')).filter((name) => {
+      const named = readers.some((path) => read(...path.split('/')).includes(name));
+      return !named;
+    });
+
+    expect(orphans).toEqual([]);
+    // And everything left really is drawn rather than hand-placed, so the
+    // palette test's reach over the script is the reach over these files.
+    for (const name of readdirSync(join(ROOT, 'assets'))) expect(script).toContain(name);
   });
 });
 
@@ -203,11 +257,11 @@ describe('the build profiles', () => {
         autoIncrement?: boolean;
         extends?: string;
         developmentClient?: boolean;
-        ios?: { simulator?: boolean };
+        ios?: { simulator?: boolean; image?: string };
         env?: Record<string, string>;
       }
     >;
-    submit: Record<string, unknown>;
+    submit: Record<string, { ios?: { ascAppId?: string } }>;
   }
   const eas = json<Eas>('eas.json');
 
@@ -223,15 +277,32 @@ describe('the build profiles', () => {
   });
 
   it('and one that needs no Apple account, which is the only build available first', () => {
-    expect(eas.build.simulator).toBeDefined();
+    // This asserted only that the profile existed, which is true of a profile
+    // that has lost both of the things its name is about. `ios.simulator` is
+    // what makes it buildable with no Apple Developer account, and `internal`
+    // is what stops it going near a store; a profile stripped to `extends` and
+    // `developmentClient` passed the old assertion unchanged.
+    expect(eas.build.simulator?.ios?.simulator).toBe(true);
+    expect(eas.build.simulator?.distribution).toBe('internal');
   });
 
-  it('has a submit profile, even though its credentials are not in the repository', () => {
-    // Apple IDs and team IDs are account facts rather than project facts, and
-    // `eas submit` prompts for them. The empty profile is what makes
-    // `--profile production` a valid thing to type.
-    expect(eas.submit.production).toBeDefined();
-    expect(read('eas.json')).not.toMatch(/appleTeamId|ascAppId/);
+  it('names the app to submit to, and still no account of its own', () => {
+    // This profile was empty, on the reasoning that `eas submit` prompts for
+    // everything it needs. It does not prompt for this one. Before uploading
+    // anything it looks the app up on App Store Connect, and that lookup is a
+    // different Apple endpoint from the one that uploads: on 2026-09-22 it
+    // answered 403, "the API key in use does not allow this request", and the
+    // submission stopped before the binary was sent. `ascAppId` is the
+    // documented way past it, because a profile that names the app skips the
+    // lookup entirely.
+    //
+    // It belongs here in a way the other two do not. An App Store ID is a
+    // project fact: it identifies this app, it is public in every App Store
+    // URL, and log.poker will carry it in a smart app banner the day this is
+    // approved. An Apple ID and a team ID are facts about whoever is doing the
+    // submitting, so those stay out and `eas submit` goes on asking for them.
+    expect(eas.submit.production?.ios?.ascAppId).toBe('6814843842');
+    expect(read('eas.json')).not.toMatch(/appleTeamId|appleId/);
   });
 
   it('has a profile for screenshots, which neither of the other two could take', () => {
@@ -261,6 +332,27 @@ describe('the build profiles', () => {
     for (const [name, profile] of store) {
       expect([name, profile.env]).toEqual([name, undefined]);
     }
+  });
+
+  it('pins the Xcode, because the newest one builds a binary that cannot launch', () => {
+    // Xcode 27's SDK makes the UIScene life cycle mandatory, and Expo SDK 57
+    // still generates an AppDelegate with no `UIApplicationSceneManifest`, so
+    // an app built with it fails at launch rather than at compile: "UIScene
+    // life cycle is required for apps built with this SDK". The backport is
+    // expo/expo#50026 and is an unmerged draft, so there is no version of this
+    // to install. EAS's default image is Xcode 26.6, which is the only reason
+    // a production build works at all today.
+    //
+    // An exact name rather than an alias is the whole point. `auto`, `latest`
+    // and `sdk-57` all move on Expo's schedule, and the day one of them lands
+    // on Xcode 27 the binary Apple receives is one that does not open, with
+    // nothing in this repository having changed.
+    const image = eas.build.production?.ios?.image;
+
+    expect(image).toMatch(/^macos-[a-z]+-[\d.]+-xcode-\d+\.\d+$/);
+    // The device build is what proves the production one launches, so it has
+    // to be built the same way for that proof to mean anything.
+    expect(eas.build.preview?.ios?.image).toBe(image);
   });
 
   it('pins the Node the rest of the project pins', () => {

@@ -275,6 +275,3 @@ export const applyPatch = <T extends object>(record: T, patch: Partial<T>): T =>
   }
   return next;
 };
-
-/** Newest first -- the order every list in the app wants. */
-export const byRecencyDesc = <T extends { at: Timestamp }>(a: T, b: T): number => b.at - a.at;

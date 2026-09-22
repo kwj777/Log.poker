@@ -287,7 +287,6 @@ export const SignInCard = () => {
             placeholder="you@example.com"
             placeholderTextColor={colors.textTertiary}
             style={styles.input}
-            keyboardType="email-address"
             inputMode="email"
             autoCapitalize="none"
             autoCorrect={false}

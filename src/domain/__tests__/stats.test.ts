@@ -20,6 +20,8 @@ import {
   totalInvested,
   totals,
 } from '../stats';
+import * as money from '../money';
+import type { Stakes } from '../types';
 import { HOUR, STAKES_1_2, STAKES_2_5, T0, completed, session, venue } from './support';
 
 describe('profit and loss', () => {
@@ -99,6 +101,16 @@ describe('hourly rate', () => {
   it('refuses to divide by a zero-length session', () => {
     const s = completed({ hours: 0, cashOut: 40_000, buyIn: 30_000 });
     expect(hourlyRate(s, s.rebuys)).toBeNull();
+  });
+
+  it('stays a loss when the loss is too small to print', () => {
+    // `Math.round` of a small negative is `-0`, and the screens hand this
+    // straight to `formatMoney(..., { signed: true })`, which read `+$0`
+    // because `-0 < 0` is false. Reachable from a cent-precision import
+    // rather than from typing, which is why it went unnoticed.
+    const s = completed({ buyIn: 30_000, cashOut: 29_999, hours: 10 });
+    expect(Object.is(hourlyRate(s, s.rebuys), -0)).toBe(true);
+    expect(money.formatMoney(hourlyRate(s, s.rebuys) as number, { signed: true })).toBe('-$0');
   });
 });
 
@@ -224,6 +236,29 @@ describe('bankroll curve', () => {
         100_000,
       );
       expect(curve[0].cumulative).toBe(80_000);
+    });
+
+    it('is plotted against session index, whatever the dates say', () => {
+      // `isAhead`'s docstring used to name this curve among the things a typed
+      // year ruins, saying a point decades out "flattens everything real into
+      // the left edge". It does not: the dashboard maps this curve to
+      // `{ x: index, y: cumulative }`, so a session dated 2062 sits one step
+      // to the right of the one before it like any other. What a typed year
+      // really corrupts is the last `cumulative`, which the axis caption and
+      // the chart's spoken label both read -- and the x spacing is what would
+      // have to change for the old sentence to become true.
+      const curve = bankrollCurve([
+        completed({ id: 'a', startedAt: T0, hours: 2, buyIn: 100, cashOut: 200 }),
+        completed({ id: 'b', startedAt: T0 + HOUR, hours: 2, buyIn: 100, cashOut: 200 }),
+        completed({ id: 'typo', startedAt: T0 + 36 * 365 * 24 * HOUR, hours: 2, buyIn: 100, cashOut: 200 }),
+      ]);
+      // Exactly what `chartSeries` on the dashboard does with it.
+      const points = curve.map((point, index) => ({ x: index, y: point.cumulative }));
+      expect(points.map((point) => point.x)).toEqual([0, 1, 2]);
+      expect(curve[curve.length - 1].at).toBeGreaterThan(T0 + 30 * 365 * 24 * HOUR);
+      // And the figure the axis caption and the spoken label read is the one
+      // the typo really moves.
+      expect(points[points.length - 1].y).toBe(300);
     });
   });
 });
@@ -483,3 +518,51 @@ describe('which currency a log is in', () => {
     expect(totals(inCurrency(log, 'EUR')).net).toBe(40_000);
   });
 });
+
+describe('how often a breakdown builds its labels', () => {
+  /**
+   * Once per bucket, not once per session.
+   *
+   * `groupBy` took one callback returning both the key and the label, so
+   * `byStakes` called `formatStakes` -- and `Intl.NumberFormat` twice inside
+   * it -- for every cash session, to produce the two or three strings the
+   * chart draws. Measured against the real functions that was 19.6ms at 600
+   * sessions and 79.9ms at 2400, against 0.5ms and 1.6ms labeling once per
+   * bucket, with byte-identical output.
+   *
+   * It is the Stakes breakdown that the dashboard opens on for anybody with a
+   * cash game, and the dominant term in the re-render when the sessions array
+   * is replaced.
+   *
+   * Counted rather than timed: a wall-clock assertion on a shared runner is a
+   * flake, and the count is the property anyway.
+   */
+  const night = (stakes: Stakes, currency = 'USD') =>
+    completed({ stakes, currency, buyIn: 30_000, cashOut: 40_000, hours: 4 });
+
+  it('builds one label per bucket, whatever the log holds', () => {
+    const calls: string[] = [];
+    const spy = jest
+      .spyOn(money, 'formatStakes')
+      .mockImplementation((stakes) => {
+        calls.push(`${stakes.smallBlind}/${stakes.bigBlind}`);
+        return `${stakes.smallBlind}/${stakes.bigBlind}`;
+      });
+
+    const sessions = [
+      ...Array.from({ length: 40 }, () => night(STAKES_1_2)),
+      ...Array.from({ length: 40 }, () => night(STAKES_2_5)),
+    ];
+    const groups = byStakes(sessions);
+    spy.mockRestore();
+
+    expect(groups).toHaveLength(2);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('and still names each bucket what it named it before', () => {
+    const sessions = [night(STAKES_1_2), night(STAKES_2_5), night(STAKES_1_2)];
+    expect(byStakes(sessions).map((group) => group.label).sort()).toEqual(['$1/$2', '$2/$5']);
+  });
+});
+

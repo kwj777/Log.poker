@@ -276,3 +276,83 @@ describe('what a sync push reads', () => {
     await db.delete();
   });
 });
+
+describe('what applying a sync answer reads', () => {
+  it('looks up the rows the answer names, rather than the tables they are in', async () => {
+    // `applyChanges` read `venues` and `sessions` whole, whatever the change
+    // set held -- 600 structured clones to place one rebuy under its parent,
+    // and the same 600 for a change set containing nothing at all. The reads
+    // it needs are by id, which is what `newerHere` beside them already did.
+    //
+    // `toArray()` is that read, counted rather than timed, for the same reason
+    // as the push test above: it says which of the two shapes the code has.
+    const db = createDatabase(`log-poker-test-apply-${++counter}`);
+    const repository = new DexieRepository(db, {
+      clock: { now: () => T0 },
+      ids: { next: () => `id-${++ids}` },
+    });
+    await repository.init();
+
+    const venue = await repository.createVenue({ name: 'Aria', isHomeGame: false });
+    const session = await repository.createSession({
+      venueId: venue.id,
+      format: 'cash',
+      gameType: 'NLHE',
+      stakes: { smallBlind: 100, bigBlind: 200 },
+      currency: 'USD',
+      buyIn: 30_000,
+      startedAt: T0,
+    });
+
+    const whole: string[] = [];
+    for (const [name, table] of [
+      ['venues', db.venues],
+      ['sessions', db.sessions],
+      ['rebuys', db.rebuys],
+      ['hands', db.hands],
+      ['moodEntries', db.moodEntries],
+    ] as const) {
+      const real = table.toArray.bind(table);
+      jest.spyOn(table, 'toArray').mockImplementation(() => {
+        whole.push(name);
+        return real();
+      });
+    }
+
+    const empty = {
+      venues: [],
+      sessions: [],
+      rebuys: [],
+      hands: [],
+      moodEntries: [],
+    };
+    await repository.applyChanges(empty);
+    expect(whole).toEqual([]);
+
+    await repository.applyChanges({
+      ...empty,
+      rebuys: [
+        {
+          record: {
+            id: 'r1',
+            sessionId: session.id,
+            amount: 10_000,
+            at: T0,
+            createdAt: T0,
+            updatedAt: T0 + 1,
+          },
+          deletedAt: null,
+        },
+      ],
+    });
+    expect(whole).toEqual([]);
+
+    jest.restoreAllMocks();
+    // And it landed, which is what stops this passing by doing nothing.
+    expect((await repository.getSession(session.id))?.rebuys).toHaveLength(1);
+    expect((await repository.listVenues())[0].id).toBe(venue.id);
+
+    db.close();
+    await db.delete();
+  });
+});

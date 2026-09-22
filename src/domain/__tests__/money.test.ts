@@ -116,6 +116,22 @@ describe('formatMoney', () => {
   });
 });
 
+describe('a result too small to print', () => {
+  it('keeps the sign it had, rather than claiming a profit', () => {
+    // `Math.round` of a small negative is `-0`, and `-0 < 0` is false, so a
+    // losing night read `+$0`. The same rule `formatRoi` already applies: zero
+    // keeps no sign, a number that is only zero because it was rounded keeps
+    // the one it had.
+    expect(formatMoney(-0, { signed: true })).toBe('-$0');
+    expect(formatMoney(-0)).toBe('-$0');
+  });
+
+  it('and a real zero still keeps none', () => {
+    expect(formatMoney(0, { signed: true })).toBe('+$0');
+    expect(formatMoney(0)).toBe('$0');
+  });
+});
+
 describe('formatMoneyCompact', () => {
   it('keeps small amounts exact and abbreviates large ones', () => {
     expect(formatMoneyCompact(84_000)).toBe('$840');
@@ -125,6 +141,32 @@ describe('formatMoneyCompact', () => {
     expect(formatMoneyCompact(15_000_000)).toBe('$150k');
     expect(formatMoneyCompact(100_000_000)).toBe('$1M');
     expect(formatMoneyCompact(325_000_000)).toBe('$3.3M');
+  });
+
+  it('moves up a unit when its own answer has grown out of the band', () => {
+    // The unit used to be chosen from the raw figure and the figure rounded
+    // after, so the last five dollars under a million printed `$1000k`, which
+    // is not a money string anybody writes. One band lower is the same cause
+    // and only untidy: $999.50 drew `$1000` where $1,000.00 fifty cents later
+    // drew `$1k`.
+    expect(formatMoneyCompact(99_999_999)).toBe('$1M');
+    expect(formatMoneyCompact(99_995_000)).toBe('$1M');
+    expect(formatMoneyCompact(-99_999_999)).toBe('-$1M');
+    expect(formatMoneyCompact(99_950)).toBe('$1k');
+    expect(formatMoneyCompact(99_949)).toBe('$999');
+  });
+
+  it('keeps the band it is in when it still fits', () => {
+    expect(formatMoneyCompact(99_949_999)).toBe('$999.5k');
+    expect(formatMoneyCompact(99_900_000)).toBe('$999k');
+  });
+
+  it('does not sign an amount that rounded away', () => {
+    // A bankroll of -$0.25 is not a negative bankroll, and this caption sits
+    // under a curve that is drawn correctly either way.
+    expect(formatMoneyCompact(-25)).toBe('$0');
+    expect(formatMoneyCompact(-49)).toBe('$0');
+    expect(formatMoneyCompact(-50)).toBe('-$1');
   });
 });
 

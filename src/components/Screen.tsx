@@ -21,6 +21,21 @@
  *
  * `Sheet` has done this since it was written. This is the same thing, on the
  * frame the rest of the app uses.
+ *
+ * ## Why that was only half of it
+ *
+ * Lifting the footer does not move the field being typed into. `padding`
+ * shrinks the frame, so the scroll area gets shorter and whatever was near the
+ * bottom of it is simply below the fold, with nothing scrolling it back. The
+ * hand note is the case that found this: tap it, and the line you are typing is
+ * under the keyboard until you dismiss the keyboard to read it.
+ *
+ * `automaticallyAdjustKeyboardInsets` is the other half and is what scrolls the
+ * focused field into view. It is iOS only and it measures the keyboard's
+ * overlap with the scroll view's own frame rather than taking the keyboard's
+ * height, so it does not fight the wrapper above it: by the time it is asked,
+ * that frame has already been lifted clear and there is no overlap left to
+ * inset for. What remains is the part that was missing.
  */
 
 import type { ReactNode } from 'react';
@@ -80,6 +95,7 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
               { paddingBottom: spacing.xxl + footerInset },
             ]}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
           >
             {body}

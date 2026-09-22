@@ -18,8 +18,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import * as tokenModule from '../../auth/token';
+import type { Tier } from '../../auth/token';
 import { SYNC_URL } from '../client';
 import { handleSync, type BlobStore, type Surroundings } from '../endpoint';
+import { LEGACY_SIGNATURES_UNTIL, mintToken } from '../verify';
 import { BUNDLE_VERSION, emptyChangeSet } from '../protocol';
 import { NOTABLE_RECORDS } from '../observe';
 import { RATE_LIMIT } from '../rateLimit';
@@ -34,14 +36,38 @@ const NOW = 1_700_000_000_000;
 
 /* ------------------------------------------------------------------ a token */
 
+const HOUR = 3_600_000;
+const SUBJECT = 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4';
+
+/**
+ * A token, minted by the thing that mints the real ones.
+ *
+ * This used to sign the bare `${expiry}.${tier}.${subject}` itself, under a
+ * comment saying that was exactly how Untilt mints one. Untilt stopped:
+ * `mintToken` signs `family.` and then that, and the bare preimage is taken
+ * only while `LEGACY_SIGNATURES_UNTIL` is open. So every authorization answer
+ * in this file was being checked on the branch that closes on 2026-11-15 and
+ * is meant to be deleted with it -- moving `NOW` past that date failed 35 of
+ * the 47 tests here, none of them about the migration.
+ *
+ * Calling the real minter means these assertions survive the deletion, and it
+ * is one fewer copy of a signature to keep in step. The old preimage keeps one
+ * test of its own, which mints it deliberately.
+ */
+const mint = (
+  {
+    tier = 'full',
+    subject = SUBJECT,
+    expiresAt = NOW + HOUR,
+  }: { tier?: Tier; subject?: string; expiresAt?: number } = {},
+): Promise<string> => mintToken(SECRET, { subject, tier, expiresAt });
+
 const base64url = (bytes: ArrayBuffer): string =>
   Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-/** Minted exactly as Untilt mints one: HMAC-SHA256 over the first three parts. */
-const mint = async (
-  { tier = 'full', subject = 'log_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4', ttl = 3_600 }: { tier?: string; subject?: string; ttl?: number } = {},
-): Promise<string> => {
-  const payload = `${Math.floor(NOW / 1000) + ttl}.${tier}.${subject}`;
+/** The preimage Untilt signed before the two purposes were told apart. */
+const mintLegacy = async ({ expiresAt = NOW + HOUR }: { expiresAt?: number } = {}): Promise<string> => {
+  const payload = `${Math.floor(expiresAt / 1000)}.full.${SUBJECT}`;
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(SECRET),
@@ -108,20 +134,26 @@ const fakeStore = (over: Partial<Fake> = {}): Fake => {
   return store;
 };
 
-const world = (store: BlobStore | null, secret = SECRET): Surroundings => ({
+const world = (store: BlobStore | null, secret = SECRET, at = NOW): Surroundings => ({
   secret,
   store: () => store,
-  now: () => NOW,
+  now: () => at,
 });
 
-const post = async (token: string | null, body: unknown, store: BlobStore | null, secret = SECRET) =>
+const post = async (
+  token: string | null,
+  body: unknown,
+  store: BlobStore | null,
+  secret = SECRET,
+  at = NOW,
+) =>
   handleSync(
     new Request('https://log.poker/api/sync', {
       method: 'POST',
       headers: token === null ? {} : { Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     }),
-    world(store, secret),
+    world(store, secret, at),
   );
 
 const push = (changes: Partial<Record<string, unknown[]>> = {}) => ({
@@ -196,6 +228,41 @@ describe('what has to be true before a byte is stored', () => {
     } finally {
       logged.mockRestore();
     }
+  });
+
+  it('still takes the preimage Untilt used to sign, while that window is open', async () => {
+    // Every test in this file went through this branch until `mint` was
+    // pointed at `mintToken`, which meant the migration was covered by
+    // accident and the endpoint's actual signature by nothing. It is covered
+    // here instead, deliberately and once.
+    const answer = await post(await mintLegacy(), push({ venues: [venue('venue-legacy')] }), fakeStore());
+    expect(answer.status).toBe(200);
+  });
+
+  it('and stops taking it the day the window closes, which is the point of it', async () => {
+    // The instruction at `LEGACY_SIGNATURES_UNTIL` is to delete the branch on
+    // this date. Nothing here has to be touched when somebody does: the two
+    // tests above and below keep passing, and this one is the one that goes.
+    const at = LEGACY_SIGNATURES_UNTIL;
+    const answer = await post(
+      await mintLegacy({ expiresAt: at + HOUR }),
+      push(),
+      fakeStore(),
+      SECRET,
+      at,
+    );
+    expect(answer.status).toBe(401);
+
+    // And the current preimage is unaffected by the date, which is what makes
+    // the refusal above about the signature rather than about the clock.
+    const current = await post(
+      await mint({ expiresAt: at + HOUR }),
+      push(),
+      fakeStore(),
+      SECRET,
+      at,
+    );
+    expect(current.status).toBe(200);
   });
 
   it('but stays quiet for a request with no token, which is a scanner', async () => {

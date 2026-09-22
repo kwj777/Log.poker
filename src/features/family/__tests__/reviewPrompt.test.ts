@@ -8,9 +8,11 @@
  * quiet and there is no store to remember a dismissal in.
  *
  * The second kind reads the card's source, the way the mid-session and
- * after-session blocks in `handOffs.test.ts` do, because this repository's
- * suite is plain ts-jest in Node and cannot render a component. What is read
- * is the copy and the rule that keeps the card off the screen at a table.
+ * after-session blocks in `handOffs.test.ts` do, because *this file's* project
+ * is plain ts-jest in Node and cannot render a component. The repository's
+ * other project can, and does render this card, in
+ * `__tests__/screens/reviewFlagged.test.tsx`. What is read here is the copy
+ * and the rule that keeps the card off the screen at a table.
  */
 
 import { readFileSync } from 'node:fs';
@@ -203,5 +205,17 @@ describe('what the dashboard does not read to draw the card', () => {
     // rendered test would pass either way.
     expect(dashboard).toContain('useHandsForSession(lastFinished?.id ?? null)');
     expect(dashboard).not.toMatch(/listHands\(\s*\)/);
+  });
+
+  it('and is counted among that hook’s callers, which it was not', () => {
+    // `useHandsForSession`'s docstring said "the two callers both branch on
+    // it" about the null-means-not-read-yet rule. This screen was the third,
+    // and it branches indirectly -- `reviewPrompt` refuses a null `hands` on
+    // its first line, which is what keeps the card off the screen in the frame
+    // before the read lands. A headcount in a comment goes stale silently; the
+    // rule does not.
+    const store = source('src', 'store', 'useLogStore.ts');
+    expect(store).not.toContain('The two callers');
+    expect(store).toContain('Every caller branches on it');
   });
 });

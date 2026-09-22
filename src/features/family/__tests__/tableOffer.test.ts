@@ -4,8 +4,11 @@
  * The decision is two lines of code and it is a product decision about when
  * this app interrupts somebody who is still playing, which is the one thing
  * `MidSessionCheckIn` spends its whole header being careful about. So it is
- * pinned here rather than left to be read off a component this repository's
- * runner cannot render.
+ * pinned here, where it is two lines of a rule rather than a string somebody
+ * has to find on a rendered screen. The card itself is rendered, in
+ * `sessions/__tests__/midSessionCheckIn.test.tsx`; this said the repository's
+ * runner cannot render it, which has not been true since the `ui` project
+ * existed.
  *
  * `handOffs.test.ts` holds the other half: that the offer is made after the
  * hand is written, once in a session, and with a way out. This file is only

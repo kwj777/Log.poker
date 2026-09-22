@@ -5,11 +5,21 @@
  * grows for years: localStorage is a synchronous ~5MB string store with no
  * indexes, and querying it would mean deserializing every session on every read.
  *
- * Rows are stored in the same shape as the domain records, with two exceptions
- * forced by IndexedDB's index rules: booleans and nulls are not indexable, so
- * `isHomeGame` is stored as 0/1 and an unfinished session's `endedAt` is stored
- * as `0` rather than `null`. Both are translated at the repository boundary, so
- * callers never see the encoding.
+ * Rows are close to the domain records and not identical, and the differences
+ * are all translated at the repository boundary, so callers never see any of
+ * them:
+ *
+ * - `isHomeGame` is 0/1 and an unfinished session's `endedAt` is `0` rather
+ *   than `null`, because booleans and nulls are not indexable.
+ * - `importKey` is *absent* rather than null on a session logged in the app,
+ *   which is a different index rule and the one with teeth. See the note on
+ *   `SessionRecord.importKey`.
+ * - `deletedAt` is a stored column that no domain type has, and
+ *   `Venue.sessionCount` is a domain field that no column holds.
+ *
+ * Listed rather than counted. This said "two exceptions" while `importKey`
+ * was the third, and a count is the part of a list that goes stale without
+ * anything to notice.
  */
 
 import Dexie, { type EntityTable } from 'dexie';
@@ -35,11 +45,20 @@ export const OPEN_SESSION_ENDED_AT = 0;
  *
  * `deletedAt` is a property rather than an index, and IndexedDB stores whole
  * objects, so adding one needs no migration: a record written by an earlier
- * build simply has no `deletedAt` and reads as live. That is the one place this
- * file and the SQLite schema genuinely differ. The tombstone column there is
- * migration 4, added by an `ALTER TABLE`, while the versions below stop at the
- * 3 that tournaments needed, because that one changed indexed keys and this
- * does not.
+ * build simply has no `deletedAt` and reads as live. SQLite has to be told --
+ * the tombstone column there is migration 4, five `ALTER TABLE`s -- and that
+ * asymmetry is why the two schemas count their versions differently. It has
+ * happened twice: `board` is the other, migration 5 there and a property here
+ * that needed no version at all.
+ *
+ * The ladder below does not stop where the property did, though. Indexed keys
+ * still need a version whatever the reason for them, and three of the six are
+ * about keys rather than columns: v4 adds the `preferences` store, v5 the
+ * `updatedAt` index that every sync reads on, and v6 the `deletedAt` index on
+ * the hands. This said the versions stopped at the 3 that tournaments needed,
+ * which was true when it was written and stopped being true three versions
+ * ago; the ladder is pinned in `migrations.test.ts` now, so the next one
+ * cannot pass here in silence.
  *
  * It stays out of the indexes almost everywhere, on purpose. Every query that
  * filters *to* live records is already ordered by an indexed key, and an index

@@ -224,6 +224,17 @@ describe('a log written out and read back', () => {
     expect(new Date(mdy.sessions[0].draft.startedAt).getMonth()).toBe(2);
   });
 
+  it('and says so, rather than asking which way round they are', () => {
+    // The import screen offers a "Dates are day-first" chip whenever the file
+    // is uncertain, and this file was: `detectDateOrder` answers `unknown` for
+    // an ISO column because there is nothing in it to detect. So Log's own
+    // export arrived under a toggle that could not change what it parsed --
+    // a control asking a question the file had already answered.
+    expect(parseSessionCsv(toCsv(SESSION_HEADERS, sessionRows([session()]))).dateOrderCertain).toBe(
+      true,
+    );
+  });
+
   it('numbers the money rather than dressing it, so a column sums', () => {
     const row = sessionRows([session()])[0];
     expect(row).toContain('300.00');

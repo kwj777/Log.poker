@@ -160,3 +160,44 @@ describe('documentation the compiler throws away', () => {
   });
 });
 
+
+describe('what this repository says it cannot do', () => {
+  /**
+   * Three comments said the repository's runner cannot render a component,
+   * and `jest.config.js` declares a second project whose own header says "**ui**
+   * is everything that renders". Both cards those comments were about are
+   * rendered in it, by tests that were already passing when the comments were
+   * written -- so nobody was talked out of a render test, but the next person
+   * reading one of those files is told the runner is half of what it is.
+   *
+   * A file may still say its own project cannot render, which is true of every
+   * `.test.ts` in the node project and is why two of these say so now.
+   */
+  const claim = /this repository'?s [^.]{0,80}?cannot render/;
+
+  const walk = (dir: string): string[] =>
+    readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) return walk(path);
+      return /\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+
+  /** Comment wrapping flattened, since every one of these spanned two lines. */
+  const flat = (source: string): string => source.replace(/\n\s*\*/g, ' ').replace(/\s+/g, ' ');
+
+  it('does not include rendering a component, which the ui project does', () => {
+    const offenders = [...walk('src'), ...walk('app')].filter((path) =>
+      claim.test(flat(readFileSync(join(ROOT, path), 'utf8'))),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('and the check sees one when there is one', () => {
+    expect(claim.test(flat("/**\n * this repository's test runner cannot\n * render a component.\n */"))).toBe(
+      true,
+    );
+    expect(claim.test(flat("/** this file's project is plain ts-jest and cannot render a component. */"))).toBe(
+      false,
+    );
+  });
+});

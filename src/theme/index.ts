@@ -101,15 +101,6 @@ export const layout = {
   tapTarget: 48,
 } as const;
 
-/** iOS-style shadow that degrades to elevation on Android and a box-shadow on web. */
-export const shadow = {
-  shadowColor: '#000',
-  shadowOpacity: 0.35,
-  shadowRadius: 16,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 6,
-} as const;
-
 export const moodColor = (score: number): string =>
   colors.mood[Math.min(4, Math.max(0, Math.round(score) - 1))];
 

@@ -11,7 +11,7 @@
  * picker here and what the parsing has to be careful about.
  */
 
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Text } from '../../components/Text';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -116,7 +116,6 @@ export const DurationInput = ({
         onChangeText={onChangeHours}
         placeholder="4"
         placeholderTextColor={colors.textTertiary}
-        keyboardType={Platform.OS === 'web' ? 'numeric' : 'decimal-pad'}
         inputMode="decimal"
         accessibilityLabel="Hours played"
         style={[styles.input, styles.number]}
@@ -127,7 +126,6 @@ export const DurationInput = ({
         onChangeText={onChangeMinutes}
         placeholder="30"
         placeholderTextColor={colors.textTertiary}
-        keyboardType={Platform.OS === 'web' ? 'numeric' : 'number-pad'}
         inputMode="numeric"
         accessibilityLabel="Minutes played"
         style={[styles.input, styles.number]}

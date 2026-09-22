@@ -126,8 +126,8 @@ const PLAN: readonly SessionPlan[] = [
 ];
 
 /**
- * Tournaments, and shaped like tournaments: seven entries, two cashes, and one
- * of those carrying the whole set. A demo that showed a tidy 60% cash rate would
+ * Tournaments, and shaped like tournaments: twelve entries, three cashes, and
+ * one of those carrying the whole set. A demo that showed a tidy 60% cash rate would
  * make the copy on the tournament card look like it was written for somebody
  * else, because the copy is about exactly this shape.
  */

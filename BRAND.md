@@ -589,13 +589,16 @@ gold. And the iOS app icon was a hand copied duplicate that nothing kept in
 sync, so it drifted the moment the color moved. **Anywhere a color is pinned by
 a hash, a pixel test, or a copy, it is not one edit.**
 
-**One remains.**
+**None remains.**
 
-**Empty states have no mark.** This document says app icons, favicons and empty
-states all derive from the same geometry. The first two do now. Log's
-`EmptyState` is type only, and giving it the mark means a drawn component and
-therefore a dependency the app does not have, which is a decision rather than a
-transcription.
+**Empty states had no mark.** This document says app icons, favicons and empty
+states all derive from the same geometry, and for a while only the first two
+did: giving `EmptyState` the mark looked like it meant a drawn component and
+therefore an SVG dependency the app does not have. It did not.
+`src/components/EmptyState.tsx` renders the PNG the icon generator already
+writes, held back to a watermark behind the sentence, so the mark on an empty
+screen is the same bytes as the mark on the home screen rather than a second
+drawing free to drift from it.
 
 ---
 

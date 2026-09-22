@@ -894,8 +894,10 @@ export const mergeIntoBundle = (
       // row whose tombstone it threw away, and taking it would put a session
       // somebody deleted back on every device. Refusing it can lose a record
       // that device really did create and never sent, which is the worse thing
-      // to lose but the rarer one: it needs three months offline and a write
-      // that never left. See SYNC.md.
+      // to lose but the rarer one: it needs six months offline and a write
+      // that never left, where the alternative needs only the six. Three
+      // months is the retention window; being below the horizon as well takes
+      // another. README and SYNC.md both say six. See SYNC.md.
       //
       // Unless this same push is carrying something live that hangs off it, in
       // which case it is not the shape of a collected row at all. See

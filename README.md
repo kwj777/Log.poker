@@ -1096,11 +1096,11 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2234 passed
+Tests:       2238 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
-  bundle              72   what ships to each platform, against the real output
+  bundle              72   the server-side merge: two devices and one bundle
   site                67   the marketing/app split, the PWA, the sitemap
   tournaments         67   ROI, its interval, cash rate, dry runs, finishes
   sessionImport       66   reading a session-summary export
@@ -1158,6 +1158,7 @@ Tests:       2234 passed
   csvWriter           11   writing CSV, and reading back exactly what was written
   tableOffer          11   which tags mean the game did it to you, and what to say about it
   pastHand            10   adding a hand to a session that is not running
+  readme              10   the test table adds up and says what each suite is for
   rowLabels           10   what a screen reader is told a row in a list is
   search              10   finding one thing in a log with years in it
   selectors           10   store reads and filters
@@ -1178,7 +1179,6 @@ Tests:       2234 passed
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room
   importWarnings       6   what the import screen says about a file it could not use
-  readme               6   the test table adds up and says what each suite is for
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
   settingsSeed         6   the demo set, and the one device it must not be written onto
@@ -1249,7 +1249,7 @@ memory a second time.
 
 `layout.tapTarget` is 48, and the chips and the card picker both say in their
 own comments that this is the floor. `Button size="small"` draws at 36 and is
-used in twenty-one places, so it makes the difference up in `hitSlop`: small is
+used in dozens of places, so it makes the difference up in touch area: small is
 meant to look small, not to be harder to hit. The `Explain` badge does the same
 from 22.
 
@@ -1554,9 +1554,10 @@ nothing at all.
 
 So the tournament card shows what can be said honestly:
 
-- **ROI and cash rate** as descriptions of what happened. Below a hundred entries
-  the copy says outright that this is a record rather than a measurement, because
-  one final table moves the number a long way.
+- **ROI and cash rate** as descriptions of what happened. Below ten entries the
+  copy says outright that this is a record rather than a measurement, because one
+  final table moves the number a long way. Ten is `MIN_ENTRIES_FOR_INTERVAL`,
+  which is also where the resampled range starts.
 - **The dry run**, which is the one genuinely inferential number here, and it is
   honest because it needs no distribution at all. Whether an entry cashes is
   independent of the last one, so the chance of missing `n` in a row is

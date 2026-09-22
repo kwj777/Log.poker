@@ -117,7 +117,9 @@ export const estimatePlayer = (observations: readonly SessionObservation[]): Pla
 };
 
 /**
- * Standard normal CDF (Abramowitz & Stegun 26.2.17, |ε| < 7.5e-8).
+ * Standard normal CDF, from the error function: Abramowitz & Stegun 7.1.26,
+ * |ε| < 7.5e-8. (Not 26.2.17, which this cited and which is a different
+ * approximation with different constants; the ones below are 7.1.26’s.)
  * Good to far more precision than a percentage read off a chart needs.
  */
 export const normalCdf = (z: number): number => {

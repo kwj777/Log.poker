@@ -1,7 +1,7 @@
 # Every check that can run without a secret, run on every change.
 #
-# The suite is the point. There are 1301 tests in here and nothing ran them
-# except somebody remembering to, which is the state that lets a red commit
+# The suite is the point. There are thousands of tests in here and nothing ran
+# them except somebody remembering to, which is the state that lets a red commit
 # reach production: the Netlify build command is `npm run build:web`, and it
 # checks nothing at all.
 #

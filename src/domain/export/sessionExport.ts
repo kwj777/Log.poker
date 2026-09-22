@@ -27,7 +27,7 @@
 import { fromCents } from '../money';
 import type { Hand, MoodEntry, SessionWithChildren } from '../types';
 
-/** `12.5` for 1250 cents, and an empty cell for nothing at all. */
+/** `12.50` for 1250 cents, and an empty cell for nothing at all. */
 const money = (cents: number | null | undefined): string =>
   cents == null ? '' : fromCents(cents).toFixed(2);
 

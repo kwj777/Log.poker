@@ -192,10 +192,43 @@ describe('asking for a code', () => {
     expect(store.held.size).toBe(0);
   });
 
-  it('refuses a body that is not an object, and one that is too big', async () => {
+  it('refuses a body that is not an object', async () => {
     const surroundings = world(fakeStore());
     expect((await ask(['player@example.com'], surroundings)).status).toBe(400);
-    expect((await ask({ email: 'a'.repeat(300) + '@example.com' }, surroundings)).status).toBe(400);
+  });
+
+  it('and an address longer than an address can be', async () => {
+    // This used to sit under "and one that is too big", beside the body-size
+    // case below, which made it look like the size cap was covered. It is the
+    // `looksLikeEmail` length rule, 254 characters, and it answers 400 from a
+    // 324-byte body -- an order of magnitude inside a 4096-byte cap.
+    const surroundings = world(fakeStore());
+    expect((await ask({ email: `${'a'.repeat(300)}@example.com` }, surroundings)).status).toBe(400);
+    expect(surroundings.sent).toEqual([]);
+  });
+
+  it('refuses a body past the cap, which the case above never reached', async () => {
+    // A valid address, so the only thing wrong with this request is its size,
+    // and 8 KB against a 4 KB cap so it is wrong by a margin. The control is
+    // the padded body below the cap: the same shape at 339 bytes is answered
+    // 202 and mailed, which is what makes the 400 here about the length.
+    const surroundings = world(fakeStore());
+    expect((await ask({ email: EMAIL, pad: 'x'.repeat(200) }, surroundings)).status).toBe(202);
+    expect((await ask({ email: EMAIL, pad: 'x'.repeat(8_000) }, surroundings)).status).toBe(400);
+    expect(surroundings.sent).toEqual([{ to: EMAIL, code: CODE }]);
+  });
+
+  it('and does not take the caller word for how big it is', async () => {
+    // `content-length` is a number the sender chose, so the cap is enforced
+    // twice: once on the claim and once on what arrives. Only the second is
+    // load-bearing against somebody who lies, and it is the branch that
+    // cancels the read part-way rather than the one that answers before it.
+    const surroundings = world(fakeStore());
+    const answer = await ask({ email: EMAIL, pad: 'x'.repeat(8_000) }, surroundings, {
+      'content-length': '10',
+    });
+    expect(answer.status).toBe(400);
+    expect(surroundings.sent).toEqual([]);
   });
 
   it('draws six digits when nothing hands it a code', async () => {

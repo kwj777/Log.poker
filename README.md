@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 105 passed
-Tests:       2286 passed
+Tests:       2296 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1134,6 +1134,7 @@ Tests:       2286 passed
   glossary            22   the shorthand on screen still matches its explanation
   clock               20   a typed date, a typed length, and what neither will accept
   privacy             20   the policy page, held to the code it describes
+  selectors           20   store reads and filters
   batch               19   a backlog split into requests, without orphaning a child
   csv                 19   quoting, delimiters, line endings
   gateCheck           19   the key-on-the-site script, run rather than read
@@ -1161,7 +1162,6 @@ Tests:       2286 passed
   readme              10   the test table adds up and says what each suite is for
   rowLabels           10   what a screen reader is told a row in a list is
   search              10   finding one thing in a log with years in it
-  selectors           10   store reads and filters
   liveTimer            9   the session clock, across a background and back
   preSessionWarmUp     9   the offer to somebody who says they are rattled before they sit
   settingsVenues       9   renaming a venue, and merging two that are one room

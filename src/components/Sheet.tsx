@@ -20,6 +20,9 @@ interface SheetProps {
   children: ReactNode;
 }
 
+/** Whose Escape key it is. See the effect below. */
+const escapeIsOurs = Platform.OS === 'web';
+
 export const Sheet = ({ visible, onClose, title, children }: SheetProps) => {
   const insets = useSafeAreaInsets();
 
@@ -46,10 +49,20 @@ export const Sheet = ({ visible, onClose, title, children }: SheetProps) => {
     if (visible) setOpener(focusedIn(focusHost()));
   }
 
-  // `onRequestClose` covers the Android back button but not the web's Escape
-  // key, which is what a browser user reaches for first.
+  // Escape, which react-native-web's `Modal` also handles -- but not yet.
+  //
+  // Its listener is inert until the modal goes `active`, and that flips from
+  // `onAnimationEnd` at the end of the 250ms slide. So for the first quarter
+  // second of an open sheet, Escape does nothing there -- which is exactly
+  // when somebody who opened one by mistake presses it. This covers that gap.
+  //
+  // Which is why `onRequestClose` is not passed on the web: with both, one
+  // press called `onClose` twice. Measured, and harmless today only because
+  // every `onClose` in the app is an idempotent `setState(false)`. The two
+  // read the same flag rather than each testing the platform, so they cannot
+  // drift into being both or neither.
   useEffect(() => {
-    if (Platform.OS !== 'web' || !visible) return;
+    if (!escapeIsOurs || !visible) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
@@ -62,7 +75,7 @@ export const Sheet = ({ visible, onClose, title, children }: SheetProps) => {
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={escapeIsOurs ? undefined : onClose}
       statusBarTranslucent
       // After the sheet has animated out, rather than when `visible` turned
       // false: while the trap is still mounted it holds a capture-phase focus

@@ -257,7 +257,7 @@ describe('the build profiles', () => {
         autoIncrement?: boolean;
         extends?: string;
         developmentClient?: boolean;
-        ios?: { simulator?: boolean };
+        ios?: { simulator?: boolean; image?: string };
         env?: Record<string, string>;
       }
     >;
@@ -321,6 +321,27 @@ describe('the build profiles', () => {
     for (const [name, profile] of store) {
       expect([name, profile.env]).toEqual([name, undefined]);
     }
+  });
+
+  it('pins the Xcode, because the newest one builds a binary that cannot launch', () => {
+    // Xcode 27's SDK makes the UIScene life cycle mandatory, and Expo SDK 57
+    // still generates an AppDelegate with no `UIApplicationSceneManifest`, so
+    // an app built with it fails at launch rather than at compile: "UIScene
+    // life cycle is required for apps built with this SDK". The backport is
+    // expo/expo#50026 and is an unmerged draft, so there is no version of this
+    // to install. EAS's default image is Xcode 26.6, which is the only reason
+    // a production build works at all today.
+    //
+    // An exact name rather than an alias is the whole point. `auto`, `latest`
+    // and `sdk-57` all move on Expo's schedule, and the day one of them lands
+    // on Xcode 27 the binary Apple receives is one that does not open, with
+    // nothing in this repository having changed.
+    const image = eas.build.production?.ios?.image;
+
+    expect(image).toMatch(/^macos-[a-z]+-[\d.]+-xcode-\d+\.\d+$/);
+    // The device build is what proves the production one launches, so it has
+    // to be built the same way for that proof to mean anything.
+    expect(eas.build.preview?.ios?.image).toBe(image);
   });
 
   it('pins the Node the rest of the project pins', () => {

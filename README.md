@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2341 passed
+Tests:       2342 passed
 
   dexieRepository    149   the IndexedDB path, against real IndexedDB
   sqlRepository      146   the SQLite path, against real SQLite
@@ -1118,9 +1118,9 @@ Tests:       2341 passed
   blog                40   the post grammar, the share cards, and what it refuses
   mood                35   what tilt costs, and when to say nothing
   merge               33   two devices disagreeing, and who wins
+  release             31   app.json, eas.json and the icon a store refuses over
   signinSweep         31   what the sign-in store may collect, and what it must not
   token               31   the family token grammar, against signed fixtures
-  release             30   app.json, eas.json and the icon a store refuses over
   session             30   holding a token, and stores that fail as real ones do
   handNotation        29   parse, round-trip, hand classes
   editSession         28   correcting a session, including the one nobody cashed out

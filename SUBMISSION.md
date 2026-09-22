@@ -232,6 +232,25 @@ file reads back.
    npx eas build --platform ios --profile preview
    ```
 
+   **Build this one and the production one on EAS, not locally, until Expo
+   ships the UIScene backport.** Xcode 27's SDK makes the scene based UIKit
+   life cycle mandatory, and Expo SDK 57 still generates an AppDelegate with no
+   `UIApplicationSceneManifest`. An app built that way compiles and then dies
+   at launch: "UIScene life cycle is required for apps built with this SDK".
+   Nothing in this repository causes it and nothing here can fix it; the
+   backport is expo/expo#50026 and was still an unmerged draft on 2026-09-22.
+
+   Both profiles therefore name `macos-tahoe-26.5-xcode-26.6` explicitly, which
+   is Xcode 26.6, where the requirement is not enforced. **The alias would have
+   been the trap**: `auto`, `latest` and `sdk-57` all move on Expo's schedule,
+   so the day one of them lands on Xcode 27, the binary Apple receives is one
+   that does not open and nothing in this repository has changed.
+   `release.test.ts` fails on an alias as well as on no image at all.
+
+   The pin comes out when the backport is released and the app carries a
+   `SceneDelegate`. Until then, a local `npx expo run:ios` on Xcode 27 builds
+   fine and will not launch, which is expected rather than a regression.
+
 5. ~~**Create the app in App Store Connect.**~~ **Done.** The record is named
    `Log: Poker Session Tracker`, iOS only, English (U.S.), SKU `poker.log.app`,
    and **its App Store ID is 6814843842**. Then the production build and the
@@ -607,6 +626,11 @@ Sign out first.
 npm run typecheck && npm run lint && npm test
 npm run build:content -- --check
 ```
+
+**And open the build.** Not a formality: the UIScene failure in step 4 is a
+binary that compiles, uploads and then does not launch, so a green suite says
+nothing about it. Install the `preview` build and watch it come up before the
+production one is submitted.
 
 Then bump the build number. `eas.json` has `autoIncrement` on the `production`
 profile and `appVersionSource: "local"`, so the build writes the new number

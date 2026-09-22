@@ -22,7 +22,7 @@ import 'fake-indexeddb/auto';
 
 import { Dexie } from 'dexie';
 
-import { createDatabase } from '../dexie/db';
+import { createDatabase, OPEN_SESSION_ENDED_AT } from '../dexie/db';
 import { DexieRepository } from '../dexie/DexieRepository';
 import { SqlRepository } from '../sql/SqlRepository';
 import { LATEST_VERSION, MIGRATIONS } from '../sql/schema';
@@ -456,6 +456,71 @@ describe('the Dexie version ladder', () => {
     expect(hands?.schema.indexes.some((index) => index.name === 'board')).toBe(false);
     await hands?.add({ id: 'h9', sessionId: 's9', holeCards: 'AsKd', board: 'Ah7c2d', position: 'BTN', note: null, tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0 });
     expect(await hands?.get('h9')).toMatchObject({ board: 'Ah7c2d' });
+  });
+});
+
+describe('where a stored row and a domain record part company', () => {
+  /**
+   * The header of `db.ts` lists these, and the list is the kind of thing that
+   * grows without the prose growing with it -- it said "two exceptions" while
+   * `importKey` was the third, and the difference between absent and null is
+   * the one with teeth here: a unique index counts a null, and nulls on every
+   * app-logged session would be one key they all shared.
+   */
+  const name = 'log-poker-shape-test';
+  let db: ReturnType<typeof createDatabase>;
+  let repository: DexieRepository;
+
+  beforeEach(async () => {
+    db = createDatabase(name);
+    repository = new DexieRepository(db);
+    await repository.init();
+  });
+
+  afterEach(async () => {
+    db.close();
+    await db.delete();
+  });
+
+  it('is absent on the row and null on the record, for a session logged in the app', async () => {
+    const venue = await repository.createVenue({ name: 'Aria', isHomeGame: false });
+    const session = await repository.createSession({
+      venueId: venue.id,
+      format: 'cash',
+      gameType: 'NLHE',
+      stakes: { smallBlind: 100, bigBlind: 200 },
+      currency: 'USD',
+      buyIn: 30_000,
+      startedAt: T0,
+    });
+
+    const row = (await db.sessions.get(session.id)) as unknown as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(row, 'importKey')).toBe(false);
+    expect((await repository.getSession(session.id))?.importKey).toBeNull();
+  });
+
+  it('and the other three the header names are what they say they are', async () => {
+    const venue = await repository.createVenue({ name: 'Aria', isHomeGame: true });
+    const session = await repository.createSession({
+      venueId: venue.id,
+      format: 'cash',
+      gameType: 'NLHE',
+      stakes: { smallBlind: 100, bigBlind: 200 },
+      currency: 'USD',
+      buyIn: 30_000,
+      startedAt: T0,
+    });
+
+    const venueRow = (await db.venues.get(venue.id)) as unknown as Record<string, unknown>;
+    // A boolean on the record, 0/1 on the row; and a count on the record that
+    // no column holds.
+    expect(venueRow.isHomeGame).toBe(1);
+    expect(Object.prototype.hasOwnProperty.call(venueRow, 'sessionCount')).toBe(false);
+    expect((await repository.listVenues())[0].sessionCount).toBe(1);
+
+    // Null on the record, the open sentinel on the row.
+    expect((await db.sessions.get(session.id))?.endedAt).toBe(OPEN_SESSION_ENDED_AT);
+    expect((await repository.getSession(session.id))?.endedAt).toBeNull();
   });
 });
 

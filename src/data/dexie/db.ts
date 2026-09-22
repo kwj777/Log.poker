@@ -5,11 +5,21 @@
  * grows for years: localStorage is a synchronous ~5MB string store with no
  * indexes, and querying it would mean deserializing every session on every read.
  *
- * Rows are stored in the same shape as the domain records, with two exceptions
- * forced by IndexedDB's index rules: booleans and nulls are not indexable, so
- * `isHomeGame` is stored as 0/1 and an unfinished session's `endedAt` is stored
- * as `0` rather than `null`. Both are translated at the repository boundary, so
- * callers never see the encoding.
+ * Rows are close to the domain records and not identical, and the differences
+ * are all translated at the repository boundary, so callers never see any of
+ * them:
+ *
+ * - `isHomeGame` is 0/1 and an unfinished session's `endedAt` is `0` rather
+ *   than `null`, because booleans and nulls are not indexable.
+ * - `importKey` is *absent* rather than null on a session logged in the app,
+ *   which is a different index rule and the one with teeth. See the note on
+ *   `SessionRecord.importKey`.
+ * - `deletedAt` is a stored column that no domain type has, and
+ *   `Venue.sessionCount` is a domain field that no column holds.
+ *
+ * Listed rather than counted. This said "two exceptions" while `importKey`
+ * was the third, and a count is the part of a list that goes stale without
+ * anything to notice.
  */
 
 import Dexie, { type EntityTable } from 'dexie';

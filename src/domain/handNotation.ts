@@ -98,6 +98,26 @@ export const toHandClass = (notation: string | null | undefined): string | null 
   return `${high.rank}${low.rank}${high.suit === low.suit ? 's' : 'o'}`;
 };
 
+/**
+ * Every way somebody might write the cards they are looking for.
+ *
+ * Three forms, because the one this stores is the one nobody sees. `AsKd` is
+ * the wire format; `HandRow` draws `formatNotation` and nothing anywhere draws
+ * the raw string, so a player typing what is on their screen -- `A♠`, `A♠ K♦` --
+ * used to match nothing. Neither did `AK` or `AA`, which is how a hand is
+ * named out loud, and `toHandClass` has written that form all along for the
+ * range charts.
+ *
+ * Empty for anything that is not cards, so a null note or an unreadable cell
+ * puts nothing in the haystack -- `formatNotation` answers those with a dash,
+ * and a dash every hand shares is a term that matches all of them.
+ */
+export const notationSearchForms = (notation: string | null | undefined): string[] => {
+  if (parseNotation(notation) === null) return [];
+  const held = toHandClass(notation);
+  return [notation as string, formatNotation(notation), ...(held === null ? [] : [held])];
+};
+
 /** Human-facing rendering: `"A♠ K♦"`. Falls back to an em dash when absent. */
 export const formatNotation = (notation: string | null | undefined): string => {
   const cards = parseNotation(notation);

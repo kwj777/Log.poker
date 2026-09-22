@@ -997,7 +997,3 @@ export const mergeIntoBundle = (
     collectedThrough: bundle.collectedThrough,
   };
 };
-
-/** Every table, for a caller that wants to walk one at a time. */
-export const tablesOf = (bundle: Bundle): [SyncTable, Record<string, StoredChange>][] =>
-  SYNC_TABLES.map((table) => [table, bundle.records[table]]);

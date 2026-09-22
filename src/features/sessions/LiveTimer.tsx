@@ -9,8 +9,6 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { formatDuration } from '../../domain/stats';
-
 /**
  * Milliseconds since `startedAt`, or 0 when there is no session. Accepts null so
  * a caller can invoke the hook unconditionally -- as the rules of hooks require --
@@ -54,6 +52,3 @@ export const useElapsed = (startedAt: number | null): number => {
   if (startedAt === null) return 0;
   return Math.max(0, now - startedAt);
 };
-
-export const useElapsedLabel = (startedAt: number | null): string =>
-  formatDuration(useElapsed(startedAt));

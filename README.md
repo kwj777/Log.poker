@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 104 passed
-Tests:       2264 passed
+Test Suites: 106 passed
+Tests:       2268 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1199,6 +1199,8 @@ Tests:       2264 passed
   notFound             3   where a link that names nothing lands
   allHands             2   who pays for a read of the whole journal
   amountField          2   the money field's box, against the font it has to hold
+  keyboardAvoidance    2   both halves of getting out of the keyboard's way
+  leaveLiveSession     2   leaving a running session without ending it
   newSessionDefaults   2   where the pre-filled session says its numbers came from
   pageMeta             2   the document head, kept off the phone it alerts on
   safeArea             2   the top inset, on a phone with a notch and without

@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2187 passed
+Tests:       2192 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1166,6 +1166,7 @@ Tests:       2187 passed
   varianceHands        9   the hand breakdown, and the sentence that must precede it
   plan                 8   what an import will write, before it writes it
   postSessionReset     8   the offer after cash-out, and who it is talking to
+  tapTargets           8   every short control against the 48pt floor
   tokenStore.web       8   the browser token store
   venuePicker          8   typing a room you already have, rather than adding a second
   claimHandoff         7   what a hand-off link may do without asking
@@ -1194,7 +1195,6 @@ Tests:       2187 passed
   lintReach            3   which files npm run lint actually looks at
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
-  tapTargets           3   every short control against the 48pt floor
   allHands             2   who pays for a read of the whole journal
   newSessionDefaults   2   where the pre-filled session says its numbers came from
 ```

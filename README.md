@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2210 passed
+Tests:       2212 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1177,6 +1177,7 @@ Tests:       2210 passed
   settingsBankroll     7   entering what you had behind you before the log started
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room
+  importWarnings       6   what the import screen says about a file it could not use
   readme               6   the test table adds up and says what each suite is for
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
@@ -1190,7 +1191,6 @@ Tests:       2210 passed
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
   dashboardFirstRun    4   labels on the dashboard with nothing under them yet
-  importWarnings       4   what the import screen says about a file it could not use
   transactionQueue     4   two writes at once, on a database with no queue of its own
   lintReach            3   which files npm run lint actually looks at
   midSessionCheckIn    3   whether a check-in that failed says it was logged

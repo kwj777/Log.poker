@@ -190,9 +190,17 @@ export const checkToken = async (
 /**
  * The same question with the reason thrown away.
  *
- * Every caller that only wants the gate goes through here, so there is one
- * place that decides what counts as a valid token and one place that has ever
- * decided it.
+ * A convenience over `checkToken` for a caller that wants only the answer.
+ * Neither gate is one: `sync/endpoint.ts` and `auth/signinEndpoint.ts` both
+ * take `checkToken` directly, because both write the refusal reason to the
+ * deploy log -- the 401 on the wire says nothing, on purpose, and the reason
+ * is the only thing that tells whoever set the key apart from a stranger.
+ * Routing them through here to make this sentence true would cost exactly
+ * that diagnosis.
+ *
+ * So the one-place claim this used to make belongs to `checkToken`, which is
+ * where both gates and this wrapper decide the same question. Today the
+ * callers of this are the tests.
  */
 export const verifyToken = async (
   secret: string,

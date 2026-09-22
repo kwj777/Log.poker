@@ -9,7 +9,8 @@
  * ever look suspicious.
  *
  * Run rather than read, in both of its modes. The minted token is handed to
- * `verifyToken`, the thing that actually guards the endpoint. The signed-in
+ * `verifyToken`, a wrapper over the `checkToken` that guards the endpoint --
+ * the same decision with the refusal reason dropped. The signed-in
  * token is fetched from a stand-in for Untilt and pushed at a stand-in for the
  * endpoint, and the test watches what the script does to both of them.
  */

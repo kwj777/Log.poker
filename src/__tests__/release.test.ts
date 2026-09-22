@@ -250,7 +250,15 @@ describe('the links the app has told the operating system it answers', () => {
 describe('the build profiles', () => {
   interface Eas {
     cli: { appVersionSource: string };
-    build: Record<string, { distribution?: string; autoIncrement?: boolean; extends?: string }>;
+    build: Record<
+      string,
+      {
+        distribution?: string;
+        autoIncrement?: boolean;
+        extends?: string;
+        ios?: { simulator?: boolean };
+      }
+    >;
     submit: Record<string, unknown>;
   }
   const eas = json<Eas>('eas.json');
@@ -267,7 +275,13 @@ describe('the build profiles', () => {
   });
 
   it('and one that needs no Apple account, which is the only build available first', () => {
-    expect(eas.build.simulator).toBeDefined();
+    // This asserted only that the profile existed, which is true of a profile
+    // that has lost both of the things its name is about. `ios.simulator` is
+    // what makes it buildable with no Apple Developer account, and `internal`
+    // is what stops it going near a store; a profile stripped to `extends` and
+    // `developmentClient` passed the old assertion unchanged.
+    expect(eas.build.simulator?.ios?.simulator).toBe(true);
+    expect(eas.build.simulator?.distribution).toBe('internal');
   });
 
   it('has a submit profile, even though its credentials are not in the repository', () => {

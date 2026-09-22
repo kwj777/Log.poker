@@ -94,10 +94,15 @@ piece that would have to be built for any of the paid options above.
 480pt column rather than a stretched phone screen. That renders sanely, it is
 just a lot of empty space.
 
-Leaving it on means Apple reviews iPad behavior and wants iPad screenshots.
-Turning it off is one line and ships iPhone-only for 1.0. Either is defensible.
-It is left on, because the layout demonstrably handles it, but it has not been
-seen on an actual iPad and should be before the screenshots are taken.
+**Decided on 2026-09-22: off, and 1.0 ships iPhone only.** Leaving it on meant
+Apple reviewing iPad behavior and wanting a second set of screenshots at 12.9
+inches, for a layout that renders correctly and has nothing to fill the space
+with. Nothing is lost that cannot be given back: it is one line, the layout
+still caps the same way, and an iPad build is a later release rather than a
+rewrite.
+
+`release.test.ts` holds it at `false` so it is not flipped back without the
+screenshot requirement being reconsidered at the same time.
 
 ### 3. The support mailbox
 
@@ -108,6 +113,55 @@ sends mail: `netlify/functions/signin.mts` sends from `signin@log.poker` and
 **Receiving is a separate thing, and it has to work before the first
 submission.** App Review uses the support address. One that bounces is worse
 than none. A forward to a real inbox is enough.
+
+A Spacemail mailbox was bought for it on 2026-09-22 and **all four records
+below were published that afternoon and verified against Cloudflare's and
+Google's resolvers**, including that the 2048 bit DKIM key reassembles whole,
+which is the failure a DNS panel hides. What is still outstanding is the only
+part DNS cannot answer: a message sent from off the domain, arriving.
+
+Spaceship is only where the values are read from: log.poker's nameservers are Netlify's
+(`dns1.p02.nsone.net` and its three siblings), so the records go in Netlify
+under Domains, log.poker, DNS records.
+
+| Name | Type | Value |
+| --- | --- | --- |
+| `@` | MX, priority 0 | `mx1.spacemail.com` |
+| `@` | MX, priority 0 | `mx2.spacemail.com` |
+| `@` | TXT | `v=spf1 include:spf.spacemail.com ~all` |
+| `spacemail._domainkey` | TXT | the account's own `v=DKIM1; k=rsa; p=...`, from Spaceship under Launchpad, Advanced DNS, Inactive records |
+
+`_dmarc.log.poker` already publishes `v=DMARC1; p=none;` and wants nothing.
+
+**The SPF record ends `~all`, not `-all`.** The stricter one was typed once and
+is worth explaining rather than only specifying. Both cover Spacemail
+identically, through the include; the tail is only about mail the record does
+not cover, and `-all` asks a receiver to reject that outright where `~all` asks
+it to accept and flag. Nothing here needs the stricter one, and this is the
+mailbox that must not bounce when App Review writes to it: a soft fail costs a
+spam folder, a hard fail costs the message. Tightening it later is a one
+character edit, and the thing that would justify it is a `rua=` on the DMARC
+record collecting reports first, which is not there today.
+
+**The apex SPF does not break the signin mailer, and the reason is worth
+writing down rather than rediscovering.** Resend sends as `signin@log.poker`
+but its SPF lives on `send.log.poker`, which is the return path a receiver
+actually checks, and its DKIM is on the `resend` selector. A `spacemail`
+selector and an apex SPF sit beside both without touching either. What would
+break it is a second record at the apex beginning `v=spf1`: two SPF records
+are one permanent error, not a conflict anybody notices. The apex also carries
+a `google-site-verification` TXT that the SPF record goes next to rather than
+over.
+
+**Proved on 2026-09-22: a message sent from off the domain arrived.** That was
+the last thing standing between this section and done, and it was worth doing
+rather than inferring, because a mailbox that does not receive looks exactly
+like one that does until App Review writes to it.
+
+Not needed for any of the above, and listed only so it is not mistaken for a
+missing step: an SRV record at `_autodiscover._tcp` of `0 0 443
+autoconfig.spacemail.com` lets mail clients configure themselves. It has
+nothing to do with whether mail arrives.
 
 ---
 
@@ -133,19 +187,23 @@ file reads back.
    see decision 1 above. Capabilities stay editable after registration, so none
    of that had to be settled here.
 
-3. **A simulator build, which needs no signing.** This is the first time any of
-   this code will have run outside a browser:
+3. **A simulator build, which needs no signing.**
 
    ```
    npx eas build --platform ios --profile simulator
    ```
 
-   Expect to spend real time here. SQLite (`src/data/sql/expoSqliteDriver.ts`),
+   This step used to warn that the code had never run outside a browser and to
+   expect real time here. It ran on 2026-09-22, in the simulator through Expo
+   Go, and the warning was right: SQLite (`src/data/sql/expoSqliteDriver.ts`),
    SecureStore (`src/auth/tokenStore.ts`), haptics and the CSV share sheet
-   (`src/features/export/saveCsv.ts`) are all carefully written and none has
-   ever executed on a device.
+   (`src/features/export/saveCsv.ts`) all work, but three layout and platform
+   bugs no static audit could see turned up in the first hour and are fixed
+   (#95, #96, #97). What this build is now for is the things Expo Go cannot
+   answer: the real icon, the splash screen, and the app under its own bundle
+   identifier rather than Expo Go's.
 
-4. **A device build**, once enrollment clears:
+4. **A device build.** Nothing is waiting on enrollment; see step 1.
 
    ```
    npx eas build --platform ios --profile preview
@@ -312,8 +370,8 @@ answers a question this app reliably raises.
 
 ## Screenshots
 
-Required at 6.7" (iPhone 15 Pro Max or similar). Add 12.9" iPad shots if
-`supportsTablet` stays `true`.
+Required at 6.7" (iPhone 15 Pro Max or similar), and that is the whole set:
+`supportsTablet` is `false`, so no iPad shots are needed. See decision 2.
 
 The screens worth showing, in the order they tell the story: the dashboard with
 a few sessions logged, a live session running, logging a hand, the variance

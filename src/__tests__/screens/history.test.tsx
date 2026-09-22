@@ -269,3 +269,56 @@ describe('searching the log', () => {
     expect(screen.getByText('1 session')).toBeTruthy();
   });
 });
+
+describe('what the period chips filter by', () => {
+  /**
+   * Every one of them is a count of days back from when the screen opened.
+   *
+   * Which the labels have to say, because the three tiles above the list are
+   * recomputed from exactly this set: a player checking a year's profit reads
+   * the figure this filter produces. The 365 chip used to be named "This
+   * year", so on any date but 1 January it quietly carried the tail of the
+   * previous one.
+   */
+  const DAY = 86_400_000;
+  const ago = (days: number) => session(`s${days}`, { startedAt: Date.now() - days * DAY });
+
+  it('names the window rather than a calendar', async () => {
+    await renderScreen(<HistoryScreen />);
+    expect(screen.getByText('365 days')).toBeTruthy();
+    expect(screen.queryByText('This year')).toBeNull();
+  });
+
+  it('and keeps a session from three hundred days ago, which is not this year', async () => {
+    // The session the old label lied about: inside the window it computes,
+    // outside the year it named.
+    load({ sessions: [ago(300)] });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.press(screen.getByText('365 days'));
+    expect(screen.getByText('1 session')).toBeTruthy();
+  });
+
+  it('and drops one from four hundred days ago', async () => {
+    load({ sessions: [ago(400)] });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.press(screen.getByText('365 days'));
+    expect(screen.getByText('0 sessions')).toBeTruthy();
+  });
+
+  it('and the shorter windows cut where they say they do', async () => {
+    load({ sessions: [ago(10), ago(60), ago(200)] });
+    await renderScreen(<HistoryScreen />);
+
+    await userEvent.press(screen.getByText('30 days'));
+    expect(screen.getByText('1 session')).toBeTruthy();
+
+    await userEvent.press(screen.getByText('90 days'));
+    expect(screen.getByText('2 sessions')).toBeTruthy();
+
+    await userEvent.press(screen.getByText('All time'));
+    expect(screen.getByText('3 sessions')).toBeTruthy();
+  });
+});
+

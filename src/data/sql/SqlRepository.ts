@@ -374,7 +374,8 @@ export class SqlRepository implements Repository {
   }
 
   /**
-   * Sync's write. Upserts verbatim, parents first, skipping orphans.
+   * Sync's write: take what the server sent, without stepping on a write it
+   * has not seen. Upserts verbatim, parents first, skipping orphans.
    *
    * **`ON CONFLICT DO UPDATE`, never `INSERT OR REPLACE`.** They read as
    * synonyms and are not: SQLite implements REPLACE as a DELETE followed by an
@@ -388,9 +389,6 @@ export class SqlRepository implements Repository {
    * delete happens and no cascade fires. The same trap applies to venues, where
    * the cascade is absent but the foreign key is not: REPLACE would try to
    * delete a venue that sessions still reference and be refused.
-   */
-  /**
-   * Take what the server sent, without stepping on a write it has not seen.
    *
    * Every upsert below carries `WHERE excluded.updated_at >= <table>.updated_at`
    * and that clause is the whole of the local merge rule. It is not the device
@@ -773,8 +771,20 @@ export class SqlRepository implements Repository {
       ? Math.max(0, Math.floor(filter.limit as number))
       : null;
     const limit = capped === null ? '' : `LIMIT ${capped}`;
+    // `id DESC` after the stamp, because `ORDER BY started_at DESC` alone leaves
+    // ties to the engine: SQLite walks them in rowid order and Dexie's
+    // `orderBy('startedAt').reverse()` walks the index backwards, which is
+    // primary key descending. Same rows, opposite order, on the one query the
+    // History tab and the dashboard render unsorted -- and with a `limit`, a
+    // different set of rows rather than a different order.
+    //
+    // Ties are the common case rather than a corner: `parseTimestamp` gives
+    // midnight to a date-only cell, which is what most tracker exports carry,
+    // so every pair of sessions imported for one day shares a stamp. This is
+    // the divergence the conformance suite exists to catch, and its ordering
+    // tests all used distinct stamps.
     const rows = await this.driver.all<SessionRow>(
-      `SELECT * FROM sessions ${where} ORDER BY started_at DESC ${limit}`,
+      `SELECT * FROM sessions ${where} ORDER BY started_at DESC, id DESC ${limit}`,
       params,
     );
     return this.attachChildren(rows.map(toSession));

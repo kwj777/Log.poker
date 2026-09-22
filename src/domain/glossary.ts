@@ -176,7 +176,7 @@ export const IMPORT_HELP: Record<ImportField, GlossaryEntry> = {
   },
   gameType: {
     term: FIELD_LABELS.gameType,
-    says: 'Hold’em, Omaha or something else. Used for grouping and nothing more, so an unfamiliar name is kept rather than refused.',
+    says: 'Hold’em, Omaha or something else. Used for grouping and nothing more, so a name Log does not know is filed under Other rather than refusing the row.',
   },
   stakes: {
     term: FIELD_LABELS.stakes,

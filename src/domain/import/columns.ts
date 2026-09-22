@@ -56,7 +56,7 @@ export const FIELD_LABELS: Record<ImportField, string> = {
 export const normalizeHeader = (header: string): string =>
   header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-const ALIASES: Record<ImportField, readonly string[]> = {
+export const ALIASES: Record<ImportField, readonly string[]> = {
   startedAt: [
     'date', 'datetime', 'day', 'when', 'start', 'started', 'startdate', 'starttime',
     'startedat', 'sessionstart', 'sessiondate', 'begin', 'began', 'dateplayed',
@@ -75,7 +75,7 @@ const ALIASES: Record<ImportField, readonly string[]> = {
   duration: [
     'duration', 'length', 'hours', 'hrs', 'hoursplayed', 'minutes', 'mins',
     'sessionlength', 'timeplayed', 'playtime', 'elapsed', 'durationhours',
-    'durationminutes', 'durationmins', 'timeatable', 'tabletime',
+    'durationminutes', 'durationmins', 'timeattable', 'tabletime',
   ],
   // `format` and `gameformat` belong to the cash/tournament discriminator rather
   // than to the variant: in these exports "Format" is overwhelmingly Cash or
@@ -100,7 +100,7 @@ const ALIASES: Record<ImportField, readonly string[]> = {
   cashOut: [
     'cashout', 'cashouts', 'cashedout', 'totalcashout', 'totalcashouts', 'amountout',
     'out', 'finalstack', 'endingstack', 'endstack', 'cashoutamount', 'totalout',
-    'prize', 'prizes', 'prizewon', 'winnings2', 'payout', 'totalpayout',
+    'prize', 'prizes', 'prizewon', 'payout', 'totalpayout',
   ],
   entrants: [
     'entrants', 'players', 'fieldsize', 'field', 'runners', 'totalentrants',
@@ -110,6 +110,20 @@ const ALIASES: Record<ImportField, readonly string[]> = {
     'finish', 'finishposition', 'finishingposition', 'place', 'placed', 'position',
     'rank', 'finishedin', 'placefinished',
   ],
+  // **`winnings` is here and not in `cashOut`, and it is a guess either way.**
+  // A cash tracker's Winnings column is the night's profit; a tournament
+  // export's is the prize. Read as a result it is right for the first and
+  // costs the entry on the second, because a result is reconstructed as
+  // `buyIn + fee + result`; read as a cash-out it would be right for the
+  // second and turn a winning cash night into a losing one, which is the worse
+  // of the two. So it stays with the commoner reading.
+  //
+  // `cashOut` used to carry `winnings2` as well, which matches no header
+  // anybody writes and so never chose anything. It is gone rather than
+  // corrected: spelled `winnings` it would have collided with this list, and
+  // the collision is the ambiguity above rather than a typo. `cashOutNamesAPrize`
+  // in `values.ts` still lists `winnings` in its own regex, where it is
+  // reachable, because that one reads the header text rather than the map.
   result: [
     'result', 'results', 'profit', 'net', 'netprofit', 'netwon', 'netwin', 'won',
     'winnings', 'pl', 'profitloss', 'amountwon', 'netresult', 'netamount',

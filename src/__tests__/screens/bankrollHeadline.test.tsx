@@ -153,15 +153,27 @@ describe('the curve under the headline', () => {
   it('names where the line starts on the axis under it', async () => {
     // Hard-coded, the left caption read $0 under a curve based at $5,000
     // while the caption at the other end of the same axis read $5.3k.
+    //
+    // $5.2k rather than $5k, because that is where the line starts.
+    // `bankrollCurve` emits one point per completed session and `cumulative`
+    // is the balance *after* it, so the left end is the starting balance plus
+    // the oldest session's result -- here $5,000 and a $200 night. Printing
+    // the balance was the same disagreement as the hard-coded zero, narrowed
+    // to one session's worth.
     load(TWO, { cents: 500_000, currency: 'USD' });
     await renderScreen(<DashboardScreen />);
-    expect(screen.getByText('$5k')).toBeTruthy();
+    expect(screen.getByText('$5.2k')).toBeTruthy();
     expect(screen.getByText('$5.3k')).toBeTruthy();
+    expect(screen.queryByText('$5k')).toBeNull();
   });
 
-  it('still starts at zero for somebody who has not set one', async () => {
+  it('and off the same line for somebody who has not set a balance', async () => {
+    // Where the balance-based caption was furthest out: $0 under a line whose
+    // left end is the first night's profit.
     load(TWO);
     await renderScreen(<DashboardScreen />);
-    expect(screen.getByText('$0')).toBeTruthy();
+    expect(screen.getByText('$200')).toBeTruthy();
+    expect(screen.getByText('$300')).toBeTruthy();
+    expect(screen.queryByText('$0')).toBeNull();
   });
 });

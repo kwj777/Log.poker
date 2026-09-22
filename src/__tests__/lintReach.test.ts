@@ -13,7 +13,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -51,12 +51,37 @@ const lintAt = (relative: string, code: string): Message[] => {
 };
 
 describe('the serverless functions', () => {
-  it('are all TypeScript, which is how they went unlinted', () => {
-    // If one is ever renamed to `.ts` this stops being the interesting case,
-    // and the test below stops proving anything. Named so that shows up here.
-    const mts = readdirSync(FUNCTIONS).filter((name) => name.endsWith('.mts'));
-    expect(mts.sort()).toEqual(['signin-sweep.mts', 'signin.mts', 'sync.mts']);
+  it('are these four, and three of them are the extension eslint walked past', () => {
+    // This asserted the `.mts` files alone, under the name "are all
+    // TypeScript" -- which was false the whole time, because `chip-scan.mjs`
+    // is a deployed function too (netlify.toml routes `/api/chip-scan` at it),
+    // and which passed whether or not it was there, because the filter took it
+    // out before the comparison.
+    //
+    // The whole listing now, so a fifth function of any extension shows up
+    // here rather than in nothing. If one is ever renamed to `.ts` the test
+    // below stops proving anything, and this is where that shows.
+    expect(readdirSync(FUNCTIONS).sort()).toEqual([
+      'chip-scan.mjs',
+      'signin-sweep.mts',
+      'signin.mts',
+      'sync.mts',
+    ]);
   });
+
+  it('and every one of them is reached by the linter, whatever it is called', () => {
+    // The `.mjs` one always was: ESLint 9 targets `.js`, `.cjs` and `.mjs` by
+    // default. The three `.mts` ones were not, which is what the override in
+    // `eslint.config.js` is for, and what the case below proves it fixed.
+    for (const name of readdirSync(FUNCTIONS)) {
+      const messages = lintAt(`netlify/functions/${name}`, 'const unusedOnPurpose = 1;\n');
+      // A rule that fired, not any message: a path with no configuration gets
+      // "File ignored because no matching configuration was supplied", which
+      // is a message and is the opposite of being linted.
+      const rules = messages.filter((message) => message.ruleId !== null);
+      expect([name, rules.length > 0]).toEqual([name, true]);
+    }
+  }, 60_000);
 
   it('are linted, so an error in one fails the build', () => {
     const messages = lintAt(
@@ -87,3 +112,51 @@ describe('the serverless functions', () => {
     expect(messages.filter((message) => message.severity === 2)).toEqual([]);
   }, 60_000);
 });
+
+describe('documentation the compiler throws away', () => {
+  /**
+   * TypeScript attaches only the last JSDoc block to a declaration.
+   *
+   * So two stacked `/** ...` blocks mean the first one documents nothing: no
+   * hover, no tooling, and in this repository's case a confident paragraph
+   * sitting directly above the wrong symbol while the one it was written for
+   * has no doc at all. Nine of those had accumulated, including the warning in
+   * `SqlRepository` about `INSERT OR REPLACE` firing `ON DELETE CASCADE` and
+   * taking a session's hands with it.
+   *
+   * A file header followed by the first declaration's doc is the one legal
+   * shape, and is why the check starts at line two.
+   */
+  const stacked = (source: string): number[] => {
+    const lines: number[] = [];
+    const pattern = /\/\*\*(?:(?!\*\/)[\s\S])*\*\/\s*\n\s*\/\*\*/g;
+    for (const match of source.matchAll(pattern)) {
+      const line = source.slice(0, match.index).split('\n').length;
+      if (line > 1) lines.push(line);
+    }
+    return lines;
+  };
+
+  it('is not stacked anywhere the compiler would discard it', () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+        return /\.tsx?$/.test(entry.name) ? [path] : [];
+      });
+
+    const offenders = [...walk('src'), ...walk('app')].flatMap((path) =>
+      stacked(readFileSync(join(ROOT, path), 'utf8')).map((line) => `${path}:${line}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('and the check sees one when there is one', () => {
+    // A tripwire for the tripwire: the pattern above is easy to write so that
+    // it matches nothing, which would pass this suite forever.
+    const planted = ['const a = 1;', '/** first */', '/** second */', 'const b = 2;'].join('\n');
+    expect(stacked(planted)).toEqual([2]);
+    expect(stacked(['/** header */', '/** first */', 'const a = 1;'].join('\n'))).toEqual([]);
+  });
+});
+

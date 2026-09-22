@@ -16,6 +16,7 @@ import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, layout, radius, spacing, typography } from '../theme';
+import { TapArea } from './TapArea';
 
 interface SearchFieldProps {
   value: string;
@@ -23,6 +24,9 @@ interface SearchFieldProps {
   placeholder: string;
   accessibilityLabel: string;
 }
+
+/** Fifteen a side, the glyph being 18 against a floor of 48. Native and web. */
+const CLEAR_SLOP = Math.ceil((layout.tapTarget - 18) / 2);
 
 export const SearchField = ({
   value,
@@ -55,8 +59,13 @@ export const SearchField = ({
         // arithmetic for its badge already and said why; this is the same
         // shortfall on the one control whose job is getting a player back out
         // of a filter they cannot see past.
-        hitSlop={Math.ceil((layout.tapTarget - 18) / 2)}
+        //
+        // All four sides here, unlike the buttons: this is a glyph with no box
+        // of its own, so there is no dimension that is not short. `TapArea` is
+        // the web half, because react-native-web drops `hitSlop` -- see there.
+        hitSlop={CLEAR_SLOP}
       >
+        <TapArea slop={CLEAR_SLOP} />
         <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
       </Pressable>
     ) : null}
@@ -80,6 +89,5 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     paddingVertical: spacing.sm,
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
 });

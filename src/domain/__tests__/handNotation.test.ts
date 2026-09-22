@@ -10,7 +10,10 @@ import {
   isValidNotation,
   parseNotation,
   toHandClass,
+  notationSearchForms,
 } from '../handNotation';
+import { matchesTerms, searchTerms } from '../search';
+
 
 describe('parseNotation', () => {
   it('parses hole cards', () => {
@@ -150,3 +153,55 @@ describe('boards', () => {
     expect(clashingCards('AsKd', 'nonsense')).toEqual([]);
   });
 });
+
+describe('the forms a search has to answer to', () => {
+  /**
+   * `AsKd` is the wire format and nothing draws it. `HandRow` renders
+   * `formatNotation`, so what a player is looking at is `A♠ K♦`, and the Hands
+   * search put only the raw string in its haystack -- under a comment claiming
+   * `AsKd` was "how the row draws it". Typing what is on screen matched
+   * nothing, and so did `AK` and `AA`.
+   */
+  const finds = (query: string, notation: string) =>
+    matchesTerms(searchTerms(query), ...notationSearchForms(notation));
+
+  it('finds a hand by what the row shows', () => {
+    expect(finds('A♠ K♦', 'AsKd')).toBe(true);
+    expect(finds('A♠', 'AsKd')).toBe(true);
+    expect(finds('k♦', 'AsKd')).toBe(true);
+  });
+
+  it('and by the name a player says it out loud with', () => {
+    expect(finds('AK', 'AsKd')).toBe(true);
+    expect(finds('AA', 'AsAh')).toBe(true);
+    expect(finds('77', '7c7d')).toBe(true);
+    expect(finds('AKs', 'AsKs')).toBe(true);
+  });
+
+  it('and still by the notation, which is what the export writes', () => {
+    expect(finds('AsKd', 'AsKd')).toBe(true);
+  });
+
+  it('but not by a hand it is not', () => {
+    expect(finds('AK', '7c7d')).toBe(false);
+    expect(finds('Q♠', 'AsKd')).toBe(false);
+    expect(finds('AKs', 'AsKd')).toBe(false);
+  });
+
+  it('and a board reads the same three ways', () => {
+    expect(finds('7♣', '7c2sKh')).toBe(true);
+    expect(finds('7c2sKh', '7c2sKh')).toBe(true);
+    // No hand class for three cards, which is what `toHandClass` refuses.
+    expect(notationSearchForms('7c2sKh')).toHaveLength(2);
+  });
+
+  it('and nothing at all goes in the haystack for a hand with no cards', () => {
+    // `formatNotation` answers a dash, and a dash every hand shares is a term
+    // that matches all of them.
+    for (const empty of [null, undefined, '', 'not cards']) {
+      expect(notationSearchForms(empty)).toEqual([]);
+    }
+    expect(matchesTerms(searchTerms('--'), ...notationSearchForms(null))).toBe(false);
+  });
+});
+

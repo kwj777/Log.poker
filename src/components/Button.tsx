@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 
 import { colors, layout, radius, spacing, typography } from '../theme';
+import { TapArea, slopFor } from './TapArea';
 import { tapFeedback } from './haptics';
 import { Text } from './Text';
 
@@ -65,7 +66,7 @@ export const Button = ({
       accessibilityRole={href === undefined ? 'button' : 'link'}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy: loading }}
-      hitSlop={slopFor(size)}
+      hitSlop={slop(size)}
       accessibilityHint={accessibilityHint}
       disabled={inactive}
       onPress={() => {
@@ -86,6 +87,7 @@ export const Button = ({
         style,
       ]}
     >
+      <TapArea slop={slop(size)} />
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? colors.accentText : colors.text} />
       ) : (
@@ -143,18 +145,22 @@ const sizeStyles: Record<Size, ViewStyle> = {
  * `small` draws at 36 and `layout.tapTarget` is 48, which the rest of this
  * design system treats as the floor -- the chips and the card picker both say
  * so in their own comments. Small is meant to look small; it is not meant to be
- * harder to hit, and it is used in twenty-one places.
+ * harder to hit, and it is used in dozens of places.
  *
  * **Vertical only.** Slop on the sides would spread each button into its
  * neighbor: two small buttons in a row sit a `spacing.sm` gap apart, and six
  * points of slop each way would have them overlapping in the middle, so a tap
  * aimed at one could land on the other. Height is the dimension that is short
  * anyway; a button is as wide as its label.
+ *
+ * The same answer goes to `hitSlop`, which is native, and to `TapArea`, which
+ * is the web half of it -- react-native-web drops `hitSlop` entirely, so for
+ * as long as this said "made up in touch area" it was saying it about native
+ * alone. See `TapArea`.
  */
-const slopFor = (size: Size) => {
+const slop = (size: Size) => {
   const drawn = sizeStyles[size].minHeight;
-  const short = layout.tapTarget - (typeof drawn === 'number' ? drawn : layout.tapTarget);
-  return short > 0 ? { top: Math.ceil(short / 2), bottom: Math.ceil(short / 2) } : undefined;
+  return slopFor(typeof drawn === 'number' ? drawn : layout.tapTarget);
 };
 
 const variantStyles: Record<Variant, ViewStyle> = {

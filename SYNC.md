@@ -1311,15 +1311,17 @@ Five approaches were designed and attacked, and the four that moved data were
 all broken, in every case through the thing that was supposed to prove
 possession.
 
-**The population is empty, which is what settles it.** Log has never shipped a
-way to receive an Untilt-minted token. The token store is `localStorage` on
-Log's own origin on web, and `expo-secure-store` with no keychain access group
-on native, so the `family_access_token` key is shared in name and not in fact.
-`signIn` has exactly one caller, the card, holding what Log's door has just
-minted. There is no deep link that reads a token and nothing pastes one. So the
-split could not happen to anybody through the app, and the only thing keeping
-it that way was a configuration that the comment above that key says is meant
-to change.
+**The population was empty when this was written, and is not any more.** Log
+had no way to receive an Untilt-minted token: the store is `localStorage` on
+Log's own origin on web and `expo-secure-store` with no keychain access group
+on native, so the `family_access_token` key was shared in name and not in fact,
+and `signIn` had one caller holding what Log's door had just minted.
+
+`app/claim.tsx` is a deep link that reads a token, and it shipped. It takes a
+one-time code out of a URL fragment, trades it at Untilt's claim endpoint and
+hands what comes back to `signIn`. So the population is not empty, and the
+paragraph below is not a belt over a closed door: it is the whole of what stops
+the split.
 
 So the door is closed rather than a bridge built across it. `hasOwnBucket` asks
 for a subject this app's own door minted, `OWN_SUBJECT` being the exact shape

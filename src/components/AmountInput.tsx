@@ -10,7 +10,8 @@
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { currencySymbol, formatMoney, parseAmount } from '../domain/money';
-import { colors, layout, radius, spacing, typography } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
+import { TapArea, slopFor } from './TapArea';
 import { tapFeedback } from './haptics';
 import { Text } from './Text';
 
@@ -20,7 +21,7 @@ const PRESET_HEIGHT = 40;
 /**
  * The eight points it draws short of `layout.tapTarget`, made up in touch area.
  *
- * The same trade `Button.slopFor` makes and for the same reason: a preset is
+ * The same trade `Button`'s `slop` makes and for the same reason: a preset is
  * meant to look smaller than the field above it, and is not meant to be harder
  * to hit than one. "The presets are the point", per the header, and they had
  * the largest shortfall of any control in the app and no slop at all.
@@ -29,11 +30,11 @@ const PRESET_HEIGHT = 40;
  * four points of slop each way would have neighbors overlapping in the middle
  * and a tap aimed at $300 could land on $400 -- which, unlike a miss, writes a
  * number the player did not choose.
+ *
+ * Handed to `hitSlop` for native and to `TapArea` for the web, which drops
+ * `hitSlop` on the floor. See `TapArea`.
  */
-const PRESET_SLOP = {
-  top: Math.ceil((layout.tapTarget - PRESET_HEIGHT) / 2),
-  bottom: Math.ceil((layout.tapTarget - PRESET_HEIGHT) / 2),
-};
+const PRESET_SLOP = slopFor(PRESET_HEIGHT);
 
 interface AmountInputProps {
   value: string;
@@ -99,6 +100,7 @@ export const AmountInput = ({
                 pressed ? styles.presetPressed : null,
               ]}
             >
+              <TapArea slop={PRESET_SLOP} />
               <Text
                 style={typography.label}
                 color={selected ? colors.accentText : colors.textSecondary}
@@ -145,8 +147,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
     paddingVertical: spacing.md,
-    // Removes the focus ring web adds to inputs, which does not match the theme.
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
   presets: {
     flexDirection: 'row',

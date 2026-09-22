@@ -54,6 +54,7 @@ import {
   type Position,
 } from '../src/domain/types';
 import { matchesTerms, searchTerms } from '../src/domain/search';
+import { notationSearchForms } from '../src/domain/handNotation';
 import { HandRow } from '../src/features/sessions/HandRow';
 import { useAllHands, useLogStore } from '../src/store/useLogStore';
 import { colors, radius, spacing } from '../src/theme';
@@ -64,7 +65,12 @@ const PERIOD_OPTIONS = [
   { value: 'all' as const, label: 'All time' },
   { value: '30' as const, label: '30 days' },
   { value: '90' as const, label: '90 days' },
-  { value: '365' as const, label: 'This year' },
+  // Not "This year", which is what it said. Every value here is a count of
+  // days back from the moment the screen opened, so a chip reading "This year"
+  // was a fourth rolling window wearing a calendar's name: on 22 September it
+  // opened the previous 22 September and swept in a hundred days of last year.
+  // Its three neighbors state their arithmetic; this one now does too.
+  { value: '365' as const, label: '365 days' },
 ];
 
 const TAG_OPTIONS = [
@@ -112,8 +118,15 @@ export default function HandsScreen() {
     const from = period === 'all' ? null : openedAt - Number(period) * DAY;
     /*
       The note, the cards and the board. The cards are worth searching and the
-      chips are not: "AsKd" is how the hand is stored and how the row draws it,
-      so somebody who remembers the hand can find it by the hand.
+      chips are not: somebody who remembers the hand can find it by the hand.
+
+      Through `notationSearchForms`, because `AsKd` is how the hand is stored
+      and not how anything draws it. `HandRow` renders `formatNotation`, so
+      what is on screen is `A♠ K♦` and the raw string appears nowhere --
+      typing what the player is looking at matched nothing, and so did `AK`
+      and `AA`, which is how a hand is named out loud. All three forms go in
+      now, so the search answers to what the screen says as well as to what
+      the database holds.
     */
     const terms = searchTerms(query);
     return hands.filter((hand) => {
@@ -121,7 +134,11 @@ export default function HandsScreen() {
       if (tag !== null && !hand.tags.includes(tag)) return false;
       if (position !== null && hand.position !== position) return false;
       if (venueId !== null && sessionById.get(hand.sessionId)?.venueId !== venueId) return false;
-      if (!matchesTerms(terms, hand.note, hand.holeCards, hand.board)) return false;
+      const cards = [
+        ...notationSearchForms(hand.holeCards),
+        ...notationSearchForms(hand.board),
+      ];
+      if (!matchesTerms(terms, hand.note, ...cards)) return false;
       return true;
     });
   }, [hands, period, tag, position, venueId, sessionById, openedAt, query]);

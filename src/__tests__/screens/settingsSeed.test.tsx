@@ -86,3 +86,53 @@ describe('loading the demo set', () => {
     expect(screen.getByText(/Sign out first/)).toBeTruthy();
   });
 });
+
+describe('what the reset warning says about getting it back', () => {
+  /**
+   * Open the confirmation and read the sentence above the two buttons.
+   *
+   * Which of the two it is turns on whether this device syncs, and that is the
+   * whole of what these tests are about: the answer used to be captured in a
+   * `useEffect(..., [])` at mount.
+   */
+  const warningAfterSigningInOrOut = async (at: 'mount' | 'press') => {
+    mockSyncing.repository = at === 'mount' ? {} : null;
+    await renderScreen(<SettingsScreen />);
+    // The mount effect has settled by now; this is the flip `SignInCard` makes
+    // a few hundred pixels up the same screen, without leaving it.
+    mockSyncing.repository = at === 'mount' ? null : {};
+    await userEvent.press(screen.getByText('Clear all data'));
+    return screen.getByText(/Delete every session/);
+  };
+
+  it('promises nothing comes back once the account is gone', async () => {
+    // The dangerous direction. Signed in at mount, signed out before the
+    // press: the copy went on saying the log "comes back from the server the
+    // next time this device syncs", about a device with no account behind it.
+    // Somebody deletes their whole log believing it is recoverable.
+    expect(await warningAfterSigningInOrOut('mount')).toHaveTextContent(/cannot be undone/);
+  });
+
+  it('and says it does come back once there is an account', async () => {
+    // The other way round, and the reason the two sentences exist: on a
+    // syncing device `clearAll` rewinds the cursors and pulls the real log
+    // straight back, so "This cannot be undone" is false and the instruction
+    // the player needs -- sign out first -- is missing.
+    expect(await warningAfterSigningInOrOut('press')).toHaveTextContent(/come back from the server/);
+  });
+
+  it('and agrees with the card that already asks at press time', async () => {
+    // `seed()` re-reads `getSyncingRepository()` when it is pressed and
+    // refuses correctly. The two cards are in one render and disagreed.
+    mockSyncing.repository = null;
+    await renderScreen(<SettingsScreen />);
+    mockSyncing.repository = {};
+
+    await userEvent.press(screen.getByText('Load demo data'));
+    expect(await screen.findByText(/Not onto a device that syncs/)).toBeTruthy();
+
+    await userEvent.press(screen.getByText('Clear all data'));
+    expect(screen.getByText(/Delete every session/)).toHaveTextContent(/come back from the server/);
+  });
+});
+

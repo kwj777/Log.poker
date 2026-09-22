@@ -621,6 +621,16 @@ names a table whenever there is a case for it. `sessionCount` is the one that is
 easy to miss: it is derived at read time, so writing a session changes every
 venue.
 
+**And the sync names them too**, which for a while it did not. `onSyncApplied`
+fires far more often than "a pull arrived": a write pushes, and the answer
+always carries back the record just pushed, so on a signed-in device it runs
+after every hand, rebuy and mood entry. Told only that *something* had landed,
+the store re-read everything -- so a hand logged at the table did the scoped
+read above and then, a moment later, a full reload that replaced the sessions,
+venues and mood arrays anyway. Every paragraph here was true of the store alone
+and false of the app the moment somebody signed in. The change set says which
+tables moved; `SyncState.appliedTables` carries it as far as the store.
+
 **Which read owns each table is counted per table.** Two reloads can be in
 flight at once -- a write during a sync, two writes in a row -- and whichever
 resolved last used to win, which on two overlapping reads of one table is the
@@ -1086,47 +1096,47 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 102 passed
-Tests:       2189 passed
+Tests:       2252 passed
 
-  dexieRepository    145   the IndexedDB path, against real IndexedDB
-  sqlRepository      142   the SQLite path, against real SQLite
-  bundle              72   what ships to each platform, against the real output
-  site                64   the marketing/app split, the PWA, the sitemap
-  tournaments         64   ROI, its interval, cash rate, dry runs, finishes
-  sessionImport       63   reading a session-summary export
+  dexieRepository    148   the IndexedDB path, against real IndexedDB
+  sqlRepository      145   the SQLite path, against real SQLite
+  bundle              72   the server-side merge: two devices and one bundle
+  site                67   the marketing/app split, the PWA, the sitemap
+  tournaments         67   ROI, its interval, cash rate, dry runs, finishes
+  sessionImport       66   reading a session-summary export
   handOffs            61   where a hand-off goes, and what the four offer cards say
   stats               56   P/L, rebuys, duration, win rate, groupings
   content             55   every figure in the guides, re-derived and read back
   signinEndpoint      55   the free door, and every bound on it
   copy                54   what the sign-in and the sync are allowed to say
+  syncingRepository   53   two devices and one server, no fakes in between
   verify              52   checking a token, and every way past it that must not work
-  syncingRepository   49   two devices and one server, no fakes in between
   endpoint            47   the sync endpoint, end to end
   values              46   money, dates, durations, stakes, formats, counts
-  variance            45   win rate, σ, confidence bands, verdicts
+  variance            46   win rate, σ, confidence bands, verdicts
   blog                39   the post grammar, the share cards, and what it refuses
   mood                34   what tilt costs, and when to say nothing
   merge               33   two devices disagreeing, and who wins
   migrations          32   a filled v2 database walked forward, both engines
   signinSweep         31   what the sign-in store may collect, and what it must not
+  token               31   the family token grammar, against signed fixtures
   session             30   holding a token, and stores that fail as real ones do
-  token               29   the family token grammar, against signed fixtures
+  handNotation        29   parse, round-trip, hand classes
   palette             27   the theme matches BRAND.md
   sessionExport       27   the log written out, and read back by the importer
   editSession         24   correcting a session, including the one nobody cashed out
   writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price
-  handNotation        23   parse, round-trip, hand classes
+  compose             23   which repository a device gets, and the unsafe sweep
+  history             23   the session list, its filters, and how much of it mounts
   release             23   app.json, eas.json and the icon a store refuses over
+  glossary            22   the shorthand on screen still matches its explanation
   money               22   cents arithmetic, parsing, formatting
   clock               20   a typed date, a typed length, and what neither will accept
-  compose             20   which repository a device gets, and the unsafe sweep
-  glossary            20   the shorthand on screen still matches its explanation
   privacy             20   the policy page, held to the code it describes
   batch               19   a backlog split into requests, without orphaning a child
   csv                 19   quoting, delimiters, line endings
   gateCheck           19   the key-on-the-site script, run rather than read
-  history             19   the session list, its filters, and how much of it mounts
   useLogStore         19   what a write reads back, and what it leaves alone
   seed                18   the demo dataset stays coherent
   signin              18   the sign-in client, against a fake fetch
@@ -1141,13 +1151,15 @@ Tests:       2189 passed
   observe             14   how big the bundle was, said without saying whose
   bankrollHeadline    13   the word over the headline figure, and what it has to be true of
   editHand            13   fixing or deleting a hand that was logged wrong
+  importIntegration   13   parse → store → read back, against real SQLite
   logHand             13   logging a hand, the optional board, and the reset after a bad one
   rateLimit           13   how often one person may ask, and what a refusal costs
+  columns             12   header matching
   csvWriter           11   writing CSV, and reading back exactly what was written
-  importIntegration   11   parse → store → read back, against real SQLite
   tableOffer          11   which tags mean the game did it to you, and what to say about it
-  columns             10   header matching
   pastHand            10   adding a hand to a session that is not running
+  readme              10   the test table adds up and says what each suite is for
+  rowLabels           10   what a screen reader is told a row in a list is
   search              10   finding one thing in a log with years in it
   selectors           10   store reads and filters
   liveTimer            9   the session clock, across a background and back
@@ -1156,6 +1168,7 @@ Tests:       2189 passed
   varianceHands        9   the hand breakdown, and the sentence that must precede it
   plan                 8   what an import will write, before it writes it
   postSessionReset     8   the offer after cash-out, and who it is talking to
+  tapTargets           8   every short control against the 48pt floor
   tokenStore.web       8   the browser token store
   venuePicker          8   typing a room you already have, rather than adding a second
   claimHandoff         7   what a hand-off link may do without asking
@@ -1165,11 +1178,13 @@ Tests:       2189 passed
   settingsBankroll     7   entering what you had behind you before the log started
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room
-  readme               6   the test table adds up and says what each suite is for
-  rowLabels            6   what a screen reader is told a row in a list is
+  importWarnings       6   what the import screen says about a file it could not use
+  lintReach            6   which files npm run lint actually looks at
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
+  settingsSeed         6   the demo set, and the one device it must not be written onto
   crossPromo           5   the family card as drawn, and the link a refusing device gives back
+  dashboardFirstRun    5   labels on the dashboard with nothing under them yet
   errorBoundary        5   a render that throws, and the way back from it
   lineChart            5   what a chart says before it has been measured
   roiInterval          5   the ROI bootstrap runs once per result set, not per render
@@ -1177,15 +1192,10 @@ Tests:       2189 passed
   staleData            5   a read that failed after the app was already open
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
-  dashboardFirstRun    4   labels on the dashboard with nothing under them yet
   importPicker         4   opening a file on a phone, and the three answers a picker gives
-  importWarnings       4   what the import screen says about a file it could not use
   transactionQueue     4   two writes at once, on a database with no queue of its own
-  lintReach            3   which files npm run lint actually looks at
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
-  settingsSeed         3   the demo set, and the one device it must not be written onto
-  tapTargets           3   every short control against the 48pt floor
   allHands             2   who pays for a read of the whole journal
   amountField          2   the money field's box, against the font it has to hold
   newSessionDefaults   2   where the pre-filled session says its numbers came from
@@ -1242,7 +1252,7 @@ memory a second time.
 
 `layout.tapTarget` is 48, and the chips and the card picker both say in their
 own comments that this is the floor. `Button size="small"` draws at 36 and is
-used in twenty-one places, so it makes the difference up in `hitSlop`: small is
+used in dozens of places, so it makes the difference up in touch area: small is
 meant to look small, not to be harder to hit. The `Explain` badge does the same
 from 22.
 
@@ -1452,10 +1462,11 @@ rendered by the session that just finished and by no other.
 told their pass already covers it rather than being sold what they own, and the
 card renders nothing at all until that read lands. Showing one sentence and
 swapping it a frame later is the same failure the hands count guards against
-one section up. `hasPass` is the question, and it is false for everybody today:
-Log's own door mints the free tier and this app has never shipped a way to
-receive one of Untilt's tokens. The branch is written, typed and tested anyway,
-for the reason everything around `SYNC_NEEDS_PASS` is.
+one section up. `hasPass` is the question. It is false for everybody who signs in at Log's own
+door, which mints the free tier, and true for anybody who arrived through a
+hand-off: `app/claim.tsx` takes delivery of a purchase made at another of the
+family's apps, and a paid claim is the ordinary answer on that path. Both
+branches are live, which they were not when the claim screen was still to come.
 
 **It names no price and links to no checkout**, which is the whole distance
 between this and a purchasing mechanism Apple would have something to say
@@ -1546,9 +1557,10 @@ nothing at all.
 
 So the tournament card shows what can be said honestly:
 
-- **ROI and cash rate** as descriptions of what happened. Below a hundred entries
-  the copy says outright that this is a record rather than a measurement, because
-  one final table moves the number a long way.
+- **ROI and cash rate** as descriptions of what happened. Below ten entries the
+  copy says outright that this is a record rather than a measurement, because one
+  final table moves the number a long way. Ten is `MIN_ENTRIES_FOR_INTERVAL`,
+  which is also where the resampled range starts.
 - **The dry run**, which is the one genuinely inferential number here, and it is
   honest because it needs no distribution at all. Whether an entry cashes is
   independent of the last one, so the chance of missing `n` in a row is

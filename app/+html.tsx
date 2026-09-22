@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 import { ScrollViewStyleReset } from 'expo-router/html';
 
 import { BOTTOM_BAR_ID } from '../src/config';
+import { colors } from '../src/theme';
 
 /**
  * Registered from the document rather than from React so the worker is installed
@@ -31,6 +32,31 @@ if ('serviceWorker' in navigator) {
     });
   });
 }`;
+
+/**
+ * The focus ring, written here because a React Native style cannot say
+ * `:focus-visible` and nine of them had said `outlineStyle: 'none'` instead.
+ *
+ * Only one of those nine carried a reason -- "Removes the focus ring web adds
+ * to inputs, which does not match the theme" -- and the other eight were
+ * copies of it. Nothing put an indicator back: there was no `:focus` rule
+ * anywhere in the build, and none of those fields changes its border or its
+ * background when focused, so a keyboard user tabbing through New session, Log
+ * a hand, Import or the sign-in card had no way to tell which field they were
+ * in. That is a WCAG 2.4.7 failure, and web-only, which is what made it easy
+ * to miss: the native builds never had it.
+ *
+ * `input`/`textarea` plus the pseudo-class rather than `:where(...)`, so this
+ * outranks react-native-web's own single-class styles whatever order they are
+ * injected in. The accent is the theme's, so the ring matches the app rather
+ * than being the browser's near-black default on a near-black surface.
+ */
+const FOCUS_RING = `
+input:focus-visible, textarea:focus-visible {
+  outline: 2px solid ${colors.accent};
+  outline-offset: 2px;
+}
+`;
 
 /**
  * Paint the page background before the bundle loads, so a cold start on a slow
@@ -90,7 +116,7 @@ body { overscroll-behavior-y: none; }
     padding-bottom: max(env(safe-area-inset-bottom), calc(100dvh - 100svh)) !important;
   }
 }
-`;
+${FOCUS_RING}`;
 
 export default function Root({ children }: { children: ReactNode }) {
   return (

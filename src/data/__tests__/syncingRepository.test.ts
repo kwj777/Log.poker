@@ -1684,3 +1684,89 @@ describe('the device that only reads', () => {
     expect(held.calls).toBeGreaterThan(spent);
   });
 });
+
+describe('what a round says it moved', () => {
+  /**
+   * The tables named by the last answer that applied anything.
+   *
+   * `applied` on its own is a counter, and by the time anything reacts the
+   * change set is gone. The store above reads these names to decide which of
+   * its slices to re-read; with only the counter it re-read all five, after
+   * every local write, because a push always gets its own record back.
+   */
+  const moved = async (repository: SyncingRepository, write: () => Promise<unknown>) => {
+    await write();
+    await repository.push();
+    return repository.current().appliedTables;
+  };
+
+  it('names the one table a hand touched, and not the other four', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const session = await startSession(phone);
+    await phone.push();
+    // A second hand, so the answer is past the settle that re-stamps a row's
+    // neighbors on the round that first carries it.
+    await moved(phone, () =>
+      phone.createHand({
+        sessionId: session.id, holeCards: 'AsKd', board: null, position: 'BTN',
+        note: null, tags: [], amount: 12_000, at: now,
+      }),
+    );
+
+    tick(HOUR);
+    const tables = await moved(phone, () =>
+      phone.createHand({
+        sessionId: session.id, holeCards: 'QsQd', board: null, position: 'CO',
+        note: null, tags: [], amount: 5_000, at: now,
+      }),
+    );
+
+    expect(tables).toEqual(['hands']);
+  });
+
+  it('and names sessions when a rebuy lands, because a rebuy is part of one', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    const session = await startSession(phone);
+    await phone.push();
+
+    tick(HOUR);
+    const tables = await moved(phone, () =>
+      phone.addRebuy({ sessionId: session.id, amount: 20_000, at: now }),
+    );
+
+    expect(tables).toContain('rebuys');
+    expect(tables).not.toContain('moodEntries');
+  });
+
+  it('and says nothing moved before anything has', async () => {
+    const { fetch } = server();
+    const phone = await device(fetch, 'phone');
+    await phone.resume();
+    expect(phone.current().appliedTables).toEqual([]);
+  });
+
+  it('and a round that applies nothing leaves both the count and the names alone', async () => {
+    // The two move together, which is what makes the names safe to read: the
+    // store reacts to `applied` changing and reads the names in the same
+    // breath, so a round that applied nothing must not disturb either.
+    const { held, fetch } = server();
+    const phone = await device(fetch, 'phone');
+    await startSession(phone);
+    await phone.push();
+    const applied = phone.current().applied;
+    const tables = phone.current().appliedTables;
+    expect(tables.length).toBeGreaterThan(0);
+
+    held.offline = true;
+    tick(HOUR);
+    // Forced, because a push with nothing dirty does not go at all.
+    await phone.push(true);
+
+    expect(phone.current().problem).toBe('unreachable');
+    expect(phone.current().applied).toBe(applied);
+    expect(phone.current().appliedTables).toEqual(tables);
+  });
+});
+

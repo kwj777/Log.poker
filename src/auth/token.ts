@@ -96,13 +96,22 @@ export const SUBJECT_PREFIX = 'log_';
  * one in a bucket nothing would ever ask for again.
  *
  * There is no way to merge the two that is not also a way to reach somebody
- * else's history, so the answer is to stop taking the second kind at all. Log
- * mints its own tokens now and has never shipped a way to receive one of
- * Untilt's, on either platform: the token store is `localStorage` on Log's own
- * origin and `expo-secure-store` with no keychain access group, and the only
- * caller of `signIn` is the card, holding what Log's door just minted. So this
- * refuses a token that cannot arrive, which is the point -- the rule was true
- * by accident and is now true by construction.
+ * else's history, so the answer is to stop taking the second kind at all.
+ *
+ * **And one can arrive now**, which is the change since this was written.
+ * `app/claim.tsx` takes a one-time code out of a URL fragment, trades it at
+ * Untilt's claim endpoint and hands the token that comes back to `signIn`. So
+ * `signIn` has two callers and one of them is holding somebody else's token,
+ * and this pattern is what stands between that and a second bucket rather than
+ * a belt over a door nobody could open. The clause that used to be here --
+ * "refuses a token that cannot arrive" -- described the tree before the
+ * hand-off shipped.
+ *
+ * Nothing about the containment changed with it, which is why the behavior is
+ * still right: a token minted for a Stripe customer carries `cus_...`,
+ * `hasOwnSubject` is false, `SessionManager` reports `syncs: false`, and
+ * `data/index.ts` composes the plain local repository. The person keeps their
+ * log on the device and gets no bucket at all, rather than a second one.
  */
 export const OWN_SUBJECT = /^log_[0-9a-f]{32}$/;
 
@@ -145,28 +154,6 @@ export const readClaim = (token: string | null, now: Timestamp): Claim | null =>
 };
 
 /**
- * Whether this claim names somebody with a log of their own to carry.
- *
- * One condition, and it is identity. The tier was the other one once, it was
- * removed, and it is back beside this rather than inside it: see
- * `paidForSync` below, which is the question about money and is asked
- * separately so that this one can go on guarding erasure too.
- *
- * The argument that removed it is worth keeping rather than quietly losing,
- * because it is still true and it is what the price has to be worth beating:
- * what is valuable in a tracker is the player's own record, and an app that
- * charges to read that back on a second device is charging rent on their work
- * rather than selling them anything. `FAMILY-PRICING.md` has ruled the other
- * way, that sync is inside the $99. What answers the argument is that the
- * whole of the tracker stays free and only the carrying is bought, and that
- * nobody is ever refused the right to empty their own bucket.
- *
- * What is left was never about money. **A passcode holder has no subject of
- * their own**: everybody who typed one shares the literal string, so carrying
- * their histories together would pour every preview visitor's log into a
- * single one.
- */
-/**
  * How close to the end a token has to be before the app asks for a new one.
  *
  * Ten days of thirty, which is the number Untilt's own renewal uses. Wide
@@ -189,6 +176,14 @@ export const dueForRenewal = (claim: Claim | null, now: Timestamp): boolean =>
 
 /**
  * Whether this claim has a log of its own to carry.
+ *
+ * **One condition, and it is identity.** The tier was the other one once, it
+ * was removed, and it lives beside this rather than inside it: see
+ * `paidForSync`, which is the question about money and is asked separately so
+ * that this one can go on guarding erasure too. What is left was never about
+ * money. A passcode holder has no subject of their own -- everybody who typed
+ * one shares the literal string -- so carrying their histories together would
+ * pour every preview visitor's log into a single one.
  *
  * The client's half of the rule the server enforces in `hasOwnBucket`, and the
  * two have to say the same thing: this decides whether the data layer builds a
@@ -236,14 +231,20 @@ export const SYNC_NEEDS_PASS: boolean = false;
  * asks which of two sentences to put on the screen. Neither should have to
  * know the grammar.
  *
- * **It is false for everybody today, and not because nobody has paid.**
- * `signinEndpoint` mints `tier: 'free'` for every sign-in made at Log's own
- * door, and Log has never shipped a way to receive one of Untilt's tokens, so
- * a `full` claim cannot reach this app at all yet. What makes it true is the
- * shared entitlement the family brief makes step 4 and `SYNC_NEEDS_PASS`
- * describes: a way for this app to learn, for an address that just signed in
- * here, that somebody bought. Until that exists, everything reading this is
- * built, wired and tested against both answers, and the answer is no.
+ * **It is false for everybody who signs in at Log's own door, and not because
+ * nobody has paid.** `signinEndpoint` mints `tier: 'free'` for every one of
+ * those. What would make it true for them is the shared entitlement the family
+ * brief makes step 4 and `SYNC_NEEDS_PASS` describes: a way for this app to
+ * learn, for an address that just signed in here, that somebody bought.
+ *
+ * **It is already true for anybody who came through a hand-off.**
+ * `src/auth/handoff.ts` exists to take delivery of a purchase made at another
+ * of the family's apps, `app/claim.tsx` hands what it gets to `signIn`, and a
+ * paid claim is the ordinary answer on that path -- Untilt answers 503 rather
+ * than a free token when it cannot reach Stripe, precisely so an outage is
+ * never read here as somebody not having paid. So the branches reading this
+ * are live rather than written-and-waiting, which is what this said until the
+ * claim screen shipped.
  *
  * Nothing here is a gate, and nothing here may become one. See the top of this
  * file: a claim read on the client proves only that somebody typed something

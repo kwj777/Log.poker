@@ -66,3 +66,45 @@ describe('the README test table', () => {
     expect(undescribed.map((row) => row.name)).toEqual([]);
   });
 });
+
+describe('numbers in the prose that the code can settle', () => {
+  /**
+   * Each of these was written true and went stale, and each is the kind a
+   * reader has no way to doubt: a citation, a fixture's shape, a count of call
+   * sites, a threshold. They are asserted against the thing they describe
+   * rather than against themselves.
+   */
+  const root = join(__dirname, '..', '..', '..');
+  const file = (...parts: string[]) => readFileSync(join(root, ...parts), 'utf8');
+
+  it('cites the approximation `normalCdf` actually uses', () => {
+    // The constants below the citation -- 0.3275911 and 0.254829592 -- are
+    // Abramowitz & Stegun 7.1.26, the error function. 26.2.17 is a different
+    // approximation with different constants.
+    const source = file('src', 'domain', 'variance.ts');
+    expect(source).toContain('0.3275911');
+    expect(source).toMatch(/Abramowitz & Stegun 7\.1\.26/);
+  });
+
+  it('and describes the demo tournament set by its own contents', () => {
+    const seed = file('src', 'data', 'seed.ts');
+    const plan = seed.slice(seed.indexOf('TOURNAMENT_PLAN'), seed.indexOf('];', seed.indexOf('TOURNAMENT_PLAN')));
+    const results = [...plan.matchAll(/resultDollars: (-?\d+)/g)].map((m) => Number(m[1]));
+    expect(results).toHaveLength(12);
+    expect(results.filter((result) => result > 0)).toHaveLength(3);
+    expect(seed).toMatch(/twelve entries, three cashes/);
+  });
+
+  it('and agrees with the rest of the repository about the backstop', () => {
+    // Three documents said six months and `bundle.ts` said three.
+    for (const source of [file('README.md'), file('SYNC.md'), file('src', 'sync', 'bundle.ts')]) {
+      expect(source).toMatch(/six months offline/);
+    }
+  });
+
+  it('and puts the ROI threshold where the code puts it', () => {
+    expect(file('src', 'domain', 'tournaments.ts')).toMatch(/MIN_ENTRIES_FOR_INTERVAL = 10;/);
+    expect(file('README.md')).toMatch(/Below ten entries/);
+  });
+});
+

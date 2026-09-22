@@ -40,7 +40,12 @@ const PERIOD_OPTIONS = [
   { value: 'all' as const, label: 'All time' },
   { value: '30' as const, label: '30 days' },
   { value: '90' as const, label: '90 days' },
-  { value: '365' as const, label: 'This year' },
+  // Not "This year", which is what it said. Every value here is a count of
+  // days back from the moment the screen opened, so a chip reading "This year"
+  // was a fourth rolling window wearing a calendar's name: on 22 September it
+  // opened the previous 22 September and swept in a hundred days of last year.
+  // Its three neighbors state their arithmetic; this one now does too.
+  { value: '365' as const, label: '365 days' },
 ];
 
 const GAME_OPTIONS = [

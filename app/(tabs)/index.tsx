@@ -438,17 +438,26 @@ export default function DashboardScreen() {
         />
         <View style={styles.chartAxis}>
           <Text variant="caption" color={colors.textTertiary}>
-            {/* Where the line starts, which is the starting balance and not
-                always zero. Hard-coded, it put $0 under the left end of a
-                curve based at $5,000 while the caption at the other end read
-                $5.3k: two captions on one axis, disagreeing. */}
+            {/* Where the line starts, read off the line. It was
+                `balance ?? 0`, described as "where the line starts, which is
+                the starting balance" -- and it is not: `bankrollCurve` emits
+                one point per completed session and `cumulative` is the balance
+                *after* that session, so the left end sits at the starting
+                balance plus the oldest session's result. `LineChart`'s
+                `baseline` widens the y range and adds no point.
+
+                So the pair still disagreed with the drawing, by the first
+                session's result rather than by the whole balance, and worst
+                for the player with no balance set: `$0` under a line whose
+                left end is their first night's profit. The right caption has
+                read the curve all along. */}
             {/* And `> 1` rather than `> 0`, which is the chart's own rule:
                 `LineChart` draws when a series has more than one point,
                 because one point is not a line, and `bankrollCurve` emits one
                 per completed session. With exactly one, the body read "Not
                 enough data yet" and this strip still printed two money figures
                 for a line nobody had drawn. */}
-            {curve.length > 1 ? formatMoneyCompact(balance ?? 0, currency) : ''}
+            {curve.length > 1 ? formatMoneyCompact(curve[0].cumulative, currency) : ''}
           </Text>
           <Text variant="caption" color={colors.textTertiary}>
             {curve.length > 1

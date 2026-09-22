@@ -24,7 +24,7 @@
  */
 
 import { useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
@@ -239,7 +239,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 48,
     paddingHorizontal: spacing.lg,
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
   actions: {
     flexDirection: 'row',

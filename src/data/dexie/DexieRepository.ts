@@ -290,9 +290,9 @@ export class DexieRepository implements Repository {
     };
   }
 
-  /** Sync's write. Upserts verbatim, parents first, skipping orphans. */
   /**
-   * Take what the server sent, without stepping on a write it has not seen.
+   * Sync's write: take what the server sent, without stepping on a write it
+   * has not seen. Upserts verbatim, parents first, skipping orphans.
    *
    * The `stale` check below is SQLite's `WHERE excluded.updated_at >= ...`
    * written out, and it is here for the same reason and with the same meaning.
@@ -638,6 +638,11 @@ export class DexieRepository implements Repository {
       ? Math.max(0, Math.floor(filter.limit as number))
       : null;
 
+    // Reversing the whole cursor is what settles a tie here: equal `startedAt`
+    // keys sit in primary-key order in the index, so walking it backwards
+    // returns them id-descending. `SqlRepository` says `ORDER BY started_at
+    // DESC, id DESC` for the same reason and to the same answer -- see there
+    // for why a tie is the common case rather than a corner.
     const matching = this.db.sessions.orderBy('startedAt').reverse().filter(wanted);
     const records = await (capped === null ? matching : matching.limit(capped)).toArray();
 
@@ -837,7 +842,16 @@ export class DexieRepository implements Repository {
   async countHands(): Promise<number> {
     const [all, tombstoned] = await Promise.all([
       this.db.hands.count(),
-      this.db.hands.where('deletedAt').above(0).count(),
+      // Every value the index holds, not every value above zero. The index
+      // holds each non-null `deletedAt`, and `above(0)` skipped `0` and
+      // anything negative -- which `isLive` two hundred lines up calls deleted,
+      // and which `SqlRepository` calls deleted too (`deleted_at IS NULL` is
+      // false for `0`). So one hand written with such a stamp was hidden by
+      // `listHands` and counted by this, and the web dashboard's hand count sat
+      // one above the number of hands the app would show, permanently and only
+      // on one engine. Nothing filters a non-positive stamp on the way in:
+      // `sanitize` in `bundle.ts` takes any finite number.
+      this.db.hands.where('deletedAt').between(-Infinity, Infinity, true, true).count(),
     ]);
     return all - tombstoned;
   }

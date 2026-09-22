@@ -58,13 +58,36 @@ export default function ImportScreen() {
   const totals = useMemo(() => {
     if (!reading || reading.sessions.length === 0) return null;
     const starts = reading.sessions.map((session) => session.draft.startedAt);
-    return {
+
+    /**
+     * One figure per currency, in the order the file first uses them.
+     *
+     * It was one sum and the first row's symbol. `parseSessionCsv` resolves a
+     * currency per row -- from a Currency column, or from a symbol in a money
+     * cell -- so a file holding two of them was added together and labeled
+     * with whichever happened to be first: $300 plus EUR700 minus GBP100
+     * printed as "+$900", on the number a player reads to decide whether to
+     * press Import.
+     *
+     * The three tab screens each carry a long comment about having fixed this
+     * exact thing, and the dashboard's puts it best: "a bankroll is a sum, and
+     * a sum of euros and dollars is neither." They scope to one currency and
+     * offer a chip; this is a preview of a file rather than a view of a log,
+     * so it says all of them rather than asking which. Log's own export writes
+     * a Currency column, so a player with two hits this on their own file.
+     */
+    const nets = new Map<string, number>();
+    for (const session of reading.sessions) {
+      const { currency } = session.draft;
       // Through `draftNet`, so the figure the player checks before importing
       // is the app's arithmetic rather than this screen's. Written out here it
       // left the tournament entry fee off, and always in the flattering
       // direction.
-      net: reading.sessions.reduce((sum, session) => sum + draftNet(session.draft), 0),
-      currency: reading.sessions[0].draft.currency,
+      nets.set(currency, (nets.get(currency) ?? 0) + draftNet(session.draft));
+    }
+
+    return {
+      nets: [...nets].map(([currency, net]) => ({ currency, net })),
       from: Math.min(...starts),
       to: Math.max(...starts),
       venues: Array.from(new Set(reading.sessions.map((session) => session.venueName))),
@@ -226,9 +249,13 @@ export default function ImportScreen() {
               <Text variant="heading">
                 {reading.sessions.length} session{reading.sessions.length === 1 ? '' : 's'}
               </Text>
-              <Text variant="heading" color={resultColor(totals.net)}>
-                {formatMoney(totals.net, { currency: totals.currency, signed: true })}
-              </Text>
+              <View style={styles.nets}>
+                {totals.nets.map(({ currency, net }) => (
+                  <Text key={currency} variant="heading" color={resultColor(net)}>
+                    {formatMoney(net, { currency, signed: true })}
+                  </Text>
+                ))}
+              </View>
             </View>
             <Text variant="caption" color={colors.textTertiary} style={styles.range}>
               {formatDay(totals.from)} - {formatDay(totals.to)} · {totals.venues.join(', ')}
@@ -357,6 +384,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
+  },
+  /** One line per currency, right-aligned under each other. */
+  nets: {
+    alignItems: 'flex-end',
   },
   range: {
     marginTop: spacing.xs,

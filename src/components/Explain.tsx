@@ -30,6 +30,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { GlossaryEntry } from '../domain/glossary';
 import { colors, layout, radius, spacing, typography } from '../theme';
 import { Sheet } from './Sheet';
+import { TapArea } from './TapArea';
 import { Text } from './Text';
 import { tapFeedback } from './haptics';
 
@@ -44,6 +45,9 @@ interface ExplainProps {
   label?: string;
 }
 
+/** Thirteen a side, the badge being 22 against a floor of 48. Native and web. */
+const BADGE_SLOP = Math.ceil((layout.tapTarget - 22) / 2);
+
 export const Explain = ({ title, entries, label }: ExplainProps) => {
   const [open, setOpen] = useState(false);
 
@@ -55,13 +59,17 @@ export const Explain = ({ title, entries, label }: ExplainProps) => {
         accessibilityHint="Opens a short explanation"
         // The badge draws at 22 and the floor is 48, so it needs 13 a side
         // rather than the 8 it had -- which left it at 38 and still short.
-        hitSlop={Math.ceil((layout.tapTarget - 22) / 2)}
+        //
+        // `TapArea` is the web half of the same number: react-native-web drops
+        // `hitSlop` entirely, so this said "13 a side" about native alone.
+        hitSlop={BADGE_SLOP}
         onPress={() => {
           tapFeedback();
           setOpen(true);
         }}
         style={({ pressed }) => [styles.badge, pressed ? styles.pressed : null]}
       >
+        <TapArea slop={BADGE_SLOP} />
         <Text style={typography.caption} color={colors.textTertiary}>
           ?
         </Text>

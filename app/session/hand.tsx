@@ -50,7 +50,7 @@
  */
 
 import { useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { AmountInput } from '../../src/components/AmountInput';
@@ -585,7 +585,6 @@ const styles = StyleSheet.create({
     minHeight: 72,
     padding: spacing.lg,
     textAlignVertical: 'top',
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
   amountHint: {
     marginBottom: spacing.lg,

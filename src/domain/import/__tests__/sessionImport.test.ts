@@ -242,6 +242,40 @@ describe('parseSessionCsv', () => {
     });
   });
 
+  describe('a date that has not happened', () => {
+    // The rule `isAhead` exists for and the three typed screens already keep:
+    // "2062-09-19 for 2026-09-19 parses, is a real date, and used to be
+    // accepted in silence." The importer accepted it. `deriveDefaults` then
+    // opened every later session from it, `assessRecentStretch` called it
+    // permanently recent, and the bankroll curve got a point decades out.
+    // Against the real clock rather than an injected one, so these fail on an
+    // assertion rather than on a signature.
+    const csv = 'Date,Result\n2199-09-19,120\n2024-01-15,50\n';
+
+    it('is skipped rather than imported, like every screen a date is typed into', () => {
+      const result = parseSessionCsv(csv);
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0].draft.startedAt).toBeLessThan(Date.now());
+      expect(result.skipped).toBe(1);
+    });
+
+    it('and says which row and why, because a typed year is the likely cause', () => {
+      const warning = parseSessionCsv(csv).warnings.find((w) => w.line === 2);
+      expect(warning?.message).toMatch(/has not happened yet/);
+      expect(warning?.message).toMatch(/year/i);
+    });
+
+    it('but a session logged as it ends is not in the future', () => {
+      // `FUTURE_TOLERANCE_MS` is five minutes, for exactly this: a device clock
+      // a minute fast must not refuse tonight's session.
+      const now = new Date(2026, 8, 22, 12).getTime();
+      const justNow = new Date(now + 60_000).toISOString();
+      const result = parseSessionCsv(`Date,Result\n${justNow},120\n`, { now });
+      expect(result.sessions).toHaveLength(1);
+      expect(result.skipped).toBe(0);
+    });
+  });
+
   describe('venues and currency', () => {
     it('names sessions from the site column', () => {
       const csv = 'Date,Site,Result\n2024-01-15,GGPoker,120\n';

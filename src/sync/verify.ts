@@ -115,12 +115,16 @@ const FAMILY_PURPOSE = 'family';
 /**
  * When this stops accepting the preimage it used to sign.
  *
- * Every token carrying the old signature is one this app's own door minted,
- * because Log has never shipped a way to receive somebody else's, and they all
- * run out within `TOKEN_TTL_MS` of the change landing. So the window only has
- * to cover thirty days from the deploy, and this date is set a couple of
- * months past the change being written, which is slack rather than a second
- * deadline.
+ * Every token carrying the old signature is one this app's own door minted or
+ * one Untilt minted for a hand-off, and they all run out within `TOKEN_TTL_MS`
+ * of the change landing. So the window only has to cover thirty days from the
+ * deploy, and this date is set a couple of months past the change being
+ * written, which is slack rather than a second deadline.
+ *
+ * This used to say the population was Log's own tokens alone, "because Log has
+ * never shipped a way to receive somebody else's". `app/claim.tsx` is exactly
+ * that and it shipped. It changes nothing here, for the reason set out below:
+ * the containment was never the population.
  *
  * It closes by itself on purpose. A migration that ends when somebody
  * remembers to delete a branch is a migration that does not end, and what that

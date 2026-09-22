@@ -117,7 +117,9 @@ export const estimatePlayer = (observations: readonly SessionObservation[]): Pla
 };
 
 /**
- * Standard normal CDF (Abramowitz & Stegun 26.2.17, |ε| < 7.5e-8).
+ * Standard normal CDF, from the error function: Abramowitz & Stegun 7.1.26,
+ * |ε| < 7.5e-8. (Not 26.2.17, which this cited and which is a different
+ * approximation with different constants; the ones below are 7.1.26’s.)
  * Good to far more precision than a percentage read off a chart needs.
  */
 export const normalCdf = (z: number): number => {
@@ -347,10 +349,14 @@ export const nothingReadable = (
   const tournaments = complete.filter((session) => session.format === 'tournament').length;
   return {
     headline: 'Nothing to measure in big blinds yet',
+    // "here" rather than "you have logged", because the screen passes sessions
+    // already scoped to one currency: a player with cash games in dollars and
+    // tournaments in euros, looking at the euro view, would otherwise be told
+    // something false about their own log.
     body:
       tournaments === complete.length
-        ? 'Every session you have logged is a tournament, and a tournament has no blinds to measure in. Their results are too lopsided for a band like this one to say anything honest about anyway. What is worth saying about them is below, as cashes and ROI.'
-        : 'This page works in big blinds, and none of the sessions logged so far carries them: a tournament has none to carry, and a cash game logged without its stakes has none recorded.',
+        ? 'Every session here is a tournament, and a tournament has no blinds to measure in. Their results are too lopsided for a band like this one to say anything honest about anyway. What is worth saying about them is below, as cashes and ROI.'
+        : 'This page works in big blinds, and none of the sessions it is looking at carries them: a tournament has none to carry, and a cash game logged without its stakes has none recorded.',
   };
 };
 
@@ -486,12 +492,6 @@ export const assessRecentStretch = (
 };
 
 /**
- * Probability of being behind after `hours` at the player's estimated numbers.
- * The single most reassuring statistic in the app: a solid winner is still in
- * the red a meaningful share of the time over any stretch short of hundreds of
- * hours, and seeing that number defuses a lot of tilt.
- */
-/**
  * A probability in words, carrying its own qualifier.
  *
  * Rounding one to a whole percent turns anything under half a percent into
@@ -513,6 +513,12 @@ export const oddsInWords = (fraction: number): string => {
   return `about ${Math.round(fraction * 100)}%`;
 };
 
+/**
+ * Probability of being behind after `hours` at the player's estimated numbers.
+ * The single most reassuring statistic in the app: a solid winner is still in
+ * the red a meaningful share of the time over any stretch short of hundreds of
+ * hours, and seeing that number defuses a lot of tilt.
+ */
 export const probabilityOfLoss = (estimate: PlayerEstimate, hours: number): number | null => {
   if (!estimate.reliable || estimate.stdDevBbPerHour <= 0 || hours <= 0) return null;
   const z = (0 - estimate.winRateBbPerHour * hours) / (estimate.stdDevBbPerHour * Math.sqrt(hours));

@@ -93,3 +93,46 @@ describe('a file that mostly worked', () => {
     expect(screen.queryByText('Worth knowing')).toBeNull();
   });
 });
+
+describe('what the preview says a file is worth', () => {
+  /**
+   * `parseSessionCsv` resolves a currency per row, so a file can hold several.
+   *
+   * The headline summed them all and labeled the total with whichever row came
+   * first. It is the number a player reads to decide whether to press Import,
+   * and Log's own export writes a Currency column, so a player with two
+   * currencies hits it on their own file. The three tab screens each carry a
+   * comment about having fixed this exact thing.
+   */
+  const MIXED = [
+    'Date,Game,Stakes,Buy-in,Cash-out,Currency,Site',
+    '2026-03-01 19:00,NLHE,1/2,200,500,USD,Aria',
+    '2026-03-02 19:00,NLHE,1/2,200,900,EUR,Kings',
+    '',
+  ].join('\n');
+
+  it('keeps two currencies apart rather than adding them up', async () => {
+    await paste(MIXED);
+
+    expect(await screen.findByText('2 sessions')).toBeTruthy();
+    expect(screen.getByText('+$300')).toBeTruthy();
+    expect(screen.getByText(/700/)).toBeTruthy();
+    // The sum that was printed before, with the first row's symbol on it.
+    expect(screen.queryByText('+$1,000')).toBeNull();
+  });
+
+  it('and still says one figure when the file says one currency', async () => {
+    await paste(
+      [
+        'Date,Game,Stakes,Buy-in,Cash-out,Currency,Site',
+        '2026-03-01 19:00,NLHE,1/2,200,500,USD,Aria',
+        '2026-03-02 19:00,NLHE,1/2,200,900,USD,Kings',
+        '',
+      ].join('\n'),
+    );
+
+    expect(await screen.findByText('2 sessions')).toBeTruthy();
+    expect(screen.getByText('+$1,000')).toBeTruthy();
+  });
+});
+

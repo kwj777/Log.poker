@@ -310,14 +310,6 @@ const heard = (
 const derived = (record: Row): Timestamp => record.updatedAt + 1;
 
 /**
- * Two sessions cannot both be running, and only the bundle knows there are two.
- *
- * The rule and its reasoning are in `src/domain/merge.ts`; what happens here is
- * the bookkeeping around it. A session the rule closes is written back with an
- * `endedAt` and **no cash-out**, which leaves it neither active nor complete, so
- * it stays out of every total until the player says what came off the table.
- */
-/**
  * A stamp this server is willing to believe, or null.
  *
  * Not clamped. Clamping a future stamp answers `now`, and `now` moves: a rule
@@ -418,6 +410,14 @@ const rescuedParents = (
   return rescued;
 };
 
+/**
+ * Two sessions cannot both be running, and only the bundle knows there are two.
+ *
+ * The rule and its reasoning are in `src/domain/merge.ts`; what happens here is
+ * the bookkeeping around it. A session the rule closes is written back with an
+ * `endedAt` and **no cash-out**, which leaves it neither active nor complete, so
+ * it stays out of every total until the player says what came off the table.
+ */
 const settleActiveSessions = (
   bundle: Bundle,
   at: Timestamp,
@@ -894,8 +894,10 @@ export const mergeIntoBundle = (
       // row whose tombstone it threw away, and taking it would put a session
       // somebody deleted back on every device. Refusing it can lose a record
       // that device really did create and never sent, which is the worse thing
-      // to lose but the rarer one: it needs three months offline and a write
-      // that never left. See SYNC.md.
+      // to lose but the rarer one: it needs six months offline and a write
+      // that never left, where the alternative needs only the six. Three
+      // months is the retention window; being below the horizon as well takes
+      // another. README and SYNC.md both say six. See SYNC.md.
       //
       // Unless this same push is carrying something live that hangs off it, in
       // which case it is not the shape of a collected row at all. See

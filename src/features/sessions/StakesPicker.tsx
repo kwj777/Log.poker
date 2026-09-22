@@ -153,6 +153,5 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.lg,
     textAlign: 'center',
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
 });

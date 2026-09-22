@@ -68,12 +68,30 @@ describe('the bankroll axis, against a chart that refused to draw', () => {
 
   it('and prints both ends once there is one', async () => {
     // The other half, so the gate cannot be fixed by deleting the captions.
+    //
+    // $5,200 and $5,400, not $5,000 and $5,400: `bankrollCurve` emits one
+    // point per completed session and `cumulative` is the balance *after* it,
+    // so the left end of the line is the starting balance plus the oldest
+    // session's result. The caption used to print the balance and call it
+    // "where the line starts".
     load([won('s1'), won('s2')], { startingBalance: BALANCE });
     await renderScreen(<DashboardScreen />);
 
     expect(screen.queryByText('Not enough data yet')).toBeNull();
-    expect(screen.getByText('$5k')).toBeTruthy();
+    expect(screen.getByText('$5.2k')).toBeTruthy();
     expect(screen.getByText('$5.4k')).toBeTruthy();
+    expect(screen.queryByText('$5k')).toBeNull();
+  });
+
+  it('and reads the left end off the line for a player with no balance set', async () => {
+    // Where the old caption was furthest out: `$0` under a line whose left end
+    // is the first night's profit.
+    load([won('s1'), won('s2')]);
+    await renderScreen(<DashboardScreen />);
+
+    expect(screen.getByText('$200')).toBeTruthy();
+    expect(screen.getByText('$400')).toBeTruthy();
+    expect(screen.queryByText('$0')).toBeNull();
   });
 });
 

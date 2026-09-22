@@ -474,4 +474,15 @@ describe('a log this model cannot read a single session of', () => {
   it('and leaves an empty log alone, where the shortfall is the whole answer', () => {
     expect(nothingReadable([], [])).toBeNull();
   });
+
+  it('and says "here", because the screen has already scoped this to a currency', () => {
+    // `app/(tabs)/variance.tsx` passes `inCurrency(all, currency)` whenever
+    // the player has more than one, so "every session you have logged" would
+    // be false for somebody with cash games in dollars and tournaments in
+    // euros, looking at the euro view.
+    const logged = entries(3);
+    const said = nothingReadable(logged, toObservations(logged));
+    expect(said!.body).not.toMatch(/you have logged/);
+    expect(said!.body).toMatch(/Every session here/);
+  });
 });

@@ -1,4 +1,4 @@
-import { ALIAS_COLLISIONS, normalizeHeader, resolveColumns } from '../columns';
+import { ALIAS_COLLISIONS, ALIASES, normalizeHeader, resolveColumns } from '../columns';
 
 describe('normalizeHeader', () => {
   it('reduces a header to letters and digits', () => {
@@ -82,3 +82,48 @@ describe('the alias table itself', () => {
     }
   });
 });
+
+describe('aliases that matched no header anybody writes', () => {
+  /**
+   * The table is matched on an exact normalized string, so an alias that is
+   * not the normalization of a real header chooses nothing, ever, and looks
+   * from the outside exactly like a spelling that is covered.
+   *
+   * Two were like that. `timeatable` has one `t` where "Time at Table"
+   * normalizes to two, so that column fell through to `unmapped` -- and with
+   * no duration and no end time the importer records the session as ending
+   * when it started, which drops it out of hourly rate and out of the variance
+   * estimate entirely. `winnings2` in the cash-out list matches literally
+   * "Winnings 2".
+   */
+  const headers = [
+    ['Time at Table', 'duration'],
+    ['Table Time', 'duration'],
+    ['Hours played', 'duration'],
+    ['Buy-In ($)', 'buyIn'],
+    ['Cash-out', 'cashOut'],
+    ['Prize', 'cashOut'],
+    ['P/L', 'result'],
+    ['Entry fee', 'fee'],
+  ] as const;
+
+  it('map the headers a real export writes', () => {
+    for (const [header, field] of headers) {
+      expect([header, resolveColumns(['Date', header]).indexes[field]]).toEqual([header, 1]);
+    }
+  });
+
+  it('and nothing is left in the table that only a typo would reach', () => {
+    // Every alias in the list, put back through the normalizer as a header a
+    // person might type: `timeattable` reads as "time at table", and a human
+    // header with those words normalizes back to it. An alias carrying a digit
+    // is the shape `winnings2` had, and no exporter numbers a column that way.
+    for (const aliases of Object.values(ALIASES)) {
+      for (const alias of aliases) {
+        expect([alias, normalizeHeader(alias)]).toEqual([alias, alias]);
+        expect([alias, /\d/.test(alias)]).toEqual([alias, false]);
+      }
+    }
+  });
+});
+

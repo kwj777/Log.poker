@@ -25,6 +25,16 @@ export const formatRelativeDay = (timestamp: number, now: number = Date.now()): 
     return date.getTime();
   };
   const days = Math.round((startOfDay(now) - startOfDay(timestamp)) / DAY);
+  // Ahead of today falls through to the date, before the branch below it.
+  // Every future timestamp makes `days` negative and every negative number is
+  // less than seven, so a row dated 2062 read "-13146 days ago" -- in the row
+  // caption and, twice as badly, in the screen-reader label beside it.
+  //
+  // There is no wording that would be right here instead. A moment that has
+  // not happened is a typed year, which is what `isAhead` and
+  // `FUTURE_TOLERANCE_MS` exist for, and the date is the one thing that shows
+  // the player what they actually entered.
+  if (days < 0) return formatSessionDate(timestamp, now);
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days} days ago`;

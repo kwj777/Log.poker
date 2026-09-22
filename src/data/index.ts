@@ -15,6 +15,7 @@
 
 import { getSession, getToken, renewIfDue } from '../auth';
 import { cursorStore } from '../sync/cursorStore';
+import type { SyncTable } from '../sync/protocol';
 import { SyncingRepository } from './SyncingRepository';
 import { createRepository, STORAGE_ENGINE } from './repositoryFactory';
 import { safeToCollect, type Repository } from './repository';
@@ -132,7 +133,7 @@ const compose = async (): Promise<Repository> => {
     syncing.subscribe((state) => {
       if (state.applied === seen) return;
       seen = state.applied;
-      for (const watcher of watchers) watcher();
+      for (const watcher of watchers) watcher(state.appliedTables);
     });
 
     // One pull on the way up, because otherwise a device that only reads never
@@ -210,10 +211,21 @@ export const syncOnResume = async (): Promise<void> => {
  * so before this the history somebody had just signed in for arrived and then
  * sat there, invisible, until they quit and reopened. Which on a device that
  * has just been signed in on looks exactly like sync not working.
+ *
+ * The listener is handed the tables the answer moved, because it fires far
+ * more often than "a pull arrived": `touched` pushes after every local write
+ * and the answer always carries back the record just pushed, so on a
+ * signed-in device this runs after every hand, rebuy and mood entry. Told only
+ * that something landed, the store re-read all five slices and replaced every
+ * array a screen was memoizing over -- undoing, a moment later, the scoped
+ * read the write had just done. The change set says which tables moved; this
+ * passes it on instead of dropping it one line before it is needed.
  */
-const watchers = new Set<() => void>();
+const watchers = new Set<(tables: readonly SyncTable[]) => void>();
 
-export const onSyncApplied = (listener: () => void): (() => void) => {
+export const onSyncApplied = (
+  listener: (tables: readonly SyncTable[]) => void,
+): (() => void) => {
   watchers.add(listener);
   return () => watchers.delete(listener);
 };

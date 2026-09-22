@@ -23,7 +23,6 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('../../features/account/SignInCard', () => ({ SignInCard: () => null }));
 jest.mock('../../features/family/FamilyCrossPromo', () => ({ FamilyCrossPromo: () => null }));
 jest.mock('../../features/export/saveCsv', () => ({
-  CAN_SAVE_FILE: true,
   saveCsv: async () => ({ saved: true }),
 }));
 

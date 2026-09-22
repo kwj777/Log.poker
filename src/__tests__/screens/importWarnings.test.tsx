@@ -24,7 +24,6 @@ import { useLogStore } from '../../store/useLogStore';
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), replace: jest.fn() } }));
 
 jest.mock('../../features/import/pickCsvFile', () => ({
-  CAN_PICK_FILE: false,
   pickCsvFile: async () => null,
 }));
 

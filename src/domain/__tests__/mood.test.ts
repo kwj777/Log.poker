@@ -281,6 +281,33 @@ describe('when it refuses to speak', () => {
     expect(result.blocker).toBe('thin-rattled');
   });
 
+  it('never says no-data once there is any observation at all', () => {
+    // There used to be a third guard below the two above, answering `no-data`
+    // when either side had no big blinds per hour. It could not be reached: a
+    // group has no rate only when it has no hours, and no hours is fewer than
+    // twelve, so the thinness guards took every such case first. It was also
+    // the wrong blocker -- `no-data` is documented as "no usable sessions at
+    // all, so not even the groups exist", which is the empty case above, and
+    // by that line both groups have cleared five sessions and twelve hours.
+    //
+    // A sweep rather than one case, because the claim is about a whole region
+    // of inputs: every session count either side of the floor, against hour
+    // totals at, around and far past it.
+    const hourTotals = [0.001, 1, MIN_HOURS_PER_GROUP - 0.001, MIN_HOURS_PER_GROUP, 40];
+    for (let steady = 1; steady <= MIN_SESSIONS_PER_GROUP + 2; steady += 1) {
+      for (let rattled = 1; rattled <= MIN_SESSIONS_PER_GROUP + 2; rattled += 1) {
+        for (const total of hourTotals) {
+          const { sessions, moods } = merge(
+            run('a', { score: 1, count: steady, resultBb: 100, hours: total / steady }),
+            run('c', { score: 5, count: rattled, resultBb: -100, hours: total / rattled }),
+          );
+          const result = startMoodComparison(sessions, moods);
+          expect(result.blocker).not.toBe('no-data');
+        }
+      }
+    }
+  });
+
   it('still reports both groups while refusing, because the refusal is the answer', () => {
     const { sessions, moods } = merge(
       run('a', { score: 1, count: 2, resultBb: 100, hours: 10 }),

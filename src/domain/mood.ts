@@ -293,14 +293,27 @@ export const compareStartMood = (
   const steady = groupOf(observations, STEADY_SCORES);
   const rattled = groupOf(observations, RATTLED_SCORES);
 
-  const thin = (group: MoodGroup): boolean =>
-    group.sessions < MIN_SESSIONS_PER_GROUP || group.hours < MIN_HOURS_PER_GROUP;
+  /**
+   * Enough sessions and enough hours, which is also enough to have a rate.
+   *
+   * The narrowing is the point, and it is sound rather than asserted:
+   * `groupOf` sets `bbPerHour` to null only when `hours` is zero, and twelve
+   * hours is not zero. There used to be a separate `bbPerHour === null` guard
+   * below these two answering `'no-data'`, and it could not be reached --
+   * `hours <= 0` implies `hours < MIN_HOURS_PER_GROUP` for any real number, so
+   * the thinness guards took every case first. Coverage agreed: 672
+   * evaluations of that condition and no entries into its body.
+   *
+   * It was also the wrong blocker. `'no-data'` means "no usable sessions at
+   * all, so not even the groups exist", which is the empty-input case handled
+   * at the top of this function; at that point both groups have cleared five
+   * sessions and twelve hours.
+   */
+  const readable = (group: MoodGroup): group is MoodGroup & { bbPerHour: number } =>
+    group.sessions >= MIN_SESSIONS_PER_GROUP && group.hours >= MIN_HOURS_PER_GROUP;
 
-  if (thin(steady)) return unsettled(steady, rattled, 'thin-steady');
-  if (thin(rattled)) return unsettled(steady, rattled, 'thin-rattled');
-  if (steady.bbPerHour === null || rattled.bbPerHour === null) {
-    return unsettled(steady, rattled, 'no-data');
-  }
+  if (!readable(steady)) return unsettled(steady, rattled, 'thin-steady');
+  if (!readable(rattled)) return unsettled(steady, rattled, 'thin-rattled');
 
   const sigma = estimatePlayer(observations).stdDevBbPerHour;
   const difference = rattled.bbPerHour - steady.bbPerHour;

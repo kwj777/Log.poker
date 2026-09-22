@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 102 passed
-Tests:       2258 passed
+Test Suites: 103 passed
+Tests:       2264 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1180,6 +1180,7 @@ Tests:       2258 passed
   venues               7   which spellings of a room name are the same room
   importWarnings       6   what the import screen says about a file it could not use
   lintReach            6   which files npm run lint actually looks at
+  returnFocus          6   who the keyboard goes back to when a sheet closes
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
   settingsSeed         6   the demo set, and the one device it must not be written onto

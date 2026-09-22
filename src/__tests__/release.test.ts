@@ -261,7 +261,7 @@ describe('the build profiles', () => {
         env?: Record<string, string>;
       }
     >;
-    submit: Record<string, unknown>;
+    submit: Record<string, { ios?: { ascAppId?: string } }>;
   }
   const eas = json<Eas>('eas.json');
 
@@ -286,12 +286,23 @@ describe('the build profiles', () => {
     expect(eas.build.simulator?.distribution).toBe('internal');
   });
 
-  it('has a submit profile, even though its credentials are not in the repository', () => {
-    // Apple IDs and team IDs are account facts rather than project facts, and
-    // `eas submit` prompts for them. The empty profile is what makes
-    // `--profile production` a valid thing to type.
-    expect(eas.submit.production).toBeDefined();
-    expect(read('eas.json')).not.toMatch(/appleTeamId|ascAppId/);
+  it('names the app to submit to, and still no account of its own', () => {
+    // This profile was empty, on the reasoning that `eas submit` prompts for
+    // everything it needs. It does not prompt for this one. Before uploading
+    // anything it looks the app up on App Store Connect, and that lookup is a
+    // different Apple endpoint from the one that uploads: on 2026-09-22 it
+    // answered 403, "the API key in use does not allow this request", and the
+    // submission stopped before the binary was sent. `ascAppId` is the
+    // documented way past it, because a profile that names the app skips the
+    // lookup entirely.
+    //
+    // It belongs here in a way the other two do not. An App Store ID is a
+    // project fact: it identifies this app, it is public in every App Store
+    // URL, and log.poker will carry it in a smart app banner the day this is
+    // approved. An Apple ID and a team ID are facts about whoever is doing the
+    // submitting, so those stay out and `eas submit` goes on asking for them.
+    expect(eas.submit.production?.ios?.ascAppId).toBe('6814843842');
+    expect(read('eas.json')).not.toMatch(/appleTeamId|appleId/);
   });
 
   it('has a profile for screenshots, which neither of the other two could take', () => {

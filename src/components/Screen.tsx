@@ -48,6 +48,17 @@ interface ScreenProps {
 
 export const Screen = ({ children, scroll = true, footer, contentStyle }: ScreenProps) => {
   const insets = useSafeAreaInsets();
+  // **The top inset is this component's job and nothing else's.** Every route
+  // is drawn with `headerShown: false`, so there is no navigation bar above any
+  // of this to hold the status bar off, and the first element a screen renders
+  // starts at the very top of the window. On web that is invisible: a browser
+  // tab reports a zero top inset, and a browser is the only place this app had
+  // ever run. On a phone it put the Back control under the clock, drawn half
+  // occluded and not tappable at all, which is how this fails -- not a crash,
+  // a control that is simply gone.
+  //
+  // Padded on the root rather than inside the scroll, so nothing slides under
+  // the status bar on its way past. The background fills the inset either way.
   // The tab bar sits in normal flow below this screen and already absorbs the
   // bottom safe-area inset, so adding it here too would double the gap.
   const bottomInset = useHasTabBar() ? spacing.md : Math.max(insets.bottom, spacing.lg);
@@ -56,7 +67,7 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
   const body = <View style={[styles.column, contentStyle]}>{children}</View>;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.center}

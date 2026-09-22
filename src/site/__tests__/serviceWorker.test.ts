@@ -24,6 +24,7 @@ const SHELL = '<!doctype html><title>Log</title><body>the app</body>';
 interface Worker {
   navigate: (url: string) => Promise<Response>;
   cached: () => Promise<string[]>;
+  body: (url: string) => Promise<string | null>;
 }
 
 /**
@@ -97,6 +98,11 @@ const workerOver = (
       return answered;
     },
     cached: async () => [...shellCache.keys()],
+    /** What is under a key, which is the half a key list cannot see. */
+    body: async (url: string) => {
+      const held = shellCache.get(url);
+      return held === undefined ? null : await held.clone().text();
+    },
   };
 };
 
@@ -153,9 +159,17 @@ describe('a navigation to the app', () => {
 
   it('does not store an answer that said no', async () => {
     // A cache that took a 502 would serve it back after the incident ended.
+    //
+    // On the body, not on the key list. The shell is seeded here under the
+    // key the worker would write to, so a `put` hoisted out of the
+    // `if (response.ok)` guard overwrites the value and leaves the key list
+    // identical -- which this asserted, and which passes against a worker
+    // that has just cached the error page. The key list is kept beside it,
+    // because it is the one that catches a put under the wrong key.
     const worker = workerOver({ '/app/index.html': SHELL }, answering(502, 'Bad Gateway'));
     await worker.navigate('https://log.poker/app/');
 
+    expect(await worker.body('/app/index.html')).toBe(SHELL);
     expect(await worker.cached()).toEqual(['/app/index.html']);
   });
 });

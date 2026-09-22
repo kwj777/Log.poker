@@ -137,9 +137,14 @@ export interface Repository {
    *
    * The only read that can see a deleted row, and the seam the sync engine
    * plugs into: `updatedAt` is the cursor, so there is no sequence number for
-   * two devices to keep in step. Nothing in the app calls this yet. It exists
-   * now because tombstones are otherwise unobservable through this interface,
-   * and an invariant nothing can read is an invariant nothing can test.
+   * two devices to keep in step.
+   *
+   * It was written before there was a sync to plug in, "because tombstones are
+   * otherwise unobservable through this interface, and an invariant nothing
+   * can read is an invariant nothing can test." Every push calls it now --
+   * `SyncingRepository.run` reads the pending change set through it -- which
+   * is why `schema.ts` indexes for it and calls it "the read that runs after
+   * every write".
    */
   listChangedSince(since: Timestamp): Promise<ChangeSet>;
 

@@ -2,9 +2,17 @@
  * The auth layer's public entry point.
  *
  * Everything above this file asks for `getSession()` and gets whatever the
- * platform's store had, which is almost always null and is meant to be: Log is
- * free in its entirety, and a session buys one feature that does not exist yet.
- * Nothing in the app calls this today.
+ * platform's store had, which for most people is null and is meant to be: Log
+ * is free in its entirety and works signed out.
+ *
+ * What a session buys is real now, which this said it was not. Five modules
+ * import this file: `src/data/index.ts` composes the syncing repository behind
+ * a token and renews one at launch, `SignInCard` runs the sign-in,
+ * `app/claim.tsx` takes delivery of a hand-off, and the warm-up and
+ * after-session cards ask `hasPass` which of two sentences to show. The
+ * paragraph that used to be here -- "a session buys one feature that does not
+ * exist yet. Nothing in the app calls this today." -- was written before any
+ * of that shipped.
  */
 
 import { SessionManager } from './session';

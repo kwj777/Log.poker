@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2217 passed
+Tests:       2219 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1126,10 +1126,10 @@ Tests:       2217 passed
   editSession         24   correcting a session, including the one nobody cashed out
   writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price
+  compose             23   which repository a device gets, and the unsafe sweep
   handNotation        23   parse, round-trip, hand classes
   history             23   the session list, its filters, and how much of it mounts
   money               22   cents arithmetic, parsing, formatting
-  compose             21   which repository a device gets, and the unsafe sweep
   release             21   app.json, eas.json and the icon a store refuses over
   clock               20   a typed date, a typed length, and what neither will accept
   glossary            20   the shorthand on screen still matches its explanation

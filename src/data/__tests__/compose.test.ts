@@ -17,7 +17,7 @@
  * device the person owns.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { TOMBSTONE_RETENTION_MS, safeToCollect } from '../repository';
@@ -242,3 +242,53 @@ describe('the store listening for it', () => {
     expect(store).toMatch(/if \(listening\) return;\s*listening = true;/);
   });
 });
+
+/**
+ * Two headers that describe the app before it had a sign-in.
+ *
+ * Both said, in as many words, that nothing called them. `src/auth/index.ts`
+ * is imported by five shipped modules including the launch path, and
+ * `listChangedSince` runs on every push -- `schema.ts` indexes for it and
+ * calls it "the read that runs after every write".
+ *
+ * A comment saying a thing has no callers is the kind other files reason
+ * from, so it is worth a tripwire rather than a re-read in a year.
+ */
+describe('what the seams say about who uses them', () => {
+  const read = (...parts: string[]) =>
+    readFileSync(join(__dirname, '..', '..', ...parts), 'utf8');
+
+  /** A file with its JSDoc line markers taken out, so a sentence that wraps still reads as one. */
+  const prose = (...parts: string[]) => read(...parts).replace(/\n\s*\*/g, '');
+
+  /** Imports of `src/auth` from shipped code, which is what the header denies. */
+  const authCallers = () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(join(__dirname, '..', '..', '..', dir), { withFileTypes: true }).flatMap(
+        (entry) => {
+          const path = `${dir}/${entry.name}`;
+          if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+          return /\.tsx?$/.test(entry.name) ? [path] : [];
+        },
+      );
+    return [...walk('src'), ...walk('app')].filter((path) =>
+      /from '(\.\.\/)+(src\/)?auth'/.test(
+        readFileSync(join(__dirname, '..', '..', '..', path), 'utf8'),
+      ),
+    );
+  };
+
+  it('the auth entry point names its callers rather than denying them', () => {
+    // Both headers still quote the sentence they retired, which is the house
+    // habit and is why these read for the correction rather than the absence.
+    expect(authCallers().length).toBeGreaterThanOrEqual(5);
+    expect(prose('auth', 'index.ts')).toMatch(/Five modules import this file/);
+  });
+
+  it('and so does the read every push makes', () => {
+    expect(prose('data', 'repository.ts')).toMatch(/Every push calls it now/);
+    // The caller it denied.
+    expect(read('data', 'SyncingRepository.ts')).toContain('this.local.listChangedSince(');
+  });
+});
+

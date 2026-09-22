@@ -14,6 +14,8 @@ import { runRepositoryContract } from './repositoryContract';
 import { NodeSqliteDriver } from './support/nodeSqliteDriver';
 
 const drivers = new WeakMap<SqlRepository, NodeSqliteDriver>();
+const T0 = 1_700_000_000_000;
+let ids = 0;
 
 runRepositoryContract('SQLite', {
   create: async ({ ctx }) => {
@@ -91,4 +93,70 @@ describe('a log too big for one statement', () => {
     jest.restoreAllMocks();
     await driver.close();
   }, 60_000);
+});
+
+describe('what applying a sync answer reads', () => {
+  it('asks for the rows the answer names, not the tables they are in', async () => {
+    // `applyChanges` issued three unfiltered scans -- `SELECT id FROM venues`,
+    // `SELECT id, updated_at FROM sessions`, and `SELECT id FROM sessions`
+    // again after the inserts -- whatever the change set held, including one
+    // that held nothing. A synced write of a single rebuy paid all three
+    // against the whole log.
+    //
+    // Counted from the SQL rather than timed: the shape is the finding, and a
+    // statement with no `WHERE` on it is the shape.
+    const driver = new NodeSqliteDriver(':memory:');
+    const repository = new SqlRepository(driver, {
+      clock: { now: () => T0 },
+      ids: { next: () => `id-${++ids}` },
+    });
+    await repository.init();
+
+    const venue = await repository.createVenue({ name: 'Aria', isHomeGame: false });
+    const session = await repository.createSession({
+      venueId: venue.id,
+      format: 'cash',
+      gameType: 'NLHE',
+      stakes: { smallBlind: 100, bigBlind: 200 },
+      currency: 'USD',
+      buyIn: 30_000,
+      startedAt: T0,
+    });
+
+    const scans: string[] = [];
+    const all = driver.all.bind(driver);
+    jest.spyOn(driver, 'all').mockImplementation((sql, params) => {
+      const text = sql.replace(/\s+/g, ' ');
+      if (/FROM (sessions|venues)\b/.test(text) && !/WHERE/.test(text)) scans.push(text.trim());
+      return all(sql, params);
+    });
+
+    const empty = { venues: [], sessions: [], rebuys: [], hands: [], moodEntries: [] };
+    await repository.applyChanges(empty);
+    expect(scans).toEqual([]);
+
+    await repository.applyChanges({
+      ...empty,
+      rebuys: [
+        {
+          record: {
+            id: 'r1',
+            sessionId: session.id,
+            amount: 10_000,
+            at: T0,
+            createdAt: T0,
+            updatedAt: T0 + 1,
+          },
+          deletedAt: null,
+        },
+      ],
+    });
+    expect(scans).toEqual([]);
+
+    jest.restoreAllMocks();
+    // And it landed, which is what stops this passing by doing nothing.
+    expect((await repository.getSession(session.id))?.rebuys).toHaveLength(1);
+
+    await driver.close();
+  });
 });

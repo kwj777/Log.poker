@@ -1096,10 +1096,10 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2317 passed
+Tests:       2319 passed
 
-  dexieRepository    148   the IndexedDB path, against real IndexedDB
-  sqlRepository      145   the SQLite path, against real SQLite
+  dexieRepository    149   the IndexedDB path, against real IndexedDB
+  sqlRepository      146   the SQLite path, against real SQLite
   bundle              72   the server-side merge: two devices and one bundle
   sessionImport       67   reading a session-summary export
   site                67   the marketing/app split, the PWA, the sitemap

@@ -64,6 +64,15 @@ describe('what the stores identify this build by', () => {
     expect(json<{ version: string }>('package.json').version).toBe(app.version);
   });
 
+  it('ships iPhone only, which is what the screenshot set was cut down to match', () => {
+    // Decided for 1.0 and asserted because the two halves live apart: this
+    // flag decides what Apple reviews, and SUBMISSION.md decides what gets
+    // photographed. Turning it back on is one character and would silently
+    // leave the submission a whole size of screenshot short, which App Store
+    // Connect refuses at upload rather than at the edit that caused it.
+    expect(app.ios.supportsTablet).toBe(false);
+  });
+
   it('names the same bundle on both, which is the one thing that cannot change later', () => {
     expect(app.ios.bundleIdentifier).toBe('poker.log.app');
     expect(app.android.package).toBe('poker.log.app');

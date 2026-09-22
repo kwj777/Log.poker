@@ -94,10 +94,15 @@ piece that would have to be built for any of the paid options above.
 480pt column rather than a stretched phone screen. That renders sanely, it is
 just a lot of empty space.
 
-Leaving it on means Apple reviews iPad behavior and wants iPad screenshots.
-Turning it off is one line and ships iPhone-only for 1.0. Either is defensible.
-It is left on, because the layout demonstrably handles it, but it has not been
-seen on an actual iPad and should be before the screenshots are taken.
+**Decided on 2026-09-22: off, and 1.0 ships iPhone only.** Leaving it on meant
+Apple reviewing iPad behavior and wanting a second set of screenshots at 12.9
+inches, for a layout that renders correctly and has nothing to fill the space
+with. Nothing is lost that cannot be given back: it is one line, the layout
+still caps the same way, and an iPad build is a later release rather than a
+rewrite.
+
+`release.test.ts` holds it at `false` so it is not flipped back without the
+screenshot requirement being reconsidered at the same time.
 
 ### 3. The support mailbox
 
@@ -365,8 +370,8 @@ answers a question this app reliably raises.
 
 ## Screenshots
 
-Required at 6.7" (iPhone 15 Pro Max or similar). Add 12.9" iPad shots if
-`supportsTablet` stays `true`.
+Required at 6.7" (iPhone 15 Pro Max or similar), and that is the whole set:
+`supportsTablet` is `false`, so no iPad shots are needed. See decision 2.
 
 The screens worth showing, in the order they tell the story: the dashboard with
 a few sessions logged, a live session running, logging a hand, the variance

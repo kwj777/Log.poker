@@ -10,7 +10,7 @@
     "backgroundColor": "#1c211f",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "poker.log.app",
       "buildNumber": "1",
       "config": {

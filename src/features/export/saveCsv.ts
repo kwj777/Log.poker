@@ -7,14 +7,11 @@
  * happens to it after that is the operating system's business, which is the
  * point: Log does not need to know, and does not want to.
  *
- * ## Why this one gets a dependency and the import picker did not
- *
- * `pickCsvFile.ts` declined two native modules on the argument that nobody
- * keeps their tracker exports on a phone, and pasting works everywhere. The
- * asymmetry is deliberate rather than an oversight. **Your log is on your
- * phone.** Getting it off is the whole feature, there is nothing to paste
- * from, and an export that only worked in a browser would be an export the
- * players who use the app most cannot reach.
+ * This section used to explain why export got a native module and the import
+ * picker did not. There is no asymmetry left to explain: `pickCsvFile.ts` now
+ * opens a file too, on the picker `expo-file-system` gained, so both halves of
+ * the round trip work on a phone and neither costs a dependency this file had
+ * not already paid for.
  *
  * ## The cache directory, not documents
  *

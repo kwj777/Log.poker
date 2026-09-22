@@ -20,8 +20,13 @@ export const CAN_PICK_FILE = true;
 
 const ACCEPT = '.csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain';
 
+/**
+ * `null` means the player backed out, and nothing else. A file that cannot be
+ * read throws, because the alternative is a picker that takes a choice and
+ * leaves the screen unchanged, which reads as the app ignoring the tap.
+ */
 export const pickCsvFile = (): Promise<PickedFile | null> =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = ACCEPT;
@@ -37,7 +42,7 @@ export const pickCsvFile = (): Promise<PickedFile | null> =>
       }
       const reader = new FileReader();
       reader.onload = () => resolve({ name: file.name, text: String(reader.result ?? '') });
-      reader.onerror = () => resolve(null);
+      reader.onerror = () => reject(new Error(`${file.name} could not be read.`));
       reader.readAsText(file);
     });
 

@@ -109,8 +109,13 @@ sends mail: `netlify/functions/signin.mts` sends from `signin@log.poker` and
 submission.** App Review uses the support address. One that bounces is worse
 than none. A forward to a real inbox is enough.
 
-A Spacemail mailbox was bought for it on 2026-09-22. Spaceship is only where
-the values are read from: log.poker's nameservers are Netlify's
+A Spacemail mailbox was bought for it on 2026-09-22 and **all four records
+below were published that afternoon and verified against Cloudflare's and
+Google's resolvers**, including that the 2048 bit DKIM key reassembles whole,
+which is the failure a DNS panel hides. What is still outstanding is the only
+part DNS cannot answer: a message sent from off the domain, arriving.
+
+Spaceship is only where the values are read from: log.poker's nameservers are Netlify's
 (`dns1.p02.nsone.net` and its three siblings), so the records go in Netlify
 under Domains, log.poker, DNS records.
 
@@ -146,6 +151,11 @@ over.
 Then prove it. Mail the address from somewhere unrelated and watch it arrive,
 because a mailbox that does not receive looks exactly like one that does until
 App Review writes to it.
+
+Not needed for any of the above, and listed only so it is not mistaken for a
+missing step: an SRV record at `_autodiscover._tcp` of `0 0 443
+autoconfig.spacemail.com` lets mail clients configure themselves. It has
+nothing to do with whether mail arrives.
 
 ---
 

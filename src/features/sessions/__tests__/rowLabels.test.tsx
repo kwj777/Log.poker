@@ -63,21 +63,15 @@ describe('a session in a list', () => {
     expect(name).not.toContain('+$');
   });
 
-  it('and is the same whether it is a row or a card on its own', async () => {
-    // Two branches, one label. They were written out twice and are the kind of
-    // pair that drifts, so they are drawn together and compared.
-    await render(
-      <>
-        <SessionRow session={session('s1')} onPress={() => undefined} />
-        <SessionRow session={session('s1')} standalone onPress={() => undefined} />
-      </>,
-    );
-    const [inline, standalone] = screen
-      .getAllByRole('button')
-      .map((row) => String(row.props.accessibilityLabel));
-
-    expect(standalone).toBe(inline);
-    expect(inline).toContain('+$150');
+  it('carries the result the row shows', async () => {
+    // This used to draw the row twice, once with a `standalone` prop, and
+    // assert the two labels matched -- under a comment saying the pair "were
+    // written out twice and are the kind of pair that drifts". They were not:
+    // there was one `spoken` binding and both branches passed it, so the
+    // comparison could not fail for the reason given. The prop had no call
+    // site either, and is gone. What is left is the part that was doing work.
+    await render(<SessionRow session={session('s1')} onPress={() => undefined} />);
+    expect(nameOf()).toContain('+$150');
   });
 });
 

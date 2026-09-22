@@ -149,7 +149,26 @@ export default function EditSessionScreen() {
    */
   const live = session.endedAt === null && activeSession?.id === session.id;
 
-  const startedAt = parseDateTime(form.date, form.time);
+  /**
+   * The instant the session already had, unless one of the two fields moved.
+   *
+   * Re-parsing what was just printed is not a round trip on the one wall-clock
+   * hour a year that happens twice. In a DST-observing zone, 01:30 on the
+   * morning the clocks go back names two instants and `formatTimeInput` prints
+   * the same "01:30" for both; `parseDateTime` has to pick one, and it picks
+   * the first. So Save on the second one moved the session an hour earlier
+   * without anybody touching a field, and moved its end with it, because the
+   * end is recomputed as start plus length.
+   *
+   * Nothing in `clock.ts` can fix that -- the two fields genuinely do not say
+   * which hour is meant -- so the screen keeps what it was given instead.
+   * Comparing the text rather than the parse, because the text is what the
+   * player either edited or did not.
+   */
+  const untouched =
+    form.date === formatDateInput(session.startedAt) &&
+    form.time === formatTimeInput(session.startedAt);
+  const startedAt = untouched ? session.startedAt : parseDateTime(form.date, form.time);
   const buyIn = parseAmount(form.buyIn);
   const cashOut = form.cashOut.trim() === '' ? null : parseAmount(form.cashOut);
   const length = live ? null : fromHoursAndMinutes(form.hours, form.minutes);

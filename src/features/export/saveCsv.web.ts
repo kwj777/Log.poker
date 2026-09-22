@@ -16,8 +16,6 @@ export interface SaveResult {
   saved: boolean;
 }
 
-export const CAN_SAVE_FILE = true;
-
 export const saveCsv = async (name: string, text: string): Promise<SaveResult> => {
   // `text/csv;charset=utf-8` and the BOM the writer puts in front, because
   // between them they are what stops Excel reading an accented venue name as

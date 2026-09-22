@@ -335,6 +335,24 @@ describe('parseSessionCsv', () => {
       expect(messages(parseSessionCsv(csv))).toContain('2 rows read as a tournament');
     });
 
+    it('and counts them the same way twice in the same sentence', () => {
+      // Four of these warnings counted their rows and then disagreed with
+      // themselves: "3 rows was read that way", "3 rows gave itself away",
+      // "1 session had no duration. They count toward profit". Each was right
+      // at one end of the count and wrong at the other, which is why none of
+      // them reads oddly in whichever case somebody happened to look at.
+      const byField = 'Date,Buyin,Prize,Entrants\n2024-01-15,$100,$0,210\n2024-01-16,$100,$0,90\n';
+      expect(messages(parseSessionCsv(byField))).toContain('2 rows gave themselves away');
+
+      const byFee = 'Date,Buyin,Prize,Entry fee\n2024-01-15,$100,$0,$10\n2024-01-16,$100,$0,$10\n';
+      expect(messages(parseSessionCsv(byFee))).toContain('2 rows were read that way');
+
+      const one = 'Date,Buyin,Prize,Entrants\n2024-01-15,$100,$0,210\n';
+      const said = messages(parseSessionCsv(one));
+      expect(said).toContain('1 row gave itself away');
+      expect(said).toContain('1 session had no duration. It counts toward profit');
+    });
+
     it('infers a tournament from a field size when no format column says so', () => {
       const inferred = 'Date,Buyin,Prize,Entrants\n2024-01-15,$100,$0,210\n';
       expect(parseSessionCsv(inferred).sessions[0].draft.format).toBe('tournament');
@@ -581,7 +599,7 @@ describe('a row that ends exactly where it starts', () => {
     for (const row of reading.sessions) {
       expect(row.draft.endedAt).toBe(row.draft.startedAt);
     }
-    expect(messages(reading)).toContain('2 sessions had no duration');
+    expect(messages(reading)).toContain('2 sessions had no duration. They count toward profit');
   });
 
   it('and a row with real hours on it is not', () => {

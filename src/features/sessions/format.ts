@@ -17,6 +17,33 @@ export const formatSessionDate = (timestamp: number, now: number = Date.now()): 
 export const formatTimeOfDay = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
+/**
+ * `Sat 12 Apr - 11:40 PM`, or `Sat 12 Apr - 2:15 AM Sun 13 Apr` when it ran
+ * past midnight.
+ *
+ * The end used to be a bare time of day, which on a night that crossed
+ * midnight read "10:00 PM - 4:00 PM": a range that appears to run backwards,
+ * on a screen whose whole subject is one night. Overnight is not a corner here
+ * -- `active.tsx` treats twelve hours as the point at which a session is
+ * probably a forgotten timer, which is to say eleven is a session somebody
+ * really played, and the edit screen's own copy is about a phone that went in
+ * a pocket until the next afternoon.
+ *
+ * The duration tile below it was right the whole time, so nobody was misled
+ * about how long they sat. They were misled about what the header said.
+ */
+export const formatSessionSpan = (
+  startedAt: number,
+  endedAt: number | null,
+  now: number = Date.now(),
+): string => {
+  const started = `${formatSessionDate(startedAt, now)} · ${formatTimeOfDay(startedAt)}`;
+  if (endedAt === null) return started;
+  const sameDay = new Date(endedAt).toDateString() === new Date(startedAt).toDateString();
+  const ended = formatTimeOfDay(endedAt);
+  return sameDay ? `${started} - ${ended}` : `${started} - ${formatSessionDate(endedAt, now)} · ${ended}`;
+};
+
 /** `Today`, `Yesterday`, or the date -- how a player refers to their own sessions. */
 export const formatRelativeDay = (timestamp: number, now: number = Date.now()): string => {
   const startOfDay = (value: number): number => {

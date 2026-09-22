@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { GAME_TYPE_LABELS } from '../../types';
 import {
   detectDateOrder,
   durationUnitFromHeader,
@@ -311,6 +315,16 @@ describe('parseGameType', () => {
   it('files fixed-limit hold’em under OTHER rather than mislabelling it', () => {
     expect(parseGameType("Limit Hold'em")).toBe('OTHER');
     expect(parseGameType("Fixed Limit Hold'em")).toBe('OTHER');
+  });
+
+  it('for a reason that does not rest on a label the app stopped showing', () => {
+    // The docstring defending that classification said the label on `NLHE`
+    // "reads No-Limit Hold'em on screen". It reads "NLHE", and `types.ts`
+    // argues in as many words that the spelled-out name is "a chip nobody can
+    // fit next to a stake" -- so the reason had been refuted one file over
+    // while the rule it defends stayed right.
+    expect(GAME_TYPE_LABELS.NLHE).toBe('NLHE');
+    expect(readFileSync(join(__dirname, '..', 'values.ts'), 'utf8')).not.toContain('No-Limit Hold');
   });
 
   it('files anything else under OTHER, and an empty cell under nothing', () => {

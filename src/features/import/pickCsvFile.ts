@@ -28,8 +28,6 @@ export interface PickedFile {
   text: string;
 }
 
-export const CAN_PICK_FILE = true;
-
 /**
  * Wide on purpose.
  *

@@ -10,6 +10,9 @@
  * guard visible.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { render } from '@testing-library/react-native';
 import { Platform } from 'react-native';
 
@@ -50,5 +53,21 @@ describe('page metadata', () => {
     await render(<PageMeta title="Sessions · Log" description="anything" />);
 
     expect(mockHeadRendered).toHaveBeenCalled();
+  });
+
+  it('and is the only thing setting one, so the router carries no titles', () => {
+    // `_layout.tsx` carried eleven `title:` options under a comment saying
+    // expo-router writes them to `document.title` on the web. It does not:
+    // `ExpoRoot` passes `documentTitle: { enabled: false }` and the fork's
+    // `useDocumentTitle` returns before either write. Confirmed in the
+    // shipped bundle, where that object is emitted as `{enabled:!1}`.
+    //
+    // They cost nothing and were never read, which is why one had already
+    // drifted: the layout said "Log a hand · Log" where `session/hand.tsx`
+    // emits "Edit hand · Log" on the edit path. A second copy of a string
+    // nobody reads is a second copy that can disagree.
+    const layout = readFileSync(join(__dirname, '..', '..', '..', 'app', '_layout.tsx'), 'utf8');
+    expect(layout).not.toMatch(/\btitle:/);
+    expect(layout).toContain('<PageMeta');
   });
 });

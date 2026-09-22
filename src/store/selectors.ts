@@ -34,8 +34,28 @@ export const selectSessionById = (
  * this, so the two did disagree about exactly one field: a filter that said
  * cash games got every tournament as well here, and silently, because an
  * ignored filter draws no error.
+ *
+ * `limit` was the same thing a second time and went unnoticed because no
+ * caller passes one yet. It is honored now, with the engines' own clamp, and
+ * the field set is pinned rather than described: `selectors.test.ts` walks
+ * `SessionFilter`'s keys and asks each one to change an answer.
+ *
+ * Taking the first N works because the array handed in is the one the store
+ * holds, which came from `listSessions()` in `started_at DESC, id DESC` order
+ * -- the order the engines apply their own `LIMIT` in. A caller that re-sorts
+ * before filtering would get a different N sessions, and so would the
+ * repository.
  */
 export const filterSessions = (
+  sessions: readonly SessionWithChildren[],
+  filter: SessionFilter,
+): SessionWithChildren[] => {
+  const capped = cappedAt(filter.limit);
+  const matching = matches(sessions, filter);
+  return capped === null ? matching : matching.slice(0, capped);
+};
+
+const matches = (
   sessions: readonly SessionWithChildren[],
   filter: SessionFilter,
 ): SessionWithChildren[] =>
@@ -49,3 +69,12 @@ export const filterSessions = (
     if (filter.status === 'completed' && session.endedAt === null) return false;
     return true;
   });
+
+/**
+ * The engines' clamp, to the letter, so the three cannot disagree on a limit
+ * that is negative, fractional or not a number. `Math.floor(NaN)` is NaN, and
+ * a limit that is not a number is no limit -- which is what a missing one
+ * already means.
+ */
+const cappedAt = (limit: number | undefined): number | null =>
+  Number.isFinite(limit as number) ? Math.max(0, Math.floor(limit as number)) : null;

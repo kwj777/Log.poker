@@ -62,6 +62,3 @@ export const tokenStore = {
     }
   },
 } satisfies TokenStore;
-
-/** Named in Settings, so a bug report says which store it hit. */
-export const TOKEN_STORE = 'Keychain (expo-secure-store)';

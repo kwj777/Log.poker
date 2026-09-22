@@ -20,6 +20,7 @@ import { session } from '../support/sessions';
 import type { Hand, MoodEntry } from '../../domain/types';
 import { router } from 'expo-router';
 
+import { formatSessionDate, formatTimeOfDay } from '../../features/sessions/format';
 import SessionDetailScreen from '../../../app/session/[id]';
 import { useLogStore } from '../../store/useLogStore';
 
@@ -112,6 +113,41 @@ describe('what the header calls the game', () => {
     load([], { sessions: [session('s1', { gameType: 'PLO' })] });
     await renderScreen(<SessionDetailScreen />);
     expect(screen.getByText(/\$1\/\$2 · PLO$/)).toBeTruthy();
+  });
+});
+
+describe('the line above the result', () => {
+  /** The overline, which is the only line carrying a time of day. */
+  const headerLine = (startedAt: number): string =>
+    String(screen.getByText(new RegExp(formatTimeOfDay(startedAt))).props.children);
+
+  /** 10pm to 4pm the next day, in whatever zone the runner is in. */
+  const overnight = () => {
+    const startedAt = new Date(2026, 8, 21, 22, 0).getTime();
+    return { startedAt, endedAt: new Date(2026, 8, 22, 16, 0).getTime() };
+  };
+
+  it('names the day a session finished on, when it is not the day it started', async () => {
+    // It printed the bare time of day, so an eighteen-hour night read
+    // "10:00 PM - 4:00 PM" -- a range that appears to run backwards, on the
+    // screen whose whole subject is that one night. The duration tile below
+    // was right throughout, which is why this survived: nobody was wrong
+    // about how long they sat, only about what the header said.
+    load([], { sessions: [session('s1', overnight())] });
+    await renderScreen(<SessionDetailScreen />);
+
+    const { startedAt, endedAt } = overnight();
+    expect(headerLine(startedAt)).toContain(formatSessionDate(startedAt));
+    expect(headerLine(startedAt)).toContain(formatSessionDate(endedAt));
+  });
+
+  it('and does not repeat the day when the night ended on it', async () => {
+    const startedAt = new Date(2026, 8, 21, 19, 0).getTime();
+    load([], { sessions: [session('s1', { startedAt, endedAt: startedAt + 4 * 3_600_000 })] });
+    await renderScreen(<SessionDetailScreen />);
+
+    const printed = headerLine(startedAt).split(formatSessionDate(startedAt));
+    expect(printed).toHaveLength(2);
   });
 });
 

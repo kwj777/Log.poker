@@ -35,6 +35,7 @@ import {
   currenciesUsed,
   formatDuration,
   inCurrency,
+  MS_PER_HOUR,
   totals,
 } from '../../src/domain/stats';
 import { formatRoi, tournamentTotals } from '../../src/domain/tournaments';
@@ -43,7 +44,7 @@ import { ReviewFlagged } from '../../src/features/family/ReviewFlagged';
 import { reviewPrompt } from '../../src/features/family/reviewPrompt';
 import { SessionRow } from '../../src/features/sessions/SessionRow';
 import { useEntryResults, useRoiInterval } from '../../src/features/sessions/useRoiInterval';
-import { useElapsed } from '../../src/features/sessions/LiveTimer';
+import { useElapsed, useNow } from '../../src/features/sessions/LiveTimer';
 import { useHandsForSession, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
 import { APP_DESCRIPTION, PageMeta } from '../../src/components/PageMeta';
@@ -267,15 +268,27 @@ export default function DashboardScreen() {
   }, [sessions, activeSession]);
 
   /**
-   * Read once on mount rather than during render, the way History reads its
-   * period window: a clock that moves every frame would re-derive the prompt
-   * constantly, and the one boundary it could cross is a week away.
+   * An hour's resolution, rather than the mount's.
+   *
+   * This read the clock once on mount, on the argument that "the one boundary
+   * it could cross is a week away". The boundary is a week from the session's
+   * end, not from the app opening, so what is left of it is whatever is left:
+   * open the dashboard an hour before a prompt expires and it is still there
+   * two hours later, because nothing moved the clock. The tab never unmounts
+   * -- `(tabs)` keeps every screen mounted once focused -- so on a laptop left
+   * open that is until the page is reloaded.
+   *
+   * An hour is far finer than a seven-day window needs and coarse enough that
+   * the memo below is not re-derived for nothing. `useNow` is the live timer's
+   * clock, which already reads the wall clock again when the app comes back to
+   * the front: a phone in a pocket suspends the interval, and that is the
+   * event this most needs.
    */
-  const [openedAt] = useState(() => Date.now());
+  const now = useNow(MS_PER_HOUR);
   const lastFinishedHands = useHandsForSession(lastFinished?.id ?? null);
   const prompt = useMemo(
-    () => reviewPrompt({ session: lastFinished, hands: lastFinishedHands, now: openedAt }),
-    [lastFinished, lastFinishedHands, openedAt],
+    () => reviewPrompt({ session: lastFinished, hands: lastFinishedHands, now }),
+    [lastFinished, lastFinishedHands, now],
   );
 
   const chartSeries = useMemo(

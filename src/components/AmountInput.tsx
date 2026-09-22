@@ -7,7 +7,7 @@
  * entry into a single tap.
  */
 
-import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { currencySymbol, formatMoney, parseAmount } from '../domain/money';
 import { colors, radius, spacing, typography } from '../theme';
@@ -68,9 +68,16 @@ export const AmountInput = ({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textTertiary}
-        // `decimal-pad` gives the big numeric keypad without a return key that
-        // would submit a half-typed amount.
-        keyboardType={Platform.OS === 'web' ? 'numeric' : 'decimal-pad'}
+        // `decimal` gives the big numeric keypad without a return key that
+        // would submit a half-typed amount, and a decimal separator that suits
+        // the device's locale.
+        //
+        // `inputMode` alone, because it is what both runtimes read: react
+        // native maps it through `inputModeToKeyboardTypeMap` and ignores
+        // `keyboardType` whenever it is set, and react-native-web tests it
+        // first and falls through to `keyboardType` only in its absence. The
+        // `keyboardType` beside this was dead on both, and on the web arm it
+        // asked for the worse of the two keyboards.
         inputMode="decimal"
         autoFocus={autoFocus}
         onSubmitEditing={onSubmitEditing}

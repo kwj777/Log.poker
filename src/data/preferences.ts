@@ -28,8 +28,6 @@ export const PREFERENCE_KEYS = ['startingBalance'] as const;
 
 export type PreferenceKey = (typeof PREFERENCE_KEYS)[number];
 
-export const DEFAULT_PREFERENCES: Preferences = { startingBalance: null };
-
 /**
  * A stored balance is money with a currency on it, so both have to be there.
  *

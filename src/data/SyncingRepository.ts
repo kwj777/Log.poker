@@ -214,6 +214,16 @@ export class SyncingRepository implements Repository {
   private epoch = 0;
   private failures = 0;
   private nextAttemptAt = 0;
+  /**
+   * The highest line this device has already swept its tombstones to.
+   *
+   * In memory rather than on the cursor record, deliberately: losing it costs
+   * one extra sweep on the next launch, and a sweep that removes nothing is
+   * exactly what this is here to skip. Persisting it would put a number that
+   * only ever saves work into the one record whose correctness a delete
+   * depends on.
+   */
+  private sweptThrough = 0;
   /** When `resume` last let a sync through. See `resume`. */
   private lastResumeAt = 0;
   /**
@@ -661,7 +671,24 @@ export class SyncingRepository implements Repository {
       outcome.response.collectedThrough,
       this.clock() - TOMBSTONE_RETENTION_MS,
     );
-    if (!batch.more && line > 0) await this.local.collectTombstones(line);
+    // **And only where the line has moved.** `collectedThrough` is zero until
+    // the server first collects something and never returns to zero after, so
+    // `line > 0` was true on every round from then on -- and `touched()`
+    // pushes after every local write. Every hand, rebuy and mood entry on a
+    // signed-in device was followed by a full sweep, which on the web engine
+    // is six whole-table reads: `sessions` twice, plus `hands`, `rebuys`,
+    // `moodEntries` and `venues`. Measured at 600 sessions and 3600 hands,
+    // that is 25ms of structured-clone churn and a `readwrite` transaction
+    // held over five tables, to remove nothing.
+    //
+    // Sweeping to a line already swept can only remove what was already
+    // removed, so the guard costs no tombstone. It is not on the critical
+    // path either way -- `touched` does not await the push -- but a lock over
+    // five tables can still delay a write that is.
+    if (!batch.more && line > this.sweptThrough) {
+      await this.local.collectTombstones(line);
+      this.sweptThrough = line;
+    }
 
     this.failures = 0;
     this.nextAttemptAt = 0;

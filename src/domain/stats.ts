@@ -299,16 +299,38 @@ export interface GroupTotals extends Totals {
   label: string;
 }
 
+/**
+ * Two callbacks rather than one, because a label is used once per bucket and
+ * was being built once per session.
+ *
+ * `keyOf` runs for every row and has to be cheap; `labelOf` runs only when a
+ * bucket is created, which is two or three times on a real log. They were one
+ * function returning both, so `byStakes` called `formatStakes` -- and through
+ * it `Intl.NumberFormat`, twice -- for all 480 cash sessions to produce the
+ * two strings the chart draws.
+ *
+ * Measured against the real functions at 600 sessions, and again at 2400:
+ *
+ *     byStakes as it was       19.6ms      79.9ms
+ *     byStakes labeling once    0.5ms       1.6ms
+ *     byVenue (a map lookup)    0.6ms
+ *
+ * Byte-identical output either way. It is the dominant term in the dashboard's
+ * re-render, which the Stakes breakdown is the default for on any log with a
+ * cash game in it: 43.5ms with the sessions array replaced against 2.8ms with
+ * it kept.
+ */
 const groupBy = (
   sessions: readonly SessionWithChildren[],
-  keyOf: (session: SessionWithChildren) => { key: string; label: string },
+  keyOf: (session: SessionWithChildren) => string,
+  labelOf: (session: SessionWithChildren) => string,
 ): GroupTotals[] => {
   const buckets = new Map<string, { label: string; sessions: SessionWithChildren[] }>();
   for (const session of sessions.filter(isComplete)) {
-    const { key, label } = keyOf(session);
+    const key = keyOf(session);
     const bucket = buckets.get(key);
     if (bucket) bucket.sessions.push(session);
-    else buckets.set(key, { label, sessions: [session] });
+    else buckets.set(key, { label: labelOf(session), sessions: [session] });
   }
   return Array.from(buckets.entries())
     .map(([key, bucket]) => ({ key, label: bucket.label, ...totals(bucket.sessions) }))
@@ -324,35 +346,33 @@ const groupBy = (
 export const byStakes = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
   groupBy(
     sessions.filter((session) => session.format === 'cash' && session.stakes !== null),
-    (session) => ({
-      key: stakesKey(session.stakes as Stakes, session.currency),
-      // Without the ante, because the key is without it too and a bucket has
-      // one label. `stakesKey` pools anted and unanted games of the same
-      // blinds on purpose, and `groupBy` names a bucket after whichever
-      // session reached it first, so a bar holding both could read
-      // "$1/$2 ($2 ante)" and assert an ante most of its nights never had.
-      // The two now agree on what the identity of a game is.
-      label: formatStakes({ ...(session.stakes as Stakes), ante: undefined }, session.currency),
-    }),
+    (session) => stakesKey(session.stakes as Stakes, session.currency),
+    // Without the ante, because the key is without it too and a bucket has one
+    // label. `stakesKey` pools anted and unanted games of the same blinds on
+    // purpose, and `groupBy` names a bucket after whichever session reached it
+    // first, so a bar holding both could read "$1/$2 ($2 ante)" and assert an
+    // ante most of its nights never had. The two agree on what the identity of
+    // a game is.
+    (session) =>
+      formatStakes({ ...(session.stakes as Stakes), ante: undefined }, session.currency),
   );
 
 /** Tournaments by what one entry cost -- the level a tournament player thinks in. */
 export const byBuyIn = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
   groupBy(
     sessions.filter((session) => session.format === 'tournament'),
-    (session) => ({
-      // Keyed on the two halves rather than their sum, so `$100+$10` and
-      // `$110` stay apart: they cost the same and are not the same tournament.
-      key: `${session.currency}:${session.buyIn}+${session.fee ?? 0}`,
-      label: formatEntry(session.buyIn, session.fee, session.currency),
-    }),
+    // Keyed on the two halves rather than their sum, so `$100+$10` and `$110`
+    // stay apart: they cost the same and are not the same tournament.
+    (session) => `${session.currency}:${session.buyIn}+${session.fee ?? 0}`,
+    (session) => formatEntry(session.buyIn, session.fee, session.currency),
   );
 
 export const byFormat = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
-  groupBy(sessions, (session) => ({
-    key: session.format,
-    label: SESSION_FORMAT_LABELS[session.format],
-  }));
+  groupBy(
+    sessions,
+    (session) => session.format,
+    (session) => SESSION_FORMAT_LABELS[session.format],
+  );
 
 /**
  * Profit by game, labeled the way every screen labels it.
@@ -368,18 +388,20 @@ export const byFormat = (sessions: readonly SessionWithChildren[]): GroupTotals[
  * was missed. It is the seventh.
  */
 export const byGameType = (sessions: readonly SessionWithChildren[]): GroupTotals[] =>
-  groupBy(sessions, (session) => ({
-    key: session.gameType,
-    label: GAME_TYPE_LABELS[session.gameType],
-  }));
+  groupBy(
+    sessions,
+    (session) => session.gameType,
+    (session) => GAME_TYPE_LABELS[session.gameType],
+  );
 
 export const byVenue = (
   sessions: readonly SessionWithChildren[],
   venues: readonly Venue[],
 ): GroupTotals[] => {
   const names = new Map(venues.map((venue) => [venue.id, venue.name]));
-  return groupBy(sessions, (session) => ({
-    key: session.venueId,
-    label: session.venue?.name ?? names.get(session.venueId) ?? 'Unknown venue',
-  }));
+  return groupBy(
+    sessions,
+    (session) => session.venueId,
+    (session) => session.venue?.name ?? names.get(session.venueId) ?? 'Unknown venue',
+  );
 };

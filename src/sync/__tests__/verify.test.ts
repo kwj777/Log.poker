@@ -9,6 +9,8 @@
  */
 
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   SUBJECT_PREFIX,
@@ -491,5 +493,32 @@ describe('the subject for an address', () => {
     const subject = await subjectForEmail(SECRET, EMAIL);
     expect(subject).not.toContain('player');
     expect(subject).not.toContain('example');
+  });
+});
+
+describe('which of the two doors the gates open', () => {
+  /**
+   * `checkToken`, both of them, and it has to stay that way.
+   *
+   * `verifyToken` is the same decision with the reason thrown away, and its
+   * docstring used to claim every caller wanting the gate came through it. No
+   * caller does: both gates want `checked.refused`, because the 401 on the
+   * wire says nothing on purpose and the reason in the deploy log is the only
+   * thing that tells whoever set the key apart from a stranger. Tidying
+   * either gate into the shorter call would read as a simplification and
+   * would silently cost that.
+   */
+  const gateOf = (relative: string): string =>
+    readFileSync(join(__dirname, '..', '..', ...relative.split('/')), 'utf8');
+
+  it.each([
+    ['sync/endpoint.ts', 'sync: refusing a token:'],
+    ['auth/signinEndpoint.ts', 'signin: refusing to renew a token:'],
+  ])('%s takes the reason and writes it down', (path, line) => {
+    const source = gateOf(path);
+    expect(source).toContain('await checkToken(');
+    expect(source).toContain(`console.error(\`${line}`);
+    expect(source).toContain('checked.refused');
+    expect(source).not.toContain('verifyToken');
   });
 });

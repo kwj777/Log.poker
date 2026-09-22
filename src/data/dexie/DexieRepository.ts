@@ -348,7 +348,26 @@ export class DexieRepository implements Repository {
         // No foreign keys here to throw, but the same skip: a session whose
         // venue never arrived would render with no venue at all, which is a
         // worse outcome than one row waiting for the next sync.
-        const known = new Set((await this.db.venues.toArray()).map((venue) => venue.id));
+        //
+        // By id, like `newerHere` above, rather than reading the table. This
+        // and the parent lookup below were whole-table reads whatever the
+        // change set held -- 600 structured clones to place one rebuy under
+        // its parent, and the same 600 for a change set containing nothing.
+        const present = async (ids: readonly string[]): Promise<Set<string>> => {
+          const found = new Set<string>();
+          if (ids.length === 0) return found;
+          for (const row of await this.db.sessions.bulkGet([...ids])) {
+            if (row !== undefined) found.add(row.id);
+          }
+          return found;
+        };
+        const wantedVenues = [...new Set(changes.sessions.map(({ record }) => record.venueId))];
+        const known = new Set<string>();
+        if (wantedVenues.length > 0) {
+          for (const row of await this.db.venues.bulkGet(wantedVenues)) {
+            if (row !== undefined) known.add(row.id);
+          }
+        }
 
         // What will actually be written, worked out before anything is,
         // because the import-key release below has to agree with it. A key
@@ -404,9 +423,16 @@ export class DexieRepository implements Repository {
           stored.add(record.id);
         }
 
+        // The parents the arriving children name, minus the ones just
+        // written. After the inserts, deliberately: a child can arrive in the
+        // same answer as its parent.
         const sessions = new Set([
           ...stored,
-          ...(await this.db.sessions.toArray()).map((session) => session.id),
+          ...(await present(
+            [...changes.rebuys, ...changes.hands, ...changes.moodEntries]
+              .map(({ record }) => record.sessionId)
+              .filter((id) => !stored.has(id)),
+          )),
         ]);
 
         const staleRebuys = await newerHere(this.db.rebuys, changes.rebuys);

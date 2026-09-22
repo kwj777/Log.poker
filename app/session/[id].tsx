@@ -31,7 +31,7 @@ import {
 import { HandRow } from '../../src/features/sessions/HandRow';
 import { MoodTimeline } from '../../src/features/sessions/MoodTimeline';
 import { PostSessionReset } from '../../src/features/sessions/PostSessionReset';
-import { formatSessionDate, formatTimeOfDay } from '../../src/features/sessions/format';
+import { formatSessionSpan } from '../../src/features/sessions/format';
 import {
   useHandsForSession,
   useLogStore,
@@ -169,8 +169,7 @@ export default function SessionDetailScreen() {
 
       <View style={styles.header}>
         <Text variant="overline" color={colors.textTertiary}>
-          {formatSessionDate(session.startedAt)} · {formatTimeOfDay(session.startedAt)}
-          {session.endedAt ? ` - ${formatTimeOfDay(session.endedAt)}` : ''}
+          {formatSessionSpan(session.startedAt, session.endedAt)}
         </Text>
         <Text variant="display" color={resultColor(net)}>
           {live ? 'In progress' : formatMoney(net ?? 0, { currency, signed: true })}

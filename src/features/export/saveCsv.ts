@@ -13,6 +13,14 @@
  * the round trip work on a phone and neither costs a dependency this file had
  * not already paid for.
  *
+ * ## No constant saying whether this works
+ *
+ * Both halves used to export `CAN_SAVE_FILE = true`, which nothing read and
+ * which could not have carried the difference anyway: a phone's ability to
+ * share is knowable at the moment of asking and not before, which is what
+ * `isAvailableAsync` is. So the answer is in `SaveResult.saved`, below, where
+ * the caller already has to look.
+ *
  * ## The cache directory, not documents
  *
  * A file the system may delete when it needs the space, which is right: this
@@ -40,8 +48,6 @@ export interface SaveResult {
    */
   saved: boolean;
 }
-
-export const CAN_SAVE_FILE = true;
 
 export const saveCsv = async (name: string, text: string): Promise<SaveResult> => {
   if (!(await isAvailableAsync())) return { saved: false };

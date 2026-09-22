@@ -29,7 +29,7 @@ import { Explain } from '../src/components/Explain';
 import { importGlossary } from '../src/domain/glossary';
 import { FIELD_LABELS, draftNet, parseSessionCsv, type ImportField } from '../src/domain/import';
 import { formatMoney } from '../src/domain/money';
-import { CAN_PICK_FILE, pickCsvFile } from '../src/features/import/pickCsvFile';
+import { pickCsvFile } from '../src/features/import/pickCsvFile';
 import { useLogStore, type ImportSummary } from '../src/store/useLogStore';
 import { colors, radius, resultColor, spacing, typography } from '../src/theme';
 
@@ -194,20 +194,16 @@ export default function ImportScreen() {
           result column or a buy-in and a cash-out. Stakes, site, game, duration and notes are
           used when they are there.
         </Text>
-        {CAN_PICK_FILE ? (
-          <Button
-            label={fileName ?? 'Choose a CSV file…'}
-            variant="secondary"
-            size="medium"
-            onPress={() => void choose()}
-          />
-        ) : null}
+        <Button
+          label={fileName ?? 'Choose a CSV file…'}
+          variant="secondary"
+          size="medium"
+          onPress={() => void choose()}
+        />
         <TextInput
           value={text}
           onChangeText={(next) => replaceText(next, null)}
-          placeholder={
-            CAN_PICK_FILE ? '…or paste the rows here' : 'Paste the rows here'
-          }
+          placeholder="…or paste the rows here"
           placeholderTextColor={colors.textTertiary}
           multiline
           autoCapitalize="none"

@@ -17,7 +17,7 @@
 
 import { SessionManager } from './session';
 import { renewToken } from './signin';
-import { tokenStore, TOKEN_STORE } from './tokenStore';
+import { tokenStore } from './tokenStore';
 
 let manager: SessionManager = new SessionManager(tokenStore);
 
@@ -45,11 +45,5 @@ export const renewIfDue = async (): Promise<boolean> =>
     })
     .catch(() => false);
 
-/** Test/dev hook: swap in another store, the way `setRepository` does. */
-export const setSessionManager = (next: SessionManager | null): void => {
-  manager = next ?? new SessionManager(tokenStore);
-};
-
-export { TOKEN_STORE };
 export * from './session';
 export * from './token';

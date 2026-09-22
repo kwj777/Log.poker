@@ -595,9 +595,9 @@ ${posts.map((post) => `    <item>
 /**
  * One sitemap, at the address robots.txt already names.
  *
- * `public/sitemap.xml` stays the hand-written truth for the front door and the
- * app, and the posts are appended to a copy of it here, so that publishing
- * never means remembering to edit a second file.
+ * `public/sitemap.xml` stays the hand-written truth for the front door, the app
+ * and the four guides, and the posts are appended to a copy of it here, so that
+ * publishing never means remembering to edit a second file.
  */
 const sitemap = (posts) => {
   const base = readFileSync(join(PUBLIC, 'sitemap.xml'), 'utf8');
@@ -755,5 +755,10 @@ write(join('sitemap', 'index.html'), page);
 
 console.log(
   `${TITLE}: ${posts.length} post${posts.length === 1 ? '' : 's'} at /blog` +
-  `${posts.length ? `, newest ${posts[0].slug}` : ''}, a feed, and ${posts.length + 2} sitemap entries`,
+  `${posts.length ? `, newest ${posts[0].slug}` : ''}, a feed, and ` +
+  // Counted out of the file rather than worked out again. This said
+  // `posts.length + 2`, which was the arithmetic when `public/sitemap.xml`
+  // held the front door and the app; it holds six URLs now, and the line
+  // under-reported by five without anything going wrong.
+  `${(xml.match(/<loc>/g) ?? []).length} sitemap entries`,
 );

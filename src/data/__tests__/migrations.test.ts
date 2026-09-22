@@ -9,6 +9,9 @@
  * version wrote, and then opened by the shipping code.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import 'fake-indexeddb/auto';
 
 import { Dexie } from 'dexie';
@@ -94,21 +97,6 @@ describe('SQLite: a v2 database upgraded to the current version', () => {
 
   it('keeps every session', async () => {
     expect(await repository.listSessions()).toHaveLength(2);
-  });
-
-  it('reads records written without the tombstone property as live', async () => {
-    // The asymmetry with SQLite: no migration added anything here, so these
-    // rows carry no `deletedAt` at all rather than a null one, and absent has
-    // to mean live or an upgrade hides the whole log.
-    const { sessions, venues } = await repository.listChangedSince(0);
-    expect(sessions.map((change) => change.record.id).sort()).toEqual(['s1', 's2']);
-    for (const change of [...sessions, ...venues]) expect(change.deletedAt).toBeNull();
-  });
-
-  it('can tombstone a migrated session, which frees its import key', async () => {
-    await repository.deleteSession('s2');
-    expect(await repository.listSessions()).toHaveLength(1);
-    expect(await repository.listImportKeys()).toEqual([]);
   });
 
   it('reads existing sessions as cash games', async () => {
@@ -389,6 +377,31 @@ describe('the migration list', () => {
       expect(indexes.some((sql) => sql.includes(`ON ${table}(updated_at)`))).toBe(true);
     }
     expect(indexes.some((sql) => sql.includes('preferences'))).toBe(false);
+  });
+});
+
+describe('what this file says it covers', () => {
+  it('names each test once, so a paste cannot double-count a block', () => {
+    // Three tests had been pasted out of the IndexedDB block into the SQLite
+    // one. Two ran twice under the same name, and one of them carried the
+    // other engine's comment: "no migration added anything here, so these rows
+    // carry no `deletedAt` at all rather than a null one" -- about a row shape
+    // SQLite cannot have, since migration 4 is five `ALTER TABLE`s and every
+    // migrated row really does get a NULL.
+    //
+    // Nothing failed and the README's count of 32 was honest. What was not
+    // honest is a list of test names advertising more upgrade coverage than
+    // there was.
+    // Within one block, not across the file: the two engines deliberately
+    // answer some of the same questions under the same name, and that parallel
+    // is the point of running both.
+    const source = readFileSync(join(__dirname, 'migrations.test.ts'), 'utf8');
+    const blocks = source.split(/^describe\(/m).slice(1);
+    expect(blocks.length).toBeGreaterThan(1);
+    for (const block of blocks) {
+      const names = [...block.matchAll(/^ {2}it\('([^']+)'/gm)].map(([, name]) => name);
+      expect([...new Set(names)]).toHaveLength(names.length);
+    }
   });
 });
 

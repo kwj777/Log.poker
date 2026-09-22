@@ -34,10 +34,13 @@ const temporary = (): string => {
   return directory;
 };
 
+/** What the build printed when it last ran, which is its own account of itself. */
+let said = '';
+
 /** Runs the real build. `posts` points it at fixtures instead of content/blog. */
 const build = (posts?: string): string => {
   const out = temporary();
-  execFileSync('node', posts ? [SCRIPT, out, posts] : [SCRIPT, out], { encoding: 'utf8' });
+  said = execFileSync('node', posts ? [SCRIPT, out, posts] : [SCRIPT, out], { encoding: 'utf8' });
   return out;
 };
 
@@ -62,6 +65,7 @@ const refusal = (posts: string): string => {
 };
 
 const site = build();
+const summary = said;
 const index = readFileSync(join(site, 'blog', 'index.html'), 'utf8');
 const feed = readFileSync(join(site, 'blog', 'feed.xml'), 'utf8');
 const sitemap = readFileSync(join(site, 'sitemap.xml'), 'utf8');
@@ -248,10 +252,21 @@ describe('the blog is findable', () => {
 
   it('adds itself and its posts to the one sitemap robots.txt names', () => {
     const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-    // The two the hand-written public/sitemap.xml maintains, then the blog.
+    // The hand-written public/sitemap.xml first -- the front door, the app and
+    // the four guides -- then the blog.
     expect(locs.slice(0, 2)).toEqual(['https://log.poker/', 'https://log.poker/app']);
     expect(locs).toContain('https://log.poker/blog');
     for (const slug of published) expect(locs).toContain(`https://log.poker/blog/${slug}`);
+  });
+
+  it('and counts them honestly in the line it prints', () => {
+    // The summary said `posts.length + 2`, which was the arithmetic back when
+    // the hand-written sitemap held the front door and the app alone. It holds
+    // six URLs now, so the build reported 7 while writing 12 -- a line whose
+    // whole job is to be read by somebody deploying, quietly off by five.
+    const written = (sitemap.match(/<loc>/g) ?? []).length;
+    expect(summary).toContain(`${written} sitemap entries`);
+    expect(written).toBeGreaterThan(published.length + 2);
   });
 
   it('and lists the same pages again at /sitemap, for the people', () => {

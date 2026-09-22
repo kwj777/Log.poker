@@ -61,8 +61,8 @@ if (!existsSync(join(APP, 'index.html'))) {
 }
 
 // After the move, so /blog stays at the root rather than following the export
-// under /app. It also rewrites dist/sitemap.xml, adding the posts to the two
-// URLs public/sitemap.xml maintains by hand.
+// under /app. It also rewrites dist/sitemap.xml, adding the posts to the URLs
+// public/sitemap.xml maintains by hand.
 execFileSync('node', [join(ROOT, 'scripts', 'build-blog.mjs'), DIST], { cwd: ROOT, stdio: 'inherit' });
 
 console.log(`\n${moved.length} bundler outputs moved under /app: ${moved.join(', ')}`);

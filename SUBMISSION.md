@@ -148,9 +148,10 @@ are one permanent error, not a conflict anybody notices. The apex also carries
 a `google-site-verification` TXT that the SPF record goes next to rather than
 over.
 
-Then prove it. Mail the address from somewhere unrelated and watch it arrive,
-because a mailbox that does not receive looks exactly like one that does until
-App Review writes to it.
+**Proved on 2026-09-22: a message sent from off the domain arrived.** That was
+the last thing standing between this section and done, and it was worth doing
+rather than inferring, because a mailbox that does not receive looks exactly
+like one that does until App Review writes to it.
 
 Not needed for any of the above, and listed only so it is not mistaken for a
 missing step: an SRV record at `_autodiscover._tcp` of `0 0 443
@@ -181,19 +182,23 @@ file reads back.
    see decision 1 above. Capabilities stay editable after registration, so none
    of that had to be settled here.
 
-3. **A simulator build, which needs no signing.** This is the first time any of
-   this code will have run outside a browser:
+3. **A simulator build, which needs no signing.**
 
    ```
    npx eas build --platform ios --profile simulator
    ```
 
-   Expect to spend real time here. SQLite (`src/data/sql/expoSqliteDriver.ts`),
+   This step used to warn that the code had never run outside a browser and to
+   expect real time here. It ran on 2026-09-22, in the simulator through Expo
+   Go, and the warning was right: SQLite (`src/data/sql/expoSqliteDriver.ts`),
    SecureStore (`src/auth/tokenStore.ts`), haptics and the CSV share sheet
-   (`src/features/export/saveCsv.ts`) are all carefully written and none has
-   ever executed on a device.
+   (`src/features/export/saveCsv.ts`) all work, but three layout and platform
+   bugs no static audit could see turned up in the first hour and are fixed
+   (#95, #96, #97). What this build is now for is the things Expo Go cannot
+   answer: the real icon, the splash screen, and the app under its own bundle
+   identifier rather than Expo Go's.
 
-4. **A device build**, once enrollment clears:
+4. **A device build.** Nothing is waiting on enrollment; see step 1.
 
    ```
    npx eas build --platform ios --profile preview

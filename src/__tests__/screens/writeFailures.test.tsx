@@ -21,8 +21,9 @@
 import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
-import { session } from '../support/sessions';
+import { session, venue } from '../support/sessions';
 import LogHandScreen from '../../../app/session/hand';
+import NewSessionScreen from '../../../app/session/new';
 import ActiveSessionScreen from '../../../app/session/active';
 import SessionDetailScreen from '../../../app/session/[id]';
 import { useLogStore } from '../../store/useLogStore';
@@ -45,6 +46,18 @@ const replace = jest.requireMock('expo-router').router.replace as jest.Mock;
 jest.mock('../../data', () => ({
   getRepository: async () => ({ listHands: async () => [] }),
   onSyncApplied: () => () => undefined,
+}));
+
+/**
+ * Signed out, which is what the offers on these screens read.
+ *
+ * `PreSessionWarmUp` and `PostSessionReset` both ask the token store on mount,
+ * and the real one has nothing behind it here. Nothing in this file is about
+ * the pass; it just has to answer.
+ */
+jest.mock('../../auth', () => ({
+  getSession: async () => null,
+  hasPass: () => false,
 }));
 
 const full = () => new Error('The database is full.');
@@ -124,7 +137,12 @@ describe('a cash-out that will not save', () => {
     await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
     await userEvent.press(screen.getByText('End session'));
 
-    expect(await screen.findByText('The database is full.')).toBeTruthy();
+    // The sentence first and the detail after, which is the other way round
+    // from how they used to arrive: both of these were passed to
+    // `describeFailure` as its *fallback*, and that returns `error.message`
+    // whenever the thrown value carries one.
+    const said = await screen.findByText(/could not be closed out/);
+    expect(said).toHaveTextContent(/The database is full\./);
   });
 
   it('and keeps the sheet open, so the number is not retyped from memory', async () => {
@@ -136,7 +154,7 @@ describe('a cash-out that will not save', () => {
     await userEvent.type(screen.getByLabelText('Cash-out amount'), '450');
     await userEvent.press(screen.getByText('End session'));
 
-    await screen.findByText('The database is full.');
+    await screen.findByText(/could not be closed out/);
     expect(screen.getByText('End session')).toBeTruthy();
   });
 });
@@ -164,7 +182,17 @@ describe('a cash-out whose night closed and whose extras did not', () => {
     await userEvent.press(screen.getByText('End session'));
 
     expect(await screen.findByText('No session running')).toBeTruthy();
-    expect(screen.getByText('The database is full.')).toBeTruthy();
+
+    // And says which of the two failures this was. Everything that reaches
+    // this catch is an `Error` with a message -- a Dexie or SQLite quota or
+    // constraint error, or the repository's own, which build theirs in the
+    // constructor -- so as a fallback the chosen sentence was never once
+    // reached. Ten lines of reasoning about telling these apart, resolving
+    // always to a raw storage error: the player was not told the night did
+    // close, or that what is missing is fixable in Edit.
+    const said = screen.getByText(/fix it in Edit/);
+    expect(said).toHaveTextContent(/The session was closed/);
+    expect(said).toHaveTextContent(/The database is full\./);
   });
 });
 
@@ -414,5 +442,62 @@ describe('when nothing has gone wrong', () => {
     ready({ logHand: (async () => ({ id: 'h1' })) as never });
     await renderScreen(<LogHandScreen />);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('a session that started and could not be read back', () => {
+  /**
+   * The write lands, the re-read after it does not.
+   *
+   * `startSession` will not fail the call for that, deliberately: the session
+   * is committed before the refresh runs, and failing it is what used to put
+   * the Start button back and let somebody write the night a second time. So
+   * this arrives at the screen as a resolved promise and an empty store.
+   */
+  const stranded = (refresh = jest.fn(async () => false)) =>
+    ready({
+      venues: [venue('v1', 'Aria')],
+      sessions: [],
+      activeSession: null,
+      startSession: (async () => session('s2')) as never,
+      refresh: refresh as never,
+    });
+
+  it('stays put rather than opening a screen that says it is not running', async () => {
+    stranded();
+    await renderScreen(<NewSessionScreen />);
+
+    await userEvent.press(screen.getByText(/^Start \$/));
+
+    // `/session/active` reads `activeSession` from the store, so replacing
+    // this screen would land on "No session running" about a session that is
+    // running -- from which the one obvious move writes a second live one.
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByText(/could not be read back/)).toBeTruthy();
+  });
+
+  it('and takes Start away, because pressing it again is the whole disaster', async () => {
+    stranded();
+    await renderScreen(<NewSessionScreen />);
+
+    await userEvent.press(screen.getByText(/^Start \$/));
+
+    expect(screen.queryByText(/^Start \$/)).toBeNull();
+    expect(screen.getByText('Open your session')).toBeTruthy();
+  });
+
+  it('and opens it once the read lands', async () => {
+    const refresh = jest.fn(async () => {
+      useLogStore.setState({ activeSession: session('s2') });
+      return true;
+    });
+    stranded(refresh);
+    await renderScreen(<NewSessionScreen />);
+    await userEvent.press(screen.getByText(/^Start \$/));
+
+    await userEvent.press(screen.getByText('Open your session'));
+
+    expect(refresh).toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith('/session/active');
   });
 });

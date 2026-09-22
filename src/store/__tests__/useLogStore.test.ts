@@ -280,3 +280,50 @@ describe('a preference written while a reload is in the air', () => {
     expect(useLogStore.getState().startingBalance).toEqual({ cents: 500_000, currency: 'USD' });
   });
 });
+
+describe('a read that does not land', () => {
+  /** The whole sessions slice refusing, which is what an unavailable database looks like. */
+  const readsFail = () => {
+    repository.listSessions.mockImplementation(async () => {
+      throw new Error('read failed');
+    });
+    repository.getActiveSession.mockImplementation(async () => {
+      throw new Error('read failed');
+    });
+  };
+
+  it('says so to its caller rather than only writing it down', async () => {
+    // `error` was the only record of this, and it has exactly one reader --
+    // the root layout, which now draws it as a banner over whatever is on
+    // screen. That is the right answer for a screen showing stale rows and the
+    // wrong one for a caller about to navigate on the strength of the re-read.
+    readsFail();
+
+    expect(await useLogStore.getState().refresh(['sessions'])).toBe(false);
+    expect(useLogStore.getState().error).toBe('read failed');
+    expect(useLogStore.getState().status).toBe('ready');
+  });
+
+  it('and says so when it does land, which is every other time', async () => {
+    expect(await useLogStore.getState().refresh(['sessions'])).toBe(true);
+    expect(useLogStore.getState().error).toBeNull();
+  });
+
+  it('still does not fail the write that already committed', async () => {
+    // The session is written before the refresh runs, and failing the call is
+    // what used to put the Start button back on `app/session/new.tsx` and let
+    // somebody write the night a second time. So `startSession` resolves, and
+    // the store is left not holding what it just wrote -- which is the state
+    // the screen has to notice for itself.
+    readsFail();
+
+    const session = await useLogStore
+      .getState()
+      .startSession({ venueId: 'v1', gameType: 'NLHE', buyIn: 30_000 });
+
+    expect(session).toEqual({ id: 's2', venueId: 'v1' });
+    expect(repository.createSession).toHaveBeenCalledTimes(1);
+    expect(useLogStore.getState().activeSession).toBeNull();
+  });
+});
+

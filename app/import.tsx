@@ -71,6 +71,37 @@ export default function ImportScreen() {
     };
   }, [reading]);
 
+  /**
+   * The reasons the parser wrote down, line by line.
+   *
+   * Outside both branches below, because the branch it used to live in is the
+   * one where it is least needed. `parseSessionCsv` reports an error whenever
+   * nothing survived -- "Nothing in that file could be read as a session." --
+   * and a file where every row was skipped is exactly that: a file the parser
+   * had a specific reason to reject on every line, and those reasons were
+   * computed and then thrown away. Month-name dates, Excel serials and a
+   * result column that is blank all land there, and the player was left with
+   * one generic sentence and a list of the column names.
+   */
+  const worthKnowing =
+    reading && reading.warnings.length > 0 ? (
+      <>
+        <SectionHeader title="Worth knowing" />
+        <Card>
+          {reading.warnings.map((warning, index) => (
+            <View key={`${warning.line}-${index}`} style={styles.warning}>
+              <Text variant="caption" color={colors.accent}>
+                {warning.line === null ? '•' : `Line ${warning.line}`}
+              </Text>
+              <Text variant="caption" color={colors.textSecondary} style={styles.warningBody}>
+                {warning.message}
+              </Text>
+            </View>
+          ))}
+        </Card>
+      </>
+    ) : null;
+
   const replaceText = (next: string, name: string | null) => {
     setText(next);
     setFileName(name);
@@ -170,6 +201,7 @@ export default function ImportScreen() {
               </Text>
             ) : null}
           </Card>
+          {worthKnowing}
         </>
       ) : null}
 
@@ -222,23 +254,7 @@ export default function ImportScreen() {
             ) : null}
           </Card>
 
-          {reading.warnings.length > 0 ? (
-            <>
-              <SectionHeader title="Worth knowing" />
-              <Card>
-                {reading.warnings.map((warning, index) => (
-                  <View key={`${warning.line}-${index}`} style={styles.warning}>
-                    <Text variant="caption" color={colors.accent}>
-                      {warning.line === null ? '•' : `Line ${warning.line}`}
-                    </Text>
-                    <Text variant="caption" color={colors.textSecondary} style={styles.warningBody}>
-                      {warning.message}
-                    </Text>
-                  </View>
-                ))}
-              </Card>
-            </>
-          ) : null}
+          {worthKnowing}
 
           <Button
             label={`Import ${reading.sessions.length} session${

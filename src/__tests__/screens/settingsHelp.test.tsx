@@ -37,6 +37,9 @@ jest.mock('../../features/export/saveCsv', () => ({
 jest.mock('../../data', () => ({
   getRepository: async () => ({ listSessions: async () => [], listHands: async () => [] }),
   onSyncApplied: () => () => undefined,
+  // No syncing repository, so this device is signed out and the reset copy
+  // says the log does not come back.
+  getSyncingRepository: async () => null,
   STORAGE_ENGINE: 'SQLite',
 }));
 

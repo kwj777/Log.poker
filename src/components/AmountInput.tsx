@@ -10,9 +10,30 @@
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { currencySymbol, formatMoney, parseAmount } from '../domain/money';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, layout, radius, spacing, typography } from '../theme';
 import { tapFeedback } from './haptics';
 import { Text } from './Text';
+
+/** What a preset draws at. Deliberately under a chip: it is the secondary control here. */
+const PRESET_HEIGHT = 40;
+
+/**
+ * The eight points it draws short of `layout.tapTarget`, made up in touch area.
+ *
+ * The same trade `Button.slopFor` makes and for the same reason: a preset is
+ * meant to look smaller than the field above it, and is not meant to be harder
+ * to hit than one. "The presets are the point", per the header, and they had
+ * the largest shortfall of any control in the app and no slop at all.
+ *
+ * **Vertical only.** Presets sit in a wrapping row a `spacing.sm` gap apart, so
+ * four points of slop each way would have neighbors overlapping in the middle
+ * and a tap aimed at $300 could land on $400 -- which, unlike a miss, writes a
+ * number the player did not choose.
+ */
+const PRESET_SLOP = {
+  top: Math.ceil((layout.tapTarget - PRESET_HEIGHT) / 2),
+  bottom: Math.ceil((layout.tapTarget - PRESET_HEIGHT) / 2),
+};
 
 interface AmountInputProps {
   value: string;
@@ -67,6 +88,7 @@ export const AmountInput = ({
               key={preset}
               accessibilityRole="button"
               accessibilityState={{ selected }}
+              hitSlop={PRESET_SLOP}
               onPress={() => {
                 tapFeedback();
                 onChangeText(String(preset / 100));
@@ -122,7 +144,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   preset: {
-    minHeight: 40,
+    minHeight: PRESET_HEIGHT,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,

@@ -318,6 +318,42 @@ const shortfall = (estimate: PlayerEstimate): string => {
   return parts.join(' and ');
 };
 
+/**
+ * Why this page has nothing to say, when the log is not empty but this model
+ * cannot read a single session in it.
+ *
+ * `toObservations` drops every tournament -- their results are a long tail
+ * carried by a handful of scores, and a Gaussian band over them would look
+ * authoritative and be wrong -- and drops any cash session whose blinds were
+ * never recorded, because a result in big blinds needs a big blind.
+ *
+ * So a player who only plays tournaments sits at `sessionCount: 0` and
+ * `totalHours: 0` forever, and the ordinary empty state told them to log
+ * "8 more sessions and around 20 more hours" -- a thing many of them had
+ * already done twice over, and a thing no amount of playing would ever change.
+ * The one instruction on the page was for a game they do not play.
+ *
+ * Returns null wherever the shortfall is the honest answer: an empty log, or
+ * one this model has read some of.
+ */
+export const nothingReadable = (
+  sessions: readonly SessionWithChildren[],
+  observations: readonly SessionObservation[],
+): { headline: string; body: string } | null => {
+  if (observations.length > 0) return null;
+  const complete = sessions.filter(isComplete);
+  if (complete.length === 0) return null;
+
+  const tournaments = complete.filter((session) => session.format === 'tournament').length;
+  return {
+    headline: 'Nothing to measure in big blinds yet',
+    body:
+      tournaments === complete.length
+        ? 'Every session you have logged is a tournament, and a tournament has no blinds to measure in. Their results are too lopsided for a band like this one to say anything honest about anyway. What is worth saying about them is below, as cashes and ROI.'
+        : 'This page works in big blinds, and none of the sessions logged so far carries them: a tournament has none to carry, and a cash game logged without its stakes has none recorded.',
+  };
+};
+
 const formatBb = (bb: number): string => `${bb >= 0 ? '+' : ''}${Math.round(bb)} bb`;
 
 const formatHours = (hours: number): string =>

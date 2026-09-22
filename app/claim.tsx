@@ -132,7 +132,7 @@ export default function ClaimScreen() {
           kind: 'failed',
           message:
             'Signing in from a link like this happens in a browser. Open it there, or sign in ' +
-            'below.',
+            'from Settings.',
         });
         return;
       }
@@ -142,8 +142,8 @@ export default function ClaimScreen() {
         setStage({
           kind: 'failed',
           message:
-            'There is nothing to sign in with on this link. Sign in below and this device picks ' +
-            'up where your account left off.',
+            'There is nothing to sign in with on this link. Sign in from Settings and this ' +
+            'device picks up where your account left off.',
         });
         return;
       }
@@ -211,7 +211,7 @@ export default function ClaimScreen() {
         kind: 'failed',
         message:
           'Something went wrong finishing the sign-in on this device. The link is used up now, ' +
-          'so sign in below and this device picks up where your account left off.',
+          'so sign in from Settings and this device picks up where your account left off.',
       });
     });
   }, [keep]);
@@ -248,7 +248,27 @@ export default function ClaimScreen() {
         {stage.kind === 'failed' ? (
           <View style={styles.stack}>
             <Text>{stage.message}</Text>
-            <Button label="Open your log" onPress={() => router.replace('/')} />
+            {/*
+              Every one of these messages ends by naming the sign-in, so the
+              screen carries the way to it. They used to say "sign in below"
+              and there was nothing below: `SignInCard` is mounted in
+              `app/(tabs)/settings.tsx` and in no other file, so the one
+              instruction on a screen somebody reaches only when their link
+              failed named a control that was not on it. The sign-in was two
+              taps away the whole time, which is worse rather than better --
+              the player is being told to look down.
+
+              `replace` rather than `push`, like the button under it: the code
+              in the fragment is spent and the URL has already been rewritten,
+              so leaving this route behind the Back gesture offers a second go
+              at a link that cannot work twice.
+            */}
+            <Button label="Sign in from Settings" onPress={() => router.replace('/settings')} />
+            <Button
+              label="Open your log"
+              variant="ghost"
+              onPress={() => router.replace('/')}
+            />
           </View>
         ) : null}
       </Card>

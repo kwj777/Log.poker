@@ -2,8 +2,21 @@
  * Build-time flags.
  *
  * `__DEV__` is defined by Metro on every platform (and by the web bundler), so
- * dev-only surfaces are stripped from a production bundle by dead-code
- * elimination rather than merely hidden at runtime.
+ * the constants below are decided while the bundle is built: in a production
+ * web build `IS_DEV` and `ALLOW_DEMO_SEED` both compile down to a literal
+ * `false` inside this module.
+ *
+ * That is as far as it goes, and the difference matters. Every export here
+ * leaves the module through a getter, and a use site in another file reads it
+ * through that getter, which the minifier will not fold. So
+ * `{ALLOW_DEMO_SEED ? <card /> : null}` survives as a runtime ternary, and
+ * everything on the branch that can never be taken ships with it: a real
+ * production bundle of this app contains the demo seeder, its venue names and
+ * the "Load demo data" button, and simply never draws them.
+ *
+ * So these flags hide; they do not strip. A `false` here means no player can
+ * reach the surface, not that the code is gone. Anything that must not run in
+ * a real build wants a second guard at the point where it would do the damage.
  */
 
 export const IS_DEV: boolean = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -23,8 +36,11 @@ export const ALLOW_DEMO_SEED = IS_DEV;
  * `/api/signin` mails a code to anybody who types an address, which is the
  * point of it and also the whole risk in it. If that is ever being abused, or
  * the mail costs something worth caring about, setting this to `false` takes
- * the card out of the next build and the endpoint keeps refusing on its own
- * limits meanwhile. One line, and it strips rather than hides.
+ * the card off the one screen that renders it, and the endpoint keeps refusing
+ * on its own limits meanwhile. One line, and there is nowhere left to reach
+ * the form. The card's code still ships either way, per the header above, so
+ * this is a switch on the door rather than a wall: what stops a request made
+ * some other way is the endpoint, not this.
  */
 export const ALLOW_SIGN_IN = true;
 

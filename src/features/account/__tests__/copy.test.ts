@@ -10,11 +10,11 @@
  * The card itself is not rendered here -- these tests run on plain ts-jest in
  * Node, with no React Native. What can be checked without a renderer is the
  * copy, which is where the rules are, and whether the card is wired up behind
- * the flag that keeps it out of production, which is a fact about a source
- * file. Both are checked, and neither needs a screen.
+ * the flag that keeps it off the screen, which is a fact about source files.
+ * Both are checked, and neither needs a screen.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CALLER_WINDOW_MS } from '../../../auth/signinEndpoint';
@@ -40,6 +40,28 @@ import {
 
 const ROOT = join(__dirname, '..', '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
+
+/**
+ * A source file with its comments taken out.
+ *
+ * So a comment quoting copy that was wrong is not itself read as copy. The
+ * question these tests ask is what a screen says, and a note explaining why it
+ * no longer says it is not part of the answer.
+ */
+const spoken = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+/** Every `.ts`/`.tsx` file under a directory, as paths relative to the root. */
+const sourcesUnder = (...parts: string[]): string[] => {
+  const walk = (dir: string): string[] =>
+    readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+      return /\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+
+  return walk(parts.join('/'));
+};
 
 const FAILURES: SignInFailure[] = ['rejected', 'throttled', 'unreachable'];
 
@@ -263,6 +285,18 @@ describe('what it says about the sync itself', () => {
     expect(state({ problem: 'unreachable', pending: 1 })).toMatch(/1 change is waiting/);
   });
 
+  it('and counts none as none, which is the commonest way to reach this line', () => {
+    // A signed-in device coming to the front offline, with nothing written
+    // since its last sync: `run()` announces `pending` before the request and
+    // records the failure after, so this is what an ordinary foreground on a
+    // train produces. It said "0 changes are waiting" -- a backlog of zero
+    // reported as a backlog, on the one line here whose job is to stop
+    // somebody wondering what is stuck.
+    const said = state({ problem: 'unreachable', pending: 0 });
+    expect(said).not.toMatch(/0 changes?/);
+    expect(said).toMatch(/nothing is lost/);
+  });
+
   it('asks for a sign-in when that is what is wrong, and does not blame the network', () => {
     const said = state({ problem: 'unauthorized' });
     expect(said).toMatch(/sign in again/);
@@ -285,12 +319,25 @@ describe('where the card is wired up', () => {
     expect(config).not.toMatch(/ALLOW_SIGN_IN = IS_DEV/);
   });
 
-  it('and the flag is a build-time constant, so turning it off strips the card', () => {
-    // Which is the difference between a kill switch and a hidden feature: a
-    // `false` here removes the card from the bundle rather than rendering it
-    // and declining to show it.
+  it('and the flag is the whole of what stands between a player and the form', () => {
+    // This used to be named for stripping, and checked neither. `IS_DEV` and
+    // the flags do fold to literals inside `src/config.ts`, but they leave it
+    // through getters and the minifier will not fold a use site across that,
+    // so a `false` here hides the card rather than removing it: a production
+    // bundle carries `SignInCard` and never draws it.
+    //
+    // What makes the switch a kill switch is the line below instead. Exactly
+    // one file renders the card, and that render is behind the flag, so there
+    // is no second way in for a `false` to miss. A new render site elsewhere
+    // is the thing that would make this claim false, so that is what is
+    // asserted -- not the word "strips", which was never true.
     expect(config).toContain('export const IS_DEV: boolean');
     expect(config).toMatch(/export const ALLOW_SIGN_IN = (true|false|IS_DEV);/);
+
+    const renders = [...sourcesUnder('app'), ...sourcesUnder('src')].filter((path) =>
+      /<SignInCard\s*\/>/.test(read(path)),
+    );
+    expect(renders).toEqual(['app/(tabs)/settings.tsx']);
   });
 
   it('signs out without touching the log', () => {
@@ -511,6 +558,28 @@ describe('carrying a purchase over from another app', () => {
     for (const failure of FAILURES) {
       expect(handoffFailed(failure)).toMatch(/sign in|try the link/i);
     }
+  });
+
+  it('and names the screen that way in is on, since it is not this one', () => {
+    // All four of these said "sign in below", and so did the three messages
+    // the claim screen writes itself. There is no sign-in below: `SignInCard`
+    // is mounted in `app/(tabs)/settings.tsx` and in no other file, so the
+    // failed branch was one sentence and one button back to the dashboard.
+    //
+    // Never a dead end -- Settings is a tab, two taps away -- which is what
+    // makes it worth the change rather than a shrug. A player reads this
+    // screen only because something has already gone wrong, and the one
+    // instruction on it told them to look down.
+    //
+    // The pair is what is asserted, because the sentence and the control are
+    // only any use together: nothing the screen says points below, and the
+    // branch carries a way to Settings.
+    for (const failure of FAILURES) {
+      expect(handoffFailed(failure)).not.toMatch(/\bbelow\b/i);
+      expect(handoffFailed(failure)).toMatch(/Settings/);
+    }
+    expect(spoken(claim)).not.toMatch(/\bbelow\b/i);
+    expect(claim).toContain("router.replace('/settings')");
   });
 
   it('says nothing is lost when it could not finish', () => {

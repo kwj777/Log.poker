@@ -404,16 +404,41 @@ export const parseSessionFormat = (input: string): SessionFormat | null => {
 };
 
 /**
+ * The shape of a count, matched whole.
+ *
+ * An optional `#`, the number, an optional ordinal suffix. The grouping
+ * separators live inside the capture and are handed to `toNumeric` with the
+ * rest, so `1,240` and `1 240` are the same number and `12.5` is not one.
+ */
+const COUNT = /^#?\s*(\d[\d.,\s]*?)\s*(?:st|nd|rd|th)?$/i;
+
+/**
  * A whole-number count: a field size, a finishing position. Accepts `1,240`,
  * `12th` and `#12`, and refuses anything that is not a positive whole number --
  * a zero-th place finish is a typo, not a result.
+ *
+ * **Matched, not filtered.** This used to strip every non-digit and read what
+ * was left, which meant the refusal in the line above could only ever fire on
+ * a cell holding no digits at all. `-5` came back as 5, `12.5` as 125, `1 of
+ * 100` as 1100 and `1e3` as 13 -- and none of those is a rejected cell that
+ * the importer warns about. It is a number, stored, drawn on the detail screen
+ * as a finishing position, and fed to `impliedByField` in `sessionImport.ts`,
+ * which types the row as a tournament and throws its stakes away. A column
+ * mapped to `entrants` by mistake is exactly the cell this reads.
+ *
+ * `toNumeric` rather than a third convention: it is already the one rule this
+ * file and `parseAmount` share, and the separator question here is the same
+ * question. It means a lone dot is a decimal point, so a European `1.240` is
+ * refused rather than read as either 1240 or 1.24. For a count that is the
+ * cheap direction to be wrong in -- a null leaves the row a cash game, a guess
+ * puts a made-up field size on the record.
  */
 export const parseCount = (input: string): number | null => {
-  const text = input.trim();
-  if (text === '' || !/\d/.test(text)) return null;
-  const digits = text.replace(/[^\d]/g, '');
-  if (digits === '') return null;
-  const value = Number(digits);
+  const match = COUNT.exec(input.trim());
+  if (!match) return null;
+
+  const value = toNumeric(match[1].replace(/\s/g, ''));
+  if (value === null) return null;
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 };
 

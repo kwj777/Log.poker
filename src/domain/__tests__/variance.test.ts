@@ -4,6 +4,7 @@ import {
   confidenceBand,
   estimatePlayer,
   normalCdf,
+  nothingReadable,
   probabilityOfLoss,
   toObservations,
   type SessionObservation,
@@ -423,5 +424,54 @@ describe('the boundary around the cash-game model', () => {
     const estimate = estimatePlayer(toObservations(entries));
     expect(estimate.sessionCount).toBe(0);
     expect(estimate.reliable).toBe(false);
+  });
+});
+
+describe('a log this model cannot read a single session of', () => {
+  const entries = (count: number) =>
+    Array.from({ length: count }, () =>
+      session({ format: 'tournament', buyIn: 10_000, fee: 1_000, cashOut: 0, hours: 4 }),
+    );
+
+  it('is not told to log more of what it has been logging all along', () => {
+    // The shortfall counts against the cash floors, and `toObservations` drops
+    // every tournament before the count is taken. So thirty entries in, the
+    // page said "Log 8 more sessions and around 20 more hours" -- the same
+    // sentence a device with nothing on it gets, and one that no amount of
+    // playing was ever going to move.
+    const logged = entries(30);
+    const said = nothingReadable(logged, toObservations(logged));
+
+    expect(said).not.toBeNull();
+    expect(said!.body).not.toMatch(/more sessions|more hours/);
+    expect(said!.body).toMatch(/tournament/i);
+  });
+
+  it('and says which way it cannot read them, when the log is mixed', () => {
+    // A cash game logged without its stakes is dropped for the same reason and
+    // is not a tournament, so the sentence that names only tournaments would
+    // be wrong.
+    const logged = [
+      ...entries(2),
+      session({ stakes: null, buyIn: 30_000, cashOut: 40_000, hours: 4 }),
+    ];
+    const said = nothingReadable(logged, toObservations(logged));
+
+    expect(said).not.toBeNull();
+    expect(said!.body).toMatch(/without its stakes/);
+  });
+
+  it('but leaves the shortfall alone when there is something to read', () => {
+    // The ordinary case, and the honest answer there: this player has readable
+    // sessions and simply not enough of them.
+    const logged = [
+      ...entries(2),
+      session({ stakes: STAKES_1_2, buyIn: 30_000, cashOut: 40_000, hours: 4 }),
+    ];
+    expect(nothingReadable(logged, toObservations(logged))).toBeNull();
+  });
+
+  it('and leaves an empty log alone, where the shortfall is the whole answer', () => {
+    expect(nothingReadable([], [])).toBeNull();
   });
 });

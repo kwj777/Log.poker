@@ -98,6 +98,7 @@ export default function EditSessionScreen() {
   const venues = useLogStore((state) => state.venues);
   const createVenue = useLogStore((state) => state.createVenue);
   const editSession = useLogStore((state) => state.editSession);
+  const activeSession = useLogStore((state) => state.activeSession);
 
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -132,7 +133,21 @@ export default function EditSessionScreen() {
     setForm((current) => ({ ...current, [key]: value }));
 
   const tournament = session.format === 'tournament';
-  const live = session.endedAt === null;
+  /**
+   * Running, which is not the same as having no result.
+   *
+   * This read `endedAt === null` and stopped there, so it treated a stranded
+   * session as the live one and hid the length and the cash-out behind it. A
+   * stranded session is the case session detail sends people *here* for: its
+   * card says "Edit it to give it a length and a cash-out, and it joins your
+   * numbers", over a button that opened a screen offering neither, under a
+   * subtitle telling them it was still running. Two devices each starting a
+   * session is all it takes to make one.
+   *
+   * `app/session/[id].tsx` already draws the distinction, in the same words:
+   * open, and not the session the live screen is showing.
+   */
+  const live = session.endedAt === null && activeSession?.id === session.id;
 
   const startedAt = parseDateTime(form.date, form.time);
   const buyIn = parseAmount(form.buyIn);
@@ -140,7 +155,11 @@ export default function EditSessionScreen() {
   const length = live ? null : fromHoursAndMinutes(form.hours, form.minutes);
 
   const startInvalid = startedAt === null;
-  const lengthInvalid = !live && length === null;
+  // A length is wrong only when there is a result for it to belong to. Both
+  // empty is this screen's own offer to put the night back to running, and a
+  // session that was never finished arrives with neither -- which is a session
+  // waiting to be given one, not a field somebody has already got wrong.
+  const lengthInvalid = !live && cashOut !== null && length === null;
 
   /** What the length works out to, so the arithmetic is on screen. */
   const endsAt = startedAt !== null && length !== null ? startedAt + length : null;
@@ -164,13 +183,28 @@ export default function EditSessionScreen() {
         ? 'How long you played, rather than when the app stopped counting.'
         : `Finishing ${formatSessionDate(endsAt)} at ${formatTimeOfDay(endsAt)}.`;
 
+  /**
+   * Zero is a buy-in. Nothing is not.
+   *
+   * This asked for more than zero, and the app writes sessions with zero
+   * itself: a result-only import has no buy-in column, so `sessionImport`
+   * stores `0` for every row that won or broke even -- it can only infer a
+   * buy-in from a loss, where the loss entails one. Those sessions opened here
+   * with "Save changes" dead from arrival and nothing saying why, so the room,
+   * the date and the stakes could not be corrected either. Within one imported
+   * file the losing nights were editable and the winning ones were not.
+   *
+   * A freeroll is the same shape and is a real thing, which `new.tsx` already
+   * says about its fee. An empty or unreadable field is still refused, because
+   * that is a question nobody has answered rather than an answer of zero.
+   */
   const canSave =
     !startInvalid &&
     !lengthInvalid &&
     !startAhead &&
     !endAhead &&
     buyIn !== null &&
-    buyIn > 0 &&
+    buyIn >= 0 &&
     !saving;
 
   const save = async () => {
@@ -250,7 +284,9 @@ export default function EditSessionScreen() {
         <Text color={colors.textSecondary} style={styles.subtitle}>
           {live
             ? 'This one is still running, so there is no result yet. The start is here if it was wrong.'
-            : 'Fix whatever was typed wrong. Everything here feeds your hourly rate and your variance.'}
+            : session.endedAt === null
+              ? 'This one was never finished. Give it a length and a cash-out and it joins your numbers.'
+              : 'Fix whatever was typed wrong. Everything here feeds your hourly rate and your variance.'}
         </Text>
       </View>
 

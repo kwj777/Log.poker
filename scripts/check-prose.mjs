@@ -31,6 +31,23 @@ const BINARY = /\.(png|jpg|jpeg|gif|ico|ttf|otf|woff2?|jks|p8|p12|keystore)$/i;
 const DASHES = /[\u2013\u2014]/;
 
 /**
+ * A `\uXXXX` escape is the same character to whoever reads it.
+ *
+ * The regex above runs over raw lines, so `public/manifest.webmanifest` wrote
+ * `Log \u2014 poker session tracker` -- six ASCII characters on the line, one
+ * em dash in the install dialog a browser draws and in Android's app info --
+ * and this file reported every tracked file clean. The one rule it has, missed
+ * on the one shipped string that broke it, in the only file format that would
+ * have hidden it.
+ *
+ * Decoded before the rules run rather than added to them, because the question
+ * is what the text says, and a rule that is blind to an encoding is a rule with
+ * a way around it rather than a rule.
+ */
+const decoded = (line) =>
+  line.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+/**
  * Not a full list, just the forms that have actually turned up here. Add to it
  * whenever one gets past: `polarised` sat in the drill copy 21 times and
  * `rasterised` in the icon scripts, both for weeks, because a list only catches
@@ -107,11 +124,12 @@ for (const file of files) {
     continue;
   }
 
-  contents.split('\n').forEach((line, index) => {
+  contents.split('\n').forEach((raw, index) => {
+    const line = decoded(raw);
     const where = `${file}:${index + 1}`;
-    if (DASHES.test(line)) problems.push(`${where}: en or em dash\n    ${line.trim()}`);
+    if (DASHES.test(line)) problems.push(`${where}: en or em dash\n    ${raw.trim()}`);
     const british = BRITISH_RE.exec(line);
-    if (british !== null) problems.push(`${where}: British spelling "${british[1]}"\n    ${line.trim()}`);
+    if (british !== null) problems.push(`${where}: British spelling "${british[1]}"\n    ${raw.trim()}`);
   });
 }
 

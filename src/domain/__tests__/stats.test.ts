@@ -273,6 +273,24 @@ describe('grouping', () => {
     ]);
   });
 
+  it('and labels them the way the rest of the app does', () => {
+    // NLHE and PLO are their own labels, which is why a test over those two
+    // passed either way. OTHER is the one that is not, and the bar was headed
+    // with the stored value: a player who picked "Other" from a chip reading
+    // Other got OTHER, in capitals, and `BarBreakdown` speaks it too.
+    const other = completed({
+      id: 'other',
+      gameType: 'OTHER',
+      hours: 3,
+      buyIn: 20_000,
+      cashOut: 26_000,
+    });
+    const labels = byGameType([...sessions, other]).map((group) => group.label);
+
+    expect(labels).toContain('Other');
+    expect(labels).not.toContain('OTHER');
+  });
+
   it('groups profit by venue using the attached venue', () => {
     const groups = byVenue(sessions, []);
     expect(groups.map((group) => [group.label, group.net])).toEqual([

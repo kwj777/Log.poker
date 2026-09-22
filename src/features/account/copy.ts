@@ -98,6 +98,13 @@ export const messageFor = (failure: SignInFailure, stage: Stage): string => {
  * careless line. So every one of these says what happened to the link and
  * offers the ordinary way in, which is always available and costs one screen.
  *
+ * **And they name the screen it is on.** All four used to say "sign in below",
+ * and they are read on `app/claim.tsx`, which renders no sign-in: `SignInCard`
+ * is mounted in `app/(tabs)/settings.tsx` and nowhere else. So the one
+ * instruction a stranded player got pointed at a control that was not there.
+ * Settings is named here and the claim screen carries a button to it, which is
+ * the pair that has to stay together.
+ *
  * **And none of them says anything was bought at all**, which is the rule the
  * rest of this file already keeps: Log is free in its entirety, and what
  * arrives through a hand-off is an identity rather than an entitlement. From
@@ -110,18 +117,18 @@ export const handoffFailed = (failure: HandoffFailure): string => {
       // Unknown, expired, already spent, or meant for another app. Untilt says
       // one thing for all of them on purpose, so this does too. Ninety seconds
       // is short, and the honest guess is that they took a while.
-      return 'That link has already been used, or it has run out. Sign in below and this ' +
-        'device picks up where your account left off.';
+      return 'That link has already been used, or it has run out. Sign in from Settings and ' +
+        'this device picks up where your account left off.';
     case 'refused':
-      return 'There was nothing to carry across on that account. Sign in below with the ' +
-        'address you use for the other apps.';
+      return 'There was nothing to carry across on that account. Sign in from Settings with ' +
+        'the address you use for the other apps.';
     case 'throttled':
-      return 'That is a lot of tries. Give it a minute, or sign in below.';
+      return 'That is a lot of tries. Give it a minute, or sign in from Settings.';
     case 'unreachable':
       // The one somebody may well be reading in the middle of an outage they
       // are on the wrong side of. Carefully vague, and never a refusal.
       return 'Could not finish signing you in just now. Nothing is lost -- try the link ' +
-        'again, or sign in below.';
+        'again, or sign in from Settings.';
   }
 };
 
@@ -184,6 +191,17 @@ export const describeSync = (state: {
     return 'Carrying your history between devices is part of the pass. Everything you have logged is still on this device.';
   }
   if (state.problem !== null) {
+    // Zero is not a small backlog, and it is the ordinary state of the device
+    // this branch exists for: signed in, nothing written since the last sync,
+    // network gone. `run()` announces `pending` before the request and records
+    // the failure after, so a foreground with nothing to send reaches here
+    // with zero. It read "0 changes are waiting, and nothing is lost", which
+    // is a sentence describing a queue that is not there, on the one line
+    // whose job is to keep somebody from wondering what is stuck.
+    if (state.pending === 0) {
+      return 'Could not reach the sync. Nothing on this device is waiting to go up, and ' +
+        'nothing is lost.';
+    }
     const waiting = state.pending === 1 ? '1 change is' : `${state.pending} changes are`;
     return `Could not reach the sync. ${waiting} waiting, and nothing is lost.`;
   }
@@ -268,6 +286,30 @@ export const ERASE_EXPLAINS =
 /** The step between the button and the deletion. Says what it reaches. */
 export const ERASE_CONFIRM =
   'This deletes your account and the copy Log is holding for you, and signs this device out. It cannot be undone, and no device will put it back. The log on this device is untouched, and so is the one on every other device you have signed in on.';
+
+/**
+ * What clearing this device actually clears, which depends on whether it syncs.
+ *
+ * "This cannot be undone" was said either way, and on a signed-in device it is
+ * undone immediately and by the app itself: `SyncingRepository.clearAll`
+ * rewinds the cursors and starts a push of its own, so the sessions, hands,
+ * rebuys, mood entries and venues are back within a round. That is deliberate
+ * and documented -- reset means this device, not every device -- and the
+ * sentence in front of it said the opposite.
+ *
+ * The starting balance is the half the old wording left out, and it is the one
+ * thing the reset really does destroy for good: preferences are not in
+ * `SYNC_TABLES`, so nothing anywhere holds a copy to send back.
+ *
+ * Two strings rather than one with a clause bolted on, because they describe
+ * two different acts. On a device that does not sync this is the end of that
+ * log; on one that does it is closer to a reload.
+ */
+export const RESET_CONFIRM =
+  'Delete every session, hand, mood entry and venue on this device, and the starting balance with them. This cannot be undone.';
+
+export const RESET_CONFIRM_SYNCING =
+  'Delete every session, hand, mood entry and venue on this device. They come back from the server the next time this device syncs, which is straight away: sign out first if you want them off this device. Your starting balance does not sync, so that one goes for good.';
 
 /**
  * The label on the button, which is a separate string for a separate reason.

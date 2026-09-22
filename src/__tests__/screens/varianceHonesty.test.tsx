@@ -39,6 +39,18 @@ const night = (id: string, resultBb: number, hours: number, index: number): Sess
     stakes: { smallBlind: 100, bigBlind: BIG_BLIND },
   });
 
+/** A finished tournament: an entry, a fee, and no blinds to measure in. */
+const tourney = (id: string, cashOut: number, index: number): SessionWithChildren =>
+  session(id, {
+    format: 'tournament',
+    stakes: null,
+    fee: 1_000,
+    buyIn: 10_000,
+    cashOut,
+    startedAt: T + index * DAY,
+    endedAt: T + index * DAY + 4 * 3_600_000,
+  });
+
 const load = (list: SessionWithChildren[]) =>
   useLogStore.setState({
     status: 'ready',
@@ -102,5 +114,34 @@ describe('how often a stretch like this finishes in the red', () => {
     expect(screen.getByText('The part nobody tells you')).toBeTruthy();
     expect(screen.queryByText(/about 0% of the time/)).toBeNull();
     expect(screen.getByText(/less than 1% of the time/)).toBeTruthy();
+  });
+});
+
+describe('what this page says to somebody who only plays tournaments', () => {
+  it('does not ask for a game they do not play', async () => {
+    // `toObservations` drops every tournament, so the cash estimate stays at
+    // zero sessions and zero hours no matter how many are logged, and the
+    // shortfall copy read "Log 8 more sessions and around 20 more hours" --
+    // byte for byte what a device with nothing on it shows. Playing more
+    // never moved it, because the count is taken after the drop.
+    load(Array.from({ length: 20 }, (_, i) => tourney(`t${i}`, i % 4 === 0 ? 40_000 : 0, i)));
+    await renderScreen(<VarianceScreen />);
+
+    expect(screen.queryByText(/Log 8 more sessions/)).toBeNull();
+    expect(screen.getByText(/no blinds to measure in/i)).toBeTruthy();
+    // And the card that does have something to say about them is still there,
+    // which is what the new copy points at.
+    expect(screen.getByText('Tournaments')).toBeTruthy();
+    expect(screen.getByText('5 of 20')).toBeTruthy();
+  });
+
+  it('and still asks for more from somebody who has started logging cash', async () => {
+    // The shortfall is the honest answer here, so it has to survive: this
+    // player has readable sessions and simply not enough of them.
+    load([night('s1', 10, 4, 0), night('s2', -20, 5, 1)]);
+    await renderScreen(<VarianceScreen />);
+
+    expect(screen.getByText(/more session/)).toBeTruthy();
+    expect(screen.queryByText(/no blinds to measure in/i)).toBeNull();
   });
 });

@@ -31,12 +31,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png",
-      "name": "Log",
-      "shortName": "Log",
-      "themeColor": "#1c211f",
-      "backgroundColor": "#1c211f",
-      "description": "The session log that keeps you off tilt."
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",

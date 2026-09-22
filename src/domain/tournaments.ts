@@ -337,11 +337,29 @@ export const MIN_BOOTSTRAP_SAMPLES = 500;
  *
  * Exported because it is the honest answer to "why does my interval say 500
  * samples", which `RoiInterval.samples` puts on the screen.
+ *
+ * **The floor bounds the budget, not the caller.** It was the other way round
+ * -- `max(MIN, min(requested, affordable))` -- so a caller asking for fewer
+ * than 500 got 500 whatever it asked for, which is the opposite of what
+ * `bootstrapRoi` says three hundred lines down: "An explicit `samples` is
+ * still a ceiling, so a caller asking for fewer gets fewer." It also made
+ * that function's `samples < 1` guard unreachable for any non-empty list.
+ *
+ * `MIN_BOOTSTRAP_SAMPLES` was never about the caller. Its own line says what
+ * it is for: however large the list, never fewer resamples than this. That is
+ * a bound on what the budget is allowed to buy, and it still is.
+ *
+ * Nothing on screen moves. No production caller passes `samples` at all, and
+ * for the default request the two orderings agree at every list size. What it
+ * cost was the one caller that does ask -- the tournaments suite, whose
+ * slowest test asks for 200 and 400 to stay quick and was given 500 three
+ * times over, at six seconds against a 166ms runner-up for the rest of the
+ * file.
  */
 export const samplesFor = (count: number, requested = BOOTSTRAP_SAMPLES): number => {
   if (count <= 0) return requested;
   const affordable = Math.floor(BOOTSTRAP_DRAW_BUDGET / count);
-  return Math.max(MIN_BOOTSTRAP_SAMPLES, Math.min(requested, affordable));
+  return Math.min(requested, Math.max(MIN_BOOTSTRAP_SAMPLES, affordable));
 };
 
 /**

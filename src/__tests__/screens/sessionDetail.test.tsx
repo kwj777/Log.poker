@@ -17,7 +17,7 @@ import { screen, userEvent } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
-import type { Hand } from '../../domain/types';
+import type { Hand, MoodEntry } from '../../domain/types';
 import { router } from 'expo-router';
 
 import SessionDetailScreen from '../../../app/session/[id]';
@@ -59,6 +59,17 @@ const hand = (id: string, over: Partial<Hand> = {}): Hand => ({
   note: null,
   tags: [],
   amount: 12_000,
+  at: T0,
+  createdAt: T0,
+  updatedAt: T0,
+  ...over,
+});
+
+const mood = (id: string, over: Partial<MoodEntry> = {}): MoodEntry => ({
+  id,
+  sessionId: 's1',
+  phase: 'start',
+  score: 4,
   at: T0,
   createdAt: T0,
   updatedAt: T0,
@@ -254,5 +265,30 @@ describe('a session that was never finished', () => {
     load([], { sessions: [session('s1'), running], activeSession: running });
     await renderScreen(<SessionDetailScreen />);
     expect(screen.queryByText('This one was never finished')).toBeNull();
+  });
+});
+
+
+describe('what the delete confirmation says is going', () => {
+  it('names the moods, because they go with it', async () => {
+    // `deleteSession` tombstones the session's rebuys, its hands and its mood
+    // entries on both engines, and the repository contract pins that cascade.
+    // The sentence listed one of the three.
+    //
+    // Not a distant consequence either: the Tilt meter card is on this screen
+    // whenever the session has moods, and this test renders it. Those entries
+    // are also what the Variance tab compares a recent stretch against, so
+    // they are the part of the delete somebody might have wanted to keep.
+    load([hand('h1')], { moodEntries: [mood('m1'), mood('m2', { phase: 'end', score: 2 })] });
+    await renderScreen(<SessionDetailScreen />);
+
+    // On screen, a few hundred pixels above the button.
+    expect(screen.getByText('Tilt meter')).toBeTruthy();
+
+    await userEvent.press(screen.getByText('Delete session'));
+
+    const said = screen.getByText(/Delete this session/);
+    expect(said).toHaveTextContent(/mood/i);
+    expect(said).toHaveTextContent(/hands/i);
   });
 });

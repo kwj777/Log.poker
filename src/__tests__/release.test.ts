@@ -10,7 +10,8 @@
  * What is asserted is only the part an app store refuses a build over. Taste
  * lives in the files; this is the floor under them.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -168,6 +169,44 @@ describe('the web block, which is read by less of the toolchain than it looks', 
     // agree on. The generated `.ico` topped out at 48px.
     expect(app.web.favicon).toBeUndefined();
     expect(read('app', '+html.tsx')).toContain('<link rel="icon" href="/icons/icon-192.png"');
+  });
+});
+
+describe('the images checked in beside the app', () => {
+  it('are each named by something that is not the script that draws them', () => {
+    // `android-icon-background.png` was 17.5 KB of nothing: no
+    // `adaptiveIcon.backgroundImage` key in app.json, no line in
+    // `generate-icons.mjs`, no mention anywhere in the tree. Expo never read
+    // it, so it shipped nowhere and broke nothing -- it just sat in the
+    // repository at 512x512 RGBA beside two 432x432 layers it was supposed to
+    // go behind, drifting from the palette `palette.test.ts` pins.
+    //
+    // The script is excluded from counting as a reader on purpose. A file it
+    // draws and nothing consumes is the same dead weight one step later,
+    // which is what `favicon.png` became the day `app.json` stopped naming
+    // it.
+    // Tests are not readers. This one names both of the files it was written
+    // for, a few lines up, and would otherwise vouch for them itself.
+    const script = read('scripts', 'generate-icons.mjs');
+    const readers = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n')
+      .filter(
+        (path) =>
+          path !== '' &&
+          !path.startsWith('assets/') &&
+          !path.includes('__tests__') &&
+          path !== 'scripts/generate-icons.mjs',
+      );
+
+    const orphans = readdirSync(join(ROOT, 'assets')).filter((name) => {
+      const named = readers.some((path) => read(...path.split('/')).includes(name));
+      return !named;
+    });
+
+    expect(orphans).toEqual([]);
+    // And everything left really is drawn rather than hand-placed, so the
+    // palette test's reach over the script is the reach over these files.
+    for (const name of readdirSync(join(ROOT, 'assets'))) expect(script).toContain(name);
   });
 });
 

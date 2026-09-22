@@ -255,16 +255,53 @@ describe('whether somebody has bought the pass', () => {
     expect(syncIsPaidFor(true, null)).toBe(hasPass(null));
   });
 
-  it('cannot be true for anybody this build can sign in, which is the point', () => {
-    /**
-     * Not a property of `hasPass` but of the door in front of it, and the
-     * thing to know before reading a branch that reads this: `signinEndpoint`
-     * mints `tier: 'free'` for every sign-in Log takes, and Log has never
-     * shipped a way to receive one of Untilt's tokens. So the paid branch of
-     * the after-session card is written, typed and tested, and no player can
-     * reach it until the shared entitlement exists.
-     */
+  it('is false for anybody who signed in at this door, which mints the free tier', () => {
+    // A property of the door rather than of `hasPass`, and the thing to know
+    // before reading a branch that reads it.
     const endpoint = readFileSync(join(__dirname, '..', 'signinEndpoint.ts'), 'utf8');
     expect(endpoint).not.toMatch(/tier: 'full'/);
+  });
+
+  it('and true for a claim that came in through the hand-off, which now ships', () => {
+    /**
+     * This block used to be named "cannot be true for anybody this build can
+     * sign in, which is the point", over a docstring saying "Log has never
+     * shipped a way to receive one of Untilt's tokens". `app/claim.tsx` is
+     * exactly that and it shipped: it trades a code from a URL fragment at
+     * Untilt's claim endpoint and hands what comes back to `signIn`. A paid
+     * claim is the ordinary answer there, because Untilt answers 503 rather
+     * than a free token when it cannot reach Stripe.
+     *
+     * So the after-session and warm-up cards are choosing between two live
+     * sentences rather than holding a branch nobody can reach.
+     */
+    const bought: Claim = { expiresAt: NOW + 1, tier: 'full', subject: 'cus_QRS123' };
+    expect(hasPass(bought)).toBe(true);
+
+    // And the containment that keeps it from becoming a second bucket, which
+    // is the part that did not change: a subject this door did not mint gets
+    // no bucket, so `SessionManager` reports `syncs: false` and the plain
+    // local repository is composed.
+    expect(hasOwnSubject(bought)).toBe(false);
+  });
+
+  it('and the documents no longer say such a claim cannot arrive', () => {
+    // Four places argued from "Log has never shipped a way to receive one of
+    // Untilt's tokens", and one of them -- the legacy-signature window in
+    // `src/sync/verify.ts` -- rested a security conclusion on it. The
+    // conclusion survives on the containment above; the premise does not.
+    const root = join(__dirname, '..', '..', '..');
+    const flat = (...parts: string[]) =>
+      readFileSync(join(root, ...parts), 'utf8').replace(/\s+/g, ' ');
+    for (const file of [
+      ['src', 'auth', 'token.ts'],
+      ['README.md'],
+      ['SYNC.md'],
+    ]) {
+      expect(flat(...file)).not.toMatch(/has never shipped a way to receive/);
+    }
+    // `verify.ts` still quotes the retired sentence, to say it is retired, so
+    // it is checked for the correction rather than the absence.
+    expect(flat('src', 'sync', 'verify.ts')).toMatch(/the containment was never the population/);
   });
 });

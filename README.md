@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2215 passed
+Tests:       2217 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1119,8 +1119,8 @@ Tests:       2215 passed
   merge               33   two devices disagreeing, and who wins
   migrations          32   a filled v2 database walked forward, both engines
   signinSweep         31   what the sign-in store may collect, and what it must not
+  token               31   the family token grammar, against signed fixtures
   session             30   holding a token, and stores that fail as real ones do
-  token               29   the family token grammar, against signed fixtures
   palette             27   the theme matches BRAND.md
   sessionExport       27   the log written out, and read back by the importer
   editSession         24   correcting a session, including the one nobody cashed out
@@ -1459,10 +1459,11 @@ rendered by the session that just finished and by no other.
 told their pass already covers it rather than being sold what they own, and the
 card renders nothing at all until that read lands. Showing one sentence and
 swapping it a frame later is the same failure the hands count guards against
-one section up. `hasPass` is the question, and it is false for everybody today:
-Log's own door mints the free tier and this app has never shipped a way to
-receive one of Untilt's tokens. The branch is written, typed and tested anyway,
-for the reason everything around `SYNC_NEEDS_PASS` is.
+one section up. `hasPass` is the question. It is false for everybody who signs in at Log's own
+door, which mints the free tier, and true for anybody who arrived through a
+hand-off: `app/claim.tsx` takes delivery of a purchase made at another of the
+family's apps, and a paid claim is the ordinary answer on that path. Both
+branches are live, which they were not when the claim screen was still to come.
 
 **It names no price and links to no checkout**, which is the whole distance
 between this and a purchasing mechanism Apple would have something to say

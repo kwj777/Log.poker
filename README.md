@@ -1814,6 +1814,72 @@ Also wanted, smaller: session photos of the chip stack,
 Apple Health style weekly summaries, an Apple Watch companion for the timer, and
 per-venue rake tracking.
 
+### What 1.1 is
+
+The list above is the long arc, and it predates anybody looking at what else is
+on the store. This is a release rather than a direction, and every item on it
+came out of comparing Log against the free poker trackers on the App Store in
+September 2026. It is kept separate from the numbering above rather than folded
+into it, because `SYNC.md` refers to those items by number.
+
+The comparison in one line: Log is at or above the free field on the things
+that matter most to it, the uncapped free tier, the export that reads back, and
+the fact that it estimates something about the player rather than only
+describing what happened. It is behind on conveniences every competitor now
+ships, and one of those is close to a baseline expectation rather than a
+nicety.
+
+1. **A Live Activity for the running session.** The one genuine baseline miss.
+   Log has an in-app elapsed timer and a Resume button on the dashboard; Left
+   Pocket, StackEdge, Nash and VPIP all put the running session on the lock
+   screen. A session timer that disappears when the phone locks is a hole in
+   the loop this app is built around rather than a feature it lacks.
+
+   It is out of 1.0 deliberately, and the reason is not what it costs to build.
+   It is the first Swift in this repository: a widget extension target added
+   through a config plugin, the card written in SwiftUI because nothing here
+   can render inside a widget, an ActivityKit bridge tied to the session
+   lifecycle, and `NSSupportsLiveActivities` in the plist. That is a second
+   binary target and a new surface for App Review, in the one submission where
+   this app has no approval history to fall back on and the review notes
+   already run to a page. If something comes back, two unknowns at once is the
+   thing that makes it expensive. The same argument closed the iPad question.
+
+   Two things to know before starting it. A widget renders in the system's
+   context rather than the app's, so it does not inherit the dark lock in
+   `app.json` and the card has to carry both themes itself. And
+   `src/__tests__/release.test.ts` asserts this app's native configuration, so
+   it has to learn about the new target rather than be stepped around.
+
+   The Apple Watch companion in the smaller list above is the same timer on a
+   third surface, and is worth doing after this rather than instead of it.
+
+2. **Expenses, tips and trip tags.** Hands carry tags and sessions do not, so
+   there is nowhere to put the travel, the food and the dealer tips a series
+   trip costs. Smallest of the five against what it is worth: the session
+   record is already the right shape to hang it on, and it is the first thing a
+   player accounting for a trip goes looking for. Poler, Left Pocket and
+   Pokerbase all have it.
+
+3. **More than one bankroll.** Live, online and staked money kept apart. It is
+   the specific feature Poker Bankroll Tracker holds back for its paid tier,
+   which is a fair reading of how much players want it.
+
+4. **Big blinds per hundred hands, beside the hourly rate.** Log reports big
+   blinds per hour, which is the right unit for live play and the one the
+   variance model needs. BB/100 is the number online players compare with each
+   other. It needs hands per hour, which is the same quantity missing from
+   multi-table support in item 3 of the list above, so the two are cheaper
+   together than apart.
+
+5. **A Home Screen widget.** Lowest of the five, and on every competitor's
+   feature list.
+
+Risk of ruin and a move-up prompt come out of that comparison too, and are
+already item 5 above rather than repeated here. Worth knowing that Log would be
+doing it from a measured sigma where the apps that offer it use a rule of
+thumb.
+
 ---
 
 ## License

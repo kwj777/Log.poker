@@ -1887,6 +1887,25 @@ nicety.
 5. **A Home Screen widget.** Lowest of the five, and on every competitor's
    feature list.
 
+6. **Arrivals: sessions that start themselves.** Added after the list was
+   written, and it would sit second if the list were being ranked again today.
+   The phone learns a venue's location from the first session logged there and
+   recognizes it afterwards, so a session carries the minute the player
+   actually sat down and the minute they actually left, rather than a time
+   reconstructed the next morning and rounded. It automates the place and the
+   clock and deliberately never touches the money, because a session row with
+   an invented buy-in is a wrong record rather than an incomplete one.
+
+   It belongs beside item 1 rather than anywhere else on this list: an arrival
+   that opens the session and a lock screen that carries it are the same idea
+   from two ends. It is also the only item here that makes the statistics more
+   correct instead of the app more pleasant, since hours are the denominator
+   under the hourly rate, big blinds per hour and the whole variance model.
+
+   The full design, including why the fence does not sync, why an arrival is
+   not a session, and what asking for background location means for an app that
+   answers the gambling question yes, is in `GEOFENCE.md`.
+
 Risk of ruin and a move-up prompt come out of that comparison too, and are
 already item 5 above rather than repeated here. Worth knowing that Log would be
 doing it from a measured sigma where the apps that offer it use a rule of

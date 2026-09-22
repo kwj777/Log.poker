@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2327 passed
+Tests:       2329 passed
 
   dexieRepository    149   the IndexedDB path, against real IndexedDB
   sqlRepository      146   the SQLite path, against real SQLite
@@ -1166,6 +1166,7 @@ Tests:       2327 passed
   preSessionWarmUp     9   the offer to somebody who says they are rattled before they sit
   settingsVenues       9   renaming a venue, and merging two that are one room
   varianceHands        9   the hand breakdown, and the sentence that must precede it
+  lintReach            8   which files npm run lint actually looks at
   plan                 8   what an import will write, before it writes it
   postSessionReset     8   the offer after cash-out, and who it is talking to
   reviewFlagged        8   the review card on the dashboard, and the nights it stays off
@@ -1179,7 +1180,6 @@ Tests:       2327 passed
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room
   importWarnings       6   what the import screen says about a file it could not use
-  lintReach            6   which files npm run lint actually looks at
   platformTwins        6   whether the files Metro swaps still export the same names
   returnFocus          6   who the keyboard goes back to when a sheet closes
   scale                6   how much of the plot the data actually gets

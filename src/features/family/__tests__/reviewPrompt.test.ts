@@ -8,9 +8,11 @@
  * quiet and there is no store to remember a dismissal in.
  *
  * The second kind reads the card's source, the way the mid-session and
- * after-session blocks in `handOffs.test.ts` do, because this repository's
- * suite is plain ts-jest in Node and cannot render a component. What is read
- * is the copy and the rule that keeps the card off the screen at a table.
+ * after-session blocks in `handOffs.test.ts` do, because *this file's* project
+ * is plain ts-jest in Node and cannot render a component. The repository's
+ * other project can, and does render this card, in
+ * `__tests__/screens/reviewFlagged.test.tsx`. What is read here is the copy
+ * and the rule that keeps the card off the screen at a table.
  */
 
 import { readFileSync } from 'node:fs';

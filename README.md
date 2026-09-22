@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 105 passed
-Tests:       2306 passed
+Test Suites: 107 passed
+Tests:       2312 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1195,6 +1195,7 @@ Tests:       2306 passed
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
   importPicker         4   opening a file on a phone, and the three answers a picker gives
+  nativeModules        4   the two native modules nothing imports and every build compiles
   transactionQueue     4   two writes at once, on a database with no queue of its own
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
@@ -1202,6 +1203,7 @@ Tests:       2306 passed
   amountField          2   the money field's box, against the font it has to hold
   deadExports          2   API nothing uses: dead exports and props nothing passes
   newSessionDefaults   2   where the pre-filled session says its numbers came from
+  pageMeta             2   the document head, kept off the phone it alerts on
   safeArea             2   the top inset, on a phone with a notch and without
 ```
 
@@ -1889,6 +1891,25 @@ nicety.
 
 5. **A Home Screen widget.** Lowest of the five, and on every competitor's
    feature list.
+
+6. **Arrivals: sessions that start themselves.** Added after the list was
+   written, and it would sit second if the list were being ranked again today.
+   The phone learns a venue's location from the first session logged there and
+   recognizes it afterwards, so a session carries the minute the player
+   actually sat down and the minute they actually left, rather than a time
+   reconstructed the next morning and rounded. It automates the place and the
+   clock and deliberately never touches the money, because a session row with
+   an invented buy-in is a wrong record rather than an incomplete one.
+
+   It belongs beside item 1 rather than anywhere else on this list: an arrival
+   that opens the session and a lock screen that carries it are the same idea
+   from two ends. It is also the only item here that makes the statistics more
+   correct instead of the app more pleasant, since hours are the denominator
+   under the hourly rate, big blinds per hour and the whole variance model.
+
+   The full design, including why the fence does not sync, why an arrival is
+   not a session, and what asking for background location means for an app that
+   answers the gambling question yes, is in `GEOFENCE.md`.
 
 Risk of ruin and a move-up prompt come out of that comparison too, and are
 already item 5 above rather than repeated here. Worth knowing that Log would be

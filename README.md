@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 103 passed
-Tests:       2256 passed
+Test Suites: 104 passed
+Tests:       2258 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1200,6 +1200,7 @@ Tests:       2256 passed
   allHands             2   who pays for a read of the whole journal
   amountField          2   the money field's box, against the font it has to hold
   newSessionDefaults   2   where the pre-filled session says its numbers came from
+  pageMeta             2   the document head, kept off the phone it alerts on
   safeArea             2   the top inset, on a phone with a notch and without
 ```
 

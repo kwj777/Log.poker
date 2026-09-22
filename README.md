@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2326 passed
+Tests:       2327 passed
 
   dexieRepository    149   the IndexedDB path, against real IndexedDB
   sqlRepository      146   the SQLite path, against real SQLite
@@ -1132,10 +1132,10 @@ Tests:       2326 passed
   compose             23   which repository a device gets, and the unsafe sweep
   history             23   the session list, its filters, and how much of it mounts
   glossary            22   the shorthand on screen still matches its explanation
+  useLogStore         21   what a write reads back, and what it leaves alone
   clock               20   a typed date, a typed length, and what neither will accept
   privacy             20   the policy page, held to the code it describes
   selectors           20   store reads and filters
-  useLogStore         20   what a write reads back, and what it leaves alone
   batch               19   a backlog split into requests, without orphaning a child
   csv                 19   quoting, delimiters, line endings
   gateCheck           19   the key-on-the-site script, run rather than read

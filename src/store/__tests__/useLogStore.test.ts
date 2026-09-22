@@ -105,6 +105,19 @@ describe('how many slices there are', () => {
     expect(counts.length).toBeGreaterThan(0);
     expect(counts.map(([, word]) => word)).toEqual(counts.map(() => SPELLED[slices - 1]));
   });
+
+  it('and the hands are described as something two screens read across', () => {
+    // `handCount`'s docstring justified holding a number rather than the rows
+    // with "every screen that shows hands is a screen about one session". Two
+    // are not: the hand log and the variance tab filter across the whole
+    // history, and they are served by `useAllHands` seven hundred lines below
+    // that sentence in the same file.
+    const source = readFileSync(join(__dirname, '..', 'useLogStore.ts'), 'utf8');
+    expect(source.replace(/\n\s*\*/g, '')).not.toContain(
+      'every screen that shows hands is a screen about one session',
+    );
+    expect(source).toContain('export const useAllHands');
+  });
 });
 
 describe('what a write reads back', () => {

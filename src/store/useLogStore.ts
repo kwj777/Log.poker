@@ -177,10 +177,13 @@ interface LogState {
   /**
    * How many hands are logged, which is all the store knows about them.
    *
-   * It used to hold every one. A hand belongs to a session and every screen
-   * that shows hands is a screen about one session, so all that array ever did
-   * was get filtered -- while costing the most expensive read in the app on
-   * every hand write, to serve one line of Settings that wanted this number.
+   * It used to hold every one, at the cost of the most expensive read in the
+   * app on every hand write, to serve one line of Settings that wanted this
+   * number. Every screen that shows hands now reads them for itself while it
+   * is open: `useHandsForSession` for the screens about one session, and
+   * `useAllHands` for the two that are not -- the hand log and the variance
+   * tab, which filter across the whole history and which this docstring used
+   * to say did not exist.
    */
   handCount: number;
   /**

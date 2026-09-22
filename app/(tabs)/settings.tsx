@@ -438,9 +438,10 @@ export default function SettingsScreen() {
         <Text color={colors.textSecondary} style={styles.body}>
           Your log as spreadsheets. The sessions file is the only one Log reads back: import it
           here and every finished session lands as the session it came from, which makes it a
-          backup as well as a record. A night still in progress is written down with the rest,
-          but it has no result yet, so it is the one row an import will pass over. The other two
-          files are records.
+          backup as well as a record. A session with no result yet is written down with the rest
+          and passed over on the way back in: a night still in progress, or one two devices both
+          had running, which Log ends and leaves waiting for you to say what came off the table.
+          The other two files are records.
         </Text>
         <View style={styles.exportRow}>
           <Button

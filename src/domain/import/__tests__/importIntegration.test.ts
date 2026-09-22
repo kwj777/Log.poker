@@ -30,6 +30,10 @@ import type { Repository } from '../../../data/repository';
 import { netResult, totalInvested } from '../../stats';
 import { toObservations } from '../../variance';
 import { parseSessionCsv, type ImportedSession } from '../sessionImport';
+import { SESSION_HEADERS, sessionRows } from '../../export/sessionExport';
+import { session } from '../../__tests__/support';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** What `getRepository` hands back, swapped per test. */
 const live: { repository: Repository | null } = { repository: null };
@@ -175,3 +179,52 @@ describe('importing a session summary end to end', () => {
     expect((await repository.listVenues()).map((venue) => venue.name)).toContain(room);
   });
 });
+
+describe('the round trip the export card sells as a backup', () => {
+  /**
+   * "Import it here and every finished session lands as the session it came
+   * from, which makes it a backup as well as a record."
+   *
+   * There are two kinds of row that do not come back, not one. A night still
+   * in progress is the one the copy named. The other is a session the merge
+   * closed: when two devices both had one running, `settleActiveSessions`
+   * writes `endedAt` and leaves `cashOut` null on purpose, so the session
+   * "stays out of every total until the player says what came off the table".
+   *
+   * That row exports with an end time filled in and a blank cash-out, which
+   * looks finished in the file, and the importer passes over it -- so on a
+   * restore it is gone, and it is precisely the session the app wanted the
+   * player to come back and fix.
+   */
+  const write = (rows: string[][]) =>
+    [SESSION_HEADERS, ...rows].map((row) => row.join(',')).join('\n') + '\n';
+
+  const needsACashOut = session({
+    startedAt: new Date(2026, 2, 1, 19).getTime(),
+    endedAt: new Date(2026, 2, 1, 23).getTime(),
+    cashOut: null,
+  });
+
+  it('writes a session the merge closed, and reads none back', async () => {
+    const csv = write(sessionRows([needsACashOut]));
+    // It looks finished in the file: an end time, and no result.
+    expect(csv).toMatch(/2026-03-01 23:00/);
+
+    const read = parseSessionCsv(csv);
+    expect(read.sessions).toHaveLength(0);
+    expect(read.skipped).toBe(1);
+  });
+
+  it('and the export card says so rather than naming one kind of row', async () => {
+    // The sentence a player reads before they trust this as a backup. It said
+    // a night in progress was "the one row an import will pass over".
+    // Whitespace flattened, because JSX wraps the sentence across lines.
+    const settings = readFileSync(
+      join(__dirname, '..', '..', '..', '..', 'app', '(tabs)', 'settings.tsx'),
+      'utf8',
+    ).replace(/\s+/g, ' ');
+    expect(settings).not.toMatch(/the one row an import will pass over/);
+    expect(settings).toMatch(/two devices both had running/);
+  });
+});
+

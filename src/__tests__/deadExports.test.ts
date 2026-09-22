@@ -1,5 +1,5 @@
 /**
- * An export nothing names, not even the docs.
+ * API nothing uses: an export no file names twice, a prop nothing passes.
  *
  * Seven had accumulated, and three of them carried comments asserting a caller
  * that did not exist -- `setSessionManager` said it worked "the way
@@ -18,6 +18,13 @@
  * structurally passes because its name is still written somewhere. Only a
  * symbol nothing in the repository mentions twice is flagged, which is a fact
  * about the repository rather than a judgment about the design.
+ *
+ * The second test asks the same question of component props, where the answer
+ * has to be drawn one file further out: a component naturally writes its own
+ * prop three times -- the interface, the destructure, the point of use -- and
+ * none of those is a caller. It is the weaker guard of the two, deliberately:
+ * a prop only a test ever passes counts as reached, which is how `standalone`
+ * on `SessionRow` survived long enough to be found by hand.
  *
  * Comments do not count, which is the half that makes it work: every one of
  * the seven was mentioned in its own docstring, and a comment claiming a
@@ -59,5 +66,44 @@ describe('every export in src', () => {
     }
 
     expect(unreached).toEqual([]);
+  });
+});
+
+const PROPS = /(?:^|\n)(?:export )?interface (\w*Props) \{([\s\S]*?)\n\}/g;
+
+describe('every prop a component declares', () => {
+  it('is passed by something other than the file that declares it', () => {
+    // A prop nothing passes is worse than a dead export, because it takes its
+    // default with it: `showEndPoint` made `showEndPoint && last` a permanently
+    // true guard on the dashboard's curve, `retryLabel` fixed the button's
+    // words while looking configurable, and `standalone` was a whole branch of
+    // `SessionRow` that only a test ever rendered.
+    //
+    // Outside the declaring file this time, since a component naturally names
+    // its own props three times -- in the interface, in the destructure and at
+    // the point of use -- and none of those is a caller. A test counts as one:
+    // it is somebody rendering the component with that prop, which is enough
+    // to say it is reachable.
+    const files = tracked();
+    const code = files.map((path) => withoutComments(readFileSync(join(ROOT, path), 'utf8')));
+    const unpassed: string[] = [];
+
+    for (const [index, path] of files.entries()) {
+      if (!path.startsWith('src/') || path.includes('__tests__')) continue;
+      for (const [, shape, fields] of code[index].matchAll(PROPS)) {
+        for (const line of fields.split('\n')) {
+          const field = line.match(/^ {2}(\w+)\??:/);
+          if (field === null) continue;
+          const mentions = new RegExp(`\\b${field[1]}\\b`, 'g');
+          const elsewhere = code.reduce(
+            (sum, body, at) => (at === index ? sum : sum + (body.match(mentions) ?? []).length),
+            0,
+          );
+          if (elsewhere === 0) unpassed.push(`${path}: ${shape}.${field[1]}`);
+        }
+      }
+    }
+
+    expect(unpassed).toEqual([]);
   });
 });

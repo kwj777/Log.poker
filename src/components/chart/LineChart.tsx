@@ -72,8 +72,6 @@ interface LineChartProps {
    * a few pixels at the top of the plot. See `padBounds`.
    */
   baseline?: number;
-  /** Marks the final point of the first series. */
-  showEndPoint?: boolean;
   emptyMessage?: string;
 }
 
@@ -85,7 +83,6 @@ export const LineChart = ({
   band,
   height = 180,
   showZeroLine = true,
-  showEndPoint = true,
   baseline = 0,
   emptyMessage = 'Not enough data yet',
 }: LineChartProps) => {
@@ -169,7 +166,7 @@ export const LineChart = ({
             />
           ))}
 
-          {showEndPoint && last ? (
+          {last ? (
             <Circle
               cx={project.x(last.x)}
               cy={project.y(last.y)}

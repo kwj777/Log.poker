@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 104 passed
-Tests:       2274 passed
+Tests:       2275 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1199,9 +1199,9 @@ Tests:       2274 passed
   notFound             3   where a link that names nothing lands
   allHands             2   who pays for a read of the whole journal
   amountField          2   the money field's box, against the font it has to hold
+  deadExports          2   API nothing uses: dead exports and props nothing passes
   newSessionDefaults   2   where the pre-filled session says its numbers came from
   safeArea             2   the top inset, on a phone with a notch and without
-  deadExports          1   an export nothing in the repository names twice
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

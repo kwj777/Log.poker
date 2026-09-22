@@ -113,16 +113,27 @@ than none. A forward to a real inbox is enough.
 
 ## Getting an account and a first build
 
-1. **Apple Developer Program**, 99 USD a year, at developer.apple.com. Enrollment
-   is not instant; an individual enrollment usually clears in a day or two and a
-   company one can take considerably longer. Start this before anything else.
+**Steps 1, 2 and the first half of 5 were done on 2026-09-22.** What is left is
+the builds, the screenshots and the upload. The finished steps are struck
+through rather than deleted, because what they settled is what the rest of this
+file reads back.
 
-2. **Register the bundle identifier** `poker.log.app` under Certificates,
-   Identifiers and Profiles. It has to match `app.json` exactly and it cannot be
-   changed after the first submission.
+1. ~~**Apple Developer Program.**~~ **Done.** The account is approved, and the
+   team already carried TiltProof's app record before this one.
 
-3. **A simulator build, which needs no account at all.** This is the one native
-   build available before enrollment clears, and it is the first time any of
+2. ~~**Register the bundle identifier.**~~ **Done.** `poker.log.app` is
+   registered as an explicit App ID, matching `app.json` on both platforms,
+   with **no capabilities enabled**, which is what this app needs: the keychain
+   is its own (`tokenStore.ts` calls SecureStore with no options and `app.json`
+   carries no access group), the `logpoker://` scheme lives in Info.plist, and
+   there is no push, no iCloud and no Sign in with Apple in the tree.
+
+   Associated Domains is the one to come back for, and only on the day a pass
+   bought at untilt.poker should land on a phone. `/claim` is web only today;
+   see decision 1 above. Capabilities stay editable after registration, so none
+   of that had to be settled here.
+
+3. **A simulator build, which needs no signing.** This is the first time any of
    this code will have run outside a browser:
 
    ```
@@ -140,7 +151,9 @@ than none. A forward to a real inbox is enough.
    npx eas build --platform ios --profile preview
    ```
 
-5. **Create the app in App Store Connect**, then the production build and the
+5. ~~**Create the app in App Store Connect.**~~ **Done.** The record is named
+   `Log: Poker Session Tracker`, iOS only, English (U.S.), SKU `poker.log.app`,
+   and **its App Store ID is 6814843842**. Then the production build and the
    upload:
 
    ```
@@ -149,8 +162,20 @@ than none. A forward to a real inbox is enough.
    ```
 
    `eas submit` prompts for the Apple ID, team ID and App Store Connect app ID.
-   Those are account facts rather than project facts, which is why `eas.json`
-   has an empty `submit.production` profile instead of placeholders.
+   The app ID is the number above. The team ID is the App ID Prefix shown on
+   the identifier's own page in Certificates, Identifiers and Profiles.
+
+   **They stay out of `eas.json` on purpose.** They are account facts rather
+   than project facts, which is why `submit.production` is an empty profile
+   instead of placeholders, and `release.test.ts` fails the suite on an
+   `appleTeamId` or `ascAppId` appearing in that file. Recording the app ID in
+   this file is documentation and does not touch that rule.
+
+   That number is also what the marketing site wants the day the app is
+   approved: an `apple-itunes-app` smart banner and the App Store badge link
+   both address the app by it. Neither goes live before approval, because App
+   Review opens the marketing URL and a download link that goes nowhere is an
+   easy rejection.
 
 ---
 
@@ -188,10 +213,34 @@ Log records real-money poker sessions that have already been played. It
 contains no game of chance, no wagering, no simulated gambling and no link to
 any gambling operator. It does not facilitate gambling; it is a record of it.
 
-Answer the gambling questions in the questionnaire honestly rather than
-answering "none". A poker app rated 4+ is a mismatch a reviewer will notice,
-and the honest answers land at 17+ (or 18+ under the newer system), which is
-the correct rating for this app.
+**All of that is true, and none of it means answering "no" to the Gambling
+question.** This paragraph used to stop at "answer the gambling questions
+honestly rather than answering none", which read as a principle and was taken
+as one. It is not a principle. It is a scar.
+
+**Untilt was rejected once for answering no to that question**, on this same
+developer account, and Untilt is a meditation app: less gambling-adjacent than
+this one by a distance. Apple reads the question as being about what the app is
+about and not only about what a user can stake inside it, and a poker app
+declaring no gambling content at all reads as evasive rather than as accurate.
+
+So the answers, spelled out rather than reasoned toward:
+
+| Question | Answer |
+| --- | --- |
+| Gambling | **Yes** |
+| Simulated Gambling | None, there is no play-money game |
+| Contests | None |
+| Loot Boxes | No |
+
+That lands the app at 18+ under the current system, which is the right rating
+for it.
+
+**Answering yes does not pull the app under guideline 5.3.4.** That rule is
+about apps which actually offer real money gaming, and it is assessed from the
+app rather than from this checkbox: there is nothing in Log to stake, so there
+is no license for a reviewer to ask after. Untilt carried the same answer
+through review without ever being asked for one.
 
 ### Export compliance
 

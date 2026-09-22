@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 102 passed
-Tests:       2252 passed
+Test Suites: 103 passed
+Tests:       2256 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1193,6 +1193,7 @@ Tests:       2252 passed
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
   importPicker         4   opening a file on a phone, and the three answers a picker gives
+  nativeModules        4   the two native modules nothing imports and every build compiles
   transactionQueue     4   two writes at once, on a database with no queue of its own
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands

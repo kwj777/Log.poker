@@ -28,6 +28,8 @@ const entry = (
     finishPosition?: number | null;
     hours?: number;
     endedAt?: number;
+    /** Amounts, exactly as the live screen records a re-entry: buy-in plus fee. */
+    rebuys?: number[];
   } = {},
 ) =>
   session({
@@ -38,6 +40,7 @@ const entry = (
     entrants: spec.entrants ?? null,
     finishPosition: spec.finishPosition ?? null,
     hours: spec.hours ?? 3,
+    ...(spec.rebuys === undefined ? {} : { rebuys: spec.rebuys }),
     ...(spec.endedAt === undefined ? {} : { endedAt: spec.endedAt }),
   });
 
@@ -60,12 +63,37 @@ describe('tournamentTotals', () => {
   });
 
   it('counts the entry fee as money spent', () => {
-    // Two entries at $100+$10, one paying $150: 300 in, 150 back.
+    // Two entries at $100+$10, one paying $150: 220 in, 150 back.
     const result = tournamentTotals([entry(), entry({ prize: 15_000 })]);
     expect(result.invested).toBe(22_000);
     expect(result.returned).toBe(15_000);
     expect(result.net).toBe(-7_000);
     expect(result.fees).toBe(2_000);
+  });
+
+  it('and counts one fee per entry, because a re-entry pays it again', () => {
+    // One $100+$10 event, re-entered twice, recorded the way the live screen
+    // records it: `entryCost = buyIn + fee`, which its own comment calls "what
+    // one entry costs, which is what a re-entry costs again". Those land in
+    // `rebuys`, so `invested` counted all three fees and `fees` counted one --
+    // on the tile labeled "Fees paid" with the hint "never coming back".
+    const result = tournamentTotals([entry({ rebuys: [11_000, 11_000] })]);
+    expect(result.invested).toBe(33_000);
+    expect(result.fees).toBe(3_000);
+  });
+
+  it('but invents no rake for money in that is not an entry', () => {
+    // A rebuy of any other amount is money in with no known rake inside it: a
+    // rebuy-format event, an add-on, or a number typed over the seeded one.
+    // Charging it a full fee would be the same error pointing the other way.
+    const result = tournamentTotals([entry({ rebuys: [10_000, 5_000] })]);
+    expect(result.invested).toBe(26_000);
+    expect(result.fees).toBe(1_000);
+  });
+
+  it('and none at all for an event with no fee to pay', () => {
+    const result = tournamentTotals([entry({ fee: 0, rebuys: [10_000] })]);
+    expect(result.fees).toBe(0);
   });
 
   it('reports ROI against everything that went in, rake included', () => {

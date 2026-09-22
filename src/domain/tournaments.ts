@@ -41,7 +41,17 @@ export interface TournamentTotals {
   cashes: number;
   /** Cashes over entries, as a fraction. Null with no entries. */
   itmRate: number | null;
-  /** Entry fees paid -- the rake, which never comes back. */
+  /**
+   * Entry fees paid -- the rake, which never comes back.
+   *
+   * One per entry, not one per session. A re-entry costs the advertised entry
+   * again, buy-in and fee together, which is what the live screen seeds its
+   * amount with: "What one entry costs, which is what a re-entry costs again."
+   * Those land in `rebuys` as a lump, so `invested`, `net` and `roi` counted
+   * their fees all along while this counted `session.fee` once -- wrong for
+   * anybody who re-enters, and always in the flattering direction, on a tile
+   * labeled "Fees paid" with the hint "never coming back".
+   */
   fees: Cents;
   /**
    * The best *net* result, not the biggest prize. Named for what it holds: it
@@ -82,6 +92,28 @@ const EMPTY: TournamentTotals = {
 };
 
 /**
+ * The rake on one tournament record, counting every entry rather than the row.
+ *
+ * A re-entry is the advertised entry paid again, and the live screen seeds its
+ * amount with exactly that (`buyIn + fee`). So a rebuy of that amount carries
+ * a fee, and `fees` counts one for it.
+ *
+ * **And nothing else does.** A rebuy of any other amount is money in with no
+ * known rake inside it: a rebuy-format event, an add-on, or a number the
+ * player typed over the seeded one. Charging it a full fee would be inventing
+ * rake, which is the same error pointing the other way and harder to notice.
+ * The exact match is the case the app itself produces, and it is the only one
+ * this can be sure about.
+ */
+const feesPaid = (session: SessionWithChildren): Cents => {
+  const fee = session.fee ?? 0;
+  if (fee <= 0) return 0;
+  const entry = session.buyIn + fee;
+  const reEntries = session.rebuys.filter((rebuy) => rebuy.amount === entry).length;
+  return fee * (1 + reEntries);
+};
+
+/**
  * Roll up completed tournaments.
  *
  * "Cashed" is read off the prize rather than the finishing position, so a file
@@ -112,7 +144,7 @@ export const tournamentTotals = (
     const net = netResult(session, session.rebuys) ?? 0;
     invested += totalInvested(session, session.rebuys);
     returned += session.cashOut ?? 0;
-    fees += session.fee ?? 0;
+    fees += feesPaid(session);
     hours += durationHours(session);
     if ((session.cashOut ?? 0) > 0) cashes += 1;
     if (biggestNet === null || net > biggestNet) biggestNet = net;

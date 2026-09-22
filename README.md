@@ -1096,14 +1096,14 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2207 passed
+Tests:       2210 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
   bundle              72   what ships to each platform, against the real output
+  tournaments         67   ROI, its interval, cash rate, dry runs, finishes
   sessionImport       66   reading a session-summary export
   site                64   the marketing/app split, the PWA, the sitemap
-  tournaments         64   ROI, its interval, cash rate, dry runs, finishes
   handOffs            61   where a hand-off goes, and what the four offer cards say
   stats               56   P/L, rebuys, duration, win rate, groupings
   content             55   every figure in the guides, re-derived and read back

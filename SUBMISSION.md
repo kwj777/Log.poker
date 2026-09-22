@@ -343,6 +343,30 @@ That is why the whole free argument lives in the promotional text and the first
 paragraph of the description instead, and it is worth knowing before somebody
 improves the subtitle by adding the one word the store will reject it for.
 
+#### Category
+
+| Field | Value |
+| --- | --- |
+| Primary | `Finance` |
+| Secondary | `Sports` |
+
+Set in App Information, not on the version page, and this file went to
+submission day without it. Kevin chose both on 2026-09-22.
+
+Finance is the honest one. What the app computes is a bankroll, an hourly rate
+and an ROI, and the category reads as record keeping, which is the same thing
+the review notes argue about the gambling question: Log is a record of poker
+that has been played, not a way to play it. Sports carries the subject matter
+for anybody browsing rather than searching.
+
+**Games is the category to stay out of**, however much the subject sounds like
+it belongs there. There is nothing to play here, and filing a poker app beside
+the poker games invites exactly the reading the rest of this file works to
+avoid.
+
+Neither is load bearing for search, which the name and the keyword field carry,
+and both are editable later without a build.
+
 #### Keywords
 
 ```

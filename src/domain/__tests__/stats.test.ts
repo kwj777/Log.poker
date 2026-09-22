@@ -102,6 +102,16 @@ describe('hourly rate', () => {
     const s = completed({ hours: 0, cashOut: 40_000, buyIn: 30_000 });
     expect(hourlyRate(s, s.rebuys)).toBeNull();
   });
+
+  it('stays a loss when the loss is too small to print', () => {
+    // `Math.round` of a small negative is `-0`, and the screens hand this
+    // straight to `formatMoney(..., { signed: true })`, which read `+$0`
+    // because `-0 < 0` is false. Reachable from a cent-precision import
+    // rather than from typing, which is why it went unnoticed.
+    const s = completed({ buyIn: 30_000, cashOut: 29_999, hours: 10 });
+    expect(Object.is(hourlyRate(s, s.rebuys), -0)).toBe(true);
+    expect(money.formatMoney(hourlyRate(s, s.rebuys) as number, { signed: true })).toBe('-$0');
+  });
 });
 
 describe('summarize', () => {

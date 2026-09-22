@@ -123,7 +123,13 @@ export const formatMoney = (
   options: { currency?: string; signed?: boolean; showCents?: boolean } = {},
 ): string => {
   const { currency = DEFAULT_CURRENCY, signed = false, showCents } = options;
-  const negative = cents < 0;
+  // `-0` counts as negative, and it is not a curiosity: `hourlyRate` is
+  // `Math.round(net / hours)`, so a session that lost a few cents over several
+  // hours arrives here as exactly that. `-0 < 0` is false, so the session read
+  // `+$0` -- a claim of profit on a losing night. Same rule as `formatRoi`:
+  // zero keeps no sign, a number that is only zero because it was rounded
+  // keeps the one it had.
+  const negative = cents < 0 || Object.is(cents, -0);
   const abs = Math.abs(cents);
   const withCents = showCents ?? abs % 100 !== 0;
   const value = (abs / 100).toLocaleString('en-US', {

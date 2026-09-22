@@ -116,6 +116,22 @@ describe('formatMoney', () => {
   });
 });
 
+describe('a result too small to print', () => {
+  it('keeps the sign it had, rather than claiming a profit', () => {
+    // `Math.round` of a small negative is `-0`, and `-0 < 0` is false, so a
+    // losing night read `+$0`. The same rule `formatRoi` already applies: zero
+    // keeps no sign, a number that is only zero because it was rounded keeps
+    // the one it had.
+    expect(formatMoney(-0, { signed: true })).toBe('-$0');
+    expect(formatMoney(-0)).toBe('-$0');
+  });
+
+  it('and a real zero still keeps none', () => {
+    expect(formatMoney(0, { signed: true })).toBe('+$0');
+    expect(formatMoney(0)).toBe('$0');
+  });
+});
+
 describe('formatMoneyCompact', () => {
   it('keeps small amounts exact and abbreviates large ones', () => {
     expect(formatMoneyCompact(84_000)).toBe('$840');

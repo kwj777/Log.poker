@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2238 passed
+Tests:       2239 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1179,6 +1179,7 @@ Tests:       2238 passed
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room
   importWarnings       6   what the import screen says about a file it could not use
+  lintReach            6   which files npm run lint actually looks at
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
   settingsSeed         6   the demo set, and the one device it must not be written onto
@@ -1186,7 +1187,6 @@ Tests:       2238 passed
   dashboardFirstRun    5   labels on the dashboard with nothing under them yet
   errorBoundary        5   a render that throws, and the way back from it
   lineChart            5   what a chart says before it has been measured
-  lintReach            5   which files npm run lint actually looks at
   roiInterval          5   the ROI bootstrap runs once per result set, not per render
   stakesPicker         5   whether the blinds on screen are the blinds saved
   staleData            5   a read that failed after the app was already open

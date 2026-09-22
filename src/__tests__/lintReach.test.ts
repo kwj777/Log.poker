@@ -51,12 +51,37 @@ const lintAt = (relative: string, code: string): Message[] => {
 };
 
 describe('the serverless functions', () => {
-  it('are all TypeScript, which is how they went unlinted', () => {
-    // If one is ever renamed to `.ts` this stops being the interesting case,
-    // and the test below stops proving anything. Named so that shows up here.
-    const mts = readdirSync(FUNCTIONS).filter((name) => name.endsWith('.mts'));
-    expect(mts.sort()).toEqual(['signin-sweep.mts', 'signin.mts', 'sync.mts']);
+  it('are these four, and three of them are the extension eslint walked past', () => {
+    // This asserted the `.mts` files alone, under the name "are all
+    // TypeScript" -- which was false the whole time, because `chip-scan.mjs`
+    // is a deployed function too (netlify.toml routes `/api/chip-scan` at it),
+    // and which passed whether or not it was there, because the filter took it
+    // out before the comparison.
+    //
+    // The whole listing now, so a fifth function of any extension shows up
+    // here rather than in nothing. If one is ever renamed to `.ts` the test
+    // below stops proving anything, and this is where that shows.
+    expect(readdirSync(FUNCTIONS).sort()).toEqual([
+      'chip-scan.mjs',
+      'signin-sweep.mts',
+      'signin.mts',
+      'sync.mts',
+    ]);
   });
+
+  it('and every one of them is reached by the linter, whatever it is called', () => {
+    // The `.mjs` one always was: ESLint 9 targets `.js`, `.cjs` and `.mjs` by
+    // default. The three `.mts` ones were not, which is what the override in
+    // `eslint.config.js` is for, and what the case below proves it fixed.
+    for (const name of readdirSync(FUNCTIONS)) {
+      const messages = lintAt(`netlify/functions/${name}`, 'const unusedOnPurpose = 1;\n');
+      // A rule that fired, not any message: a path with no configuration gets
+      // "File ignored because no matching configuration was supplied", which
+      // is a message and is the opposite of being linted.
+      const rules = messages.filter((message) => message.ruleId !== null);
+      expect([name, rules.length > 0]).toEqual([name, true]);
+    }
+  }, 60_000);
 
   it('are linted, so an error in one fails the build', () => {
     const messages = lintAt(

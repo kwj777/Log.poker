@@ -1096,13 +1096,13 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2323 passed
+Tests:       2324 passed
 
   dexieRepository    149   the IndexedDB path, against real IndexedDB
   sqlRepository      146   the SQLite path, against real SQLite
   bundle              72   the server-side merge: two devices and one bundle
+  site                68   the marketing/app split, the PWA, the sitemap
   sessionImport       67   reading a session-summary export
-  site                67   the marketing/app split, the PWA, the sitemap
   tournaments         67   ROI, its interval, cash rate, dry runs, finishes
   handOffs            61   where a hand-off goes, and what the four offer cards say
   stats               59   P/L, rebuys, duration, win rate, groupings

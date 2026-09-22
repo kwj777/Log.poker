@@ -649,3 +649,37 @@ describe('the focus ring on the web build', () => {
   });
 });
 
+describe('the keyboard a field asks for', () => {
+  it('is asked for once, because the second way of asking is never read', () => {
+    // Six fields passed `keyboardType` and `inputMode` together, five of them
+    // through a `Platform.OS === 'web'` ternary. Neither runtime reads the
+    // first when the second is there: react native maps `inputMode` through
+    // `inputModeToKeyboardTypeMap` and uses `keyboardType` only in its
+    // absence, and react-native-web tests `inputMode` first and falls through
+    // to `keyboardType` only when it is null. Rendered through the shipped web
+    // component, the `numeric` those ternaries asked for never reaches the DOM.
+    //
+    // Nobody got the wrong keyboard: the map turns `decimal` into
+    // `decimal-pad`, which is what each native arm asked for, and `decimal`
+    // beats `numeric` on a money field anyway. It is dead code that reads like
+    // a platform difference, in five places, in front of the app's most-used
+    // control.
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+        return /\.tsx$/.test(entry.name) ? [path] : [];
+      });
+
+    // Comments stripped, so the note in `AmountInput` explaining why there is
+    // no `keyboardType` does not read as one.
+    const both = [...walk('src'), ...walk('app')].filter((path) => {
+      const code = readFileSync(join(ROOT, path), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/\/\/[^\n]*/g, ' ');
+      return code.includes('keyboardType') && code.includes('inputMode');
+    });
+    expect(both).toEqual([]);
+  });
+});
+

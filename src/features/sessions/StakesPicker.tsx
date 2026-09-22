@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Chip } from '../../components/Chip';
 import { Text } from '../../components/Text';
@@ -102,7 +102,6 @@ export const StakesPicker = ({ value, onChange, currency }: StakesPickerProps) =
             }}
             placeholder="SB"
             placeholderTextColor={colors.textTertiary}
-            keyboardType={Platform.OS === 'web' ? 'numeric' : 'decimal-pad'}
             inputMode="decimal"
             style={styles.input}
             accessibilityLabel="Small blind"
@@ -118,7 +117,6 @@ export const StakesPicker = ({ value, onChange, currency }: StakesPickerProps) =
             }}
             placeholder="BB"
             placeholderTextColor={colors.textTertiary}
-            keyboardType={Platform.OS === 'web' ? 'numeric' : 'decimal-pad'}
             inputMode="decimal"
             style={styles.input}
             accessibilityLabel="Big blind"

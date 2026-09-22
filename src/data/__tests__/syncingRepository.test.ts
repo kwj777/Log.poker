@@ -1770,3 +1770,117 @@ describe('what a round says it moved', () => {
   });
 });
 
+describe('sweeping the tombstones this device holds', () => {
+  const DAY = 24 * HOUR;
+
+  /** A device whose sweeps can be counted, and the lines it swept to. */
+  const counted = async (fetch: Fetch, name: string) => {
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    let counter = 0;
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `${name}-${String(++counter).padStart(3, '0')}` },
+    });
+    await local.init();
+
+    const sweeps: number[] = [];
+    const watched = new Proxy(local, {
+      get(target, property, receiver) {
+        if (property !== 'collectTombstones') return Reflect.get(target, property, receiver) as unknown;
+        return async (through: number) => {
+          sweeps.push(through);
+          return local.collectTombstones(through);
+        };
+      },
+    });
+
+    const repository = new SyncingRepository(
+      watched as Repository,
+      'a.b.c.d',
+      memoryCursorStore({
+        pulled: 0,
+        pushed: 0,
+        device: `device-${name}0001`,
+        settled: 0,
+        subject: null,
+      }),
+      { fetch },
+      () => now,
+    );
+    return { repository, sweeps };
+  };
+
+  const hand = (repository: SyncingRepository, sessionId: string, holeCards: string) =>
+    repository.createHand({
+      sessionId,
+      holeCards,
+      board: null,
+      position: 'BTN',
+      note: null,
+      tags: [],
+      amount: 1_000,
+      at: now,
+    });
+
+  it('does not sweep again for a line it has already swept to', async () => {
+    // The sweep was gated on the server's line being above zero, and that line
+    // is zero only until the server first collects something -- it never
+    // returns to zero after. `touched` pushes after every local write, so from
+    // the first collection onward every hand, rebuy and mood entry was
+    // followed by a full sweep: on the web engine six whole-table reads and a
+    // `readwrite` transaction held over five tables, to remove nothing.
+    const { fetch } = server();
+    const phone = await counted(fetch, 'phone');
+
+    const gone = await startSession(phone.repository);
+    const kept = await startSession(phone.repository, 'Wynn');
+    await phone.repository.push();
+
+    tick(DAY);
+    await phone.repository.deleteSession(gone.id);
+    await phone.repository.push();
+    expect(phone.sweeps).toEqual([]);
+
+    // Past the window, with nobody left to hand the tombstone to, so the
+    // server collects and draws its line. The device sweeps to it once.
+    tick(91 * DAY);
+    await phone.repository.push(true);
+    expect(phone.sweeps).toHaveLength(1);
+
+    // Three ordinary hands, each of which pushes. The line has not moved, and
+    // sweeping to a line already swept can only remove what already went.
+    for (const holeCards of ['AsKd', 'QsQd', 'Jh9h']) {
+      await hand(phone.repository, kept.id, holeCards);
+      await phone.repository.push();
+    }
+    expect(phone.sweeps).toHaveLength(1);
+  });
+
+  it('but does sweep again once the line has moved', async () => {
+    // The guard must not turn into never sweeping again: the server collects
+    // more than once, and there are tombstones between one line and the next.
+    const { fetch } = server();
+    const phone = await counted(fetch, 'phone');
+
+    const first = await startSession(phone.repository);
+    const second = await startSession(phone.repository, 'Wynn');
+    await phone.repository.push();
+
+    tick(DAY);
+    await phone.repository.deleteSession(first.id);
+    await phone.repository.push();
+    tick(91 * DAY);
+    await phone.repository.push(true);
+    expect(phone.sweeps).toHaveLength(1);
+
+    tick(DAY);
+    await phone.repository.deleteSession(second.id);
+    await phone.repository.push();
+    tick(91 * DAY);
+    await phone.repository.push(true);
+
+    expect(phone.sweeps).toHaveLength(2);
+    expect(phone.sweeps[1]).toBeGreaterThan(phone.sweeps[0]);
+  });
+});

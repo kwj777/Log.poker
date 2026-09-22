@@ -290,9 +290,9 @@ export class DexieRepository implements Repository {
     };
   }
 
-  /** Sync's write. Upserts verbatim, parents first, skipping orphans. */
   /**
-   * Take what the server sent, without stepping on a write it has not seen.
+   * Sync's write: take what the server sent, without stepping on a write it
+   * has not seen. Upserts verbatim, parents first, skipping orphans.
    *
    * The `stale` check below is SQLite's `WHERE excluded.updated_at >= ...`
    * written out, and it is here for the same reason and with the same meaning.

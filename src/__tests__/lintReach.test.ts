@@ -13,7 +13,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -87,3 +87,51 @@ describe('the serverless functions', () => {
     expect(messages.filter((message) => message.severity === 2)).toEqual([]);
   }, 60_000);
 });
+
+describe('documentation the compiler throws away', () => {
+  /**
+   * TypeScript attaches only the last JSDoc block to a declaration.
+   *
+   * So two stacked `/** ...` blocks mean the first one documents nothing: no
+   * hover, no tooling, and in this repository's case a confident paragraph
+   * sitting directly above the wrong symbol while the one it was written for
+   * has no doc at all. Nine of those had accumulated, including the warning in
+   * `SqlRepository` about `INSERT OR REPLACE` firing `ON DELETE CASCADE` and
+   * taking a session's hands with it.
+   *
+   * A file header followed by the first declaration's doc is the one legal
+   * shape, and is why the check starts at line two.
+   */
+  const stacked = (source: string): number[] => {
+    const lines: number[] = [];
+    const pattern = /\/\*\*(?:(?!\*\/)[\s\S])*\*\/\s*\n\s*\/\*\*/g;
+    for (const match of source.matchAll(pattern)) {
+      const line = source.slice(0, match.index).split('\n').length;
+      if (line > 1) lines.push(line);
+    }
+    return lines;
+  };
+
+  it('is not stacked anywhere the compiler would discard it', () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+        return /\.tsx?$/.test(entry.name) ? [path] : [];
+      });
+
+    const offenders = [...walk('src'), ...walk('app')].flatMap((path) =>
+      stacked(readFileSync(join(ROOT, path), 'utf8')).map((line) => `${path}:${line}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('and the check sees one when there is one', () => {
+    // A tripwire for the tripwire: the pattern above is easy to write so that
+    // it matches nothing, which would pass this suite forever.
+    const planted = ['const a = 1;', '/** first */', '/** second */', 'const b = 2;'].join('\n');
+    expect(stacked(planted)).toEqual([2]);
+    expect(stacked(['/** header */', '/** first */', 'const a = 1;'].join('\n'))).toEqual([]);
+  });
+});
+

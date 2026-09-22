@@ -486,12 +486,6 @@ export const assessRecentStretch = (
 };
 
 /**
- * Probability of being behind after `hours` at the player's estimated numbers.
- * The single most reassuring statistic in the app: a solid winner is still in
- * the red a meaningful share of the time over any stretch short of hundreds of
- * hours, and seeing that number defuses a lot of tilt.
- */
-/**
  * A probability in words, carrying its own qualifier.
  *
  * Rounding one to a whole percent turns anything under half a percent into
@@ -513,6 +507,12 @@ export const oddsInWords = (fraction: number): string => {
   return `about ${Math.round(fraction * 100)}%`;
 };
 
+/**
+ * Probability of being behind after `hours` at the player's estimated numbers.
+ * The single most reassuring statistic in the app: a solid winner is still in
+ * the red a meaningful share of the time over any stretch short of hundreds of
+ * hours, and seeing that number defuses a lot of tilt.
+ */
 export const probabilityOfLoss = (estimate: PlayerEstimate, hours: number): number | null => {
   if (!estimate.reliable || estimate.stdDevBbPerHour <= 0 || hours <= 0) return null;
   const z = (0 - estimate.winRateBbPerHour * hours) / (estimate.stdDevBbPerHour * Math.sqrt(hours));

@@ -154,28 +154,6 @@ export const readClaim = (token: string | null, now: Timestamp): Claim | null =>
 };
 
 /**
- * Whether this claim names somebody with a log of their own to carry.
- *
- * One condition, and it is identity. The tier was the other one once, it was
- * removed, and it is back beside this rather than inside it: see
- * `paidForSync` below, which is the question about money and is asked
- * separately so that this one can go on guarding erasure too.
- *
- * The argument that removed it is worth keeping rather than quietly losing,
- * because it is still true and it is what the price has to be worth beating:
- * what is valuable in a tracker is the player's own record, and an app that
- * charges to read that back on a second device is charging rent on their work
- * rather than selling them anything. `FAMILY-PRICING.md` has ruled the other
- * way, that sync is inside the $99. What answers the argument is that the
- * whole of the tracker stays free and only the carrying is bought, and that
- * nobody is ever refused the right to empty their own bucket.
- *
- * What is left was never about money. **A passcode holder has no subject of
- * their own**: everybody who typed one shares the literal string, so carrying
- * their histories together would pour every preview visitor's log into a
- * single one.
- */
-/**
  * How close to the end a token has to be before the app asks for a new one.
  *
  * Ten days of thirty, which is the number Untilt's own renewal uses. Wide
@@ -198,6 +176,14 @@ export const dueForRenewal = (claim: Claim | null, now: Timestamp): boolean =>
 
 /**
  * Whether this claim has a log of its own to carry.
+ *
+ * **One condition, and it is identity.** The tier was the other one once, it
+ * was removed, and it lives beside this rather than inside it: see
+ * `paidForSync`, which is the question about money and is asked separately so
+ * that this one can go on guarding erasure too. What is left was never about
+ * money. A passcode holder has no subject of their own -- everybody who typed
+ * one shares the literal string -- so carrying their histories together would
+ * pour every preview visitor's log into a single one.
  *
  * The client's half of the rule the server enforces in `hasOwnBucket`, and the
  * two have to say the same thing: this decides whether the data layer builds a

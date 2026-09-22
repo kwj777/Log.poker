@@ -66,11 +66,6 @@ import { PageMeta } from '../../src/components/PageMeta';
 const RECENT_SESSIONS = 10;
 
 /**
- * Only the true outliers get a color. A stretch inside the normal band is
- * shown in plain text on purpose -- painting an ordinary bad week red is exactly
- * the reflex this screen exists to interrupt.
- */
-/**
  * The same restraint as the cash verdicts: only a range that has actually
  * cleared break even gets a color. An undetermined one is the ordinary case
  * after any realistic number of entries, and painting it would suggest the
@@ -83,6 +78,11 @@ const ROI_COLORS: Record<RoiAssessment['verdict'], string> = {
   losing: colors.loss,
 };
 
+/**
+ * Only the true outliers get a color. A stretch inside the normal band is
+ * shown in plain text on purpose -- painting an ordinary bad week red is exactly
+ * the reflex this screen exists to interrupt.
+ */
 const VERDICT_COLORS: Record<StretchVerdict, string> = {
   insufficient_data: colors.text,
   running_bad: colors.loss,
@@ -250,14 +250,6 @@ export default function VarianceScreen() {
   }, [band, assessment]);
 
   /**
-   * The long version of what this screen is doing, on the marketing site.
-   *
-   * It appears in both branches below: with no sample yet, because that is
-   * when somebody most wants to know what the page will eventually tell them,
-   * and with one, because the loss chance printed above it is a number people
-   * want to see the working for.
-   */
-  /**
    * Offered only when there is a choice, and in both branches below, because
    * the empty one is reachable per currency: a player with a season in
    * dollars and three sessions in euros gets the real screen for one and
@@ -275,6 +267,14 @@ export default function VarianceScreen() {
       </View>
     ) : null;
 
+  /**
+   * The long version of what this screen is doing, on the marketing site.
+   *
+   * It appears in both branches below: with no sample yet, because that is
+   * when somebody most wants to know what the page will eventually tell them,
+   * and with one, because the loss chance printed above it is a number people
+   * want to see the working for.
+   */
   const guide = (
     <Button
       label="Running bad, or playing bad?"

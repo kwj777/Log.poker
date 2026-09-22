@@ -374,7 +374,8 @@ export class SqlRepository implements Repository {
   }
 
   /**
-   * Sync's write. Upserts verbatim, parents first, skipping orphans.
+   * Sync's write: take what the server sent, without stepping on a write it
+   * has not seen. Upserts verbatim, parents first, skipping orphans.
    *
    * **`ON CONFLICT DO UPDATE`, never `INSERT OR REPLACE`.** They read as
    * synonyms and are not: SQLite implements REPLACE as a DELETE followed by an
@@ -388,9 +389,6 @@ export class SqlRepository implements Repository {
    * delete happens and no cascade fires. The same trap applies to venues, where
    * the cascade is absent but the foreign key is not: REPLACE would try to
    * delete a venue that sessions still reference and be refused.
-   */
-  /**
-   * Take what the server sent, without stepping on a write it has not seen.
    *
    * Every upsert below carries `WHERE excluded.updated_at >= <table>.updated_at`
    * and that clause is the whole of the local merge rule. It is not the device

@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2229 passed
+Tests:       2231 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1186,13 +1186,13 @@ Tests:       2229 passed
   dashboardFirstRun    5   labels on the dashboard with nothing under them yet
   errorBoundary        5   a render that throws, and the way back from it
   lineChart            5   what a chart says before it has been measured
+  lintReach            5   which files npm run lint actually looks at
   roiInterval          5   the ROI bootstrap runs once per result set, not per render
   stakesPicker         5   whether the blinds on screen are the blinds saved
   staleData            5   a read that failed after the app was already open
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
   transactionQueue     4   two writes at once, on a database with no queue of its own
-  lintReach            3   which files npm run lint actually looks at
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
   allHands             2   who pays for a read of the whole journal

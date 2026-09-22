@@ -73,15 +73,6 @@ export const buildVenue = (input: NewVenue, ctx: RepositoryContext): Venue => {
 };
 
 /**
- * The format decides which fields a session is allowed to carry, and it is
- * enforced here rather than trusted from the caller.
- *
- * A tournament has no blinds and a cash game has no entry fee, no field and no
- * finishing position. Letting either keep the other's fields would put them in
- * the database, where some later screen would eventually read one and show it --
- * a `$1/$2` tournament, or a cash game that finished 14th.
- */
-/**
  * Copied field by field rather than spread.
  *
  * SQLite writes named columns and drops anything else; IndexedDB stores whatever
@@ -98,6 +89,15 @@ const normalizeStakes = (stakes: Stakes | null | undefined): Stakes | null => {
   };
 };
 
+/**
+ * The format decides which fields a session is allowed to carry, and it is
+ * enforced here rather than trusted from the caller.
+ *
+ * A tournament has no blinds and a cash game has no entry fee, no field and no
+ * finishing position. Letting either keep the other's fields would put them in
+ * the database, where some later screen would eventually read one and show it --
+ * a `$1/$2` tournament, or a cash game that finished 14th.
+ */
 export const buildSession = (input: NewSession, ctx: RepositoryContext): Session => {
   const now = ctx.clock.now();
   const format = input.format ?? 'cash';

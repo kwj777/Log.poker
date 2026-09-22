@@ -830,16 +830,21 @@ export const useLogStore = create<LogState>((set, get) => ({
 
 // ------------------------------------------------------------------- reads
 
-/**
- * Screens use these hooks rather than passing a filtering selector to
- * `useLogStore`.
- *
- * Zustand compares the selector's result by reference, so a selector that builds
- * a new array on every call reports a change on every render -- which is an
- * infinite render loop, not merely a wasted render. Subscribing to the stored
- * array (a stable reference) and deriving inside `useMemo` keeps the comparison
- * honest.
- */
+/*
+  Screens use the hooks below rather than passing a filtering selector to
+  `useLogStore`.
+
+  Zustand compares the selector's result by reference, so a selector that builds
+  a new array on every call reports a change on every render -- which is an
+  infinite render loop, not merely a wasted render. Subscribing to the stored
+  array (a stable reference) and deriving inside `useMemo` keeps the comparison
+  honest.
+
+  A block comment rather than a docstring: it is about all of them, and as the
+  first of two doc blocks stacked above one hook, TypeScript attached it to
+  nothing and showed it nowhere.
+*/
+
 /**
  * One session's hands, read when they are wanted rather than held for ever.
  *

@@ -310,14 +310,6 @@ const heard = (
 const derived = (record: Row): Timestamp => record.updatedAt + 1;
 
 /**
- * Two sessions cannot both be running, and only the bundle knows there are two.
- *
- * The rule and its reasoning are in `src/domain/merge.ts`; what happens here is
- * the bookkeeping around it. A session the rule closes is written back with an
- * `endedAt` and **no cash-out**, which leaves it neither active nor complete, so
- * it stays out of every total until the player says what came off the table.
- */
-/**
  * A stamp this server is willing to believe, or null.
  *
  * Not clamped. Clamping a future stamp answers `now`, and `now` moves: a rule
@@ -418,6 +410,14 @@ const rescuedParents = (
   return rescued;
 };
 
+/**
+ * Two sessions cannot both be running, and only the bundle knows there are two.
+ *
+ * The rule and its reasoning are in `src/domain/merge.ts`; what happens here is
+ * the bookkeeping around it. A session the rule closes is written back with an
+ * `endedAt` and **no cash-out**, which leaves it neither active nor complete, so
+ * it stays out of every total until the player says what came off the table.
+ */
 const settleActiveSessions = (
   bundle: Bundle,
   at: Timestamp,

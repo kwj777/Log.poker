@@ -123,6 +123,16 @@ under Domains, log.poker, DNS records.
 
 `_dmarc.log.poker` already publishes `v=DMARC1; p=none;` and wants nothing.
 
+**The SPF record ends `~all`, not `-all`.** The stricter one was typed once and
+is worth explaining rather than only specifying. Both cover Spacemail
+identically, through the include; the tail is only about mail the record does
+not cover, and `-all` asks a receiver to reject that outright where `~all` asks
+it to accept and flag. Nothing here needs the stricter one, and this is the
+mailbox that must not bounce when App Review writes to it: a soft fail costs a
+spam folder, a hard fail costs the message. Tightening it later is a one
+character edit, and the thing that would justify it is a `rua=` on the DMARC
+record collecting reports first, which is not there today.
+
 **The apex SPF does not break the signin mailer, and the reason is worth
 writing down rather than rediscovering.** Resend sends as `signin@log.poker`
 but its SPF lives on `send.log.poker`, which is the return path a receiver

@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 107 passed
-Tests:       2336 passed
+Tests:       2341 passed
 
   dexieRepository    149   the IndexedDB path, against real IndexedDB
   sqlRepository      146   the SQLite path, against real SQLite
@@ -1120,13 +1120,13 @@ Tests:       2336 passed
   merge               33   two devices disagreeing, and who wins
   signinSweep         31   what the sign-in store may collect, and what it must not
   token               31   the family token grammar, against signed fixtures
+  release             30   app.json, eas.json and the icon a store refuses over
   session             30   holding a token, and stores that fail as real ones do
   handNotation        29   parse, round-trip, hand classes
   editSession         28   correcting a session, including the one nobody cashed out
   sessionExport       28   the log written out, and read back by the importer
   money               27   cents arithmetic, parsing, formatting
   palette             27   the theme matches BRAND.md
-  release             25   app.json, eas.json and the icon a store refuses over
   writeFailures       24   what the player sees when a write does not work
   chip                23   /chip resolves, offline, and never quotes a price
   compose             23   which repository a device gets, and the unsafe sweep

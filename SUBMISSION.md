@@ -533,12 +533,28 @@ answers a question this app reliably raises.
 
 ## Screenshots
 
-Required at 6.7" (iPhone 15 Pro Max or similar), and that is the whole set:
-`supportsTablet` is `false`, so no iPad shots are needed. See decision 2.
+**One set, at the 6.9 inch display class, and that is the whole requirement.**
+`supportsTablet` is `false`, so no iPad shots are needed (see decision 2), and
+Apple takes between one and ten per class. Five is the number below.
+
+This file said 6.7 inch until 2026-09-22, which is a size class Apple no longer
+names. Those devices, the iPhone 15 Pro Max among them, were folded into 6.9
+inch along with the current Max phones. **The reliable way to get the
+dimensions right is to shoot on a Max simulator rather than to resize anything
+afterwards**, because a screenshot taken on a device in the class is by
+definition the size that class wants. An iPhone 18 Pro Max simulator, if it is
+not already in the list:
+
+```
+xcrun simctl create "iPhone 18 Pro Max" \
+  com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro-Max \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-0
+```
 
 The screens worth showing, in the order they tell the story: the dashboard with
 a few sessions logged, a live session running, logging a hand, the variance
-view, and the history list.
+view, and the history list. The first two are the ones most people ever see, so
+they carry the argument and the rest are support.
 
 **Take them from a development run, not from the build in step 3.** Four of
 those five want a log with sessions already in it, and the way to get one is
@@ -555,6 +571,13 @@ The pixels are the same either way. Those flags hide rather than strip, and no
 layout differs between the two configurations. Step 3 answers the icon, the
 splash screen and the bundle identifier, which is a different question from
 what a screen looks like with data behind it.
+
+**A development run draws a floating dev menu button, and it must not be in a
+screenshot.** It comes from Expo Go rather than from anything in `app/` or
+`src/`, so it cannot reach a store build, but it is on screen while you shoot.
+Press cmd-D in the simulator and turn it off first. If it will not hide, shoot
+from the Release build instead and fill the log through the importer rather
+than the seeder.
 
 The seeder refuses on a signed-in device on purpose: it starts with a reset, so
 a device that syncs would pull the real log back and then push the demo up.

@@ -204,4 +204,16 @@ describe('what the dashboard does not read to draw the card', () => {
     expect(dashboard).toContain('useHandsForSession(lastFinished?.id ?? null)');
     expect(dashboard).not.toMatch(/listHands\(\s*\)/);
   });
+
+  it('and is counted among that hook’s callers, which it was not', () => {
+    // `useHandsForSession`'s docstring said "the two callers both branch on
+    // it" about the null-means-not-read-yet rule. This screen was the third,
+    // and it branches indirectly -- `reviewPrompt` refuses a null `hands` on
+    // its first line, which is what keeps the card off the screen in the frame
+    // before the read lands. A headcount in a comment goes stale silently; the
+    // rule does not.
+    const store = source('src', 'store', 'useLogStore.ts');
+    expect(store).not.toContain('The two callers');
+    expect(store).toContain('Every caller branches on it');
+  });
 });

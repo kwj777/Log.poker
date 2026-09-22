@@ -861,7 +861,10 @@ export const useLogStore = create<LogState>((set, get) => ({
  * **Null means not read yet, and it is not the same as none.** A screen that
  * treats them alike says "no hands logged for this session" in the gap before
  * the first read lands, which is a sentence that is wrong rather than merely
- * early. The two callers both branch on it.
+ * early. Every caller branches on it, and one that cannot tell the two apart
+ * must not draw an empty state. Stated as the rule rather than as a count,
+ * because this said "the two callers" while there were three -- the dashboard
+ * arrived later and branches indirectly, through `reviewPrompt`'s first line.
  *
  * Reloaded when `handsVersion` moves, which is any write or sync that touched
  * the hands. The previous answer is left on screen while the next one is read,

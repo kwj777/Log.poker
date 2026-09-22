@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 99 passed
-Tests:       2242 passed
+Test Suites: 102 passed
+Tests:       2252 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1129,9 +1129,9 @@ Tests:       2242 passed
   chip                23   /chip resolves, offline, and never quotes a price
   compose             23   which repository a device gets, and the unsafe sweep
   history             23   the session list, its filters, and how much of it mounts
+  release             23   app.json, eas.json and the icon a store refuses over
   glossary            22   the shorthand on screen still matches its explanation
   money               22   cents arithmetic, parsing, formatting
-  release             21   app.json, eas.json and the icon a store refuses over
   clock               20   a typed date, a typed length, and what neither will accept
   privacy             20   the policy page, held to the code it describes
   batch               19   a backlog split into requests, without orphaning a child
@@ -1192,11 +1192,14 @@ Tests:       2242 passed
   staleData            5   a read that failed after the app was already open
   varianceCurrency     5   the variance page stops adding euros to dollars
   varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
+  importPicker         4   opening a file on a phone, and the three answers a picker gives
   transactionQueue     4   two writes at once, on a database with no queue of its own
   midSessionCheckIn    3   whether a check-in that failed says it was logged
   notFound             3   where a link that names nothing lands
   allHands             2   who pays for a read of the whole journal
+  amountField          2   the money field's box, against the font it has to hold
   newSessionDefaults   2   where the pre-filled session says its numbers came from
+  safeArea             2   the top inset, on a phone with a notch and without
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

@@ -94,10 +94,15 @@ piece that would have to be built for any of the paid options above.
 480pt column rather than a stretched phone screen. That renders sanely, it is
 just a lot of empty space.
 
-Leaving it on means Apple reviews iPad behavior and wants iPad screenshots.
-Turning it off is one line and ships iPhone-only for 1.0. Either is defensible.
-It is left on, because the layout demonstrably handles it, but it has not been
-seen on an actual iPad and should be before the screenshots are taken.
+**Decided on 2026-09-22: off, and 1.0 ships iPhone only.** Leaving it on meant
+Apple reviewing iPad behavior and wanting a second set of screenshots at 12.9
+inches, for a layout that renders correctly and has nothing to fill the space
+with. Nothing is lost that cannot be given back: it is one line, the layout
+still caps the same way, and an iPad build is a later release rather than a
+rewrite.
+
+`release.test.ts` holds it at `false` so it is not flipped back without the
+screenshot requirement being reconsidered at the same time.
 
 ### 3. The support mailbox
 
@@ -109,38 +114,113 @@ sends mail: `netlify/functions/signin.mts` sends from `signin@log.poker` and
 submission.** App Review uses the support address. One that bounces is worse
 than none. A forward to a real inbox is enough.
 
+A Spacemail mailbox was bought for it on 2026-09-22 and **all four records
+below were published that afternoon and verified against Cloudflare's and
+Google's resolvers**, including that the 2048 bit DKIM key reassembles whole,
+which is the failure a DNS panel hides. What is still outstanding is the only
+part DNS cannot answer: a message sent from off the domain, arriving.
+
+Spaceship is only where the values are read from: log.poker's nameservers are Netlify's
+(`dns1.p02.nsone.net` and its three siblings), so the records go in Netlify
+under Domains, log.poker, DNS records.
+
+| Name | Type | Value |
+| --- | --- | --- |
+| `@` | MX, priority 0 | `mx1.spacemail.com` |
+| `@` | MX, priority 0 | `mx2.spacemail.com` |
+| `@` | TXT | `v=spf1 include:spf.spacemail.com ~all` |
+| `spacemail._domainkey` | TXT | the account's own `v=DKIM1; k=rsa; p=...`, from Spaceship under Launchpad, Advanced DNS, Inactive records |
+
+`_dmarc.log.poker` already publishes `v=DMARC1; p=none;` and wants nothing.
+
+**The SPF record ends `~all`, not `-all`.** The stricter one was typed once and
+is worth explaining rather than only specifying. Both cover Spacemail
+identically, through the include; the tail is only about mail the record does
+not cover, and `-all` asks a receiver to reject that outright where `~all` asks
+it to accept and flag. Nothing here needs the stricter one, and this is the
+mailbox that must not bounce when App Review writes to it: a soft fail costs a
+spam folder, a hard fail costs the message. Tightening it later is a one
+character edit, and the thing that would justify it is a `rua=` on the DMARC
+record collecting reports first, which is not there today.
+
+**The apex SPF does not break the signin mailer, and the reason is worth
+writing down rather than rediscovering.** Resend sends as `signin@log.poker`
+but its SPF lives on `send.log.poker`, which is the return path a receiver
+actually checks, and its DKIM is on the `resend` selector. A `spacemail`
+selector and an apex SPF sit beside both without touching either. What would
+break it is a second record at the apex beginning `v=spf1`: two SPF records
+are one permanent error, not a conflict anybody notices. The apex also carries
+a `google-site-verification` TXT that the SPF record goes next to rather than
+over.
+
+**Proved on 2026-09-22: a message sent from off the domain arrived.** That was
+the last thing standing between this section and done, and it was worth doing
+rather than inferring, because a mailbox that does not receive looks exactly
+like one that does until App Review writes to it.
+
+Not needed for any of the above, and listed only so it is not mistaken for a
+missing step: an SRV record at `_autodiscover._tcp` of `0 0 443
+autoconfig.spacemail.com` lets mail clients configure themselves. It has
+nothing to do with whether mail arrives.
+
 ---
 
 ## Getting an account and a first build
 
-1. **Apple Developer Program**, 99 USD a year, at developer.apple.com. Enrollment
-   is not instant; an individual enrollment usually clears in a day or two and a
-   company one can take considerably longer. Start this before anything else.
+**Steps 1, 2 and the first half of 5 were done on 2026-09-22.** What is left is
+the builds, the screenshots and the upload. The finished steps are struck
+through rather than deleted, because what they settled is what the rest of this
+file reads back.
 
-2. **Register the bundle identifier** `poker.log.app` under Certificates,
-   Identifiers and Profiles. It has to match `app.json` exactly and it cannot be
-   changed after the first submission.
+1. ~~**Apple Developer Program.**~~ **Done.** The account is approved, and the
+   team already carried TiltProof's app record before this one.
 
-3. **A simulator build, which needs no account at all.** This is the one native
-   build available before enrollment clears, and it is the first time any of
-   this code will have run outside a browser:
+2. ~~**Register the bundle identifier.**~~ **Done.** `poker.log.app` is
+   registered as an explicit App ID, matching `app.json` on both platforms,
+   with **no capabilities enabled**, which is what this app needs: the keychain
+   is its own (`tokenStore.ts` calls SecureStore with no options and `app.json`
+   carries no access group), the `logpoker://` scheme lives in Info.plist, and
+   there is no push, no iCloud and no Sign in with Apple in the tree.
+
+   Associated Domains is the one to come back for, and only on the day a pass
+   bought at untilt.poker should land on a phone. `/claim` is web only today;
+   see decision 1 above. Capabilities stay editable after registration, so none
+   of that had to be settled here.
+
+3. **A simulator build, which needs no signing.**
 
    ```
    npx eas build --platform ios --profile simulator
    ```
 
-   Expect to spend real time here. SQLite (`src/data/sql/expoSqliteDriver.ts`),
+   This step used to warn that the code had never run outside a browser and to
+   expect real time here. It ran on 2026-09-22, in the simulator through Expo
+   Go, and the warning was right: SQLite (`src/data/sql/expoSqliteDriver.ts`),
    SecureStore (`src/auth/tokenStore.ts`), haptics and the CSV share sheet
-   (`src/features/export/saveCsv.ts`) are all carefully written and none has
-   ever executed on a device.
+   (`src/features/export/saveCsv.ts`) all work, but three layout and platform
+   bugs no static audit could see turned up in the first hour and are fixed
+   (#95, #96, #97). What this build is now for is the things Expo Go cannot
+   answer: the real icon, the splash screen, and the app under its own bundle
+   identifier rather than Expo Go's.
 
-4. **A device build**, once enrollment clears:
+   `npx expo prebuild --platform ios` was run against this config on
+   2026-09-22, which is the first thing EAS does on its own machines, and it
+   generates cleanly. It found one thing on the way, worth reading as a pattern
+   rather than as a fixed bug: the splash screen's dark variant was writing
+   `UIUserInterfaceStyle = Automatic` into Info.plist and overriding the
+   `userInterfaceStyle: "dark"` set higher up the same file. Expo Go carries
+   its own Info.plist, so that class of defect cannot appear until exactly this
+   step. Run the build expecting a second round of them.
+
+4. **A device build.** Nothing is waiting on enrollment; see step 1.
 
    ```
    npx eas build --platform ios --profile preview
    ```
 
-5. **Create the app in App Store Connect**, then the production build and the
+5. ~~**Create the app in App Store Connect.**~~ **Done.** The record is named
+   `Log: Poker Session Tracker`, iOS only, English (U.S.), SKU `poker.log.app`,
+   and **its App Store ID is 6814843842**. Then the production build and the
    upload:
 
    ```
@@ -149,12 +229,164 @@ than none. A forward to a real inbox is enough.
    ```
 
    `eas submit` prompts for the Apple ID, team ID and App Store Connect app ID.
-   Those are account facts rather than project facts, which is why `eas.json`
-   has an empty `submit.production` profile instead of placeholders.
+   The app ID is the number above. The team ID is the App ID Prefix shown on
+   the identifier's own page in Certificates, Identifiers and Profiles.
+
+   **They stay out of `eas.json` on purpose.** They are account facts rather
+   than project facts, which is why `submit.production` is an empty profile
+   instead of placeholders, and `release.test.ts` fails the suite on an
+   `appleTeamId` or `ascAppId` appearing in that file. Recording the app ID in
+   this file is documentation and does not touch that rule.
+
+   That number is also what the marketing site wants the day the app is
+   approved: an `apple-itunes-app` smart banner and the App Store badge link
+   both address the app by it. Neither goes live before approval, because App
+   Review opens the marketing URL and a download link that goes nowhere is an
+   easy rejection.
 
 ---
 
 ## The answers App Store Connect asks for
+
+### The listing
+
+Everything else in this file is a checkbox or a sentence of prose. This is the
+one section that is copy, and it was the last thing here to get written, which
+is backwards: it is the only part of the submission that decides whether
+anybody ever finds the app. The code is ahead of every free tracker on the
+store; the listing is the whole distribution channel, and a free app with no ad
+budget has no second one.
+
+**The App Store record already exists** (see decision 1), so all of this is an
+edit to it rather than a first entry.
+
+#### Name and subtitle
+
+| Field | Value | Limit |
+| --- | --- | --- |
+| Name | `Log: Poker Bankroll Tracker` | 30, this is 27 |
+| Subtitle | `Running bad, or playing bad?` | 30, this is 28 |
+
+**The app is called Log and that is unsearchable.** The name on the home screen
+comes from `expo.name` in `app.json` and stays `Log`, which is right: it is a
+short word under an icon. The App Store Connect name is a different field
+entirely, it is indexed for search, and `Log` alone will never surface for
+anybody typing "poker tracker". The name above keeps the brand and buys the
+three words that matter.
+
+The subtitle is indexed too, so spending it on a slogan is a real trade. It is
+worth making here: the name already carries poker, bankroll and tracker, the
+keyword field below carries the rest, and every competitor's subtitle on a
+search results page says some arrangement of the same three words. The line
+above is the question the app exists to answer and it is the app's own copy,
+from the variance screen.
+
+If the app is still invisible after a few months, the keyword-weighted
+alternative is `Session log and variance math` (29), and swapping it is a
+metadata change that does not need a build.
+
+**No price words in the name or the subtitle.** Apple's own metadata guidance
+puts pricing out of both fields, so "Free" cannot go where it would help most.
+That is why the whole free argument lives in the promotional text and the first
+paragraph of the description instead, and it is worth knowing before somebody
+improves the subtitle by adding the one word the store will reject it for.
+
+#### Keywords
+
+```
+session,variance,winrate,downswing,tournament,hourly,journal,cash,game,live,stakes,casino,roi
+```
+
+93 of the 100 characters. Three rules are load bearing and easy to get wrong:
+the field is comma separated with **no space after the comma**, because a space
+costs a character; Apple indexes the name and the keyword field together, so
+repeating `poker`, `bankroll`, `tracker` or `log` here would spend characters on
+words already covered; and singulars match plurals, so nothing on that list
+needs an `s`.
+
+`downswing` is on it deliberately. It is what a player types into a search box
+on the night they most want this app, and no competitor's listing is written
+around it.
+
+#### Promotional text
+
+170 characters, and the one field that can be changed without submitting a
+build. This is where the wedge goes.
+
+```
+Everything in Log is free. No session limit, no ads, no account needed. Export
+your whole log whenever you like, and sync it across your devices for nothing.
+```
+
+Each clause of that is a paywall somewhere else. Poker Analytics gives one
+session a month, Nash four a week, StackEdge fifty sessions and then charges for
+the export, and Left Pocket caps sessions and gates multiple bankrolls. Saying
+plainly what is free is not modesty, it is the comparison.
+
+#### Description
+
+Long, and only the first three lines show before the "more" link, which is why
+the first paragraph carries the whole argument.
+
+```
+Log is a poker session tracker for live cash games, home games and tournaments.
+It is free in its entirety: no session limit, no ads, no subscription, and no
+account unless you want your log on more than one device.
+
+Log a session in under ten seconds and a hand in under fifteen. Start with the
+stakes, the game and the buy-in, add rebuys as they happen, cash out at the
+end. The duration, the profit and the hourly rate are worked out for you rather
+than typed.
+
+AM I RUNNING BAD, OR PLAYING BAD?
+
+That is the question a downswing provokes, and Log is built to answer it
+honestly. It estimates your own win rate and your own standard deviation from
+the sessions you have logged, never from a typical number somebody else picked,
+and it shows your recent stretch inside the range those two numbers predict. A
+rough patch inside the range is named as ordinary. An outlier is named as an
+outlier. A heater is called a heater, so you do not bank on it. Below eight
+sessions it says it does not know yet rather than inventing a verdict.
+
+WHAT IS IN IT
+
+Sessions with stakes, venue, game, rebuys and notes, cash or tournament.
+
+A quick hand journal: hole cards in two taps, position, one line of note, and
+tags for a bad beat, a cooler, a bluff or a hand you think you misplayed.
+
+Your bankroll over time, your hourly rate, and where the money comes from,
+broken down by stakes, by venue and by game.
+
+The variance view, with your win rate in big blinds per hour and the swing that
+goes with it.
+
+Tournaments kept separate, with the entry and the fee apart, a cash rate, and
+an ROI carrying a real interval rather than a false air of precision.
+
+An optional one tap mood check at the start and end of a session, and an honest
+look at what it costs you. It refuses to claim a finding the numbers cannot
+carry.
+
+Filters and search across the whole log.
+
+IT WORKS WITH NO SIGNAL
+
+Card rooms are basements. Every read and every write is on your device, so
+adding a rebuy and logging a hand work with the network entirely gone.
+
+YOUR LOG IS YOURS
+
+Export all of it to CSV whenever you like, at no charge, in a file Log reads
+back. Import a year of sessions from a spreadsheet or from a tracker export
+rather than typing them out. Sign in with an email address if you want to, and
+your log follows you to your other devices, which is free as well.
+
+Log keeps no user table and never stores your email address.
+```
+
+There is no "What's New" text for 1.0, which is the one version that does not
+need any.
 
 ### App Privacy
 
@@ -188,10 +420,34 @@ Log records real-money poker sessions that have already been played. It
 contains no game of chance, no wagering, no simulated gambling and no link to
 any gambling operator. It does not facilitate gambling; it is a record of it.
 
-Answer the gambling questions in the questionnaire honestly rather than
-answering "none". A poker app rated 4+ is a mismatch a reviewer will notice,
-and the honest answers land at 17+ (or 18+ under the newer system), which is
-the correct rating for this app.
+**All of that is true, and none of it means answering "no" to the Gambling
+question.** This paragraph used to stop at "answer the gambling questions
+honestly rather than answering none", which read as a principle and was taken
+as one. It is not a principle. It is a scar.
+
+**Untilt was rejected once for answering no to that question**, on this same
+developer account, and Untilt is a meditation app: less gambling-adjacent than
+this one by a distance. Apple reads the question as being about what the app is
+about and not only about what a user can stake inside it, and a poker app
+declaring no gambling content at all reads as evasive rather than as accurate.
+
+So the answers, spelled out rather than reasoned toward:
+
+| Question | Answer |
+| --- | --- |
+| Gambling | **Yes** |
+| Simulated Gambling | None, there is no play-money game |
+| Contests | None |
+| Loot Boxes | No |
+
+That lands the app at 18+ under the current system, which is the right rating
+for it.
+
+**Answering yes does not pull the app under guideline 5.3.4.** That rule is
+about apps which actually offer real money gaming, and it is assessed from the
+app rather than from this checkbox: there is nothing in Log to stake, so there
+is no license for a reviewer to ask after. Untilt carried the same answer
+through review without ever being asked for one.
 
 ### Export compliance
 
@@ -263,8 +519,8 @@ answers a question this app reliably raises.
 
 ## Screenshots
 
-Required at 6.7" (iPhone 15 Pro Max or similar). Add 12.9" iPad shots if
-`supportsTablet` stays `true`.
+Required at 6.7" (iPhone 15 Pro Max or similar), and that is the whole set:
+`supportsTablet` is `false`, so no iPad shots are needed. See decision 2.
 
 The screens worth showing, in the order they tell the story: the dashboard with
 a few sessions logged, a live session running, logging a hand, the variance

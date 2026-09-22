@@ -23,6 +23,7 @@ interface AppConfig {
     version: string;
     scheme: string;
     icon: string;
+    userInterfaceStyle: string;
     ios: {
       bundleIdentifier: string;
       buildNumber: string;
@@ -64,6 +65,15 @@ describe('what the stores identify this build by', () => {
     expect(json<{ version: string }>('package.json').version).toBe(app.version);
   });
 
+  it('ships iPhone only, which is what the screenshot set was cut down to match', () => {
+    // Decided for 1.0 and asserted because the two halves live apart: this
+    // flag decides what Apple reviews, and SUBMISSION.md decides what gets
+    // photographed. Turning it back on is one character and would silently
+    // leave the submission a whole size of screenshot short, which App Store
+    // Connect refuses at upload rather than at the edit that caused it.
+    expect(app.ios.supportsTablet).toBe(false);
+  });
+
   it('names the same bundle on both, which is the one thing that cannot change later', () => {
     expect(app.ios.bundleIdentifier).toBe('poker.log.app');
     expect(app.android.package).toBe('poker.log.app');
@@ -94,6 +104,30 @@ describe('the splash screen, which moved out from under the app', () => {
 
   it('and the dead key is gone rather than left to look meaningful', () => {
     expect(app.splash).toBeUndefined();
+  });
+
+  it('offers no dark variant, which would quietly unlock the app from dark mode', () => {
+    // There was one, and its image and background were byte for byte the light
+    // ones, so it looked like harmless duplication. It was not. A dark variant
+    // makes the plugin write `UIUserInterfaceStyle = Automatic` into
+    // Info.plist, which overrides the `userInterfaceStyle: "dark"` three lines
+    // up in the same file, and `expo prebuild` says so in a warning that reads
+    // like it is about the splash screen.
+    //
+    // The app would still draw its own dark palette, because that is a fixed
+    // theme rather than a response to the system. What follows the system is
+    // everything iOS draws: the keyboard, the share sheet, the alerts, the
+    // selection handles. A light keyboard under a dark app, on a light mode
+    // phone, and nowhere else.
+    //
+    // Expo Go cannot show this, since it carries its own Info.plist, so the
+    // first place it could ever have appeared is the first real build.
+    const plugin = app.plugins.find(
+      (entry) => Array.isArray(entry) && entry[0] === 'expo-splash-screen',
+    ) as [string, Record<string, unknown>];
+
+    expect(plugin[1].dark).toBeUndefined();
+    expect(app.userInterfaceStyle).toBe('dark');
   });
 
   it('with the package it needs as a dependency, not just a plugin name', () => {

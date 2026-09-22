@@ -10,7 +10,7 @@
     "backgroundColor": "#1c211f",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "poker.log.app",
       "buildNumber": "1",
       "config": {
@@ -41,11 +41,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#1c211f",
-          "dark": {
-            "image": "./assets/splash-icon.png",
-            "backgroundColor": "#1c211f"
-          }
+          "backgroundColor": "#1c211f"
         }
       ]
     ],

@@ -5,8 +5,14 @@
  * store, which never exercises an upgrade. That is the one path where a mistake
  * is unrecoverable: a fresh install that reads wrong can be reinstalled, and a
  * migration that drops a year of sessions cannot be undone. So each engine is
- * built here at the *previous* version, filled with rows in the shape that
- * version wrote, and then opened by the shipping code.
+ * built here at an *older* version, filled with rows in the shape that version
+ * wrote, and then opened by the shipping code.
+ *
+ * Older rather than previous, which is what this used to say. SQLite starts
+ * from 2, 3, 4 and 6 against a head of 7, and Dexie from 2 and 5 against a
+ * head of 6, because "the previous version" is a single start point and this
+ * file has never had one. A phone that has not been opened since last winter
+ * is not one version behind.
  */
 
 import { readFileSync } from 'node:fs';
@@ -589,5 +595,134 @@ describe('an upgrade that was interrupted halfway through', () => {
     const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
     expect(row.user_version).toBe(LATEST_VERSION);
     expect(await repository.listSessions()).toHaveLength(1);
+  });
+});
+
+describe('SQLite: a v6 database, which is the shortest walk that exists', () => {
+  /**
+   * Every SQLite block above starts at 2, 3 or 4, so migration 7's
+   * `CREATE INDEX` over existing rows is only ever run at the end of a long
+   * walk. That is not the walk a phone one release behind takes, and it is the
+   * one the index is most likely to be wrong on -- an index built over rows
+   * that were already there rather than over an empty table.
+   */
+  let driver: NodeSqliteDriver;
+  let repository: SqlRepository;
+
+  beforeEach(async () => {
+    driver = new NodeSqliteDriver(':memory:');
+    for (const migration of MIGRATIONS.filter((entry) => entry.version <= 6)) {
+      for (const statement of migration.statements) await driver.execute(statement);
+    }
+    await driver.execute('PRAGMA user_version = 6');
+
+    await driver.run(
+      `INSERT INTO venues (id, name, is_home_game, created_at, updated_at)
+       VALUES ('v1', 'Aria', 0, ?, ?)`,
+      [T0, T0],
+    );
+    await driver.run(
+      `INSERT INTO sessions (id, venue_id, format, game_type, small_blind, big_blind, ante,
+         currency, buy_in, fee, cash_out, entrants, finish_position, started_at, ended_at,
+         notes, import_key, created_at, updated_at)
+       VALUES ('s1', 'v1', 'cash', 'NLHE', 100, 200, NULL, 'USD', 30000, NULL, 45000, NULL,
+         NULL, ?, ?, NULL, 'csv|1', ?, ?)`,
+      [T0, T0 + 3_600_000, T0, T0],
+    );
+
+    repository = new SqlRepository(driver);
+    await repository.init();
+  });
+
+  afterEach(async () => {
+    await driver.close();
+  });
+
+  it('walks to the current version', async () => {
+    const [row] = await driver.all<{ user_version: number }>('PRAGMA user_version');
+    expect(row.user_version).toBe(LATEST_VERSION);
+  });
+
+  it('and the index migration 7 builds answers over the rows that were already there', async () => {
+    // `listChangedSince` is the read that index exists for, and the row it has
+    // to find was written before the index was.
+    const { sessions, venues } = await repository.listChangedSince(0);
+    expect(sessions.map((change) => change.record.id)).toEqual(['s1']);
+    expect(venues.map((change) => change.record.id)).toEqual(['v1']);
+    expect(await repository.listChangedSince(T0 + 1)).toEqual({
+      venues: [],
+      sessions: [],
+      rebuys: [],
+      hands: [],
+      moodEntries: [],
+    });
+  });
+
+  it('and the log it was holding is all still there', async () => {
+    expect(await repository.listSessions()).toHaveLength(1);
+    expect(await repository.listImportKeys()).toEqual(['csv|1']);
+  });
+});
+
+describe('IndexedDB: a v5 database, where the tombstone index has yet to land', () => {
+  /**
+   * v6 indexes `deletedAt` on the hands so `countHands` can answer with two
+   * counts of keys instead of a cursor over the log. Every Dexie block above
+   * starts at 2, so that index has only ever been built during a four-version
+   * walk; this is the one-step upgrade a device one release behind performs,
+   * over hands that are already there and one that is already tombstoned.
+   */
+  const name = 'log-poker-v5-test';
+  let db: ReturnType<typeof createDatabase>;
+  let repository: DexieRepository;
+
+  beforeEach(async () => {
+    const legacy = new Dexie(name);
+    // v5's stores exactly: the `updatedAt` indexes, and no `deletedAt` on the
+    // hands.
+    legacy.version(5).stores({
+      venues: 'id, name, createdAt, updatedAt',
+      sessions: 'id, venueId, format, gameType, startedAt, endedAt, updatedAt, &importKey',
+      rebuys: 'id, sessionId, at, updatedAt',
+      hands: 'id, sessionId, at, updatedAt',
+      moodEntries: 'id, sessionId, phase, at, updatedAt',
+      preferences: 'key',
+    });
+    await legacy.open();
+    await legacy.table('venues').add({
+      id: 'v1', name: 'Aria', isHomeGame: 0, createdAt: T0, updatedAt: T0,
+    });
+    await legacy.table('sessions').add({
+      id: 's1', venueId: 'v1', format: 'cash', gameType: 'NLHE',
+      stakes: { smallBlind: 100, bigBlind: 200 }, currency: 'USD', buyIn: 30_000,
+      fee: null, cashOut: 45_000, entrants: null, finishPosition: null,
+      startedAt: T0, endedAt: T0 + 3_600_000, notes: null, createdAt: T0, updatedAt: T0,
+    });
+    await legacy.table('hands').bulkAdd([
+      { id: 'h1', sessionId: 's1', holeCards: 'AsKd', position: 'BTN', note: null, tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0 },
+      { id: 'h2', sessionId: 's1', holeCards: 'QhQd', position: 'CO', note: null, tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0 },
+      // Already deleted when the index arrives, which is the row the index is
+      // for and the one a fresh table would never have.
+      { id: 'h3', sessionId: 's1', holeCards: '7c2s', position: 'BB', note: null, tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0, deletedAt: T0 },
+    ]);
+    legacy.close();
+
+    db = createDatabase(name);
+    repository = new DexieRepository(db);
+    await repository.init();
+  });
+
+  afterEach(async () => {
+    db.close();
+    await db.delete();
+  });
+
+  it('opens at 6, which is one step', async () => {
+    expect(db.verno).toBe(6);
+  });
+
+  it('counts the live hands over an index built after they were written', async () => {
+    expect(await repository.countHands()).toBe(2);
+    expect(await repository.listHands('s1')).toHaveLength(2);
   });
 });

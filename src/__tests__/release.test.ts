@@ -10,7 +10,8 @@
  * What is asserted is only the part an app store refuses a build over. Taste
  * lives in the files; this is the floor under them.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -152,7 +153,60 @@ describe('the web block, which is read by less of the toolchain than it looks', 
     // `src/version.ts` calls "the source of truth" that their edit had gone
     // nowhere. The copy that is read lives in `public/manifest.webmanifest`
     // and `app/+html.tsx`.
-    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'favicon', 'output']);
+    expect(Object.keys(app.web).sort()).toEqual(['bundler', 'output']);
+  });
+
+  it('and declares no favicon, because the shell already declares one', () => {
+    // `web.favicon` generated `dist/app/favicon.ico` and a `<link rel="icon">`
+    // appended after the shell's head, so every one of the nineteen exported
+    // /app documents carried two conflicting icon declarations and left the
+    // choice to the browser. In the one file that goes out of its way to
+    // avoid a duplicated head tag -- `+html.tsx` says two `<title>` elements
+    // would be wrong because "the browser reads the first".
+    //
+    // The one that stays is the shell's `/icons/icon-192.png`, which the
+    // manifest, the apple-touch-icon and all nine marketing pages already
+    // agree on. The generated `.ico` topped out at 48px.
+    expect(app.web.favicon).toBeUndefined();
+    expect(read('app', '+html.tsx')).toContain('<link rel="icon" href="/icons/icon-192.png"');
+  });
+});
+
+describe('the images checked in beside the app', () => {
+  it('are each named by something that is not the script that draws them', () => {
+    // `android-icon-background.png` was 17.5 KB of nothing: no
+    // `adaptiveIcon.backgroundImage` key in app.json, no line in
+    // `generate-icons.mjs`, no mention anywhere in the tree. Expo never read
+    // it, so it shipped nowhere and broke nothing -- it just sat in the
+    // repository at 512x512 RGBA beside two 432x432 layers it was supposed to
+    // go behind, drifting from the palette `palette.test.ts` pins.
+    //
+    // The script is excluded from counting as a reader on purpose. A file it
+    // draws and nothing consumes is the same dead weight one step later,
+    // which is what `favicon.png` became the day `app.json` stopped naming
+    // it.
+    // Tests are not readers. This one names both of the files it was written
+    // for, a few lines up, and would otherwise vouch for them itself.
+    const script = read('scripts', 'generate-icons.mjs');
+    const readers = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n')
+      .filter(
+        (path) =>
+          path !== '' &&
+          !path.startsWith('assets/') &&
+          !path.includes('__tests__') &&
+          path !== 'scripts/generate-icons.mjs',
+      );
+
+    const orphans = readdirSync(join(ROOT, 'assets')).filter((name) => {
+      const named = readers.some((path) => read(...path.split('/')).includes(name));
+      return !named;
+    });
+
+    expect(orphans).toEqual([]);
+    // And everything left really is drawn rather than hand-placed, so the
+    // palette test's reach over the script is the reach over these files.
+    for (const name of readdirSync(join(ROOT, 'assets'))) expect(script).toContain(name);
   });
 });
 
@@ -223,7 +277,13 @@ describe('the build profiles', () => {
   });
 
   it('and one that needs no Apple account, which is the only build available first', () => {
-    expect(eas.build.simulator).toBeDefined();
+    // This asserted only that the profile existed, which is true of a profile
+    // that has lost both of the things its name is about. `ios.simulator` is
+    // what makes it buildable with no Apple Developer account, and `internal`
+    // is what stops it going near a store; a profile stripped to `extends` and
+    // `developmentClient` passed the old assertion unchanged.
+    expect(eas.build.simulator?.ios?.simulator).toBe(true);
+    expect(eas.build.simulator?.distribution).toBe('internal');
   });
 
   it('has a submit profile, even though its credentials are not in the repository', () => {

@@ -19,11 +19,9 @@ import { formatRelativeDay } from './format';
 interface SessionRowProps {
   session: SessionWithChildren;
   onPress: () => void;
-  /** Renders as a standalone card rather than a row inside one. */
-  standalone?: boolean;
 }
 
-export const SessionRow = ({ session, onPress, standalone = false }: SessionRowProps) => {
+export const SessionRow = ({ session, onPress }: SessionRowProps) => {
   const net = netResult(session, session.rebuys);
   const live = session.endedAt === null;
   const { currency } = session;
@@ -86,14 +84,6 @@ export const SessionRow = ({ session, onPress, standalone = false }: SessionRowP
       )}
     </View>
   );
-
-  if (standalone) {
-    return (
-      <Card onPress={onPress} accessibilityLabel={spoken}>
-        {content}
-      </Card>
-    );
-  }
 
   return (
     <Card onPress={onPress} style={styles.inline} accessibilityLabel={spoken}>

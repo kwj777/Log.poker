@@ -140,19 +140,25 @@ export default function RootLayout() {
             headerShown: false,
             contentStyle: { backgroundColor: colors.background },
             animation: 'slide_from_right',
-            // Screen titles are never displayed (there are no headers), but on
-            // web expo-router writes them to `document.title`. Without one on
-            // every route the browser tab ends up blank.
-            title: 'Log',
+            // No `title` on any of these, deliberately. There are no headers,
+            // so nothing displays one, and the note that used to be here said
+            // expo-router writes them to `document.title` on the web. It does
+            // not: `ExpoRoot` passes `documentTitle: { enabled: false }` to the
+            // navigation container, and the fork's `useDocumentTitle` returns
+            // before either write. The tab title comes from `PageMeta`, which
+            // every screen renders and which documents the whole arrangement.
+            //
+            // Eleven strings sat here doing nothing, and one had already
+            // drifted from the live one: this said "Log a hand · Log" while
+            // `session/hand.tsx` emits "Edit hand · Log" on the edit path.
           }}
         >
-          <Stack.Screen name="(tabs)" options={{ title: 'Log' }} />
+          <Stack.Screen name="(tabs)" />
           <Stack.Screen
             name="session/new"
             options={{
               presentation: 'modal',
               animation: 'slide_from_bottom',
-              title: 'New session · Log',
             }}
           />
           <Stack.Screen
@@ -160,7 +166,6 @@ export default function RootLayout() {
             options={{
               presentation: 'modal',
               animation: 'slide_from_bottom',
-              title: 'Add a past session · Log',
             }}
           />
           <Stack.Screen
@@ -168,20 +173,19 @@ export default function RootLayout() {
             options={{
               presentation: 'modal',
               animation: 'slide_from_bottom',
-              title: 'Log a hand · Log',
             }}
           />
-          <Stack.Screen name="import" options={{ title: 'Import sessions · Log' }} />
-          <Stack.Screen name="hands" options={{ title: 'Hands · Log' }} />
+          <Stack.Screen name="import" />
+          <Stack.Screen name="hands" />
           {/* Where a purchase made at another of the family's apps lands. The
               route has to exist under /app, because that is where this site
               serves the app from and a link to /claim would be answered by the
               marketing site's catch-all -- which is the failure that kept the
               hand-off to TiltProof broken for its whole shipped life. */}
-          <Stack.Screen name="claim" options={{ title: 'Signing you in · Log' }} />
-          <Stack.Screen name="session/active" options={{ title: 'Live session · Log' }} />
-          <Stack.Screen name="session/[id]" options={{ title: 'Session · Log' }} />
-          <Stack.Screen name="session/edit" options={{ title: 'Edit session · Log' }} />
+          <Stack.Screen name="claim" />
+          <Stack.Screen name="session/active" />
+          <Stack.Screen name="session/[id]" />
+          <Stack.Screen name="session/edit" />
         </Stack>
       ) : (
         status === 'error' ? (

@@ -16,8 +16,6 @@ export interface PickedFile {
   text: string;
 }
 
-export const CAN_PICK_FILE = true;
-
 const ACCEPT = '.csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain';
 
 /**

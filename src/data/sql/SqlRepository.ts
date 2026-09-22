@@ -428,8 +428,23 @@ export class SqlRepository implements Repository {
       // A session naming a venue that is still missing is skipped rather than
       // thrown on: foreign keys are on, and one inconsistent row should cost
       // that row rather than the whole sync.
+      //
+      // Only the venues the arriving sessions name. This read the whole table,
+      // and so did the two below it, whatever the change set held: a synced
+      // write of one rebuy scanned `venues` and `sessions` twice over, and an
+      // empty change set did the same. `createSessions` already asks this
+      // question this way, one id list at a time.
+      const wantedVenues = Array.from(
+        new Set(changes.sessions.map(({ record }) => String(record.venueId ?? ''))),
+      );
       const known = new Set(
-        (await this.driver.all<{ id: string }>(`SELECT id FROM venues`)).map((row) => row.id),
+        (
+          await inChunks<{ id: string }>(
+            this.driver,
+            wantedVenues,
+            (placeholders) => `SELECT id FROM venues WHERE id IN (${placeholders})`,
+          )
+        ).map((row) => row.id),
       );
 
       // An incoming session can carry an import key that a *different* local
@@ -455,8 +470,11 @@ export class SqlRepository implements Repository {
       // the key with it.
       const stamps = new Map(
         (
-          await this.driver.all<{ id: string; updated_at: Timestamp }>(
-            `SELECT id, updated_at FROM sessions`,
+          await inChunks<{ id: string; updated_at: Timestamp }>(
+            this.driver,
+            changes.sessions.map(({ record }) => record.id),
+            (placeholders) =>
+              `SELECT id, updated_at FROM sessions WHERE id IN (${placeholders})`,
           )
         ).map((row) => [row.id, row.updated_at]),
       );
@@ -526,9 +544,26 @@ export class SqlRepository implements Repository {
         stored.add(record.id);
       }
 
+      // The sessions the arriving children name, and the ones just written.
+      // After the inserts, deliberately -- a child can arrive in the same
+      // answer as its parent -- which is why it cannot be folded into the read
+      // above; it can only be asked about fewer rows.
+      const wantedParents = Array.from(
+        new Set(
+          [...changes.rebuys, ...changes.hands, ...changes.moodEntries]
+            .map(({ record }) => String(record.sessionId ?? ''))
+            .filter((id) => !stored.has(id)),
+        ),
+      );
       const sessions = new Set([
         ...stored,
-        ...(await this.driver.all<{ id: string }>(`SELECT id FROM sessions`)).map((row) => row.id),
+        ...(
+          await inChunks<{ id: string }>(
+            this.driver,
+            wantedParents,
+            (placeholders) => `SELECT id FROM sessions WHERE id IN (${placeholders})`,
+          )
+        ).map((row) => row.id),
       ]);
 
       for (const { record, deletedAt } of changes.rebuys) {

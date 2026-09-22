@@ -81,8 +81,11 @@ import { preSessionHandOff } from '../family/links';
  * What the card says, given what is known about the player.
  *
  * Exported and pure for the reason `PostSessionReset`'s is: the wording is the
- * load bearing part of this card and this repository's test runner cannot
- * render a component.
+ * load bearing part of this card, and a string is cheaper to pin than a
+ * render. Not because nothing can render it -- this said the repository's test
+ * runner cannot, and the `ui` project exists precisely to, which is where
+ * `src/__tests__/screens/preSessionWarmUp.test.tsx` draws this card nine
+ * times.
  *
  * Both branches name the pass, because both are true of the same screen. The
  * unpaid one adds the free reset, which is the row that player will actually

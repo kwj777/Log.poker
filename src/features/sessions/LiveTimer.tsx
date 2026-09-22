@@ -9,12 +9,12 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { formatDuration } from '../../domain/stats';
-
 /**
- * Milliseconds since `startedAt`, or 0 when there is no session. Accepts null so
- * a caller can invoke the hook unconditionally -- as the rules of hooks require --
- * without inventing a start time by reading the clock during render.
+ * A clock that moves, at whatever resolution the caller needs.
+ *
+ * The dashboard's flagged-hand prompt wants an hour and the live timer wants a
+ * minute; both want the same handling of a phone that has been away, which is
+ * why this is one hook.
  *
  * ## Why the clock is also read on the way back
  *
@@ -33,12 +33,12 @@ import { formatDuration } from '../../domain/stats';
  * Both subscriptions live in one effect because they do one job between them,
  * and neither depends on anything that changes.
  */
-export const useElapsed = (startedAt: number | null): number => {
+export const useNow = (period: number): number => {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const tick = () => setNow(Date.now());
-    const interval = setInterval(tick, 60_000);
+    const interval = setInterval(tick, period);
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') tick();
     });
@@ -49,11 +49,18 @@ export const useElapsed = (startedAt: number | null): number => {
       // layout guards its own `AppState` subscription the same way.
       subscription?.remove();
     };
-  }, []);
+  }, [period]);
 
+  return now;
+};
+
+/**
+ * Milliseconds since `startedAt`, or 0 when there is no session. Accepts null so
+ * a caller can invoke the hook unconditionally -- as the rules of hooks require --
+ * without inventing a start time by reading the clock during render.
+ */
+export const useElapsed = (startedAt: number | null): number => {
+  const now = useNow(60_000);
   if (startedAt === null) return 0;
   return Math.max(0, now - startedAt);
 };
-
-export const useElapsedLabel = (startedAt: number | null): string =>
-  formatDuration(useElapsed(startedAt));

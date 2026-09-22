@@ -253,8 +253,6 @@ export const resolveImportCollisions = (
  */
 export const MERGE_ORDER = ['venues', 'sessions', 'rebuys', 'hands', 'moodEntries'] as const;
 
-export type MergeTable = (typeof MERGE_ORDER)[number];
-
 /**
  * Whether a venue tombstone may be applied, given the sessions that will exist
  * once the merge is done.

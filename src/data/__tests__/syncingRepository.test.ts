@@ -16,6 +16,7 @@
 import { SqlRepository } from '../sql/SqlRepository';
 import { SyncingRepository, memoryCursorStore, type CursorStore, type Cursors } from '../SyncingRepository';
 import { mergeIntoBundle } from '../../sync/bundle';
+import { byVenue } from '../../domain/stats';
 import { countChanges } from '../../sync/protocol';
 import type { Fetch } from '../../sync/client';
 import type { ChangeSet, Repository } from '../repository';
@@ -1770,3 +1771,199 @@ describe('what a round says it moved', () => {
   });
 });
 
+describe('two rooms with one name', () => {
+  /**
+   * The card room with no signal, which is where this comes from.
+   *
+   * Two devices that have not synced each create a venue called "Aria",
+   * because neither can see the other's. `findVenueNamed` stops this happening
+   * twice on one device and the importer has folded names since it shipped;
+   * the server compared no names at all, so both survived the merge and the
+   * dashboard drew two rows both saying "Aria" with the bankroll split between
+   * them, on both devices.
+   */
+  const bothTyped = async (fetch: Fetch, held: { offline: boolean }) => {
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop', 'device-laptop001');
+
+    held.offline = true;
+    const here = await startSession(phone, 'Aria');
+    await phone.updateSession(here.id, { endedAt: now + HOUR, cashOut: 45_000 });
+    tick(HOUR);
+    const there = await startSession(laptop, 'Aria');
+    await laptop.updateSession(there.id, { endedAt: now + HOUR, cashOut: 20_000 });
+    held.offline = false;
+
+    await phone.push(true);
+    await laptop.push(true);
+    await phone.push(true);
+    await laptop.push(true);
+    return { phone, laptop, here, there };
+  };
+
+  it('are one room on both devices after a sync', async () => {
+    const { held, fetch } = server();
+    const { phone, laptop } = await bothTyped(fetch, held);
+
+    for (const repository of [phone, laptop]) {
+      const venues = await repository.listVenues();
+      expect(venues.map((venue) => venue.name)).toEqual(['Aria']);
+    }
+  });
+
+  it('and both nights are counted against it, rather than split across two', async () => {
+    // The visible failure: `byVenue` groups on `venueId`, so two ids with one
+    // label is two rows on the dashboard breakdown and a bankroll divided
+    // between them.
+    const { held, fetch } = server();
+    const { phone, laptop } = await bothTyped(fetch, held);
+
+    for (const repository of [phone, laptop]) {
+      const sessions = await repository.listSessions();
+      const venues = await repository.listVenues();
+      const rows = byVenue(sessions, venues);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].sessionCount).toBe(2);
+    }
+  });
+
+  it('and both devices keep the same one, which is the half that cannot be decided later', async () => {
+    // Each device applies the merge's answer rather than deciding its own, so
+    // this only has to be deterministic from the bundle: oldest `createdAt`
+    // wins, lowest id breaks a tie.
+    const { held, fetch } = server();
+    const { phone, laptop, here } = await bothTyped(fetch, held);
+
+    const kept = await phone.listVenues();
+    expect(kept[0].id).toBe(here.venueId);
+    expect((await laptop.listVenues())[0].id).toBe(here.venueId);
+  });
+
+  it('and it stays folded, rather than coming back on the next round', async () => {
+    const { held, fetch } = server();
+    const { phone, laptop } = await bothTyped(fetch, held);
+
+    tick(HOUR);
+    await phone.push(true);
+    await laptop.push(true);
+    await phone.push(true);
+
+    expect(await phone.listVenues()).toHaveLength(1);
+    expect(await laptop.listVenues()).toHaveLength(1);
+  });
+});
+
+describe('sweeping the tombstones this device holds', () => {
+  const DAY = 24 * HOUR;
+
+  /** A device whose sweeps can be counted, and the lines it swept to. */
+  const counted = async (fetch: Fetch, name: string) => {
+    const driver = new NodeSqliteDriver(':memory:');
+    drivers.push(driver);
+    let counter = 0;
+    const local = new SqlRepository(driver, {
+      clock: { now: () => now },
+      ids: { next: () => `${name}-${String(++counter).padStart(3, '0')}` },
+    });
+    await local.init();
+
+    const sweeps: number[] = [];
+    const watched = new Proxy(local, {
+      get(target, property, receiver) {
+        if (property !== 'collectTombstones') return Reflect.get(target, property, receiver) as unknown;
+        return async (through: number) => {
+          sweeps.push(through);
+          return local.collectTombstones(through);
+        };
+      },
+    });
+
+    const repository = new SyncingRepository(
+      watched as Repository,
+      'a.b.c.d',
+      memoryCursorStore({
+        pulled: 0,
+        pushed: 0,
+        device: `device-${name}0001`,
+        settled: 0,
+        subject: null,
+      }),
+      { fetch },
+      () => now,
+    );
+    return { repository, sweeps };
+  };
+
+  const hand = (repository: SyncingRepository, sessionId: string, holeCards: string) =>
+    repository.createHand({
+      sessionId,
+      holeCards,
+      board: null,
+      position: 'BTN',
+      note: null,
+      tags: [],
+      amount: 1_000,
+      at: now,
+    });
+
+  it('does not sweep again for a line it has already swept to', async () => {
+    // The sweep was gated on the server's line being above zero, and that line
+    // is zero only until the server first collects something -- it never
+    // returns to zero after. `touched` pushes after every local write, so from
+    // the first collection onward every hand, rebuy and mood entry was
+    // followed by a full sweep: on the web engine six whole-table reads and a
+    // `readwrite` transaction held over five tables, to remove nothing.
+    const { fetch } = server();
+    const phone = await counted(fetch, 'phone');
+
+    const gone = await startSession(phone.repository);
+    const kept = await startSession(phone.repository, 'Wynn');
+    await phone.repository.push();
+
+    tick(DAY);
+    await phone.repository.deleteSession(gone.id);
+    await phone.repository.push();
+    expect(phone.sweeps).toEqual([]);
+
+    // Past the window, with nobody left to hand the tombstone to, so the
+    // server collects and draws its line. The device sweeps to it once.
+    tick(91 * DAY);
+    await phone.repository.push(true);
+    expect(phone.sweeps).toHaveLength(1);
+
+    // Three ordinary hands, each of which pushes. The line has not moved, and
+    // sweeping to a line already swept can only remove what already went.
+    for (const holeCards of ['AsKd', 'QsQd', 'Jh9h']) {
+      await hand(phone.repository, kept.id, holeCards);
+      await phone.repository.push();
+    }
+    expect(phone.sweeps).toHaveLength(1);
+  });
+
+  it('but does sweep again once the line has moved', async () => {
+    // The guard must not turn into never sweeping again: the server collects
+    // more than once, and there are tombstones between one line and the next.
+    const { fetch } = server();
+    const phone = await counted(fetch, 'phone');
+
+    const first = await startSession(phone.repository);
+    const second = await startSession(phone.repository, 'Wynn');
+    await phone.repository.push();
+
+    tick(DAY);
+    await phone.repository.deleteSession(first.id);
+    await phone.repository.push();
+    tick(91 * DAY);
+    await phone.repository.push(true);
+    expect(phone.sweeps).toHaveLength(1);
+
+    tick(DAY);
+    await phone.repository.deleteSession(second.id);
+    await phone.repository.push();
+    tick(91 * DAY);
+    await phone.repository.push(true);
+
+    expect(phone.sweeps).toHaveLength(2);
+    expect(phone.sweeps[1]).toBeGreaterThan(phone.sweeps[0]);
+  });
+});

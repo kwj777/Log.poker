@@ -29,7 +29,6 @@ const mockSaved: { name: string; text: string }[] = [];
 const mockShareable = { yes: true };
 
 jest.mock('../../features/export/saveCsv', () => ({
-  CAN_SAVE_FILE: true,
   saveCsv: async (name: string, text: string) => {
     if (!mockShareable.yes) return { saved: false };
     mockSaved.push({ name, text });

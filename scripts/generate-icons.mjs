@@ -317,7 +317,6 @@ const OUTPUTS = [
   ['assets/splash-icon.png', { size: 512, transparent: true, inset: 0.54, lit: LOG }],
   ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.43, lit: LOG }],
   ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.43, lit: LOG }],
-  ['assets/favicon.png', { size: 64, inset: 0.7, cornerRadius: 0.16, lit: LOG }],
 
   // The mark alone, on nothing, for empty states inside the app. A PNG rather
   // than a drawn component on purpose: BRAND.md wants empty states derived from

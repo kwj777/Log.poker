@@ -22,7 +22,7 @@
  */
 
 import { Linking } from 'react-native';
-import { screen, userEvent } from '@testing-library/react-native';
+import { act, screen, userEvent } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
 import { session } from '../support/sessions';
@@ -45,6 +45,8 @@ jest.mock('../../data', () => ({
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
+/** Read before the timers are faked, so `load` states its case against it. */
+const REAL_NOW = Date.now();
 
 const hand = (over: Partial<Hand> = {}): Hand => ({
   id: 'h1',
@@ -64,9 +66,8 @@ const hand = (over: Partial<Hand> = {}): Hand => ({
 /**
  * A dashboard with one finished session that ended `endedAgo` ago.
  *
- * The clock is the real one rather than a frozen fixture: the screen reads
- * `Date.now()` once on mount, and every case here is stated relative to now,
- * which is how the window is stated too.
+ * The clock is the real one rather than a frozen fixture, and every case here
+ * is stated relative to now, which is how the window is stated too.
  */
 const load = (over: { endedAgo?: number; live?: boolean; hands?: Hand[] } = {}) => {
   const endedAt = Date.now() - (over.endedAgo ?? HOUR);
@@ -123,6 +124,31 @@ describe('the flagged-hand review card', () => {
     await renderScreen(<DashboardScreen />);
 
     expect(screen.queryByText(/You flagged/)).toBeNull();
+  });
+
+  it('and goes quiet under a screen that is already open, rather than at the next launch', async () => {
+    // The dashboard used to read the clock once on mount, under a comment
+    // saying "the one boundary it could cross is a week away". The boundary is
+    // a week from the session's end, so what is left of it is whatever is
+    // left. `(tabs)` never unmounts a screen it has focused, so a card shown
+    // an hour before its window closed stayed up until the app was relaunched
+    // -- on a laptop with the tab open, indefinitely.
+    jest.useFakeTimers();
+    jest.setSystemTime(REAL_NOW);
+    try {
+      load({ endedAgo: 7 * DAY - HOUR });
+      await renderScreen(<DashboardScreen />);
+      expect(await screen.findByText(/You flagged/)).toBeTruthy();
+
+      await act(async () => {
+        jest.setSystemTime(REAL_NOW + 2 * HOUR);
+        jest.advanceTimersByTime(2 * HOUR);
+      });
+
+      expect(screen.queryByText(/You flagged/)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('opens that hand’s own review, with its cards, its seat and its runout', async () => {

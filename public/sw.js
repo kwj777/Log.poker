@@ -23,8 +23,15 @@
  * Strategy
  * --------
  * - Navigations: network first (so a deploy is picked up promptly), falling back
- *   to the cached shell. The app is a single-page build, so every route resolves
- *   to the same `index.html`.
+ *   to the cached shell, which is why any navigation's answer may be stored
+ *   under `SHELL_URL`. Not because this is a single-page build -- it is not,
+ *   `app.json` sets web output `static` and the export writes nineteen
+ *   documents -- but because those documents are byte-identical to
+ *   `/app/index.html`, and `netlify.toml` rewrites every route that is not one
+ *   of them to it. `/app/_sitemap` is the single exception, an expo-router
+ *   page nothing in the app links to; caching it as the shell costs the
+ *   prerendered title and the loading spinner, both replaced the moment the
+ *   app mounts.
  * - Build assets and icons: cache first. Their URLs are content-hashed by the
  *   bundler, so a cached copy can never be stale -- a new build means a new URL.
  * - Everything else same-origin: stale-while-revalidate.

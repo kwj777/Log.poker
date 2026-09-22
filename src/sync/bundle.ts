@@ -51,6 +51,7 @@ import {
   type Versioned,
 } from '../domain/merge';
 import type { Session, Timestamp } from '../domain/types';
+import { venueNameKey } from '../domain/venues';
 import {
   DEVICE_FORGET_MS,
   TOMBSTONE_RETENTION_MS,
@@ -524,6 +525,73 @@ const settleSessionEnds = (
 };
 
 /**
+ * Two rooms with one name are one room, whichever device typed it.
+ *
+ * Both local paths already know this. `findVenueNamed` stops the in-app
+ * create, and the importer has folded names since it shipped -- both through
+ * `venueNameKey`, which is what this uses, so the three cannot disagree about
+ * which spellings are one room. The server knew nothing about it, and the
+ * server is the one place two devices meet.
+ *
+ * It takes no conflict to get there. Two players at the same table with no
+ * signal, or one player on a phone and a laptop that have not synced: each
+ * types "Aria", each gets a venue of its own, and the merge keeps both because
+ * nothing in it ever compared their names. Then the dashboard breakdown draws
+ * two rows both saying "Aria" with the bankroll split between them, on both
+ * devices, which looks like a bug in the totals -- and is one.
+ *
+ * The keeper is the oldest by `createdAt`, lowest id first where two were
+ * created in the same millisecond. Both ends have to reach the same answer
+ * from the same bundle, so it cannot be "the one that got here first".
+ *
+ * Sessions move before the loser is tombstoned, which is what keeps
+ * `settleVenueTombstones` from undoing this at the end of the same merge: it
+ * revives a venue tombstone that a live session still points at, and by then
+ * none does. A session pushed against the loser later revives it, and the next
+ * merge folds it again -- the same convergence `settleFoldedChildren` relies
+ * on, one table over.
+ */
+const settleVenueCollisions = (bundle: Bundle, at: Timestamp): void => {
+  const venues = bundle.records.venues;
+  const byName = new Map<string, string[]>();
+  for (const [id, change] of Object.entries(venues)) {
+    if (change.deletedAt !== null) continue;
+    const key = venueNameKey(String(change.record.name ?? ''));
+    if (key === '') continue;
+    byName.set(key, [...(byName.get(key) ?? []), id]);
+  }
+
+  const losers = new Map<string, string>();
+  for (const ids of byName.values()) {
+    if (ids.length < 2) continue;
+    const age = (id: string): number => Number(venues[id].record.createdAt ?? 0);
+    const [keeper, ...rest] = [...ids].sort((a, b) => age(a) - age(b) || (a < b ? -1 : 1));
+    for (const loser of rest) losers.set(loser, keeper);
+  }
+  if (losers.size === 0) return;
+
+  for (const [id, change] of Object.entries(bundle.records.sessions)) {
+    if (change.deletedAt !== null) continue;
+    const keeper = losers.get(String(change.record.venueId ?? ''));
+    if (keeper === undefined) continue;
+    bundle.records.sessions[id] = {
+      record: { ...change.record, venueId: keeper, updatedAt: derived(change.record) },
+      deletedAt: null,
+      heardAt: at,
+    };
+  }
+
+  for (const loser of losers.keys()) {
+    const held = venues[loser];
+    venues[loser] = {
+      record: { ...held.record, updatedAt: derived(held.record) },
+      deletedAt: at,
+      heardAt: at,
+    };
+  }
+};
+
+/**
  * One import key is one session, however many devices imported the same file.
  *
  * The loser is tombstoned and anything logged against it moves across, because
@@ -941,9 +1009,14 @@ export const mergeIntoBundle = (
     }
   }
 
-  // In order, and the order matters twice over.
+  // In order, and the order matters three times over.
   //
-  // Collisions first, because that rule *removes* sessions: a duplicate that
+  // One name is one room first, because the rule below reads sessions and
+  // this one rewrites which venue they name: a pair of duplicate imports that
+  // arrived pointing at two spellings of one room should be compared after
+  // they agree about the room, not before.
+  //
+  // Then the import collisions, because that rule *removes* sessions: a duplicate that
   // exists only until the end of this merge could otherwise win the
   // one-active-session contest and close the session the player is actually
   // sitting in, permanently, on the word of a row that no longer exists. Which
@@ -955,6 +1028,7 @@ export const mergeIntoBundle = (
   //
   // And the venue rule last, because closing a session changes which sessions
   // are live and that is what it reads.
+  settleVenueCollisions(bundle, at);
   settleImportCollisions(bundle, at);
   settleFoldedChildren(bundle, at);
   const activity = lastActivity(bundle, now);
@@ -997,7 +1071,3 @@ export const mergeIntoBundle = (
     collectedThrough: bundle.collectedThrough,
   };
 };
-
-/** Every table, for a caller that wants to walk one at a time. */
-export const tablesOf = (bundle: Bundle): [SyncTable, Record<string, StoredChange>][] =>
-  SYNC_TABLES.map((table) => [table, bundle.records[table]]);

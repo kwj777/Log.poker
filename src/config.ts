@@ -21,8 +21,32 @@
 
 export const IS_DEV: boolean = typeof __DEV__ !== 'undefined' && __DEV__;
 
-/** Gates the demo-data seeder in Settings. */
-export const ALLOW_DEMO_SEED = IS_DEV;
+/**
+ * Gates the demo-data seeder in Settings.
+ *
+ * On in development, and on in a build that asks for it by name. The second
+ * half is for screenshots, and it exists because the two ways of getting them
+ * were both wrong. A development run has the seeder and also draws Expo Go's
+ * floating dev button over every shot. A Release build is clean and has
+ * `__DEV__` false, so the card is never drawn and there is no way to put a
+ * bankroll behind the screens that are meant to show one.
+ *
+ * `EXPO_PUBLIC_DEMO_SEED` closes that gap with a third build: Release, no dev
+ * button, seeder present. Locally that is
+ *
+ *     EXPO_PUBLIC_DEMO_SEED=true npx expo run:ios --configuration Release
+ *
+ * and the `screenshots` profile in `eas.json` is the same thing on EAS.
+ *
+ * **The safety is that the production profile declares no `env` at all**, which
+ * `release.test.ts` asserts, so the variable is absent from a store build and
+ * this compiles to `false` there. Metro inlines `EXPO_PUBLIC_` variables at
+ * build time, so an unset one is `undefined` rather than a lookup that could
+ * be answered later. It is still only a flag: per the header above it hides
+ * the card rather than stripping the seeder, and the caller in Settings keeps
+ * its own refusal on a device that syncs.
+ */
+export const ALLOW_DEMO_SEED = IS_DEV || process.env.EXPO_PUBLIC_DEMO_SEED === 'true';
 
 /**
  * Gates the sign-in card in Settings.

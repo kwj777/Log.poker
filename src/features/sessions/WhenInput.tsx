@@ -159,7 +159,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
   number: {
     flex: 1,

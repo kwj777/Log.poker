@@ -607,3 +607,45 @@ describe('the security headers', () => {
     expect(netlify).toContain('Referrer-Policy = "strict-origin-when-cross-origin"');
   });
 });
+
+describe('the focus ring on the web build', () => {
+  /**
+   * Nine `TextInput` styles set `outlineStyle: 'none'` on web, and nothing put
+   * an indicator back: no `:focus` rule anywhere in the build, and none of
+   * those fields changes its border or background when focused. So a keyboard
+   * user on log.poker/app tabbing through New session, Log a hand, Import or
+   * the sign-in card had no way to tell which field they were in -- a WCAG
+   * 2.4.7 failure, and web-only, which is why the native builds never showed
+   * it.
+   */
+  const html = read('app', '+html.tsx');
+
+  it('is written where a React Native style cannot reach', () => {
+    expect(html).toMatch(/input:focus-visible, textarea:focus-visible/);
+    expect(html).toMatch(/outline: 2px solid/);
+    // Injected, not merely declared.
+    expect(html).toMatch(/\$\{FOCUS_RING\}/);
+  });
+
+  it('and outranks react-native-web whatever order the styles land in', () => {
+    // A type selector plus the pseudo-class beats a single class, so this does
+    // not depend on the runtime injecting its stylesheet before this one.
+    expect(html).not.toMatch(/:where\([^)]*\):focus-visible/);
+  });
+
+  it('and no input takes it away again', () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(path);
+        return /\.tsx?$/.test(entry.name) ? [path] : [];
+      });
+
+    const suppressing = [...walk('src'), ...walk('app')]
+      // The one file that may name it: the rule above quotes the line it replaced.
+      .filter((path) => path !== 'app/+html.tsx')
+      .filter((path) => readFileSync(join(ROOT, path), 'utf8').includes("outlineStyle: 'none'"));
+    expect(suppressing).toEqual([]);
+  });
+});
+

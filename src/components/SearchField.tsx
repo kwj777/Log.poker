@@ -89,6 +89,5 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     paddingVertical: spacing.sm,
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
 });

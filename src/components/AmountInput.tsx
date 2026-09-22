@@ -136,8 +136,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
     paddingVertical: spacing.md,
-    // Removes the focus ring web adds to inputs, which does not match the theme.
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
   presets: {
     flexDirection: 'row',

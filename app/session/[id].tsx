@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -414,7 +414,6 @@ const styles = StyleSheet.create({
     minHeight: 96,
     padding: spacing.lg,
     textAlignVertical: 'top',
-    ...Platform.select({ web: { outlineStyle: 'none' as 'solid' }, default: {} }),
   },
   dangerZone: {
     marginTop: spacing.xxl,

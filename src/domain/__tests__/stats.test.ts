@@ -237,6 +237,29 @@ describe('bankroll curve', () => {
       );
       expect(curve[0].cumulative).toBe(80_000);
     });
+
+    it('is plotted against session index, whatever the dates say', () => {
+      // `isAhead`'s docstring used to name this curve among the things a typed
+      // year ruins, saying a point decades out "flattens everything real into
+      // the left edge". It does not: the dashboard maps this curve to
+      // `{ x: index, y: cumulative }`, so a session dated 2062 sits one step
+      // to the right of the one before it like any other. What a typed year
+      // really corrupts is the last `cumulative`, which the axis caption and
+      // the chart's spoken label both read -- and the x spacing is what would
+      // have to change for the old sentence to become true.
+      const curve = bankrollCurve([
+        completed({ id: 'a', startedAt: T0, hours: 2, buyIn: 100, cashOut: 200 }),
+        completed({ id: 'b', startedAt: T0 + HOUR, hours: 2, buyIn: 100, cashOut: 200 }),
+        completed({ id: 'typo', startedAt: T0 + 36 * 365 * 24 * HOUR, hours: 2, buyIn: 100, cashOut: 200 }),
+      ]);
+      // Exactly what `chartSeries` on the dashboard does with it.
+      const points = curve.map((point, index) => ({ x: index, y: point.cumulative }));
+      expect(points.map((point) => point.x)).toEqual([0, 1, 2]);
+      expect(curve[curve.length - 1].at).toBeGreaterThan(T0 + 30 * 365 * 24 * HOUR);
+      // And the figure the axis caption and the spoken label read is the one
+      // the typo really moves.
+      expect(points[points.length - 1].y).toBe(300);
+    });
   });
 });
 

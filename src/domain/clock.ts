@@ -90,8 +90,14 @@ export const FUTURE_TOLERANCE_MS = 5 * 60_000;
  * the typo. `deriveDefaults` takes the session with the newest `startedAt` as
  * the template every later session opens with, `assessRecentStretch` takes the
  * most recent by end time so the mistake is permanently "recent", and the
- * bankroll curve gets a point decades out that flattens everything real into
- * the left edge.
+ * bankroll curve gets a last point that includes it -- which the dashboard
+ * reads twice, for the caption at the right-hand end of the axis and for the
+ * spoken label the chart is handed in place of the drawing.
+ *
+ * Not the x axis, which this used to say it flattened. The dashboard plots
+ * that curve against session index rather than against time, so a session
+ * dated 2062 sits one step to the right of the one before it like any other.
+ * What it corrupts is the figure, not the spacing.
  */
 export const isAhead = (at: Timestamp, now: number = Date.now()): boolean =>
   at > now + FUTURE_TOLERANCE_MS;

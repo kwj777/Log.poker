@@ -16,6 +16,7 @@
 import { SqlRepository } from '../sql/SqlRepository';
 import { SyncingRepository, memoryCursorStore, type CursorStore, type Cursors } from '../SyncingRepository';
 import { mergeIntoBundle } from '../../sync/bundle';
+import { byVenue } from '../../domain/stats';
 import { countChanges } from '../../sync/protocol';
 import type { Fetch } from '../../sync/client';
 import type { ChangeSet, Repository } from '../repository';
@@ -1767,6 +1768,88 @@ describe('what a round says it moved', () => {
     expect(phone.current().problem).toBe('unreachable');
     expect(phone.current().applied).toBe(applied);
     expect(phone.current().appliedTables).toEqual(tables);
+  });
+});
+
+describe('two rooms with one name', () => {
+  /**
+   * The card room with no signal, which is where this comes from.
+   *
+   * Two devices that have not synced each create a venue called "Aria",
+   * because neither can see the other's. `findVenueNamed` stops this happening
+   * twice on one device and the importer has folded names since it shipped;
+   * the server compared no names at all, so both survived the merge and the
+   * dashboard drew two rows both saying "Aria" with the bankroll split between
+   * them, on both devices.
+   */
+  const bothTyped = async (fetch: Fetch, held: { offline: boolean }) => {
+    const phone = await device(fetch, 'phone');
+    const laptop = await device(fetch, 'laptop', 'device-laptop001');
+
+    held.offline = true;
+    const here = await startSession(phone, 'Aria');
+    await phone.updateSession(here.id, { endedAt: now + HOUR, cashOut: 45_000 });
+    tick(HOUR);
+    const there = await startSession(laptop, 'Aria');
+    await laptop.updateSession(there.id, { endedAt: now + HOUR, cashOut: 20_000 });
+    held.offline = false;
+
+    await phone.push(true);
+    await laptop.push(true);
+    await phone.push(true);
+    await laptop.push(true);
+    return { phone, laptop, here, there };
+  };
+
+  it('are one room on both devices after a sync', async () => {
+    const { held, fetch } = server();
+    const { phone, laptop } = await bothTyped(fetch, held);
+
+    for (const repository of [phone, laptop]) {
+      const venues = await repository.listVenues();
+      expect(venues.map((venue) => venue.name)).toEqual(['Aria']);
+    }
+  });
+
+  it('and both nights are counted against it, rather than split across two', async () => {
+    // The visible failure: `byVenue` groups on `venueId`, so two ids with one
+    // label is two rows on the dashboard breakdown and a bankroll divided
+    // between them.
+    const { held, fetch } = server();
+    const { phone, laptop } = await bothTyped(fetch, held);
+
+    for (const repository of [phone, laptop]) {
+      const sessions = await repository.listSessions();
+      const venues = await repository.listVenues();
+      const rows = byVenue(sessions, venues);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].sessionCount).toBe(2);
+    }
+  });
+
+  it('and both devices keep the same one, which is the half that cannot be decided later', async () => {
+    // Each device applies the merge's answer rather than deciding its own, so
+    // this only has to be deterministic from the bundle: oldest `createdAt`
+    // wins, lowest id breaks a tie.
+    const { held, fetch } = server();
+    const { phone, laptop, here } = await bothTyped(fetch, held);
+
+    const kept = await phone.listVenues();
+    expect(kept[0].id).toBe(here.venueId);
+    expect((await laptop.listVenues())[0].id).toBe(here.venueId);
+  });
+
+  it('and it stays folded, rather than coming back on the next round', async () => {
+    const { held, fetch } = server();
+    const { phone, laptop } = await bothTyped(fetch, held);
+
+    tick(HOUR);
+    await phone.push(true);
+    await laptop.push(true);
+    await phone.push(true);
+
+    expect(await phone.listVenues()).toHaveLength(1);
+    expect(await laptop.listVenues()).toHaveLength(1);
   });
 });
 

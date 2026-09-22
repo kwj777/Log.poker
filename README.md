@@ -1085,8 +1085,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 100 passed
-Tests:       2181 passed
+Test Suites: 101 passed
+Tests:       2183 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
@@ -1186,6 +1186,7 @@ Tests:       2181 passed
   settingsSeed         3   the demo set, and the one device it must not be written onto
   tapTargets           3   every short control against the 48pt floor
   allHands             2   who pays for a read of the whole journal
+  amountField          2   the money field's box, against the font it has to hold
   newSessionDefaults   2   where the pre-filled session says its numbers came from
   safeArea             2   the top inset, on a phone with a notch and without
 ```

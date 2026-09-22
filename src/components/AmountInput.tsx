@@ -129,6 +129,17 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // **Its height comes from the field, not from the platform's measurement.**
+    // Left to size itself, iOS gave this box less room than its own 30pt line
+    // needs and clipped the top off the glyph: a placeholder zero drew as a U,
+    // in every money field in the app. `flex: 1` only governs the row's main
+    // axis, which is the width, so the height was whatever the platform
+    // measured and nothing here checked it.
+    //
+    // Stretching to the field makes the box arithmetic rather than a guess:
+    // `minHeight` below, less the padding on this style, is what the text has,
+    // and `amountField.test.tsx` holds that difference above the font size.
+    alignSelf: 'stretch',
     color: colors.text,
     fontSize: 30,
     fontWeight: '700',

@@ -349,10 +349,14 @@ export const nothingReadable = (
   const tournaments = complete.filter((session) => session.format === 'tournament').length;
   return {
     headline: 'Nothing to measure in big blinds yet',
+    // "here" rather than "you have logged", because the screen passes sessions
+    // already scoped to one currency: a player with cash games in dollars and
+    // tournaments in euros, looking at the euro view, would otherwise be told
+    // something false about their own log.
     body:
       tournaments === complete.length
-        ? 'Every session you have logged is a tournament, and a tournament has no blinds to measure in. Their results are too lopsided for a band like this one to say anything honest about anyway. What is worth saying about them is below, as cashes and ROI.'
-        : 'This page works in big blinds, and none of the sessions logged so far carries them: a tournament has none to carry, and a cash game logged without its stakes has none recorded.',
+        ? 'Every session here is a tournament, and a tournament has no blinds to measure in. Their results are too lopsided for a band like this one to say anything honest about anyway. What is worth saying about them is below, as cashes and ROI.'
+        : 'This page works in big blinds, and none of the sessions it is looking at carries them: a tournament has none to carry, and a cash game logged without its stakes has none recorded.',
   };
 };
 

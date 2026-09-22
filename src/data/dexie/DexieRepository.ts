@@ -842,7 +842,16 @@ export class DexieRepository implements Repository {
   async countHands(): Promise<number> {
     const [all, tombstoned] = await Promise.all([
       this.db.hands.count(),
-      this.db.hands.where('deletedAt').above(0).count(),
+      // Every value the index holds, not every value above zero. The index
+      // holds each non-null `deletedAt`, and `above(0)` skipped `0` and
+      // anything negative -- which `isLive` two hundred lines up calls deleted,
+      // and which `SqlRepository` calls deleted too (`deleted_at IS NULL` is
+      // false for `0`). So one hand written with such a stamp was hidden by
+      // `listHands` and counted by this, and the web dashboard's hand count sat
+      // one above the number of hands the app would show, permanently and only
+      // on one engine. Nothing filters a non-positive stamp on the way in:
+      // `sanitize` in `bundle.ts` takes any finite number.
+      this.db.hands.where('deletedAt').between(-Infinity, Infinity, true, true).count(),
     ]);
     return all - tombstoned;
   }

@@ -245,6 +245,32 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(sessions.map((session) => session.id)).toEqual([third.id, second.id]);
       });
 
+      it('counts a hand the same way it lists one, whatever the tombstone says', async () => {
+        // `isLive` treats any non-null `deletedAt` as deleted, and nothing
+        // filters a non-positive one on the way in: `sanitize` in `bundle.ts`
+        // takes any finite number and the client passes the server's answer
+        // straight through. Dexie's count subtracted only the stamps above
+        // zero, so a hand tombstoned at `0` was hidden by `listHands` and
+        // counted by `countHands` -- on one engine, forever, one too many on
+        // the dashboard.
+        const venue = await newVenue();
+        const session = await newSession({ venueId: venue.id, startedAt: T0 });
+        await repository.applyChanges({
+          venues: [], sessions: [], rebuys: [], moodEntries: [],
+          hands: [{
+            record: {
+              id: 'hand-from-elsewhere', sessionId: session.id, holeCards: 'AsKd',
+              board: null, position: 'BTN', note: null, tags: [], amount: 1,
+              at: T0, createdAt: T0, updatedAt: T0,
+            },
+            deletedAt: 0,
+          }],
+        } as Parameters<Repository['applyChanges']>[0]);
+
+        expect(await repository.listHands(session.id)).toEqual([]);
+        expect(await repository.countHands()).toBe(0);
+      });
+
       it('returns an empty list when nothing is stored', async () => {
         expect(await repository.listSessions()).toEqual([]);
       });

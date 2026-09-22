@@ -1096,10 +1096,10 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2239 passed
+Tests:       2242 passed
 
-  dexieRepository    147   the IndexedDB path, against real IndexedDB
-  sqlRepository      144   the SQLite path, against real SQLite
+  dexieRepository    148   the IndexedDB path, against real IndexedDB
+  sqlRepository      145   the SQLite path, against real SQLite
   bundle              72   the server-side merge: two devices and one bundle
   site                67   the marketing/app split, the PWA, the sitemap
   tournaments         67   ROI, its interval, cash rate, dry runs, finishes
@@ -1113,7 +1113,7 @@ Tests:       2239 passed
   verify              52   checking a token, and every way past it that must not work
   endpoint            47   the sync endpoint, end to end
   values              46   money, dates, durations, stakes, formats, counts
-  variance            45   win rate, σ, confidence bands, verdicts
+  variance            46   win rate, σ, confidence bands, verdicts
   blog                39   the post grammar, the share cards, and what it refuses
   mood                34   what tilt costs, and when to say nothing
   merge               33   two devices disagreeing, and who wins

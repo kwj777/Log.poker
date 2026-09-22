@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 102 passed
-Tests:       2252 passed
+Tests:       2254 passed
 
   dexieRepository    148   the IndexedDB path, against real IndexedDB
   sqlRepository      145   the SQLite path, against real SQLite
@@ -1105,7 +1105,7 @@ Tests:       2252 passed
   tournaments         67   ROI, its interval, cash rate, dry runs, finishes
   sessionImport       66   reading a session-summary export
   handOffs            61   where a hand-off goes, and what the four offer cards say
-  stats               56   P/L, rebuys, duration, win rate, groupings
+  stats               58   P/L, rebuys, duration, win rate, groupings
   content             55   every figure in the guides, re-derived and read back
   signinEndpoint      55   the free door, and every bound on it
   copy                54   what the sign-in and the sync are allowed to say

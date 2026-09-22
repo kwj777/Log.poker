@@ -17,7 +17,7 @@
 
 import { SessionManager } from './session';
 import { renewToken } from './signin';
-import { tokenStore, TOKEN_STORE } from './tokenStore';
+import { tokenStore } from './tokenStore';
 
 let manager: SessionManager = new SessionManager(tokenStore);
 
@@ -45,6 +45,5 @@ export const renewIfDue = async (): Promise<boolean> =>
     })
     .catch(() => false);
 
-export { TOKEN_STORE };
 export * from './session';
 export * from './token';

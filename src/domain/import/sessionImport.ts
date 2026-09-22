@@ -30,6 +30,7 @@
  * keeps it out of the cash-game variance model by the same rule.
  */
 
+import { isAhead } from '../clock';
 import { DEFAULT_CURRENCY, stakesKey } from '../money';
 import type { Cents, GameType, SessionFormat, Stakes, Timestamp } from '../types';
 import { cellAt, parseCsv, type CsvRow } from './csv';
@@ -120,6 +121,8 @@ export interface SessionImportOptions {
   defaultVenue?: string;
   /** Forces day-first or month-first instead of inferring it from the column. */
   dateOrder?: DateOrder;
+  /** Now, for the future-date guard. Defaults to the wall clock; tests pass their own. */
+  now?: number;
 }
 
 export interface SessionImportResult {
@@ -176,10 +179,14 @@ const plural = (count: number, one: string, many = `${one}s`): string =>
 /**
  * Read a CSV or TSV of session summaries.
  *
- * Pure: it takes a string and returns a description of what is in it. Nothing is
- * written, no venue is created, and the caller is expected to show the result to
- * the player before any of that happens -- an import that silently rewrites a
- * bankroll is not one anybody would run twice.
+ * Pure but for the clock, which one guard needs: a date that has not happened
+ * is a typed year, and telling requires knowing what now is. `options.now`
+ * supplies it, defaulting to the wall clock, which is the same shape `isAhead`
+ * and `formatRelativeDay` take.
+ *
+ * Nothing is written, no venue is created, and the caller is expected to show
+ * the result to the player before any of that happens -- an import that
+ * silently rewrites a bankroll is not one anybody would run twice.
  */
 export const parseSessionCsv = (
   text: string,
@@ -235,6 +242,7 @@ export const parseSessionCsv = (
 
   const warnings: ImportWarning[] = [];
   const warn = (line: number | null, message: string) => warnings.push({ line, message });
+  const now = options.now ?? Date.now();
 
   const dateSamples = table.rows
     .filter((row) => !isBlankRow(row))
@@ -272,6 +280,23 @@ export const parseSessionCsv = (
     if (startedAt === null) {
       skipped += 1;
       warn(row.line, `Couldn’t read the date “${dateCell}”, so this row was skipped.`);
+      continue;
+    }
+
+    // The rule the three typed screens already keep, kept here too. `isAhead`
+    // exists because "2062-09-19 for 2026-09-19 parses, is a real date, and
+    // used to be accepted in silence", and every screen a player types a date
+    // into refuses one. The importer took it: `deriveDefaults` then opened
+    // every later session from it, `assessRecentStretch` called it permanently
+    // recent, and the bankroll curve got a point decades out that flattened
+    // everything real into the left edge.
+    //
+    // Skipped rather than warned-and-kept, for the same reason those screens
+    // refuse rather than confirm: there is no reading of a year forty years
+    // out that is the session somebody played.
+    if (isAhead(startedAt, now)) {
+      skipped += 1;
+      warn(row.line, `“${dateCell}” has not happened yet, so this row was skipped. Check the year.`);
       continue;
     }
 

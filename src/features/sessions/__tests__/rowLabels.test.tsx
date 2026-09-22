@@ -21,6 +21,7 @@ import { render, screen } from '@testing-library/react-native';
 
 import { HandRow } from '../HandRow';
 import { SessionRow } from '../SessionRow';
+import { formatRelativeDay } from '../format';
 import { session } from '../../../__tests__/support/sessions';
 import type { Hand } from '../../../domain/types';
 
@@ -110,3 +111,47 @@ describe('a hand in a list', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 });
+
+describe('how a row dates itself', () => {
+  /**
+   * `formatRelativeDay` had three named outcomes and four branches.
+   *
+   * `days < 7` is satisfied by every negative number, so a moment that has not
+   * happened yet came out as "-13146 days ago" -- in the caption and again in
+   * the screen-reader label, which is the whole of what the row is announced
+   * as. A row can hold one: the CSV importer took a mistyped year in silence.
+   */
+  const DAY = 86_400_000;
+  const NOW = new Date(2026, 8, 22, 12).getTime();
+  const said = (startedAt: number) =>
+    formatRelativeDay(startedAt, NOW);
+
+  it('counts the days back for a session inside the last week', () => {
+    expect(said(NOW)).toBe('Today');
+    expect(said(NOW - DAY)).toBe('Yesterday');
+    expect(said(NOW - 3 * DAY)).toBe('3 days ago');
+  });
+
+  it('and gives the date for anything older', () => {
+    expect(said(NOW - 30 * DAY)).toMatch(/Aug/);
+  });
+
+  it('and the date for anything that has not happened, rather than a negative count', () => {
+    for (const ahead of [DAY, 30 * DAY, 13_146 * DAY]) {
+      const answer = said(NOW + ahead);
+      expect(answer).not.toMatch(/-\d/);
+      expect(answer).not.toMatch(/ago/);
+    }
+    expect(said(new Date(2062, 8, 19, 12).getTime())).toMatch(/2062/);
+  });
+
+  it('and the row says the same thing twice, where both of them are read', async () => {
+    // The caption a player sees and the label a screen reader is given.
+    await render(
+      <SessionRow session={session('s1', { startedAt: NOW + 13_146 * DAY })} onPress={() => undefined} />,
+    );
+    expect(nameOf()).not.toMatch(/-\d+ days ago/);
+    expect(screen.queryByText(/-\d+ days ago/)).toBeNull();
+  });
+});
+

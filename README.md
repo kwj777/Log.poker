@@ -1096,14 +1096,14 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2196 passed
+Tests:       2203 passed
 
   dexieRepository    145   the IndexedDB path, against real IndexedDB
   sqlRepository      142   the SQLite path, against real SQLite
   bundle              72   what ships to each platform, against the real output
+  sessionImport       66   reading a session-summary export
   site                64   the marketing/app split, the PWA, the sitemap
   tournaments         64   ROI, its interval, cash rate, dry runs, finishes
-  sessionImport       63   reading a session-summary export
   handOffs            61   where a hand-off goes, and what the four offer cards say
   stats               56   P/L, rebuys, duration, win rate, groupings
   content             55   every figure in the guides, re-derived and read back
@@ -1158,6 +1158,7 @@ Tests:       2196 passed
   tableOffer          11   which tags mean the game did it to you, and what to say about it
   columns             10   header matching
   pastHand            10   adding a hand to a session that is not running
+  rowLabels           10   what a screen reader is told a row in a list is
   search              10   finding one thing in a log with years in it
   selectors           10   store reads and filters
   liveTimer            9   the session clock, across a background and back
@@ -1177,7 +1178,6 @@ Tests:       2196 passed
   settingsHelp         7   the privacy link, the support address, the build
   venues               7   which spellings of a room name are the same room
   readme               6   the test table adds up and says what each suite is for
-  rowLabels            6   what a screen reader is told a row in a list is
   scale                6   how much of the plot the data actually gets
   serviceWorker        6   what the worker answers a navigation with, run rather than read
   settingsSeed         6   the demo set, and the one device it must not be written onto

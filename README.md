@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2219 passed
+Tests:       2221 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1154,9 +1154,9 @@ Tests:       2219 passed
   importIntegration   13   parse → store → read back, against real SQLite
   logHand             13   logging a hand, the optional board, and the reset after a bad one
   rateLimit           13   how often one person may ask, and what a refusal costs
+  columns             12   header matching
   csvWriter           11   writing CSV, and reading back exactly what was written
   tableOffer          11   which tags mean the game did it to you, and what to say about it
-  columns             10   header matching
   pastHand            10   adding a hand to a session that is not running
   rowLabels           10   what a screen reader is told a row in a list is
   search              10   finding one thing in a log with years in it

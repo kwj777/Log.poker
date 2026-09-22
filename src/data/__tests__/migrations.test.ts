@@ -392,6 +392,54 @@ describe('the migration list', () => {
   });
 });
 
+describe('the Dexie version ladder', () => {
+  /**
+   * Pinned because the note at the top of `db.ts` describes it, and prose
+   * cannot be run. That note said the versions "stop at the 3 that tournaments
+   * needed" for three versions after they stopped doing so, which is the shape
+   * a comment goes stale in: nothing errors, and the next reader is told the
+   * ladder is half as tall as it is. Adding a version now costs a line here.
+   */
+  const name = 'log-poker-ladder-test';
+  let db: ReturnType<typeof createDatabase>;
+
+  beforeEach(async () => {
+    db = createDatabase(name);
+    await db.open();
+  });
+
+  afterEach(async () => {
+    db.close();
+    await db.delete();
+  });
+
+  it('runs to 6, and the note at the top of db.ts says which three of those are about keys', () => {
+    expect(db.verno).toBe(6);
+  });
+
+  it('indexes the tombstone on the hands and on nothing else', async () => {
+    // The other half of that note, and the more expensive one to get wrong:
+    // an index on a property that is null on almost every row costs a write
+    // per tombstone to answer a question only `countHands` asks.
+    const indexed = db.tables
+      .filter((table) => table.schema.indexes.some((index) => index.name === 'deletedAt'))
+      .map((table) => table.name);
+    expect(indexed).toEqual(['hands']);
+  });
+
+  it('and the board needed no version here, which is where the two schemas part', async () => {
+    // SQLite took an `ALTER TABLE` for it, migration 5. IndexedDB stores whole
+    // objects, so a hand with a board and a hand without are both just hands.
+    // The note calls this the second time that asymmetry has come up; this is
+    // the assertion that it is still true.
+    expect(MIGRATIONS[4].statements).toEqual(['ALTER TABLE hands ADD COLUMN board TEXT']);
+    const hands = db.tables.find((table) => table.name === 'hands');
+    expect(hands?.schema.indexes.some((index) => index.name === 'board')).toBe(false);
+    await hands?.add({ id: 'h9', sessionId: 's9', holeCards: 'AsKd', board: 'Ah7c2d', position: 'BTN', note: null, tags: [], amount: null, at: T0, createdAt: T0, updatedAt: T0 });
+    expect(await hands?.get('h9')).toMatchObject({ board: 'Ah7c2d' });
+  });
+});
+
 describe('a hand written before there was anywhere to put the board', () => {
   let driver: NodeSqliteDriver;
   let repository: SqlRepository;

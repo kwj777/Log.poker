@@ -25,7 +25,8 @@ import {
   importGlossary,
   positionGlossary,
 } from '../glossary';
-import { FIELD_LABELS, IMPORT_FIELDS } from '../import';
+import { FIELD_LABELS, IMPORT_FIELDS, parseSessionCsv } from '../import';
+import { parseGameType } from '../import/values';
 import { HAND_TAGS, HAND_TAG_LABELS, POSITIONS } from '../types';
 
 const ROOT = join(__dirname, '..', '..', '..');
@@ -227,3 +228,33 @@ describe('the rake', () => {
     expect(rake?.says).toMatch(/tournament/i);
   });
 });
+
+describe('what the import glossary promises about a column', () => {
+  /**
+   * These sentences are shown on the import screen, in the sheet behind "What
+   * each column is", before anything is written. They are read as a
+   * description of what the importer will do, so a promise it does not keep is
+   * the worst kind of entry to carry.
+   */
+  it('does not say an unfamiliar game name is kept, because it is not', () => {
+    // `GameType` is the closed union NLHE | PLO | OTHER, `parseGameType`
+    // answers anything else with OTHER, and `sessionImport` writes that
+    // straight onto the record. The cell text is stored nowhere, so a file
+    // whose Game column says "Short Deck" produces a log of rows reading
+    // "Other" with no way back. The neighboring entry for Venue makes the same
+    // kind of promise -- "the spelling in your spreadsheet is the spelling you
+    // get" -- and keeps it, which is why a reader takes this one literally.
+    expect(parseGameType('Short Deck')).toBe('OTHER');
+    expect(IMPORT_HELP.gameType.says).not.toMatch(/\bkept\b/);
+    expect(IMPORT_HELP.gameType.says).toMatch(/filed under Other/);
+  });
+
+  it('and the venue entry keeps the one it makes', () => {
+    // The comparison that makes the line above worth asserting rather than
+    // rewriting by taste.
+    expect(IMPORT_HELP.venue.says).toMatch(/spelling/);
+    expect(parseSessionCsv('Date,Site,Result\n2024-01-15,Kings Resort,120\n').sessions[0].venueName)
+      .toBe('Kings Resort');
+  });
+});
+

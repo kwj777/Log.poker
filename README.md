@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 99 passed
-Tests:       2221 passed
+Tests:       2223 passed
 
   dexieRepository    147   the IndexedDB path, against real IndexedDB
   sqlRepository      144   the SQLite path, against real SQLite
@@ -1129,10 +1129,10 @@ Tests:       2221 passed
   compose             23   which repository a device gets, and the unsafe sweep
   handNotation        23   parse, round-trip, hand classes
   history             23   the session list, its filters, and how much of it mounts
+  glossary            22   the shorthand on screen still matches its explanation
   money               22   cents arithmetic, parsing, formatting
   release             21   app.json, eas.json and the icon a store refuses over
   clock               20   a typed date, a typed length, and what neither will accept
-  glossary            20   the shorthand on screen still matches its explanation
   privacy             20   the policy page, held to the code it describes
   batch               19   a backlog split into requests, without orphaning a child
   csv                 19   quoting, delimiters, line endings

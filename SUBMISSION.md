@@ -248,6 +248,146 @@ file reads back.
 
 ## The answers App Store Connect asks for
 
+### The listing
+
+Everything else in this file is a checkbox or a sentence of prose. This is the
+one section that is copy, and it was the last thing here to get written, which
+is backwards: it is the only part of the submission that decides whether
+anybody ever finds the app. The code is ahead of every free tracker on the
+store; the listing is the whole distribution channel, and a free app with no ad
+budget has no second one.
+
+**The App Store record already exists** (see decision 1), so all of this is an
+edit to it rather than a first entry.
+
+#### Name and subtitle
+
+| Field | Value | Limit |
+| --- | --- | --- |
+| Name | `Log: Poker Bankroll Tracker` | 30, this is 27 |
+| Subtitle | `Running bad, or playing bad?` | 30, this is 28 |
+
+**The app is called Log and that is unsearchable.** The name on the home screen
+comes from `expo.name` in `app.json` and stays `Log`, which is right: it is a
+short word under an icon. The App Store Connect name is a different field
+entirely, it is indexed for search, and `Log` alone will never surface for
+anybody typing "poker tracker". The name above keeps the brand and buys the
+three words that matter.
+
+The subtitle is indexed too, so spending it on a slogan is a real trade. It is
+worth making here: the name already carries poker, bankroll and tracker, the
+keyword field below carries the rest, and every competitor's subtitle on a
+search results page says some arrangement of the same three words. The line
+above is the question the app exists to answer and it is the app's own copy,
+from the variance screen.
+
+If the app is still invisible after a few months, the keyword-weighted
+alternative is `Session log and variance math` (29), and swapping it is a
+metadata change that does not need a build.
+
+**No price words in the name or the subtitle.** Apple's own metadata guidance
+puts pricing out of both fields, so "Free" cannot go where it would help most.
+That is why the whole free argument lives in the promotional text and the first
+paragraph of the description instead, and it is worth knowing before somebody
+improves the subtitle by adding the one word the store will reject it for.
+
+#### Keywords
+
+```
+session,variance,winrate,downswing,tournament,hourly,journal,cash,game,live,stakes,casino,roi
+```
+
+93 of the 100 characters. Three rules are load bearing and easy to get wrong:
+the field is comma separated with **no space after the comma**, because a space
+costs a character; Apple indexes the name and the keyword field together, so
+repeating `poker`, `bankroll`, `tracker` or `log` here would spend characters on
+words already covered; and singulars match plurals, so nothing on that list
+needs an `s`.
+
+`downswing` is on it deliberately. It is what a player types into a search box
+on the night they most want this app, and no competitor's listing is written
+around it.
+
+#### Promotional text
+
+170 characters, and the one field that can be changed without submitting a
+build. This is where the wedge goes.
+
+```
+Everything in Log is free. No session limit, no ads, no account needed. Export
+your whole log whenever you like, and sync it across your devices for nothing.
+```
+
+Each clause of that is a paywall somewhere else. Poker Analytics gives one
+session a month, Nash four a week, StackEdge fifty sessions and then charges for
+the export, and Left Pocket caps sessions and gates multiple bankrolls. Saying
+plainly what is free is not modesty, it is the comparison.
+
+#### Description
+
+Long, and only the first three lines show before the "more" link, which is why
+the first paragraph carries the whole argument.
+
+```
+Log is a poker session tracker for live cash games, home games and tournaments.
+It is free in its entirety: no session limit, no ads, no subscription, and no
+account unless you want your log on more than one device.
+
+Log a session in under ten seconds and a hand in under fifteen. Start with the
+stakes, the game and the buy-in, add rebuys as they happen, cash out at the
+end. The duration, the profit and the hourly rate are worked out for you rather
+than typed.
+
+AM I RUNNING BAD, OR PLAYING BAD?
+
+That is the question a downswing provokes, and Log is built to answer it
+honestly. It estimates your own win rate and your own standard deviation from
+the sessions you have logged, never from a typical number somebody else picked,
+and it shows your recent stretch inside the range those two numbers predict. A
+rough patch inside the range is named as ordinary. An outlier is named as an
+outlier. A heater is called a heater, so you do not bank on it. Below eight
+sessions it says it does not know yet rather than inventing a verdict.
+
+WHAT IS IN IT
+
+Sessions with stakes, venue, game, rebuys and notes, cash or tournament.
+
+A quick hand journal: hole cards in two taps, position, one line of note, and
+tags for a bad beat, a cooler, a bluff or a hand you think you misplayed.
+
+Your bankroll over time, your hourly rate, and where the money comes from,
+broken down by stakes, by venue and by game.
+
+The variance view, with your win rate in big blinds per hour and the swing that
+goes with it.
+
+Tournaments kept separate, with the entry and the fee apart, a cash rate, and
+an ROI carrying a real interval rather than a false air of precision.
+
+An optional one tap mood check at the start and end of a session, and an honest
+look at what it costs you. It refuses to claim a finding the numbers cannot
+carry.
+
+Filters and search across the whole log.
+
+IT WORKS WITH NO SIGNAL
+
+Card rooms are basements. Every read and every write is on your device, so
+adding a rebuy and logging a hand work with the network entirely gone.
+
+YOUR LOG IS YOURS
+
+Export all of it to CSV whenever you like, at no charge, in a file Log reads
+back. Import a year of sessions from a spreadsheet or from a tracker export
+rather than typing them out. Sign in with an email address if you want to, and
+your log follows you to your other devices, which is free as well.
+
+Log keeps no user table and never stores your email address.
+```
+
+There is no "What's New" text for 1.0, which is the one version that does not
+need any.
+
 ### App Privacy
 
 Every answer below is what the code actually does. The reasoning is in

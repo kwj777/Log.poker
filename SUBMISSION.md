@@ -187,21 +187,34 @@ file reads back.
    see decision 1 above. Capabilities stay editable after registration, so none
    of that had to be settled here.
 
-3. **A simulator build, which needs no signing.**
+3. ~~**A simulator build, which needs no signing.**~~ **Done on 2026-09-22.**
+   It built, installed and launched.
 
    ```
    npx eas build --platform ios --profile simulator
    ```
 
    This step used to warn that the code had never run outside a browser and to
-   expect real time here. It ran on 2026-09-22, in the simulator through Expo
-   Go, and the warning was right: SQLite (`src/data/sql/expoSqliteDriver.ts`),
-   SecureStore (`src/auth/tokenStore.ts`), haptics and the CSV share sheet
-   (`src/features/export/saveCsv.ts`) all work, but three layout and platform
+   expect real time here, and the warning was right twice over. The Expo Go run
+   that came first settled the native surface: SQLite
+   (`src/data/sql/expoSqliteDriver.ts`), SecureStore
+   (`src/auth/tokenStore.ts`), haptics and the CSV share sheet
+   (`src/features/export/saveCsv.ts`) all work, and three layout and platform
    bugs no static audit could see turned up in the first hour and are fixed
-   (#95, #96, #97). What this build is now for is the things Expo Go cannot
-   answer: the real icon, the splash screen, and the app under its own bundle
-   identifier rather than Expo Go's.
+   (#95, #96, #97).
+
+   **Then this build found a fourth that Expo Go could not have shown.** Every
+   screen renders a `<PageMeta>`, and on iOS `expo-router/head` is not the
+   helmet that sets a browser tab title but a registrar for the NSUserActivity
+   behind Handoff and Spotlight. With no `origin` in the Expo config it alerts
+   the player, in those words, from inside a render, on every focused screen.
+   Expo Go cannot reach it, because the native module that switches it on is
+   switched off there by name, and Jest cannot either, because it loads no
+   native module at all. A production bundle alerts where a development one
+   throws. So a standalone Release build is the only thing that shows it, and
+   that is the kind of build an app store gets. Fixed by keeping the head on
+   the web; the reasoning, including why setting an `origin` would not have
+   worked here, is in `src/components/PageMeta.tsx`.
 
    `npx expo prebuild --platform ios` was run against this config on
    2026-09-22, which is the first thing EAS does on its own machines, and it
@@ -210,7 +223,8 @@ file reads back.
    `UIUserInterfaceStyle = Automatic` into Info.plist and overriding the
    `userInterfaceStyle: "dark"` set higher up the same file. Expo Go carries
    its own Info.plist, so that class of defect cannot appear until exactly this
-   step. Run the build expecting a second round of them.
+   step. The head alert above is the same shape, and it is why a device build
+   is worth running before the screenshots rather than after them.
 
 4. **A device build.** Nothing is waiting on enrollment; see step 1.
 
@@ -524,8 +538,27 @@ Required at 6.7" (iPhone 15 Pro Max or similar), and that is the whole set:
 
 The screens worth showing, in the order they tell the story: the dashboard with
 a few sessions logged, a live session running, logging a hand, the variance
-view, and the history list. The simulator build from step 3 is what these come
-from.
+view, and the history list.
+
+**Take them from a development run, not from the build in step 3.** Four of
+those five want a log with sessions already in it, and the way to get one is
+Settings, then Load demo data. That card is gated on `ALLOW_DEMO_SEED` in
+`src/config.ts`, which is `__DEV__`, and the `simulator` profile sets
+`developmentClient: false`, so step 3 produces a Release build where `__DEV__`
+is false and the card is never drawn. Run this instead, seed, then shoot:
+
+```
+npm run ios
+```
+
+The pixels are the same either way. Those flags hide rather than strip, and no
+layout differs between the two configurations. Step 3 answers the icon, the
+splash screen and the bundle identifier, which is a different question from
+what a screen looks like with data behind it.
+
+The seeder refuses on a signed-in device on purpose: it starts with a reset, so
+a device that syncs would pull the real log back and then push the demo up.
+Sign out first.
 
 ---
 

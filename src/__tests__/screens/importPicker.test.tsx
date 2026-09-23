@@ -43,7 +43,7 @@ const chose = (name: string, text: string) => ({
 
 const open = async () => {
   await renderScreen(<ImportScreen />);
-  await userEvent.press(screen.getByText('Choose a CSV file…'));
+  await userEvent.press(screen.getByText('Choose a file…'));
 };
 
 beforeEach(() => {
@@ -90,8 +90,8 @@ describe('the import screen on a phone', () => {
   it('and leaves the screen alone when the player backs out', async () => {
     mockPickFileAsync.mockResolvedValue({ canceled: true, result: null });
     await renderScreen(<ImportScreen />);
-    await userEvent.paste(screen.getByLabelText('Session summary rows'), CSV);
-    await userEvent.press(screen.getByText('Choose a CSV file…'));
+    await userEvent.paste(screen.getByLabelText('Session summary rows or hand histories'), CSV);
+    await userEvent.press(screen.getByText('Choose a file…'));
 
     // Backing out of the picker is not a request to throw away what is already
     // in the box, which is the one thing a cancel must not do.

@@ -6,10 +6,11 @@
  * same history already -- their site or their tracker wrote it down for them --
  * and no way to get it in here without typing out a year of sessions by hand.
  *
- * This reads a session-summary export and turns it into sessions. It does not
- * read hand histories: a hand history is an action-level record of one hand, and
- * Log's `Hand` is a journal entry *about* a hand, so there is nothing to import
- * into. Session summaries are the level the two products actually share.
+ * This reads a session-summary export and turns it into sessions. Hand
+ * histories are read elsewhere, by `handHistory/`: a hand history is an
+ * action-level record of one hand, Log's `Hand` is a journal entry *about* a
+ * hand, and the two meet only at the cards, the board, the seat and the result,
+ * which is all that importer keeps.
  *
  * Two invariants hold for everything this produces, and both matter downstream:
  *

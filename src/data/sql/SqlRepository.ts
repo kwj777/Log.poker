@@ -1117,6 +1117,36 @@ export class SqlRepository implements Repository {
     const session = await this.getSession(input.sessionId);
     if (!session) throw new NotFoundError('Session', input.sessionId);
     const hand = buildHand(input, this.ctx);
+    await this.insertHand(hand);
+    return hand;
+  }
+
+  async createHands(inputs: readonly NewHand[]): Promise<Hand[]> {
+    if (inputs.length === 0) return [];
+
+    const sessionIds = Array.from(new Set(inputs.map((input) => input.sessionId)));
+    const live = new Set(
+      (
+        await inChunks<{ id: string }>(
+          this.driver,
+          sessionIds,
+          (placeholders) => `SELECT id FROM sessions
+           WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+        )
+      ).map((row) => row.id),
+    );
+    for (const sessionId of sessionIds) {
+      if (!live.has(sessionId)) throw new NotFoundError('Session', sessionId);
+    }
+
+    return this.driver.transaction(async () => {
+      const hands = inputs.map((input) => buildHand(input, this.ctx));
+      for (const hand of hands) await this.insertHand(hand);
+      return hands;
+    });
+  }
+
+  private async insertHand(hand: Hand): Promise<void> {
     await this.driver.run(
       `INSERT INTO hands (id, session_id, hole_cards, board, position, note, tags, amount, at, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1134,7 +1164,6 @@ export class SqlRepository implements Repository {
         hand.updatedAt,
       ],
     );
-    return hand;
   }
 
   async updateHand(id: string, patch: HandPatch): Promise<Hand> {

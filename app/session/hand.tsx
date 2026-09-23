@@ -78,6 +78,7 @@ import {
   cardToString,
   clashingCards,
   isBoard,
+  parseNotation,
 } from '../../src/domain/handNotation';
 import { formatSessionDate } from '../../src/features/sessions/format';
 import { openLink } from '../../src/features/family/hooks';
@@ -401,11 +402,18 @@ export default function LogHandScreen() {
         The guard was wired one way only, so a player who set the runout first
         and their own cards second could deal the same card twice, and the
         hand stored a board and a holding that cannot both be true.
+
+        As many slots as the hand was saved with, when that is more. An
+        imported Omaha hand can land in a session logged as hold'em, and two
+        slots showed half of it and cut the rest off at the first edit.
       */}
       <CardPicker
         value={holeCards}
         onChange={setHoleCards}
-        cardCount={session.gameType === 'PLO' ? 4 : 2}
+        cardCount={Math.max(
+          session.gameType === 'PLO' ? 4 : 2,
+          parseNotation(existing?.holeCards ?? null)?.length ?? 0,
+        )}
         exclude={showBoard ? board : null}
       />
       {clash.length > 0 ? (

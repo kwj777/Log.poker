@@ -8,12 +8,17 @@
  */
 
 import { looksLikeHandHistory, parseHandHistory } from '..';
-import { positionsAround, readAmount, readCards, readGameType } from '../common';
+import { positionsAround, readAmount, readCards, readGameType, sumAmounts } from '../common';
 import { readHeaderTime } from '../time';
 import {
   ACR_SET,
+  EIGHT88_DEAD_BLIND,
+  EIGHT88_SPACED,
   EIGHT88_UNCALLED,
+  EIGHT88_WALK,
   GG_RUSH,
+  PARTY_DEAD_BLIND,
+  PARTY_POT_LIMIT,
   PARTY_THREE_BET,
   STARS_ALL_IN,
   STARS_HERO_FOLDS,
@@ -21,6 +26,8 @@ import {
   STARS_PLAY_MONEY_SMALL,
   STARS_WATCHED,
   WINAMAX_ALL_IN,
+  WINAMAX_BLIND_RAISE,
+  WINAMAX_TOURNAMENT,
 } from './fixtures';
 
 const only = (text: string) => {
@@ -37,6 +44,15 @@ describe('the pieces', () => {
     expect(readAmount('1,500')).toBe(150000);
     expect(readAmount('[$0.10 USD].')).toBe(10);
     expect(readAmount('no number')).toBeNull();
+  });
+
+  it('reads thousands set apart by a space, as 888poker writes them in some countries', () => {
+    expect(readAmount('( 3\u00a0023,50 $ )')).toBe(302350);
+    expect(readAmount('[1\u202f250 $]')).toBe(125000);
+    expect(readAmount('1 250 000')).toBe(125000000);
+    // Two figures a space apart are only one amount when the second is a group of three.
+    expect(readAmount('25 $')).toBe(2500);
+    expect(sumAmounts('[$1 + $2]')).toBe(300);
   });
 
   it('reads cards, including a ten written as 10', () => {
@@ -90,6 +106,13 @@ describe('the pieces', () => {
       expect(readHeaderTime('2026/11/01 12:00:00 ET')?.at).toBe(Date.UTC(2026, 10, 1, 17));
     });
 
+    it('trusts Eastern when PokerStars writes two that disagree', () => {
+      // PokerStars can keep writing CET through a European summer, when the
+      // clock it read was CEST. Eastern is the one it always gets right.
+      const read = readHeaderTime('2026/07/08 18:14:22 CET [2026/07/08 12:14:22 ET]');
+      expect(read).toEqual({ at: Date.UTC(2026, 6, 8, 16, 14, 22), zoned: true });
+    });
+
     it('prefers the zone it knows when PokerStars writes two', () => {
       const read = readHeaderTime('2026/09/23 14:02:11 CEST [2026/09/23 8:02:11 ET]');
       expect(read).toEqual({ at: Date.UTC(2026, 8, 23, 12, 2, 11), zoned: true });
@@ -104,6 +127,9 @@ describe('the pieces', () => {
 
     it('does not read a date that is not one', () => {
       expect(readHeaderTime('2026/13/40 25:00:00 UTC')).toBeNull();
+      // Not a real day either, though every field is in range on its own.
+      expect(readHeaderTime('2026/02/31 12:00:00 UTC')).toBeNull();
+      expect(readHeaderTime('2028/02/29 12:00:00 UTC')?.at).toBe(Date.UTC(2028, 1, 29, 12));
     });
   });
 });
@@ -198,6 +224,12 @@ describe('PokerStars', () => {
     expect(result.sites).toEqual(['PokerStars']);
   });
 
+  it('reads a file saved with bare carriage returns between lines', () => {
+    const hand = only(STARS_HERO_FOLDS.replace(/\n/g, '\r'));
+    expect(hand).toMatchObject({ handId: '1846552153', net: -100, holeCards: '4s7h' });
+    expect(looksLikeHandHistory(STARS_HERO_FOLDS.replace(/\n/g, '\r'))).toBe(true);
+  });
+
   it('skips a canceled hand with its reason', () => {
     // The site's own spelling, split so the house spelling check lets it through.
     const voided = `${STARS_HERO_FOLDS}\nHand cancel` + `led`;
@@ -225,6 +257,22 @@ describe('GGPoker', () => {
       position: 'UTG',
       stack: 512,
     });
+  });
+});
+
+describe('whose hand it is', () => {
+  it('is the player dealt cards in every hand, not whoever showed first', () => {
+    // GGPoker writes the cards of a player who showed on their `Dealt to` line,
+    // and the lowest seat comes first. That player became the hero, with their
+    // cards and their result.
+    const shown = GG_RUSH.replace('#RC2000000001', '#RC2000000002')
+      .replace('18:30:00', '18:31:00')
+      .replace('Dealt to 1a2b3c\n', 'Dealt to 1a2b3c [Qs Qd]\n');
+    const result = parseHandHistory(`${GG_RUSH}\n\n${shown}`);
+    expect(result.hands.map((hand) => [hand.handId, hand.hero, hand.holeCards])).toEqual([
+      ['RC2000000001', 'Hero', 'AhKh'],
+      ['RC2000000002', 'Hero', 'AhKh'],
+    ]);
   });
 });
 
@@ -264,6 +312,30 @@ describe('Winamax', () => {
   });
 });
 
+describe('Winamax, the first street', () => {
+  it('keeps the blinds when a raise comes from one', () => {
+    const hand = only(WINAMAX_BLIND_RAISE);
+    // In: 0.50 blind, raised to 2.50, then 5 to call the three-bet to 7.50.
+    // Back: 14.02. Net +6.52. Reading PRE-FLOP as a new street forgot the
+    // 0.50 and put in 8.00.
+    expect(hand).toMatchObject({ net: 652, position: 'BTN', showdown: true, currency: 'EUR' });
+  });
+
+  it('reads a tournament with a name and no number as a tournament, in chips', () => {
+    const hand = only(WINAMAX_TOURNAMENT);
+    // In: 5 ante + 40 small blind. Net -45 chips.
+    expect(hand).toMatchObject({
+      format: 'tournament',
+      tournamentId: '700001',
+      currency: null,
+      smallBlind: 4000,
+      bigBlind: 8000,
+      net: -4500,
+      stack: 300000,
+    });
+  });
+});
+
 describe('888poker', () => {
   it('hands back a river bet nobody called, which the file never mentions', () => {
     const hand = only(EIGHT88_UNCALLED);
@@ -282,7 +354,60 @@ describe('888poker', () => {
   });
 });
 
+describe('888poker, the corners', () => {
+  it('does not count a walk twice', () => {
+    const hand = only(EIGHT88_WALK);
+    // In: the 1.00 big blind. Back: 1.50, the whole pot. Net +0.50. Handing
+    // back the half of the blind nobody matched as well made it +1.00.
+    expect(hand.net).toBe(50);
+  });
+
+  it('reads both halves of a dead blind', () => {
+    const hand = only(EIGHT88_DEAD_BLIND);
+    // In: 1 dead + 2 live. Back: 5.70. Net +2.70.
+    expect(hand.net).toBe(270);
+    expect(hand.showdown).toBe(true);
+  });
+
+  it('reads blinds and stacks written with spaces in them', () => {
+    const result = parseHandHistory(EIGHT88_SPACED);
+    expect(result.warnings).toEqual([]);
+    expect(result.hands[0]).toMatchObject({
+      smallBlind: 2500,
+      bigBlind: 5000,
+      stack: 1555250,
+      gameType: 'PLO',
+      holeCards: 'AhKd5c5s',
+      net: 0,
+    });
+  });
+});
+
 describe('partypoker', () => {
+  it('reads a big blind posted with a dead one', () => {
+    const hand = only(PARTY_DEAD_BLIND);
+    // In: 3 posted (2 live, 1 dead) + 2 raise + 7.12 + 14 = 26.12. Back: nothing.
+    expect(hand.net).toBe(-2612);
+  });
+
+  it('reads a pot-limit hand that opens like an 888poker one, once', () => {
+    const result = parseHandHistory(PARTY_POT_LIMIT);
+    expect(result.warnings).toEqual([]);
+    expect(result.skipped).toBe(0);
+    expect(result.hands).toHaveLength(1);
+    // In: 0.25 + 0.25 + 0.71 = 1.21. Back: 2.30. Net +1.09.
+    expect(result.hands[0]).toMatchObject({
+      site: 'partypoker',
+      hero: 'Hero Man',
+      smallBlind: 25,
+      bigBlind: 50,
+      net: 109,
+      currency: 'USD',
+      position: 'BTN',
+      at: Date.UTC(2012, 3, 3, 7, 48, 45),
+    });
+  });
+
   it('reads raises as what was added, and a win with the uncalled part in it', () => {
     const hand = only(PARTY_THREE_BET);
     // In: 0.05 + 0.25 + 0.50 + 2.94 = 3.74. Back: 5.18. Net +1.44.

@@ -8,18 +8,30 @@ import { toNumeric } from '../../money';
 import type { GameType, Position } from '../../types';
 
 /**
+ * One amount: digits with `.` and `,` in them, or thousands set apart by a
+ * space, which is how 888poker writes `3 023,50 $` for a player whose locale
+ * groups that way (usually with a no-break space). Reading only up to the
+ * space made that stack 3 and a 1 250 bet 1.
+ */
+const AMOUNT = /\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?(?!\d)|\d[\d.,]*/g;
+
+/**
  * The first amount in a piece of text, in hundredths: `$0.05` is 5, `0.25€` is
  * 25, `1,500` chips is 150000. Null when there is no number in it.
  */
 export const readAmount = (text: string): number | null => {
-  const match = /\d[\d.,]*/.exec(text);
+  const match = new RegExp(AMOUNT.source).exec(text);
   if (!match) return null;
   // A sentence can end on the amount: "posts big blind [$0.10 USD]." and
   // "collected $1.50." both put a stop after the last digit.
-  const digits = match[0].replace(/[.,]+$/, '');
+  const digits = match[0].replace(/[ \u00a0\u202f]/g, '').replace(/[.,]+$/, '');
   const value = toNumeric(digits);
   return value === null ? null : Math.round(value * 100);
 };
+
+/** Every amount in a piece of text, summed: `[$1 + $2]` is 300. */
+export const sumAmounts = (text: string): number =>
+  (text.match(AMOUNT) ?? []).reduce((sum, token) => sum + (readAmount(token) ?? 0), 0);
 
 /**
  * Cards as a site writes them, `[Ah Kd]`, `[ 3d, Jc ]`, `[10h 9h]`, in Log's
@@ -127,6 +139,50 @@ export const actorOf = (
   return null;
 };
 
+/** `Dealt to Name [Ah Kd]`: a player's cards, which a site shows face up only for its own player, mostly. */
+const DEALT = /^Dealt to (.+?) \[([^\]]+)\]/;
+
+/** How many hands in a file each name was dealt cards in, face up. */
+export const dealtCounts = (hands: readonly (readonly string[])[]): Map<string, number> => {
+  const counts = new Map<string, number>();
+  for (const lines of hands) {
+    const names = new Set<string>();
+    for (const line of lines) {
+      const dealt = DEALT.exec(line);
+      if (dealt) names.add(dealt[1]);
+    }
+    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return counts;
+};
+
+/**
+ * Whose hand this is: of the players dealt cards face up, the one dealt them
+ * in the most hands of the file.
+ *
+ * A site writes the cards of the player who downloaded the file, but not only
+ * theirs: GGPoker writes a `Dealt to` line with cards for everyone who showed,
+ * and a hand history someone else saved has their name on it. Taking the first
+ * such line made whoever sat in the lowest seat the player whenever cards were
+ * shown, with their cards and their result. The player is the one dealt in
+ * every hand; a tie goes to the first line, as before.
+ */
+export const readHero = (
+  lines: readonly string[],
+  counts: ReadonlyMap<string, number>,
+): { hero: string; holeCards: string | null } | null => {
+  let best: { hero: string; holeCards: string | null; count: number } | null = null;
+  for (const line of lines) {
+    const dealt = DEALT.exec(line);
+    if (!dealt) continue;
+    const count = counts.get(dealt[1]) ?? 0;
+    if (best === null || count > best.count) {
+      best = { hero: dealt[1], holeCards: readCards(dealt[2]), count };
+    }
+  }
+  return best && { hero: best.hero, holeCards: best.holeCards };
+};
+
 export const longestFirst = (names: Iterable<string>): string[] =>
   [...names].sort((a, b) => b.length - a.length);
 
@@ -140,11 +196,19 @@ export const longestFirst = (names: Iterable<string>): string[] =>
  */
 export class Ledger {
   private street = new Map<string, number>();
+  /** The part of `street` the player chose to put in: everything but a blind. */
+  private chosen = new Map<string, number>();
   private putIn = new Map<string, number>();
   private won = new Map<string, number>();
 
-  /** Money in the pot that counts toward the street, a blind or a call or a bet. */
+  /** Money in the pot that counts toward the street: a call, a bet, a raise. */
   put(player: string, amount: number): void {
+    this.blind(player, amount);
+    this.chosen.set(player, (this.chosen.get(player) ?? 0) + amount);
+  }
+
+  /** A live blind: it counts toward the street, but nobody chose to bet it. */
+  blind(player: string, amount: number): void {
     this.street.set(player, (this.street.get(player) ?? 0) + amount);
     this.putIn.set(player, (this.putIn.get(player) ?? 0) + amount);
   }
@@ -163,6 +227,7 @@ export class Ledger {
   returned(player: string, amount: number): void {
     this.putIn.set(player, (this.putIn.get(player) ?? 0) - amount);
     this.street.set(player, (this.street.get(player) ?? 0) - amount);
+    this.chosen.set(player, (this.chosen.get(player) ?? 0) - amount);
   }
 
   collect(player: string, amount: number): void {
@@ -173,18 +238,22 @@ export class Ledger {
    * Hand back whatever the biggest bet on this street had over the next one.
    *
    * For the formats that return an uncalled bet without writing a line to say
-   * so, and then write the pot collected without it.
+   * so, and then write the pot collected without it. Only a bet comes back,
+   * never a blind: when everyone folds to the big blind, 888poker writes the
+   * whole pot as collected, the big blind's own blind included, so handing
+   * the half the small blind did not match back as well counted it twice.
    */
   refundUncalled(): void {
     const amounts = [...this.street.entries()].sort((a, b) => b[1] - a[1]);
     if (amounts.length === 0) return;
     const [top, second] = amounts;
-    const excess = top[1] - (second?.[1] ?? 0);
+    const excess = Math.min(top[1] - (second?.[1] ?? 0), this.chosen.get(top[0]) ?? 0);
     if (excess > 0) this.returned(top[0], excess);
   }
 
   newStreet(): void {
     this.street = new Map();
+    this.chosen = new Map();
   }
 
   net(player: string): number {

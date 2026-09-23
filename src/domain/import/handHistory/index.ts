@@ -16,12 +16,16 @@
  * error that says so, rather than an empty preview.
  */
 
+import { dealtCounts } from './common';
 import { BRACKET_FAMILY_START, parseBracketFamilyHand } from './bracketFamily';
 import { STARS_FAMILY_START, parseStarsFamilyHand } from './starsFamily';
 import type { HandHistoryResult, HandHistoryWarning, HandSite, ParsedHand } from './types';
 
 export * from './types';
 export * from './sittings';
+
+/** Every line ending in use: Windows, Unix, and the bare return of an older Mac export. */
+const LINE_BREAK = /\r\n|\r|\n/;
 
 const isStart = (line: string): boolean =>
   STARS_FAMILY_START.test(line) || BRACKET_FAMILY_START.test(line);
@@ -36,18 +40,28 @@ const isStart = (line: string): boolean =>
 export const looksLikeHandHistory = (text: string): boolean => {
   const first = text
     .replace(/^﻿/, '')
-    .split(/\r?\n/)
+    .split(LINE_BREAK)
     .find((line) => line.trim() !== '');
   return first !== undefined && isStart(first.trim());
 };
 
-/** Break a file into one block of lines per hand. */
+/**
+ * Break a file into one block of lines per hand.
+ *
+ * partypoker opens a hand with 888poker's `#Game No` line and then its own
+ * `***** Hand History for Game` line, and both are starts. The second one
+ * straight after the first is the same hand, not another; splitting there
+ * left every partypoker hand with a one-line twin that was read as an 888poker
+ * hand with no date, and warned about.
+ */
 const splitHands = (text: string): string[][] => {
   const hands: string[][] = [];
   let current: string[] | null = null;
-  for (const raw of text.replace(/^﻿/, '').split(/\r?\n/)) {
+  for (const raw of text.replace(/^﻿/, '').split(LINE_BREAK)) {
     const line = raw.replace(/^﻿/, '').trimEnd();
-    if (isStart(line.trim())) {
+    const continues =
+      current !== null && current.length === 1 && /^#Game No/.test(current[0]);
+    if (isStart(line.trim()) && !continues) {
       current = [line.trim()];
       hands.push(current);
       continue;
@@ -65,10 +79,12 @@ export const parseHandHistory = (text: string): HandHistoryResult => {
   let skipped = 0;
   let watched = 0;
 
-  for (const block of splitHands(text)) {
+  const blocks = splitHands(text);
+  const counts = dealtCounts(blocks);
+  for (const block of blocks) {
     const read = BRACKET_FAMILY_START.test(block[0])
-      ? parseBracketFamilyHand(block)
-      : parseStarsFamilyHand(block);
+      ? parseBracketFamilyHand(block, counts)
+      : parseStarsFamilyHand(block, counts);
     if ('skip' in read) {
       skipped += 1;
       // Hands the player only watched are the common case in a file somebody

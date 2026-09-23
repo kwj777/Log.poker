@@ -335,3 +335,218 @@ Aa collected $2.50 from pot
 *** SUMMARY ***
 Total pot $2.50 | Rake $0
 Seat 1: Aa (button) collected ($2.50)`;
+
+/**
+ * Real hand (Winamax GeneralHand), a `Dealt to` line added. Heads-up, the hero
+ * on the button raises from the small blind and calls a three-bet. Winamax
+ * names the first street `PRE-FLOP`, which was once taken for a new street and
+ * forgot the blinds, so the raise to 2.50 counted 2.50 on top of the 0.50.
+ */
+export const WINAMAX_BLIND_RAISE = `Winamax Poker - CashGame - HandId: #5281577-471-1382586707 - Holdem no limit (0.50€/1€) - 2013/10/24 03:51:47 UTC
+Table: 'Gold Coast-Tweed 13' 2-max (real money) Seat #2 is the button
+Seat 1: Birch (138.61€)
+Seat 2: Hero (116.40€)
+*** ANTE/BLINDS ***
+Hero posts small blind 0.50€
+Birch posts big blind 1€
+Dealt to Hero [8d Jd]
+*** PRE-FLOP *** 
+Hero raises 1.50€ to 2.50€
+Birch raises 5€ to 7.50€
+Hero calls 5€
+*** FLOP *** [3c 7d 2s]
+Birch checks
+Hero checks
+*** TURN *** [3c 7d 2s] [3h]
+Birch checks
+Hero checks
+*** RIVER *** [3c 7d 2s 3h] [4c]
+Birch checks
+Hero checks
+*** SHOW DOWN ***
+Birch shows [8s Td] (One pair : 3)
+Hero shows [8d Jd] (One pair : 3)
+Hero collected 14.02€ from pot
+*** SUMMARY ***
+Total pot 14.02€ | Rake 0.98€
+Board: [3c 7d 2s 3h 4c]
+Seat 1: Birch (big blind) mucked
+Seat 2: Hero (small blind) (button) showed [8d Jd] and won 14.02€ with One pair : 3`;
+
+/**
+ * A Winamax tournament hand, written in the site's layout: the tournament has
+ * a name and no number on the first line, and the buy-in there names euros.
+ */
+export const WINAMAX_TOURNAMENT = `Winamax Poker - Tournament "Freeroll 250€" buyIn: 0€ + 0€ level: 3 - HandId: #700001-12-1695480000 - Holdem no limit (5/40/80) - 2023/09/23 14:02:11 UTC
+Table: 'Freeroll 250€(700001)#012' 9-max (real money) Seat #1 is the button
+Seat 1: Ash (2400)
+Seat 2: Hero (3000)
+Seat 3: Beech (1800)
+*** ANTE/BLINDS ***
+Ash posts ante 5
+Hero posts ante 5
+Beech posts ante 5
+Hero posts small blind 40
+Beech posts big blind 80
+Dealt to Hero [7c 2d]
+*** PRE-FLOP ***
+Ash raises 160 to 240
+Hero folds
+Beech folds
+Ash collected 375 from pot
+*** SUMMARY ***
+Total pot 375 | No rake
+Seat 1: Ash (button) won 375`;
+
+/** Real hand (888poker NoHoleCards), a `Dealt to` line added. Everyone folds to the hero's big blind. */
+export const EIGHT88_WALK = `#Game No : 539304533
+***** 888poker Hand History for Game 539304533 *****
+$0.50/$1 Blinds Fix Limit Holdem - *** 06 01 2014 00:00:25
+Table Downey 6 Max (Real Money)
+Seat 1 is the button
+Total number of players : 3
+Seat 1: Ash ( $6 )
+Seat 2: Beech ( $64.84 )
+Seat 9: Hero ( $55.40 )
+Beech posts small blind [$0.50]
+Hero posts big blind [$1]
+** Dealing down cards **
+Dealt to Hero [ 7c, 2d ]
+Ash folds
+Beech folds
+** Summary **
+Hero collected [ $1.50 ]`;
+
+/** Real hand (888poker PostingDead), a `Dealt to` line added. The hero comes in posting both blinds. */
+export const EIGHT88_DEAD_BLIND = `#Game No : 359567819
+***** 888poker Hand History for Game 359567819 *****
+$1/$2 Blinds No Limit Holdem - *** 14 04 2015 03:11:08
+Table Arezzo 6 Max (Real Money)
+Seat 6 is the button
+Total number of players : 6
+Seat 1: Ash ( $284.58 )
+Seat 2: Hero ( $70 )
+Seat 4: Beech ( $221.75 )
+Seat 6: Cherry ( $310.86 )
+Seat 7: Larch ( $220.01 )
+Seat 9: Maple ( $100.89 )
+Larch posts small blind [$1]
+Maple posts big blind [$2]
+Hero posts dead blind [$1 + $2]
+** Dealing down cards **
+Dealt to Hero [ Js, 7d ]
+Ash folds
+Hero checks
+Beech folds
+Cherry folds
+Larch folds
+Maple checks
+** Dealing flop ** [ Ks, Jc, Ac ]
+Maple checks
+Hero checks
+** Dealing turn ** [ 2s ]
+Maple checks
+Hero checks
+** Dealing river ** [ 4d ]
+Maple checks
+Hero checks
+** Summary **
+Maple shows [ 5c, 7s ]
+Hero shows [ Js, 7d ]
+Hero collected [ $5.70 ]`;
+
+/**
+ * Real hand (888poker Limit5), a `Dealt to` line added and its no-break spaces
+ * restored (the sample had them double-encoded). Blinds with a space before
+ * the dollar sign, and stacks in the thousands with a space between groups.
+ */
+export const EIGHT88_SPACED = `#Game No : 409714750
+***** 888poker Hand History for Game 409714750 *****
+25 $/50 $ Blinds Pot Limit Omaha - *** 30 04 2015 09:13:22
+Table Coruna 6 Max (Real Money)
+Seat 2 is the button
+Total number of players : 4
+Seat 2: Ash ( 3 023,50 $ )
+Seat 4: Hero ( 15 552,50 $ )
+Seat 7: Beech ( 4 925 $ )
+Seat 9: Cherry ( 7 167 $ )
+Hero posts small blind [25 $]
+** Dealing down cards **
+Dealt to Hero [ Ah, Kd, 5c, 5s ]
+Beech folds
+Cherry folds
+Ash folds
+** Summary **
+Hero did not show his hand
+Hero collected [ 25 $ ]`;
+
+/** Real hand (partypoker Posting), a `Dealt to` line added. The hero posts the big blind and a dead small one. */
+export const PARTY_DEAD_BLIND = `***** Hand History for Game 14507003662 *****
+$1/$2 USD NL Texas Hold'em - Saturday, April 11, 13:57:03 EDT 2015
+Table Abuja (Real Money)
+Seat 2 is the button
+Total number of players : 6/6 
+Seat 2: Ash ( $296.69 USD )
+Seat 4: Beech ( $169.83 USD )
+Seat 1: Hero ( $97.37 USD )
+Seat 3: Cherry ( $243.55 USD )
+Seat 6: Larch ( $200 USD )
+Seat 5: Maple ( $197.58 USD )
+Cherry posts small blind [$1 USD].
+Maple posts big blind [$2 USD].
+Hero posts big blind + dead [$3].
+** Dealing down cards **
+Dealt to Hero [ 6h, Ks ]
+Larch folds
+Hero raises [$2 USD]
+Ash folds
+Cherry folds
+Maple will be using their time bank for this hand.
+Maple calls [$2 USD]
+** Dealing Flop ** [ 4h, 4s, Jh ]
+Maple will be using their time bank for this hand.
+Maple bets [$7.12 USD]
+Hero calls [$7.12 USD]
+** Dealing Turn ** [ 6s ]
+Maple will be using their time bank for this hand.
+Maple bets [$14 USD]
+Hero calls [$14 USD]
+** Dealing River ** [ 5s ]
+Maple will be using their time bank for this hand.
+Maple checks
+Hero checks
+Maple shows [ Td, Jc ]two pairs, Jacks and Fours.
+Hero doesn't show [ 6h, Ks ]two pairs, Sixes and Fours.
+Maple wins $49.63 USD from the main pot with two pairs, Jacks and Fours.`;
+
+/**
+ * Real hand (partypoker PotLimitHoldem), a `Dealt to` line added. It opens
+ * with 888poker's `#Game No` line before its own, and its game line names the
+ * table's maximum buy-in and no blinds.
+ */
+export const PARTY_POT_LIMIT = `#Game No : 11614201072 
+***** Hand History for Game 11614201072 *****
+$50 USD PL Texas Hold'em - Tuesday, April 03, 03:48:45 EDT 2012
+Table Table  131342 (No DP) (Real Money)
+Seat 2 is the button
+Total number of players : 2/6 
+Seat 3: Oak ( $97.65 USD )
+Seat 2: Hero Man ( $45.70 USD )
+Hero Man posts small blind [$0.25 USD].
+Oak posts big blind [$0.50 USD].
+** Dealing down cards **
+Dealt to Hero Man [ 7s, 9h ]
+Hero Man calls [$0.25 USD]
+Oak checks
+** Dealing Flop ** [ Kh, 7c, 2h ]
+Oak bets [$0.71 USD]
+Hero Man calls [$0.71 USD]
+** Dealing Turn ** [ Ts ]
+Oak checks
+Hero Man checks
+** Dealing River ** [ Tc ]
+Oak checks
+Hero Man checks
+Oak shows [ 2c, Qs ]two pairs, Tens and Twos.
+Hero Man shows [ 7s, 9h ]two pairs, Tens and Sevens.
+Hero Man wins $2.30 USD from the main pot with two pairs, Tens and Sevens.`;

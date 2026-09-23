@@ -67,16 +67,23 @@ export interface Sitting {
   zoned: boolean;
 }
 
-const groupKey = (hand: ParsedHand): string =>
-  [
+/**
+ * What hands must share to be one sitting. A tournament's blinds go up every
+ * level, so they are left out for one: keeping them made every level its own
+ * sitting, and a night's tournament a dozen cards in the preview.
+ */
+const groupKey = (hand: ParsedHand): string => {
+  const cash = hand.format === 'cash';
+  return [
     hand.site,
     hand.format,
     hand.tournamentId ?? '',
     hand.currency ?? 'chips',
     hand.gameType,
-    hand.smallBlind ?? '',
-    hand.bigBlind ?? '',
+    cash ? (hand.smallBlind ?? '') : '',
+    cash ? (hand.bigBlind ?? '') : '',
   ].join('|');
+};
 
 /** Hands in, sittings out, earliest first. `hands` must be sorted by time. */
 export const groupSittings = (hands: readonly ParsedHand[]): Sitting[] => {
@@ -163,7 +170,7 @@ export const defaultDestination = (
 ): Destination => {
   const matched = matchSession(sitting, sessions, now);
   if (matched !== null) return { kind: 'session', sessionId: matched };
-  return sitting.money ? { kind: 'new' } : { kind: 'skip' };
+  return canMakeSession(sitting) ? { kind: 'new' } : { kind: 'skip' };
 };
 
 /**
@@ -188,6 +195,13 @@ export const candidateSessions = <S extends SessionLike>(
     );
   return near.slice(0, limit);
 };
+
+/**
+ * Whether a sitting has what a new session needs: real money, and the stack
+ * the player had at every table. Offering "New session" for one that does not
+ * made the choice look taken and then left the hands out without a word.
+ */
+export const canMakeSession = (sitting: Sitting): boolean => sessionFromSitting(sitting) !== null;
 
 /**
  * The session a sitting becomes when there is none to put it in.

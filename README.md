@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2400 passed
+Tests:       2414 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1117,6 +1117,7 @@ Tests:       2400 passed
   migrations             41   a filled v2 database walked forward, both engines
   blog                   40   the post grammar, the share cards, and what it refuses
   mood                   35   what tilt costs, and when to say nothing
+  handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins
   release                31   app.json, eas.json and the icon a store refuses over
   signinSweep            31   what the sign-in store may collect, and what it must not
@@ -1132,7 +1133,6 @@ Tests:       2400 passed
   compose                23   which repository a device gets, and the unsafe sweep
   history                23   the session list, its filters, and how much of it mounts
   glossary               22   the shorthand on screen still matches its explanation
-  handHistory            22   reading six sites' hand histories, the money worked out by hand
   useLogStore            21   what a write reads back, and what it leaves alone
   clock                  20   a typed date, a typed length, and what neither will accept
   privacy                20   the policy page, held to the code it describes
@@ -1143,17 +1143,17 @@ Tests:       2400 passed
   seed                   18   the demo dataset stays coherent
   sessionDetail          18   one session and the hands that belong to it
   signin                 18   the sign-in client, against a fake fetch
+  sittings               18   which session an imported hand goes into, and why
   client                 17   the sync client, against a fake fetch
   handoff                17   taking delivery of a purchase made at another app's door
   pastSession            17   logging a night that was played before it was logged
   settingsExport         17   the export card, and what it refuses to write
   reviewPrompt           16   which flagged hands still want a review, and what the offer says
-  sittings               16   which session an imported hand goes into, and why
   handsList              15   browsing every hand, and finding one of them
+  editHand               14   fixing or deleting a hand that was logged wrong
   hands                  14   what a pile of logged hands adds up to, and the caveat on it
   observe                14   how big the bundle was, said without saying whose
   bankrollHeadline       13   the word over the headline figure, and what it has to be true of
-  editHand               13   fixing or deleting a hand that was logged wrong
   importIntegration      13   parse → store → read back, against real SQLite
   logHand                13   logging a hand, the optional board, and the reset after a bad one
   rateLimit              13   how often one person may ask, and what a refusal costs

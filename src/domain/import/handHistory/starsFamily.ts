@@ -29,6 +29,7 @@ import {
   readAmount,
   readCards,
   readGameType,
+  readHero,
   type Seat,
 } from './common';
 import { readHeaderTime } from './time';
@@ -41,15 +42,20 @@ export const STARS_FAMILY_START =
 interface Header {
   site: HandSite;
   handId: string;
+  tournament: boolean;
   tournamentId: string | null;
   stakesText: string | null;
   smallBlind: number | null;
   bigBlind: number | null;
 }
 
-/** `($0.05/$0.10 USD)`, `(0.25€/0.50€)`, `(25/50)`, and GGPoker's `(200/400(50))` with an ante. */
+/**
+ * `($0.05/$0.10 USD)`, `(0.25€/0.50€)`, `(25/50)`, GGPoker's `(200/400(50))`
+ * with an ante after, and Winamax's `(25/500/1000)` with the ante first. The
+ * last two numbers are always the blinds.
+ */
 const PAREN_STAKES =
-  /\(([$€£]?\s?[\d.,]+\s?[€$£]?)\s?\/\s?([$€£]?\s?[\d.,]+\s?[€$£]?)(?:\s?\([^()]*\))?(?:\s+[A-Z]{3})?\)/;
+  /\((?:[\d.,]+\s?[€$£]?\s?\/\s?(?=[$€£]?\s?[\d.,]+\s?[€$£]?\s?\/))?([$€£]?\s?[\d.,]+\s?[€$£]?)\s?\/\s?([$€£]?\s?[\d.,]+\s?[€$£]?)(?:\s?\([^()]*\))?(?:\s+[A-Z]{3})?\)/;
 /** ACR writes its blinds between dashes, with no brackets: `- $0.01/$0.02 -`. */
 const DASHED_STAKES = / - ([$€£]?[\d.,]+[€$£]?)\/([$€£]?[\d.,]+[€$£]?)(?: [A-Z]{3})? - /;
 
@@ -77,12 +83,17 @@ const readHeader = (line: string): Header | null => {
     return null;
   }
 
-  const tournament = /Tournament #?\s?(\d+)/i.exec(line);
+  // A tournament by name, number or not: Winamax writes `Tournament "Name"`
+  // with no number, and that read as a cash game in euros, its chips counted
+  // as money because the buy-in on the same line named a currency.
+  const tournament = /\b(?:Tournament|Tourney)\b/i.test(line);
+  const tournamentId = /Tournament #?\s?(\d+)/i.exec(line)?.[1] ?? null;
   const stakes = PAREN_STAKES.exec(line) ?? DASHED_STAKES.exec(line);
   return {
     site,
     handId,
-    tournamentId: tournament ? tournament[1] : null,
+    tournament,
+    tournamentId,
     stakesText: stakes ? stakes[0] : null,
     smallBlind: stakes ? readAmount(stakes[1]) : null,
     bigBlind: stakes ? readAmount(stakes[2]) : null,
@@ -99,6 +110,7 @@ const SEAT = /^Seat (\d+): (.+?) \(([$€£]?\s?\d[\d.,]*\s?[€$£]?)(?: in chi
 
 export const parseStarsFamilyHand = (
   lines: readonly string[],
+  counts: ReadonlyMap<string, number> = new Map(),
 ): { hand: ParsedHand } | { skip: string; handId: string | null } => {
   const header = readHeader(lines[0]);
   if (!header) return { skip: 'The first line is not a hand this can read.', handId: null };
@@ -113,6 +125,11 @@ export const parseStarsFamilyHand = (
 
   const tableLine = lines.find((line) => /is the button/.test(line)) ?? lines[1] ?? '';
   const tableName = /^Table:? '([^']+)'/.exec(tableLine)?.[1] ?? null;
+  // Winamax puts the tournament's number in the table name, `Name(123456)#004`,
+  // and none on the first line.
+  const tournamentId =
+    header.tournamentId ??
+    (header.tournament ? (/\((\d+)\)#\d+$/.exec(tableName ?? '')?.[1] ?? null) : null);
   const button = /Seat #?(\d+) is the button/.exec(tableLine);
   const playMoney =
     /play money/i.test(tableLine) || /play money/i.test(lines[0]);
@@ -136,19 +153,11 @@ export const parseStarsFamilyHand = (
     }
   }
 
-  let hero: string | null = null;
-  let holeCards: string | null = null;
-  for (const line of lines) {
-    const dealt = /^Dealt to (.+?) \[([^\]]+)\]/.exec(line);
-    if (dealt) {
-      hero = dealt[1];
-      holeCards = readCards(dealt[2]);
-      break;
-    }
-  }
-  if (hero === null) {
+  const dealt = readHero(lines, counts);
+  if (dealt === null) {
     return { skip: 'No cards were dealt to you in this hand, so it is one you watched.', handId };
   }
+  const { hero, holeCards } = dealt;
 
   const names = longestFirst(seats.map((seat) => seat.name));
   const ledger = new Ledger();
@@ -160,7 +169,10 @@ export const parseStarsFamilyHand = (
 
     const street = /^\*\*\* ([A-Z -]+) \*\*\*(.*)$/.exec(line);
     if (street) {
-      if (/FLOP|TURN|RIVER/.test(street[1])) {
+      // `PRE-FLOP` is Winamax's name for the first street, which the blinds
+      // were posted into: starting a new street there forgot them, and every
+      // raise from a blind was then counted as if the blind had not been in.
+      if (/(?:^|\s)(?:FLOP|TURN|RIVER)$/.test(street[1].trim())) {
         ledger.newStreet();
         const cards = readCards(street[2]);
         if (cards !== null && !/SECOND|2ND/.test(street[1])) streetBoard = cards;
@@ -184,14 +196,14 @@ export const parseStarsFamilyHand = (
       // The small blind half is dead money; the big blind half is live.
       const total = readAmount(match[1]) ?? 0;
       const live = Math.min(total, header.bigBlind ?? total);
-      ledger.put(name, live);
+      ledger.blind(name, live);
       ledger.dead(name, total - live);
     } else if ((match = /^posts (?:the )?ante (.+)$/i.exec(rest))) {
       ledger.dead(name, readAmount(match[1]) ?? 0);
     } else if ((match = /^posts (?:the )?dead (?:small )?blind (.+)$/i.exec(rest))) {
       ledger.dead(name, readAmount(match[1]) ?? 0);
     } else if ((match = /^posts (.+)$/i.exec(rest))) {
-      ledger.put(name, readAmount(match[1]) ?? 0);
+      ledger.blind(name, readAmount(match[1]) ?? 0);
     } else if ((match = /^raises (.+?) to (.+)$/i.exec(rest))) {
       ledger.raiseTo(name, readAmount(match[2]) ?? 0);
     } else if ((match = /^raises (.+)$/i.exec(rest))) {
@@ -214,7 +226,7 @@ export const parseStarsFamilyHand = (
   let board: string | null = null;
   for (let i = summaryAt; i < lines.length; i += 1) {
     const line = lines[i];
-    const summaryBoard = /^(?:First )?Board:? \[([^\]]+)\]/.exec(line);
+    const summaryBoard = /^(?:First )?Board:? \[([^\]]+)\]/i.exec(line);
     if (summaryBoard && board === null) board = readCards(summaryBoard[1]);
     if (line.includes(`: ${hero} `) && /showed \[/.test(line)) showdown = true;
   }
@@ -223,11 +235,12 @@ export const parseStarsFamilyHand = (
   const heroSeat = seats.find((seat) => seat.name === hero);
   const positions = positionsAround(orderFromButton(seats, button ? Number(button[1]) : null));
 
-  const tournament = header.tournamentId !== null;
-  const currency =
-    tournament || playMoney
-      ? null
-      : (parseCurrency(header.stakesText ?? '') ?? parseCurrency(lines[0]));
+  const { tournament } = header;
+  // From the blinds alone. It fell back to the whole header line, which is
+  // where a tournament's buy-in is written, so a line with no currency in its
+  // blinds could still be read as money. Blinds that name no currency are
+  // chips, and chips are the safe mistake: they never reach a bankroll.
+  const currency = tournament || playMoney ? null : parseCurrency(header.stakesText ?? '');
 
   return {
     hand: {
@@ -237,7 +250,7 @@ export const parseStarsFamilyHand = (
       at: time.at,
       zoned: time.zoned,
       format: tournament ? 'tournament' : 'cash',
-      tournamentId: header.tournamentId,
+      tournamentId,
       currency,
       gameType: readGameType(lines[0]),
       smallBlind: header.smallBlind,

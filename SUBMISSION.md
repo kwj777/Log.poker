@@ -593,6 +593,69 @@ answers a question this app reliably raises.
 
 ---
 
+## The request a new account gets, and the answer
+
+**Build 3 was met on 2026-09-23 with a guideline 2.1 rejection that found
+nothing wrong with the app.** It opens "this app has been submitted by a
+developer account that has a limited App Review history" and asks for six
+things plus a screen recording. It is what a first submission from a new
+account draws. Nothing in it names a defect, a screen or a guideline this app
+breaks, and it needs no new build: the reply goes in Resolution Center and the
+same binary carries on.
+
+Apple asks for the answers to live in App Review Information, Notes, for future
+submissions, so they belong below the review notes above rather than in place
+of them.
+
+**1. A screen recording on a physical device**, beginning at launch, showing
+the typical flow, and covering registration, login and deletion, user content
+with its reporting and blocking mechanisms, and access to paid features.
+
+Record it from TestFlight rather than a local build, because that is the binary
+under review, and delete any existing copy first so it opens empty. Build the
+data live: start a session, rebuy, log a hand, cash out, then the dashboard,
+Sessions and Variance, then sign in with a mailed code and delete the account.
+Signing in last gives the sign-in something real to carry.
+
+Two of the three named items need saying rather than showing. There is no
+registration step, because there are no accounts to register. And there is no
+reporting or blocking mechanism, because nothing a user writes is ever visible
+to another user: no feed, no profiles, no comments, no sharing. Say both
+plainly. Silence on a question Apple asked reads as evasion, which is the same
+lesson as the gambling answer above.
+
+**2. Purpose and audience.** A session tracker and hand journal for live poker.
+It answers "am I playing badly or running badly", which short term swings hide
+for months, from the player's own record rather than a number somebody else
+picked. Adult recreational and semi-professional players. The games happen away
+from the phone.
+
+**3. Setting up.** No login is required, no credentials exist to hand over, and
+there is no demo account because there are no accounts. "Load demo data" is
+gated on `ALLOW_DEMO_SEED` and is not in a store build, so a reviewer builds
+their own data the way the recording does.
+
+**4. External services.** Netlify, which hosts the web app, runs the functions
+behind sign-in and sync, and stores the synced log in Netlify Blobs. Resend,
+which sends the one sign-in code. That is the whole list: no analytics, no
+crash reporting, no advertising or attribution SDK, no AI service, no payment
+processor, no data provider, no third party login. Worth adding that the
+sign-in service keeps no user table and never stores an address.
+
+**5. Regional differences.** None. Same features and content everywhere,
+English only, and currency is a per-session choice by the user rather than
+anything derived from region.
+
+**6. Regulated industry and third-party material.** Log does not offer
+gambling: nothing to wager, no game of chance, no odds, no operator link, no
+payment anywhere in the product. No license is required to keep a record of
+one's own play and none is held. No protected material either: the text, icon
+and artwork are original, the icon set is Ionicons through
+`@expo/vector-icons` under MIT, card suits are Unicode characters, and no fonts
+or data feeds are bundled.
+
+---
+
 ## Screenshots
 
 **One set, at the 6.9 inch display class, and that is the whole requirement.**

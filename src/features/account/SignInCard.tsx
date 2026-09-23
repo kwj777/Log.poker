@@ -310,11 +310,29 @@ export const SignInCard = () => {
           <TextInput
             value={code}
             onChangeText={setCode}
-            placeholder="ABCD-2345"
+            // Six digits, because that is what `randomCode` in
+            // `signinEndpoint.ts` mints: `String(draw % 1_000_000)` padded to
+            // six. The placeholder used to read ABCD-2345, which advertised a
+            // format nothing has ever sent, and the field dressed to match it
+            // -- letters forced uppercase and a letter keyboard in front of a
+            // number. Somebody reading 123456 off a lock screen was told to
+            // expect a shape they could not have been given.
+            placeholder="123456"
             placeholderTextColor={colors.textTertiary}
             style={styles.input}
-            autoCapitalize="characters"
+            autoCapitalize="none"
             autoCorrect={false}
+            // The number pad, which is the whole of what this field can take.
+            // `redeemCode` only trims, so there is no separator to strip and
+            // nothing here to type but digits.
+            //
+            // `inputMode` alone, with no `keyboardType` beside it: react
+            // native maps `numeric` straight to `number-pad` and reads
+            // `keyboardType` only when `inputMode` is absent, so the second
+            // one would be dead code that reads like a platform difference.
+            // `site.test.ts` fails the build on a field that asks twice.
+            inputMode="numeric"
+            maxLength={6}
             // One-time codes autofill from the notification on both platforms,
             // which is the difference between reading a code off a lock screen
             // and typing it from memory in a card room.

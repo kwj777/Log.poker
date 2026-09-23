@@ -171,6 +171,76 @@ describe('what it answers at all', () => {
   });
 });
 
+/* ------------------------------------------------- the field that takes it */
+
+/**
+ * The shape the server mints, and the field a player types it into.
+ *
+ * These live in two repositories' worth of distance from each other -- an edge
+ * function and a card in Settings -- and nothing but this test holds them
+ * together. It got out of step: the placeholder read `ABCD-2345` and the field
+ * forced uppercase and opened a letter keyboard, in front of a code that has
+ * only ever been six digits. Kevin found it by signing in.
+ *
+ * Driven rather than read. `randomCode` is not exported, so the codes below
+ * are the ones the endpoint actually mails when nothing overrides its
+ * generator, which is how it runs in production.
+ */
+describe('the code the endpoint mints, and the field built for it', () => {
+  const card = readFileSync(
+    join(__dirname, '..', '..', 'features', 'account', 'SignInCard.tsx'),
+    'utf8',
+  );
+
+  const mint = async (): Promise<string> => {
+    const surroundings = world(fakeStore(), { code: undefined });
+    await ask({ email: EMAIL }, surroundings);
+    return surroundings.sent[0].code;
+  };
+
+  it('is six digits and nothing else, every time', async () => {
+    for (let round = 0; round < 200; round += 1) {
+      expect(await mint()).toMatch(/^[0-9]{6}$/);
+    }
+  });
+
+  // The code field alone. The address field above it has a placeholder too,
+  // and a sweep of the whole file would read that one and pass.
+  const field = (): string => {
+    const found = /value={code}[^]*?accessibilityLabel="The code from the email"/.exec(card)?.[0];
+    expect(found).toBeDefined();
+    return found as string;
+  };
+
+  it('is what the placeholder shows, rather than a format nothing sends', async () => {
+    const placeholder = /placeholder="([^"]+)"/.exec(field())?.[1];
+    expect(placeholder).toBeDefined();
+    // The placeholder is an example, so it has to be an example of a code this
+    // endpoint could have mailed.
+    expect(placeholder as string).toMatch(/^[0-9]{6}$/);
+    expect(await mint()).toHaveLength((placeholder as string).length);
+  });
+
+  it('is typed on a number pad, with no letters to capitalize', () => {
+    // Comments stripped, so the note below explaining why there is no
+    // `keyboardType` does not read as one. `site.test.ts` learned the same
+    // thing about `AmountInput`.
+    const it = field().replace(/\/\/[^\n]*/g, ' ');
+    // `numeric` and not `keyboardType`, which react native would never read
+    // beside it. See the rule in `site.test.ts`.
+    expect(it).toContain('inputMode="numeric"');
+    expect(it).not.toContain('keyboardType');
+    expect(it).toContain('maxLength={6}');
+    // A digit has no case, so forcing one is how a letter keyboard got in
+    // front of a number in the first place.
+    expect(it).not.toContain('autoCapitalize="characters"');
+    // Autofill off a lock screen still has to work, which is the one thing
+    // this field does that the player never asked for.
+    expect(it).toContain('autoComplete="one-time-code"');
+    expect(it).toContain('textContentType="oneTimeCode"');
+  });
+});
+
 /* ----------------------------------------------------------------- asking */
 
 describe('asking for a code', () => {

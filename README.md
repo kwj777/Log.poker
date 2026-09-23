@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2414 passed
+Tests:       2418 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1105,9 +1105,9 @@ Tests:       2414 passed
   sessionImport          67   reading a session-summary export
   tournaments            67   ROI, its interval, cash rate, dry runs, finishes
   handOffs               61   where a hand-off goes, and what the four offer cards say
+  signinEndpoint         61   the free door, and every bound on it
   stats                  60   P/L, rebuys, duration, win rate, groupings
   syncingRepository      59   two devices and one server, no fakes in between
-  signinEndpoint         58   the free door, and every bound on it
   content                55   every figure in the guides, re-derived and read back
   copy                   54   what the sign-in and the sync are allowed to say
   verify                 54   checking a token, and every way past it that must not work
@@ -1201,11 +1201,11 @@ Tests:       2414 passed
   importPicker            4   opening a file on a phone, and the three answers a picker gives
   nativeModules           4   the two native modules nothing imports and every build compiles
   transactionQueue        4   two writes at once, on a database with no queue of its own
+  amountField             3   the money field's box, against the font it has to hold
   midSessionCheckIn       3   whether a check-in that failed says it was logged
   notFound                3   where a link that names nothing lands
   pageMeta                3   the document head, kept off the phone it alerts on
   allHands                2   who pays for a read of the whole journal
-  amountField             2   the money field's box, against the font it has to hold
   deadExports             2   API nothing uses: dead exports and props nothing passes
   keyboardAvoidance       2   both halves of getting out of the keyboard's way
   leaveLiveSession        2   leaving a running session without ending it

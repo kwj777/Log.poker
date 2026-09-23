@@ -107,11 +107,15 @@ export interface ReadTime {
   zoned: boolean;
 }
 
+/** Days in a month, `month` 1-12: day 0 of the next month is the last of this one. */
+const daysIn = (year: number, month: number): number =>
+  new Date(Date.UTC(year, month, 0)).getUTCDate();
+
 const isValid = (clock: WallClock): boolean =>
   clock.month >= 1 &&
   clock.month <= 12 &&
   clock.day >= 1 &&
-  clock.day <= 31 &&
+  clock.day <= daysIn(clock.year, clock.month) &&
   clock.hour >= 0 &&
   clock.hour <= 23 &&
   clock.minute >= 0 &&
@@ -149,11 +153,15 @@ const YMD_TIME =
  * Every year-first time on a header line, with the zone it names.
  *
  * PokerStars writes two: the player's chosen zone and then Eastern in brackets.
- * The first one whose zone is known wins; the bracketed one is there for
- * exactly the case where the player's zone is one this does not know.
+ * Eastern wins when it is there. It is the one time on the line PokerStars
+ * always writes the same way, and the one whose summer rule this file knows
+ * exactly; the player's own zone is a bare abbreviation, and `CET` in a July
+ * header may well mean `CEST`, an hour away. Otherwise the first zone this
+ * knows wins, and a time with no known zone is the last resort.
  */
 export const readHeaderTime = (line: string): ReadTime | null => {
   let fallback: ReadTime | null = null;
+  let zoned: ReadTime | null = null;
   for (const match of line.matchAll(YMD_TIME)) {
     const clock: WallClock = {
       year: Number(match[1]),
@@ -163,10 +171,12 @@ export const readHeaderTime = (line: string): ReadTime | null => {
       minute: Number(match[5]),
       second: Number(match[6]),
     };
-    const read = fromWallClock(clock, match[7] ?? null);
+    const zone = match[7] ?? null;
+    const read = fromWallClock(clock, zone);
     if (read === null) continue;
-    if (read.zoned) return read;
-    fallback ??= read;
+    if (read.zoned && zone === 'ET') return read;
+    if (read.zoned) zoned ??= read;
+    else fallback ??= read;
   }
-  return fallback;
+  return zoned ?? fallback;
 };

@@ -22,6 +22,7 @@ import { successFeedback } from '../../components/haptics';
 import {
   BIG_POT_BB,
   candidateSessions,
+  canMakeSession,
   defaultDestination,
   groupSittings,
   isBigPot,
@@ -233,7 +234,7 @@ export const HandHistoryPreview = ({ text }: Props) => {
         const hasOwn = sessions.some((session) => session.importKey === sittingImportKey(sitting));
         const options: Option<Choice>[] = [
           ...offered.map((session) => ({ value: session.id, label: describeSession(session) })),
-          ...(sitting.money && !hasOwn ? [{ value: NEW, label: 'New session' }] : []),
+          ...(canMakeSession(sitting) && !hasOwn ? [{ value: NEW, label: 'New session' }] : []),
           { value: SKIP, label: 'Leave out' },
         ];
 
@@ -260,10 +261,11 @@ export const HandHistoryPreview = ({ text }: Props) => {
                 device’s. Check the session below is the right one.
               </Text>
             ) : null}
-            {destination.kind === 'skip' && !sitting.money ? (
+            {destination.kind === 'skip' && !canMakeSession(sitting) ? (
               <Text variant="caption" color={colors.textSecondary} style={styles.line}>
-                No session was running then, and these hands were played for chips, so there is
-                no result to make one from. Pick a session, or add it first.
+                {sitting.money
+                  ? 'No session was running then, and the file does not say what you sat down with, so there is no result to make one from. Pick a session, or add it first.'
+                  : 'No session was running then, and these hands were played for chips, so there is no result to make one from. Pick a session, or add it first.'}
               </Text>
             ) : null}
             <ChipGroup

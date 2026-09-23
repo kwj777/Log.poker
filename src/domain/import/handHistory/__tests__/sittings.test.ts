@@ -10,6 +10,7 @@ import {
   BIG_POT_BB,
   MATCH_SLACK_MS,
   SITTING_GAP_MS,
+  canMakeSession,
   candidateSessions,
   defaultDestination,
   groupSittings,
@@ -93,6 +94,18 @@ describe('grouping hands into sittings', () => {
     expect(sittings).toHaveLength(1);
     expect(sittings[0].money).toBe(false);
   });
+
+  it('keeps a tournament whole as its blinds go up', () => {
+    const level = (at: number, smallBlind: number, bigBlind: number) =>
+      hand({ at, format: 'tournament', tournamentId: '9', currency: null, smallBlind, bigBlind });
+    const sittings = groupSittings([
+      level(T0, 1000, 2000),
+      level(T0 + 10 * MIN, 1500, 3000),
+      level(T0 + 20 * MIN, 2500, 5000),
+    ]);
+    expect(sittings).toHaveLength(1);
+    expect(sittings[0].hands).toHaveLength(3);
+  });
 });
 
 describe('matching a sitting to a session', () => {
@@ -146,6 +159,16 @@ describe('matching a sitting to a session', () => {
     const [chips] = groupSittings([hand({ at: T0, currency: null })]);
     expect(defaultDestination(cash, [], T0)).toEqual({ kind: 'new' });
     expect(defaultDestination(chips, [], T0)).toEqual({ kind: 'skip' });
+  });
+
+  it('does not offer a new session it cannot build', () => {
+    // Real money, but no stack on the hand to work the buy-in out from. It
+    // defaulted to a new session all the same, and then left the hands out.
+    const [unstacked] = groupSittings([hand({ at: T0, stack: null })]);
+    expect(canMakeSession(unstacked)).toBe(false);
+    expect(defaultDestination(unstacked, [], T0)).toEqual({ kind: 'skip' });
+    const [stacked] = groupSittings([hand({ at: T0 })]);
+    expect(canMakeSession(stacked)).toBe(true);
   });
 
   it('offers the running session and the ones near in time, nearest first', () => {

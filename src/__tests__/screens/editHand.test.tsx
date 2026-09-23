@@ -198,6 +198,21 @@ describe('saving the correction', () => {
   });
 });
 
+describe('a hand with more cards than the session’s game deals', () => {
+  it('shows every card, and an edit keeps the ones not touched', async () => {
+    // Imported from an Omaha table into a session logged as hold'em. The
+    // picker had two slots, so two cards were hidden, and the first edit
+    // kept only the two that showed.
+    load([hand({ holeCards: 'AhKd5c5s' })]);
+    await renderScreen(<LogHandScreen />);
+
+    await userEvent.press(await screen.findByLabelText('5 of spades, tap to remove'));
+    await userEvent.press(screen.getByText('Save changes'));
+
+    expect(updated[0].patch.holeCards).toBe('AhKd5c');
+  });
+});
+
 describe('deleting the hand', () => {
   it('asks first', async () => {
     load([hand()]);

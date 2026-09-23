@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2414 passed
+Tests:       2417 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1105,9 +1105,9 @@ Tests:       2414 passed
   sessionImport          67   reading a session-summary export
   tournaments            67   ROI, its interval, cash rate, dry runs, finishes
   handOffs               61   where a hand-off goes, and what the four offer cards say
+  signinEndpoint         61   the free door, and every bound on it
   stats                  60   P/L, rebuys, duration, win rate, groupings
   syncingRepository      59   two devices and one server, no fakes in between
-  signinEndpoint         58   the free door, and every bound on it
   content                55   every figure in the guides, re-derived and read back
   copy                   54   what the sign-in and the sync are allowed to say
   verify                 54   checking a token, and every way past it that must not work

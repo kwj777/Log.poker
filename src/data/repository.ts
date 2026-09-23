@@ -249,6 +249,12 @@ export interface Repository {
   countHands(): Promise<number>;
   getHand(id: string): Promise<Hand | null>;
   createHand(input: NewHand): Promise<Hand>;
+  /**
+   * Many hands in one all-or-nothing write: the hand-history importer's. A
+   * night online can be hundreds of hands, and an import that failed halfway
+   * would leave half a night with no way to tell which half.
+   */
+  createHands(inputs: readonly NewHand[]): Promise<Hand[]>;
   updateHand(id: string, patch: HandPatch): Promise<Hand>;
   deleteHand(id: string): Promise<void>;
 

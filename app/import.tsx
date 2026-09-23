@@ -1,10 +1,17 @@
 /**
- * Import session summaries.
+ * Import session summaries, or hand histories.
  *
  * Log is a live-poker journal, and an online player's history already exists in
  * a file somewhere -- a PokerTracker or Holdem Manager session report, a
- * PokerCraft export, a spreadsheet they have kept for years. This screen is the
- * one door into the app that does not involve typing a session out by hand.
+ * PokerCraft export, a spreadsheet they have kept for years, or the hand
+ * histories the site itself writes. This screen is the one door into the app
+ * that does not involve typing a session or a hand out by hand.
+ *
+ * One door for both kinds of file, because a player holding a file should not
+ * have to know which kind it is to find where it goes. The first line decides:
+ * every hand-history format opens with its hand header, and no spreadsheet
+ * does. Hand histories go to `HandHistoryPreview`; everything else is read as
+ * a session summary, as it always was.
  *
  * The shape of it is deliberately: choose a file, *see what it read*, then
  * import. An importer that writes straight to the database is one nobody runs a
@@ -28,6 +35,8 @@ import { successFeedback } from '../src/components/haptics';
 import { Explain } from '../src/components/Explain';
 import { importGlossary } from '../src/domain/glossary';
 import { FIELD_LABELS, draftNet, parseSessionCsv, type ImportField } from '../src/domain/import';
+import { looksLikeHandHistory } from '../src/domain/import/handHistory';
+import { HandHistoryPreview } from '../src/features/import/HandHistoryPreview';
 import { formatMoney } from '../src/domain/money';
 import { pickCsvFile } from '../src/features/import/pickCsvFile';
 import { useLogStore, type ImportSummary } from '../src/store/useLogStore';
@@ -50,9 +59,13 @@ export default function ImportScreen() {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
+  const handHistory = useMemo(() => looksLikeHandHistory(text), [text]);
   const reading = useMemo(
-    () => (text.trim() === '' ? null : parseSessionCsv(text, dayFirst ? { dateOrder: 'dmy' } : {})),
-    [text, dayFirst],
+    () =>
+      text.trim() === '' || handHistory
+        ? null
+        : parseSessionCsv(text, dayFirst ? { dateOrder: 'dmy' } : {}),
+    [text, dayFirst, handHistory],
   );
 
   const totals = useMemo(() => {
@@ -177,25 +190,30 @@ export default function ImportScreen() {
 
   return (
     <Screen>
-      <PageMeta title="Import sessions · Log" />
+      <PageMeta title="Import · Log" />
 
       <View style={styles.header}>
-        <Text variant="title">Import sessions</Text>
+        <Text variant="title">Import</Text>
         <Text color={colors.textSecondary} style={styles.lede}>
           If you play online, your history is already written down: your site or your tracker
-          did it. Export a session summary as CSV and drop it in here.
+          did it. Export a session summary as CSV, or save your hand histories, and drop the file
+          in here.
         </Text>
       </View>
 
       <SectionHeader title="The file" />
       <Card>
         <Text variant="caption" color={colors.textTertiary} style={styles.spec}>
-          One row per session, with a header row on top. It needs a date column, and either a
-          result column or a buy-in and a cash-out. Stakes, site, game, duration and notes are
-          used when they are there.
+          A session summary is one row per session, with a header row on top. It needs a date
+          column, and either a result column or a buy-in and a cash-out. Stakes, site, game,
+          duration and notes are used when they are there.
+        </Text>
+        <Text variant="caption" color={colors.textTertiary} style={styles.spec}>
+          Hand histories from PokerStars, GGPoker, ACR, Winamax, 888poker and partypoker go
+          into the session you were playing when they were dealt, including one still running.
         </Text>
         <Button
-          label={fileName ?? 'Choose a CSV file…'}
+          label={fileName ?? 'Choose a file…'}
           variant="secondary"
           size="medium"
           onPress={() => void choose()}
@@ -208,7 +226,7 @@ export default function ImportScreen() {
           multiline
           autoCapitalize="none"
           autoCorrect={false}
-          accessibilityLabel="Session summary rows"
+          accessibilityLabel="Session summary rows or hand histories"
           style={styles.paste}
         />
         <Text variant="caption" color={colors.textTertiary}>
@@ -216,6 +234,8 @@ export default function ImportScreen() {
           else in Log.
         </Text>
       </Card>
+
+      {handHistory ? <HandHistoryPreview key={text} text={text} /> : null}
 
       {reading && reading.error !== null ? (
         <>

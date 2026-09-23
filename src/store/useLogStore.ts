@@ -26,6 +26,13 @@ import { create } from 'zustand';
 
 import { getRepository, onSyncApplied } from '../data';
 import { planImport, venueNameKey, type ImportedSession } from '../domain/import';
+import {
+  handFromParsed,
+  handIdentity,
+  planHandImport,
+  type Destination,
+  type Sitting,
+} from '../domain/import/handHistory';
 import { selectMoodForSession, selectSessionById } from './selectors';
 import type {
   GameType,
@@ -142,6 +149,17 @@ export interface ImportSummary {
   venuesCreated: string[];
 }
 
+export interface HandImportSummary {
+  /** Hands written. */
+  imported: number;
+  /** Hands already in the log, skipped rather than written twice. */
+  duplicates: number;
+  /** Sessions the import built for sittings with nowhere to go. */
+  sessionsCreated: number;
+  /** Names of venues the import had to create. */
+  venuesCreated: string[];
+}
+
 export interface LogHandInput {
   sessionId: string;
   holeCards?: string | null;
@@ -246,6 +264,11 @@ interface LogState {
   deleteSession: (sessionId: string) => Promise<void>;
 
   importSessions: (sessions: readonly ImportedSession[]) => Promise<ImportSummary>;
+  importHands: (
+    sittings: readonly Sitting[],
+    destinations: ReadonlyMap<string, Destination>,
+    every: boolean,
+  ) => Promise<HandImportSummary>;
 
   logHand: (input: LogHandInput) => Promise<Hand>;
   updateHand: (id: string, patch: Partial<LogHandInput>) => Promise<void>;
@@ -781,6 +804,87 @@ export const useLogStore = create<LogState>((set, get) => ({
       imported: plan.writes.length,
       duplicates: plan.duplicates,
       venuesCreated: created.map((venue) => venue.name),
+    };
+  },
+
+  /**
+   * Write a parsed hand-history import.
+   *
+   * The plan is made here, against the log as it is at the moment of writing,
+   * rather than trusted from the preview: a sync can land between the two, and
+   * a hand that arrived from the phone in the meantime is exactly the one that
+   * would otherwise go in twice.
+   *
+   * Sessions first, since the hands need their ids, then every hand in one
+   * batch. If the hands fail, the sessions and venues this import made are
+   * taken back out, for the reason `importSessions` gives.
+   */
+  importHands: async (sittings, destinations, every) => {
+    const repository = await getRepository();
+    const stored = new Set((await repository.listHands()).map(handIdentity));
+    const plan = planHandImport(sittings, destinations, every, stored);
+
+    const newSessions = plan.groups.flatMap((group) => (group.session ? [group.session] : []));
+    const venues = await repository.listVenues();
+    const sessionPlan = planImport(
+      newSessions,
+      new Set(await repository.listImportKeys()),
+      venues.map((venue) => venue.name),
+    );
+    const writing = new Set(sessionPlan.writes.map((session) => session.importKey));
+
+    const byName = new Map(venues.map((venue) => [venueNameKey(venue.name), venue.id]));
+    const createdVenues: Venue[] = [];
+    const createdSessions: Session[] = [];
+    let imported = 0;
+
+    try {
+      for (const name of sessionPlan.venuesToCreate) {
+        const venue = await repository.createVenue({ name, isHomeGame: false });
+        byName.set(venueNameKey(venue.name), venue.id);
+        createdVenues.push(venue);
+      }
+      createdSessions.push(
+        ...(await repository.createSessions(
+          sessionPlan.writes.map((session) => ({
+            ...session.draft,
+            venueId: byName.get(venueNameKey(session.venueName)) as string,
+            importKey: session.importKey,
+          })),
+        )),
+      );
+      const sessionFor = new Map(
+        createdSessions.map((session) => [session.importKey as string, session.id]),
+      );
+
+      const hands = plan.groups.flatMap((group) => {
+        const sessionId =
+          group.destination.kind === 'session'
+            ? group.destination.sessionId
+            : group.session && writing.has(group.session.importKey)
+              ? sessionFor.get(group.session.importKey)
+              : undefined;
+        return sessionId === undefined
+          ? []
+          : group.hands.map((hand) => handFromParsed(hand, sessionId));
+      });
+      imported = (await repository.createHands(hands)).length;
+    } catch (error) {
+      for (const session of createdSessions) {
+        await repository.deleteSession(session.id).catch(() => undefined);
+      }
+      for (const venue of createdVenues) {
+        await repository.deleteVenue(venue.id).catch(() => undefined);
+      }
+      throw error;
+    }
+
+    await get().refresh(['sessions', 'venues', 'hands']);
+    return {
+      imported,
+      duplicates: plan.duplicates,
+      sessionsCreated: createdSessions.length,
+      venuesCreated: createdVenues.map((venue) => venue.name),
     };
   },
 

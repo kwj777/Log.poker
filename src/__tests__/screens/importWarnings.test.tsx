@@ -34,7 +34,7 @@ jest.mock('../../data', () => ({
 
 const paste = async (csv: string) => {
   await renderScreen(<ImportScreen />);
-  await userEvent.paste(screen.getByLabelText('Session summary rows'), csv);
+  await userEvent.paste(screen.getByLabelText('Session summary rows or hand histories'), csv);
 };
 
 beforeEach(() => {

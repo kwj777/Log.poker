@@ -802,6 +802,9 @@ export class SyncingRepository implements Repository {
   async createHand(input: Parameters<Repository['createHand']>[0]) {
     return this.touched(await this.local.createHand(input));
   }
+  async createHands(inputs: Parameters<Repository['createHands']>[0]) {
+    return this.touched(await this.local.createHands(inputs));
+  }
   async updateHand(id: string, patch: HandPatch) {
     return this.touched(await this.local.updateHand(id, patch));
   }

@@ -422,11 +422,11 @@ export default function SettingsScreen() {
       <SectionHeader title="Import" />
       <Card>
         <Text color={colors.textSecondary} style={styles.body}>
-          Play online? Export a session summary from your site or your tracker and bring the
-          whole history in at once, rather than typing it out.
+          Play online? Export a session summary from your site or your tracker, or save your
+          hand histories, and bring them in at once rather than typing them out.
         </Text>
         <Button
-          label="Import sessions"
+          label="Import sessions or hands"
           variant="secondary"
           size="medium"
           onPress={() => router.push('/import')}

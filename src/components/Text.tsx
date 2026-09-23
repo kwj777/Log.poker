@@ -35,8 +35,13 @@ type Variant = keyof typeof typography;
  * Numbers rather than one constant because 40pt and 11pt are not the same
  * problem: the overline is small enough that doubling it still fits a chip,
  * and the display figure is not.
+ *
+ * Exported because a `TextInput` is not a `Text` and does not come through
+ * this file, so the caps have to be reachable from the one place that draws
+ * type large enough to matter. `AmountInput` reads `display` and sizes its box
+ * from it.
  */
-const MAX_SCALE: Record<Variant, number> = {
+export const MAX_SCALE: Record<Variant, number> = {
   display: 1.3,
   title: 1.4,
   heading: 1.5,

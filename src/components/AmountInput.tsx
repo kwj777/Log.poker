@@ -13,7 +13,45 @@ import { currencySymbol, formatMoney, parseAmount } from '../domain/money';
 import { colors, radius, spacing, typography } from '../theme';
 import { TapArea, slopFor } from './TapArea';
 import { tapFeedback } from './haptics';
-import { Text } from './Text';
+import { MAX_SCALE, Text } from './Text';
+
+/**
+ * The amount's own type, and the box built from it.
+ *
+ * ## Why the box is arithmetic and not a round number
+ *
+ * `Text` caps Dynamic Type per variant, because the rows and tiles this app
+ * draws have fixed heights and the number somebody turned the text size up to
+ * read is the first thing to get clipped. A `TextInput` does not come through
+ * that file, so this field had no cap at all: its 30pt bold digits grew with
+ * the system text size while the box holding them stayed 64 points, and the
+ * top of the glyph was cut off again. A placeholder zero drew as a U, which is
+ * the same symptom as before and a different cause.
+ *
+ * The earlier fix measured the box against the font's *declared* size, which
+ * is the size nobody reading at an accessibility setting ever sees. So the
+ * font is capped here, at the same band `display` gets for being the largest
+ * type in the app, and the box is sized from the largest line that cap can
+ * produce rather than from the smallest.
+ */
+const FONT_SIZE = 30;
+
+/** The cap the input is given, and the one the box is built to hold. */
+const FONT_MAX_SCALE = MAX_SCALE.display;
+
+/** The loosest line box a face is drawn in, which is what has to fit. */
+const LINE_BOX = 1.2;
+
+/** Above and below the text, inside the border. */
+const FIELD_PADDING = spacing.md;
+
+/**
+ * Tall enough for the biggest line the cap allows, at any system text size.
+ *
+ * `amountField.test.tsx` re-derives this rather than reading the number, so a
+ * change to the font, the cap or the padding moves the box with it.
+ */
+const FIELD_HEIGHT = Math.ceil(FONT_SIZE * FONT_MAX_SCALE * LINE_BOX + FIELD_PADDING * 2);
 
 /** What a preset draws at. Deliberately under a chip: it is the secondary control here. */
 const PRESET_HEIGHT = 40;
@@ -79,6 +117,11 @@ export const AmountInput = ({
         // `keyboardType` beside this was dead on both, and on the web arm it
         // asked for the worse of the two keyboards.
         inputMode="decimal"
+        // The cap `Text` gives every string in the app, which a `TextInput`
+        // would otherwise go without. Scaling stays on: the box above is built
+        // to hold this multiple, so a player who asked for larger text gets it
+        // and still sees the whole digit.
+        maxFontSizeMultiplier={FONT_MAX_SCALE}
         autoFocus={autoFocus}
         onSubmitEditing={onSubmitEditing}
         selectTextOnFocus
@@ -131,7 +174,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.lg,
-    minHeight: 64,
+    minHeight: FIELD_HEIGHT,
   },
   symbol: {
     marginRight: spacing.sm,
@@ -146,14 +189,15 @@ const styles = StyleSheet.create({
     // measured and nothing here checked it.
     //
     // Stretching to the field makes the box arithmetic rather than a guess:
-    // `minHeight` below, less the padding on this style, is what the text has,
-    // and `amountField.test.tsx` holds that difference above the font size.
+    // `minHeight` above, less the padding on this style, is what the text has,
+    // and `amountField.test.tsx` holds that difference above the *scaled* font
+    // rather than the declared one. See `FIELD_HEIGHT`.
     alignSelf: 'stretch',
     color: colors.text,
-    fontSize: 30,
+    fontSize: FONT_SIZE,
     fontWeight: '700',
     letterSpacing: -0.5,
-    paddingVertical: spacing.md,
+    paddingVertical: FIELD_PADDING,
   },
   presets: {
     flexDirection: 'row',

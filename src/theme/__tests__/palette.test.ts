@@ -139,6 +139,81 @@ describe('the generated icons draw the family mark', () => {
   });
 });
 
+describe('the icon stands on a tile of its own', () => {
+  // Log, Untilt and TiltProof draw the same mark and light a different ring,
+  // and on a home screen that read as one app installed three times. The tile
+  // is what tells them apart now; BRAND.md, "Each app on its own tile".
+  const hex = (bytes: string): string => `#${bytes.split(', ').map((b) => b.slice(2)).join('')}`;
+  const tileSource = iconScript.slice(iconScript.indexOf('const ON_TILE = {'));
+  const [ground, ...rest] = [...tileSource.matchAll(/\[(0x[0-9a-f]{2}(?:, 0x[0-9a-f]{2}){2})\]/g)]
+    .slice(0, 5)
+    .map((m) => hex(m[1]));
+  const canopy = rest.slice(0, 3);
+  const gold = rest[3];
+
+  const luminance = (color: string): number => {
+    const channel = (v: number): number => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    const [r, g, b] = [1, 3, 5].map((i) => channel(parseInt(color.slice(i, i + 2), 16)));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const onTile = (color: string): number => {
+    const [hi, lo] = [luminance(color), luminance(ground)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it('is cream, and BRAND.md says so', () => {
+    expect(ground).toBe(brandColor('cream'));
+    const row = brand.split('\n').find((line) => line.startsWith('| **Log** | Cream'));
+    expect(row).toBeDefined();
+    for (const color of [ground, ...canopy, gold]) expect(row).toContain(color);
+  });
+
+  it('turns the ramp over, darkest outermost, in even steps', () => {
+    const ramp = canopy.map(onTile);
+    expect(ramp[0]).toBeGreaterThan(ramp[1]);
+    expect(ramp[1]).toBeGreaterThan(ramp[2]);
+    const steps = [ramp[0] / ramp[1], ramp[1] / ramp[2]];
+    for (const step of steps) expect(step).toBeGreaterThan(1.3);
+    expect(Math.abs(steps[0] - steps[1])).toBeLessThan(0.1);
+    expect(ramp[2]).toBeGreaterThan(2.5);
+  });
+
+  it('deepens the gold so it holds on cream, and keeps it out of the canopy', () => {
+    expect(onTile(brandColor('gold'))).toBeLessThan(2);
+    expect(onTile(gold)).toBeGreaterThan(3);
+    expect(canopy).not.toContain(gold);
+  });
+
+  it('draws every icon on the tile, and the splash and the empty states on the ground', () => {
+    const line = (path: string): string =>
+      iconScript.split('\n').find((l) => l.startsWith(`  ['${path}'`)) ?? '';
+    for (const path of [
+      'assets/icon.png',
+      'assets/android-icon-foreground.png',
+      'public/icons/icon-192.png',
+      'public/icons/icon-512.png',
+      'public/icons/icon-maskable-512.png',
+      'public/icons/apple-touch-icon.png',
+    ]) {
+      expect(line(path)).toContain('palette: ON_TILE');
+    }
+    for (const path of ['assets/splash-icon.png', 'assets/mark.png']) {
+      expect(line(path)).not.toBe('');
+      expect(line(path)).not.toContain('ON_TILE');
+    }
+  });
+
+  it('and Android paints the same tile under the adaptive foreground', () => {
+    const app = JSON.parse(readFileSync(join(ROOT, 'app.json'), 'utf8')) as {
+      expo: { android: { adaptiveIcon: { backgroundColor: string } } };
+    };
+    expect(app.expo.android.adaptiveIcon.backgroundColor.toLowerCase()).toBe(ground);
+  });
+});
+
 describe('the mark reaches the app itself', () => {
   it('exists as an asset, generated rather than drawn twice', () => {
     expect(existsSync(join(ROOT, 'assets', 'mark.png'))).toBe(true);

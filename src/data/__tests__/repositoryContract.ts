@@ -773,6 +773,45 @@ export const runRepositoryContract = (name: string, harness: Harness): void => {
         expect(hand.tags).toEqual(['cooler', 'misplayed']);
       });
 
+      it('writes a batch of hands in one call, across sessions', async () => {
+        const venue = await newVenue();
+        const one = await newSession({ venueId: venue.id });
+        const two = await newSession({ venueId: venue.id });
+        const written = await repository.createHands([
+          { sessionId: one.id, at: T0, holeCards: 'AsKd', amount: 1_250 },
+          { sessionId: two.id, at: T0 + HOUR, holeCards: 'QhQd', note: 'PokerStars hand #1' },
+        ]);
+
+        expect(written.map((hand) => hand.holeCards)).toEqual(['AsKd', 'QhQd']);
+        expect(await repository.listHands(one.id)).toHaveLength(1);
+        expect(await repository.getHand(written[1].id)).toEqual(written[1]);
+        expect(await repository.countHands()).toBe(2);
+      });
+
+      it('accepts an empty batch of hands', async () => {
+        expect(await repository.createHands([])).toEqual([]);
+        expect(await repository.countHands()).toBe(0);
+      });
+
+      it('writes no hands at all when one names a session that is not there', async () => {
+        const session = await newSession();
+        await expect(
+          repository.createHands([
+            { sessionId: session.id, at: T0 },
+            { sessionId: 'nope', at: T0 + HOUR },
+          ]),
+        ).rejects.toBeInstanceOf(NotFoundError);
+        expect(await repository.countHands()).toBe(0);
+      });
+
+      it('refuses a batch of hands for a deleted session', async () => {
+        const session = await newSession();
+        await repository.deleteSession(session.id);
+        await expect(
+          repository.createHands([{ sessionId: session.id, at: T0 }]),
+        ).rejects.toBeInstanceOf(NotFoundError);
+      });
+
       it('defaults optional fields so a one-tap hand is valid', async () => {
         const session = await newSession();
         const hand = await repository.createHand({ sessionId: session.id, at: T0 });

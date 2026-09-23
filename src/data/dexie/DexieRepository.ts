@@ -895,6 +895,25 @@ export class DexieRepository implements Repository {
     return hand;
   }
 
+  async createHands(inputs: readonly NewHand[]): Promise<Hand[]> {
+    if (inputs.length === 0) return [];
+    const sessionIds = Array.from(new Set(inputs.map((input) => input.sessionId)));
+    const live = new Set(
+      (await this.db.sessions.where('id').anyOf(sessionIds).toArray())
+        .filter(isLive)
+        .map((session) => session.id),
+    );
+    for (const sessionId of sessionIds) {
+      if (!live.has(sessionId)) throw new NotFoundError('Session', sessionId);
+    }
+
+    return this.db.transaction('rw', this.db.hands, async () => {
+      const hands = inputs.map((input) => buildHand(input, this.ctx));
+      await this.db.hands.bulkAdd(hands.map((hand) => ({ ...hand, tags: [...hand.tags] })));
+      return hands;
+    });
+  }
+
   async updateHand(id: string, patch: HandPatch): Promise<Hand> {
     const existing = await this.db.hands.get(id);
     if (!existing || !isLive(existing)) throw new NotFoundError('Hand', id);

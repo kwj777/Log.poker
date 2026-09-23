@@ -1095,118 +1095,122 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 109 passed
-Tests:       2346 passed
+Test Suites: 113 passed
+Tests:       2414 passed
 
-  dexieRepository    149   the IndexedDB path, against real IndexedDB
-  sqlRepository      146   the SQLite path, against real SQLite
-  bundle              72   the server-side merge: two devices and one bundle
-  site                68   the marketing/app split, the PWA, the sitemap
-  sessionImport       67   reading a session-summary export
-  tournaments         67   ROI, its interval, cash rate, dry runs, finishes
-  handOffs            61   where a hand-off goes, and what the four offer cards say
-  stats               60   P/L, rebuys, duration, win rate, groupings
-  syncingRepository   59   two devices and one server, no fakes in between
-  signinEndpoint      58   the free door, and every bound on it
-  content             55   every figure in the guides, re-derived and read back
-  copy                54   what the sign-in and the sync are allowed to say
-  verify              54   checking a token, and every way past it that must not work
-  endpoint            49   the sync endpoint, end to end
-  values              47   money, dates, durations, stakes, formats, counts
-  variance            46   win rate, σ, confidence bands, verdicts
-  migrations          41   a filled v2 database walked forward, both engines
-  blog                40   the post grammar, the share cards, and what it refuses
-  mood                35   what tilt costs, and when to say nothing
-  merge               33   two devices disagreeing, and who wins
-  release             31   app.json, eas.json and the icon a store refuses over
-  signinSweep         31   what the sign-in store may collect, and what it must not
-  token               31   the family token grammar, against signed fixtures
-  session             30   holding a token, and stores that fail as real ones do
-  handNotation        29   parse, round-trip, hand classes
-  editSession         28   correcting a session, including the one nobody cashed out
-  sessionExport       28   the log written out, and read back by the importer
-  money               27   cents arithmetic, parsing, formatting
-  palette             27   the theme matches BRAND.md
-  writeFailures       24   what the player sees when a write does not work
-  chip                23   /chip resolves, offline, and never quotes a price
-  compose             23   which repository a device gets, and the unsafe sweep
-  history             23   the session list, its filters, and how much of it mounts
-  glossary            22   the shorthand on screen still matches its explanation
-  useLogStore         21   what a write reads back, and what it leaves alone
-  clock               20   a typed date, a typed length, and what neither will accept
-  privacy             20   the policy page, held to the code it describes
-  selectors           20   store reads and filters
-  batch               19   a backlog split into requests, without orphaning a child
-  csv                 19   quoting, delimiters, line endings
-  gateCheck           19   the key-on-the-site script, run rather than read
-  seed                18   the demo dataset stays coherent
-  sessionDetail       18   one session and the hands that belong to it
-  signin              18   the sign-in client, against a fake fetch
-  client              17   the sync client, against a fake fetch
-  handoff             17   taking delivery of a purchase made at another app's door
-  pastSession         17   logging a night that was played before it was logged
-  settingsExport      17   the export card, and what it refuses to write
-  reviewPrompt        16   which flagged hands still want a review, and what the offer says
-  handsList           15   browsing every hand, and finding one of them
-  hands               14   what a pile of logged hands adds up to, and the caveat on it
-  observe             14   how big the bundle was, said without saying whose
-  bankrollHeadline    13   the word over the headline figure, and what it has to be true of
-  editHand            13   fixing or deleting a hand that was logged wrong
-  importIntegration   13   parse → store → read back, against real SQLite
-  logHand             13   logging a hand, the optional board, and the reset after a bad one
-  rateLimit           13   how often one person may ask, and what a refusal costs
-  columns             12   header matching
-  csvWriter           11   writing CSV, and reading back exactly what was written
-  tableOffer          11   which tags mean the game did it to you, and what to say about it
-  pastHand            10   adding a hand to a session that is not running
-  readme              10   the test table adds up and says what each suite is for
-  rowLabels           10   what a screen reader is told a row in a list is
-  search              10   finding one thing in a log with years in it
-  liveTimer            9   the session clock, across a background and back
-  preSessionWarmUp     9   the offer to somebody who says they are rattled before they sit
-  settingsVenues       9   renaming a venue, and merging two that are one room
-  varianceHands        9   the hand breakdown, and the sentence that must precede it
-  lintReach            8   which files npm run lint actually looks at
-  plan                 8   what an import will write, before it writes it
-  postSessionReset     8   the offer after cash-out, and who it is talking to
-  reviewFlagged        8   the review card on the dashboard, and the nights it stays off
-  tapTargets           8   every short control against the 48pt floor
-  tokenStore.web       8   the browser token store
-  venuePicker          8   typing a room you already have, rather than adding a second
-  claimHandoff         7   what a hand-off link may do without asking
-  cursorStore          7   which cursors survive a launch, and what a lost one costs
-  mergeVenues          7   folding one room into another, and the order it does it in
-  settingsBankroll     7   entering what you had behind you before the log started
-  settingsHelp         7   the privacy link, the support address, the build
-  venues               7   which spellings of a room name are the same room
-  importWarnings       6   what the import screen says about a file it could not use
-  platformTwins        6   whether the files Metro swaps still export the same names
-  returnFocus          6   who the keyboard goes back to when a sheet closes
-  scale                6   how much of the plot the data actually gets
-  serviceWorker        6   what the worker answers a navigation with, run rather than read
-  settingsSeed         6   the demo set, and the one device it must not be written onto
-  crossPromo           5   the family card as drawn, and the link a refusing device gives back
-  dashboardFirstRun    5   labels on the dashboard with nothing under them yet
-  errorBoundary        5   a render that throws, and the way back from it
-  lineChart            5   what a chart says before it has been measured
-  roiInterval          5   the ROI bootstrap runs once per result set, not per render
-  stakesPicker         5   whether the blinds on screen are the blinds saved
-  staleData            5   a read that failed after the app was already open
-  varianceCurrency     5   the variance page stops adding euros to dollars
-  varianceHonesty      5   the two sentences on the Variance tab that could deny themselves
-  importPicker         4   opening a file on a phone, and the three answers a picker gives
-  nativeModules        4   the two native modules nothing imports and every build compiles
-  transactionQueue     4   two writes at once, on a database with no queue of its own
-  midSessionCheckIn    3   whether a check-in that failed says it was logged
-  notFound             3   where a link that names nothing lands
-  pageMeta             3   the document head, kept off the phone it alerts on
-  allHands             2   who pays for a read of the whole journal
-  amountField          2   the money field's box, against the font it has to hold
-  deadExports          2   API nothing uses: dead exports and props nothing passes
-  keyboardAvoidance    2   both halves of getting out of the keyboard's way
-  leaveLiveSession     2   leaving a running session without ending it
-  newSessionDefaults   2   where the pre-filled session says its numbers came from
-  safeArea             2   the top inset, on a phone with a notch and without
+  dexieRepository       153   the IndexedDB path, against real IndexedDB
+  sqlRepository         150   the SQLite path, against real SQLite
+  bundle                 72   the server-side merge: two devices and one bundle
+  site                   68   the marketing/app split, the PWA, the sitemap
+  sessionImport          67   reading a session-summary export
+  tournaments            67   ROI, its interval, cash rate, dry runs, finishes
+  handOffs               61   where a hand-off goes, and what the four offer cards say
+  stats                  60   P/L, rebuys, duration, win rate, groupings
+  syncingRepository      59   two devices and one server, no fakes in between
+  signinEndpoint         58   the free door, and every bound on it
+  content                55   every figure in the guides, re-derived and read back
+  copy                   54   what the sign-in and the sync are allowed to say
+  verify                 54   checking a token, and every way past it that must not work
+  endpoint               49   the sync endpoint, end to end
+  values                 47   money, dates, durations, stakes, formats, counts
+  variance               46   win rate, σ, confidence bands, verdicts
+  migrations             41   a filled v2 database walked forward, both engines
+  blog                   40   the post grammar, the share cards, and what it refuses
+  mood                   35   what tilt costs, and when to say nothing
+  handHistory            33   reading six sites' hand histories, the money worked out by hand
+  merge                  33   two devices disagreeing, and who wins
+  release                31   app.json, eas.json and the icon a store refuses over
+  signinSweep            31   what the sign-in store may collect, and what it must not
+  token                  31   the family token grammar, against signed fixtures
+  session                30   holding a token, and stores that fail as real ones do
+  handNotation           29   parse, round-trip, hand classes
+  editSession            28   correcting a session, including the one nobody cashed out
+  sessionExport          28   the log written out, and read back by the importer
+  money                  27   cents arithmetic, parsing, formatting
+  palette                27   the theme matches BRAND.md
+  writeFailures          24   what the player sees when a write does not work
+  chip                   23   /chip resolves, offline, and never quotes a price
+  compose                23   which repository a device gets, and the unsafe sweep
+  history                23   the session list, its filters, and how much of it mounts
+  glossary               22   the shorthand on screen still matches its explanation
+  useLogStore            21   what a write reads back, and what it leaves alone
+  clock                  20   a typed date, a typed length, and what neither will accept
+  privacy                20   the policy page, held to the code it describes
+  selectors              20   store reads and filters
+  batch                  19   a backlog split into requests, without orphaning a child
+  csv                    19   quoting, delimiters, line endings
+  gateCheck              19   the key-on-the-site script, run rather than read
+  seed                   18   the demo dataset stays coherent
+  sessionDetail          18   one session and the hands that belong to it
+  signin                 18   the sign-in client, against a fake fetch
+  sittings               18   which session an imported hand goes into, and why
+  client                 17   the sync client, against a fake fetch
+  handoff                17   taking delivery of a purchase made at another app's door
+  pastSession            17   logging a night that was played before it was logged
+  settingsExport         17   the export card, and what it refuses to write
+  reviewPrompt           16   which flagged hands still want a review, and what the offer says
+  handsList              15   browsing every hand, and finding one of them
+  editHand               14   fixing or deleting a hand that was logged wrong
+  hands                  14   what a pile of logged hands adds up to, and the caveat on it
+  observe                14   how big the bundle was, said without saying whose
+  bankrollHeadline       13   the word over the headline figure, and what it has to be true of
+  importIntegration      13   parse → store → read back, against real SQLite
+  logHand                13   logging a hand, the optional board, and the reset after a bad one
+  rateLimit              13   how often one person may ask, and what a refusal costs
+  columns                12   header matching
+  csvWriter              11   writing CSV, and reading back exactly what was written
+  tableOffer             11   which tags mean the game did it to you, and what to say about it
+  pastHand               10   adding a hand to a session that is not running
+  readme                 10   the test table adds up and says what each suite is for
+  rowLabels              10   what a screen reader is told a row in a list is
+  search                 10   finding one thing in a log with years in it
+  liveTimer               9   the session clock, across a background and back
+  preSessionWarmUp        9   the offer to somebody who says they are rattled before they sit
+  settingsVenues          9   renaming a venue, and merging two that are one room
+  varianceHands           9   the hand breakdown, and the sentence that must precede it
+  lintReach               8   which files npm run lint actually looks at
+  plan                    8   what an import will write, before it writes it
+  postSessionReset        8   the offer after cash-out, and who it is talking to
+  reviewFlagged           8   the review card on the dashboard, and the nights it stays off
+  tapTargets              8   every short control against the 48pt floor
+  tokenStore.web          8   the browser token store
+  venuePicker             8   typing a room you already have, rather than adding a second
+  claimHandoff            7   what a hand-off link may do without asking
+  cursorStore             7   which cursors survive a launch, and what a lost one costs
+  mergeVenues             7   folding one room into another, and the order it does it in
+  settingsBankroll        7   entering what you had behind you before the log started
+  settingsHelp            7   the privacy link, the support address, the build
+  venues                  7   which spellings of a room name are the same room
+  importWarnings          6   what the import screen says about a file it could not use
+  platformTwins           6   whether the files Metro swaps still export the same names
+  returnFocus             6   who the keyboard goes back to when a sheet closes
+  scale                   6   how much of the plot the data actually gets
+  serviceWorker           6   what the worker answers a navigation with, run rather than read
+  settingsSeed            6   the demo set, and the one device it must not be written onto
+  crossPromo              5   the family card as drawn, and the link a refusing device gives back
+  dashboardFirstRun       5   labels on the dashboard with nothing under them yet
+  errorBoundary           5   a render that throws, and the way back from it
+  lineChart               5   what a chart says before it has been measured
+  roiInterval             5   the ROI bootstrap runs once per result set, not per render
+  stakesPicker            5   whether the blinds on screen are the blinds saved
+  staleData               5   a read that failed after the app was already open
+  varianceCurrency        5   the variance page stops adding euros to dollars
+  varianceHonesty         5   the two sentences on the Variance tab that could deny themselves
+  handImportIntegration   4   hand histories into a running session, against real SQLite
+  importHands             4   the import screen given hands, and where it sends them
+  importPicker            4   opening a file on a phone, and the three answers a picker gives
+  nativeModules           4   the two native modules nothing imports and every build compiles
+  transactionQueue        4   two writes at once, on a database with no queue of its own
+  midSessionCheckIn       3   whether a check-in that failed says it was logged
+  notFound                3   where a link that names nothing lands
+  pageMeta                3   the document head, kept off the phone it alerts on
+  allHands                2   who pays for a read of the whole journal
+  amountField             2   the money field's box, against the font it has to hold
+  deadExports             2   API nothing uses: dead exports and props nothing passes
+  keyboardAvoidance       2   both halves of getting out of the keyboard's way
+  leaveLiveSession        2   leaving a running session without ending it
+  newSessionDefaults      2   where the pre-filled session says its numbers came from
+  safeArea                2   the top inset, on a phone with a notch and without
 ```
 
 `npm run check:prose` is the house-style pass (American spellings, no en or em

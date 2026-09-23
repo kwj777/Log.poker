@@ -64,6 +64,37 @@ const CANOPY = [
 // drawn heavier than the canopy strokes and why brown was refused at 2.66:1.
 const GOLD = [0xc9, 0xa8, 0x6a];
 
+/** The mark as it sits on the family ground: the app's own screens. */
+const ON_GROUND = { background: BACKGROUND, canopy: CANOPY, gold: GOLD };
+
+/**
+ * The mark as it sits on Log's own tile, which is cream.
+ *
+ * All three apps draw the same mark and light a different ring, and on a home
+ * screen that was not enough: at 60 points, which ring is gold is a detail,
+ * and the three icons read as one app installed three times. So each app now
+ * stands on a tile of its own (BRAND.md, "Each app on its own tile"), and the
+ * tile is the first thing a player tells apart. Log's is Cream, the family's
+ * body text color, so it is the light one of the three.
+ *
+ * On a light ground the ramp turns over: darkest outermost, for the same
+ * reason the ground ramp is lightest outermost, which is that the silhouette
+ * is the strongest line. Forest, which is too quiet to stroke on the ground,
+ * is the right outer stroke here at 7.31:1, and the other two follow it at
+ * 4.46 and 2.74, which is 1.64x twice. The gold deepens to 3.58:1, because
+ * the family gold is 1.58:1 on cream and would vanish; it keeps its hue, and
+ * warm against cool is what carries a lit ring, as BRAND.md says of Untilt's.
+ */
+const ON_TILE = {
+  background: [0xe8, 0xe4, 0xda],
+  canopy: [
+    [0x3d, 0x4a, 0x44],
+    [0x5b, 0x6c, 0x52],
+    [0x7f, 0x8e, 0x76],
+  ],
+  gold: [0x94, 0x70, 0x2e],
+};
+
 /**
  * Which ring an app lights, or `null` for the family mark, which has no gold in
  * the canopy at all. That is what keeps the family and the apps from ever being
@@ -201,10 +232,19 @@ const blend = (rgba, index, color, alpha) => {
  *                      foreground to 61%, so up to 0.44
  * @param lit           which canopy ring turns gold, or null for the family
  *                      mark, which has no gold in the canopy at all
+ * @param palette       ON_TILE for an icon, ON_GROUND for the mark inside the
+ *                      app, which sits on the family ground
  * @param cornerRadius  fraction of the size; 0 for a square (maskable icons are
  *                      cropped by the platform and must fill the canvas)
  */
-const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, lit = null }) => {
+const drawIcon = ({
+  size,
+  transparent = false,
+  inset = 0.62,
+  cornerRadius = 0,
+  lit = null,
+  palette = ON_GROUND,
+}) => {
   const rgba = new Uint8Array(size * size * 4);
 
   // Background.
@@ -214,7 +254,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
       for (let x = 0; x < size; x += 1) {
         const coverage =
           radius > 0 ? roundedRectCoverage(x, y, 0, 0, size, size, radius) : 1;
-        if (coverage > 0) blend(rgba, (y * size + x) * 4, BACKGROUND, coverage);
+        if (coverage > 0) blend(rgba, (y * size + x) * 4, palette.background, coverage);
       }
     }
   }
@@ -252,7 +292,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
   // what a baseline is.
   const strokes = [
     {
-      color: GOLD,
+      color: palette.gold,
       width: trunkStroke,
       segments: [[centerX, baseY, centerX, baseY + trunkLength]],
     },
@@ -269,7 +309,7 @@ const drawIcon = ({ size, transparent = false, inset = 0.62, cornerRadius = 0, l
     if (i === 0) segments.push([...left, ...right]);
     const isLit = i === lit;
     strokes.push({
-      color: isLit ? GOLD : CANOPY[i],
+      color: isLit ? palette.gold : palette.canopy[i],
       width: isLit ? litStroke : canopyStroke,
       segments,
       lit: isLit,
@@ -312,24 +352,28 @@ const size = (buffer) => `${Math.round(buffer.length / 102.4) / 10}KB`;
 const LOG = RINGS.observe;
 
 const OUTPUTS = [
-  // Native app icons.
-  ['assets/icon.png', { size: 1024, inset: 0.66, cornerRadius: 0, lit: LOG }],
+  // Native app icons. The icon and the adaptive foreground stand on Log's own
+  // tile, which Android paints from `android.adaptiveIcon.backgroundColor`. The
+  // splash mark stands on the app's ground, because the splash is the app.
+  ['assets/icon.png', { size: 1024, inset: 0.66, cornerRadius: 0, lit: LOG, palette: ON_TILE }],
   ['assets/splash-icon.png', { size: 512, transparent: true, inset: 0.54, lit: LOG }],
-  ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.43, lit: LOG }],
-  ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.43, lit: LOG }],
+  ['assets/android-icon-foreground.png', { size: 432, transparent: true, inset: 0.43, lit: LOG, palette: ON_TILE }],
+  ['assets/android-icon-monochrome.png', { size: 432, transparent: true, inset: 0.43, lit: LOG, palette: ON_TILE }],
 
   // The mark alone, on nothing, for empty states inside the app. A PNG rather
   // than a drawn component on purpose: BRAND.md wants empty states derived from
   // this geometry, and rendering it with <Image> needs no SVG dependency, so
-  // the mark on a screen is the same bytes as the mark on the icon rather than
+  // the mark on a screen comes off the same drawing as the icon rather than
   // a second drawing that can drift from it.
   ['assets/mark.png', { size: 512, transparent: true, inset: 0.9, lit: LOG }],
 
-  // PWA icons. `maskable` fills the canvas because the platform crops it.
-  ['public/icons/icon-192.png', { size: 192, inset: 0.68, cornerRadius: 0.22, lit: LOG }],
-  ['public/icons/icon-512.png', { size: 512, inset: 0.68, cornerRadius: 0.22, lit: LOG }],
-  ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.56, cornerRadius: 0, lit: LOG }],
-  ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.68, cornerRadius: 0, lit: LOG }],
+  // PWA icons, which are what a phone puts on its home screen from the web, so
+  // they stand on the tile too. `maskable` fills the canvas because the
+  // platform crops it.
+  ['public/icons/icon-192.png', { size: 192, inset: 0.68, cornerRadius: 0.22, lit: LOG, palette: ON_TILE }],
+  ['public/icons/icon-512.png', { size: 512, inset: 0.68, cornerRadius: 0.22, lit: LOG, palette: ON_TILE }],
+  ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.56, cornerRadius: 0, lit: LOG, palette: ON_TILE }],
+  ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.68, cornerRadius: 0, lit: LOG, palette: ON_TILE }],
 ];
 
 for (const [path, options] of OUTPUTS) {

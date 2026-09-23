@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2418 passed
+Tests:       2423 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1119,6 +1119,7 @@ Tests:       2418 passed
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins
+  palette                32   the theme matches BRAND.md
   release                31   app.json, eas.json and the icon a store refuses over
   signinSweep            31   what the sign-in store may collect, and what it must not
   token                  31   the family token grammar, against signed fixtures
@@ -1127,7 +1128,6 @@ Tests:       2418 passed
   editSession            28   correcting a session, including the one nobody cashed out
   sessionExport          28   the log written out, and read back by the importer
   money                  27   cents arithmetic, parsing, formatting
-  palette                27   the theme matches BRAND.md
   writeFailures          24   what the player sees when a write does not work
   chip                   23   /chip resolves, offline, and never quotes a price
   compose                23   which repository a device gets, and the unsafe sweep

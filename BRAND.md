@@ -74,6 +74,35 @@ ratio answers whether text is legible rather than whether one ring looks
 different from the next. Warm against cool carries it at equal brightness. The
 number is only the right tool for type.
 
+### Each app on its own tile
+
+**Lighting a different ring was not enough on a home screen.** At 60 points,
+which ring is gold is a detail, and in September 2026 Log and Untilt sat side by
+side in a folder reading as one app installed twice. The grounds already
+differed, by accident and too little to see. So the tile is now the difference,
+on purpose, and the mark and its one lit ring stay exactly as they are.
+
+| App | Tile | Canopy, outermost first | Gold |
+|---|---|---|---|
+| **TiltProof** | Deep green `#27402f` | `#d3dcc2`, `#a9ba90`, `#86997a` | `#c9a86a` |
+| **Log** | Cream `#e8e4da` | `#3d4a44`, `#5b6c52`, `#7f8e76` | `#94702e` |
+| **Untilt** | Near black `#0d1512` | `#9aae80`, `#75886a`, `#55665e` | `#c9a86a` |
+
+**No words in the icon.** The platform already prints the name under it, and a
+word small enough to fit is too small to read. The tile is what a glance catches.
+
+**On cream the ramp turns over**, darkest outermost, for the same reason it is
+lightest outermost on the ground: the silhouette is the strongest line. Forest
+is the outer stroke there at 7.31:1, which is the one place it is a stroke.
+**The gold deepens on cream**, to 3.58:1, because the family gold is 1.58:1
+there and disappears. It keeps its hue, and warm against cool is what carries a
+lit ring. On the green tile the ramp lightens to 7.95, 5.44 and 3.68 and the
+family gold holds at 4.99.
+
+**The tile is for icons only.** Every app's own screens, its splash and its
+empty states still stand on its dark ground, and the mark inside the app is
+drawn in the ground's colors.
+
 ## The palette
 
 | Token | Hex | Where |

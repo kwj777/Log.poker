@@ -220,6 +220,45 @@ export const FIGURES = {
     ],
   },
 
+  /** The aces: three of them in sight, so his could only be one card. */
+  'last-ace': {
+    title: 'Trip aces against trip aces, and a six on the river',
+    desc: `My hand: the ace of spades and six of clubs. His: an ace and a king. His ace
+    can only be the ace of diamonds, because the other three were mine and the board's;
+    the king's suit I did not write down. The flop came the ace of hearts, ace of clubs
+    and eight of spades, giving us both trip aces and him the better kicker. He
+    check-raised and I called. The turn was the five of spades, and he moved all in for
+    $21 more when I bet. The river was the six of hearts, which gave me aces full of
+    sixes. Gold-edged cards are the five that made my hand.`,
+    rows: [
+      {
+        type: 'hands',
+        groups: [
+          { label: 'MY HAND', cards: ['As!', '6c!'] },
+          { label: 'HIS HAND', cards: ['Ad', 'K?'] },
+        ],
+      },
+      {
+        label: 'THE FLOP',
+        cards: ['Ah!', 'Ac!', '8s'],
+        outcomes: [
+          ['ME', 'Trip aces, six kicker', 'muted'],
+          ['HIM', 'Trip aces, king kicker', 'muted'],
+        ],
+      },
+      { type: 'note', text: 'HE CHECK-RAISED. I CALLED.' },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['5s', '6h!'],
+        outcomes: [
+          ['ME', 'Aces full of sixes', 'gold'],
+          ['HIM', 'Trip aces, king kicker', 'muted'],
+        ],
+      },
+      { type: 'note', text: 'HE MOVED IN ON THE TURN. I CALLED $21.' },
+    ],
+  },
+
   /** The diamonds: one card made both hands, and only one of us knew what that meant. */
   'seven-diamonds': {
     title: 'An ace-high flush, and the one card that beat it',

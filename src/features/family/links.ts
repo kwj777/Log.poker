@@ -54,7 +54,11 @@ export const TILTPROOF_REVIEW = `${FAMILY_LINKS.tiltproofApp}/review`;
 const REVIEW_POSITIONS: Partial<Record<Position, string>> = { UTG1: 'UTG+1' };
 
 /**
- * "Drill this in TiltProof" for a hand the player flagged as misplayed.
+ * "Review AKo in TiltProof" for a hand the player logged.
+ *
+ * It said "Drill" until the link reached the hand's own screen. The far side
+ * is TiltProof's review, not a drill, and "review" is the word a player uses
+ * when looking for it.
  *
  * Opens TiltProof's review on the spot, which is a real hand-off rather than a
  * greeting: `hand` and `position` are read on arrival and the player lands on
@@ -68,7 +72,7 @@ const REVIEW_POSITIONS: Partial<Record<Position, string>> = { UTG1: 'UTG+1' };
  * player types is even legal -- nobody holds `AhKs` on a board with the king of
  * spades in it. Sent as a class the review has to stop and ask which suits
  * these were. Sent whole, that screen never appears. The class stays on the
- * return value because the *label* wants it: "Drill AKo in TiltProof" is what a
+ * return value because the *label* wants it: "Review AKo in TiltProof" is what a
  * person calls the hand.
  *
  * **The board is what makes it a spot rather than a holding.** `AKo` on the
@@ -103,7 +107,7 @@ export const drillHandOff = (hand: Pick<Hand, 'holeCards' | 'board' | 'position'
 
   return {
     url: `${TILTPROOF_REVIEW}?${params.toString()}`,
-    label: handClass === null ? 'Drill this spot in TiltProof' : `Drill ${handClass} in TiltProof`,
+    label: handClass === null ? 'Review this hand in TiltProof' : `Review ${handClass} in TiltProof`,
     handClass,
   };
 };

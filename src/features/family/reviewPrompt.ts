@@ -3,7 +3,7 @@
  *
  * ## The moment this exists for
  *
- * `HandRow` already offers "Drill this in TiltProof" on a hand tagged
+ * `HandRow` already offers "Review AKo in TiltProof" on a hand tagged
  * *misplayed?*, and until now that link was the only TiltProof moment in the
  * app. It is in the wrong place for the thing it is offering. A player taps
  * *misplayed?* at a table, where the tap means *come back to this*; the link

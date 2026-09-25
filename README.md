@@ -1096,7 +1096,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2423 passed
+Tests:       2427 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1140,6 +1140,7 @@ Tests:       2423 passed
   batch                  19   a backlog split into requests, without orphaning a child
   csv                    19   quoting, delimiters, line endings
   gateCheck              19   the key-on-the-site script, run rather than read
+  editHand               18   fixing or deleting a hand that was logged wrong
   seed                   18   the demo dataset stays coherent
   sessionDetail          18   one session and the hands that belong to it
   signin                 18   the sign-in client, against a fake fetch
@@ -1150,7 +1151,6 @@ Tests:       2423 passed
   settingsExport         17   the export card, and what it refuses to write
   reviewPrompt           16   which flagged hands still want a review, and what the offer says
   handsList              15   browsing every hand, and finding one of them
-  editHand               14   fixing or deleting a hand that was logged wrong
   hands                  14   what a pile of logged hands adds up to, and the caveat on it
   observe                14   how big the bundle was, said without saying whose
   bankrollHeadline       13   the word over the headline figure, and what it has to be true of

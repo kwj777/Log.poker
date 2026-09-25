@@ -82,7 +82,7 @@ import {
 } from '../../src/domain/handNotation';
 import { formatSessionDate } from '../../src/features/sessions/format';
 import { openLink } from '../../src/features/family/hooks';
-import { tableHandOff } from '../../src/features/family/links';
+import { drillHandOff, tableHandOff } from '../../src/features/family/links';
 import { tableOfferCopy, wantsTableReset } from '../../src/features/family/tableOffer';
 import { useHandById, useLogStore, useSessionById } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
@@ -146,6 +146,24 @@ export default function LogHandScreen() {
    */
   const atTheTable =
     !editing && session !== null && activeSession !== null && session.id === activeSession.id;
+
+  /**
+   * Whether this hand offers TiltProof's review of it.
+   *
+   * Every hand that has been saved, whatever it was tagged, once its night is
+   * over. The link used to live only on session detail rows tagged
+   * *misplayed?*, so a hand logged without that tag -- or opened from the live
+   * session, or from All hands -- had no way to reach the review at all, and
+   * the player went looking for it on the one screen that is plainly about
+   * this hand.
+   *
+   * Not while its session is the one being played, for `HandRow`'s reason:
+   * sending a player out to a training app mid-session is the last thing this
+   * app should do. Against `activeSession` rather than `endedAt`, the way
+   * `atTheTable` is, so a stranded session from last week still offers it.
+   */
+  const offersReview =
+    editing && session !== null && (activeSession === null || session.id !== activeSession.id);
 
   const [holeCards, setHoleCards] = useState<string | null>(null);
   const [board, setBoard] = useState<string | null>(null);
@@ -519,6 +537,10 @@ export default function LogHandScreen() {
 
       <ErrorNote message={failed} />
 
+      {offersReview ? (
+        <ReviewLink holeCards={holeCards} board={showBoard ? board : null} position={position} />
+      ) : null}
+
       {/*
         Only on a hand that exists, and behind a confirmation, the way session
         detail asks before dropping a night. A hand is a smaller thing to lose
@@ -561,7 +583,44 @@ export default function LogHandScreen() {
   );
 }
 
+/**
+ * The hand, handed to TiltProof's review.
+ *
+ * Built from the form rather than from the saved hand, so a card fixed a
+ * moment ago goes across as fixed. `drillHandOff` decides what crosses: the
+ * cards, the seat and the runout, never the note. It names no price, which is
+ * the rule for every link out of this app (see `promptCopy`).
+ */
+const ReviewLink = ({
+  holeCards,
+  board,
+  position,
+}: {
+  holeCards: string | null;
+  board: string | null;
+  position: Position | null;
+}) => {
+  const handOff = drillHandOff({ holeCards, board, position });
+  return (
+    <Card style={styles.review}>
+      <Text variant="caption" color={colors.textTertiary} style={styles.offerHint}>
+        TiltProof walks this hand back four steps: the tell, the range, the equity, the exploit.
+        {isBoard(board) ? '' : ' Add the board first if the hand saw a flop.'}
+      </Text>
+      <Button
+        label={handOff.label}
+        variant="secondary"
+        size="small"
+        onPress={() => openLink(handOff.url)}
+      />
+    </Card>
+  );
+};
+
 const styles = StyleSheet.create({
+  review: {
+    marginTop: spacing.lg,
+  },
   header: {
     paddingTop: spacing.xl,
   },

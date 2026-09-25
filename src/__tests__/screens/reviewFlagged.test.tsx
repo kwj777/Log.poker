@@ -158,7 +158,7 @@ describe('the flagged-hand review card', () => {
     load({ hands: [hand({ holeCards: 'AsKd', board: 'Kh7d2c', position: 'UTG1' })] });
     await renderScreen(<DashboardScreen />);
 
-    await userEvent.press(await screen.findByLabelText('Drill AKo in TiltProof'));
+    await userEvent.press(await screen.findByLabelText('Review AKo in TiltProof'));
 
     expect(open).toHaveBeenCalledTimes(1);
     const url = new URL(open.mock.calls[0][0] as string);
@@ -178,7 +178,7 @@ describe('the flagged-hand review card', () => {
     load({ hands: [hand({ note: 'called off my stack like an idiot' })] });
     await renderScreen(<DashboardScreen />);
 
-    await userEvent.press(await screen.findByLabelText('Drill AKo in TiltProof'));
+    await userEvent.press(await screen.findByLabelText('Review AKo in TiltProof'));
 
     const url = open.mock.calls[0][0] as string;
     expect(url).not.toMatch(/idiot/i);
@@ -193,6 +193,6 @@ describe('the flagged-hand review card', () => {
 
     expect(await screen.findByText('You flagged 5 hands')).toBeTruthy();
     expect(screen.getByText('2 more are on that session.')).toBeTruthy();
-    expect(screen.getAllByLabelText('Drill AKo in TiltProof')).toHaveLength(3);
+    expect(screen.getAllByLabelText('Review AKo in TiltProof')).toHaveLength(3);
   });
 });

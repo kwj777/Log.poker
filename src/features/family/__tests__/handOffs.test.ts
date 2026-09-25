@@ -112,7 +112,7 @@ describe('the TiltProof hand-off', () => {
     // thing to send, so it stays on the return value for the label's sake.
     const handOff = spot();
     expect(handOff.handClass).toBe('AKo');
-    expect(handOff.label).toBe('Drill AKo in TiltProof');
+    expect(handOff.label).toBe('Review AKo in TiltProof');
   });
 
   it('says nothing about a hand it was never given', () => {
@@ -121,7 +121,7 @@ describe('the TiltProof hand-off', () => {
     // spot to review.
     expect(query({ holeCards: null }).get('hand')).toBeNull();
     expect(spot({ holeCards: null }).handClass).toBeNull();
-    expect(spot({ holeCards: null }).label).toBe('Drill this spot in TiltProof');
+    expect(spot({ holeCards: null }).label).toBe('Review this hand in TiltProof');
   });
 
   it('spells every seat Log can record the way the review reads it', () => {

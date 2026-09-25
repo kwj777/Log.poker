@@ -15,6 +15,7 @@
  * is usually from a night that ended weeks ago.
  */
 
+import { Linking } from 'react-native';
 import { screen, userEvent } from '@testing-library/react-native';
 
 import { renderScreen } from '../support/screen';
@@ -264,5 +265,54 @@ describe('the session the hand belongs to', () => {
     expect(screen.getByLabelText('K of diamonds, tap to remove')).toBeTruthy();
     expect(screen.getByLabelText('Q of clubs, tap to remove')).toBeTruthy();
     expect(screen.getByLabelText('J of hearts, tap to remove')).toBeTruthy();
+  });
+});
+
+describe('taking the hand to TiltProof', () => {
+  // The link used to be on session detail only, and only on hands tagged
+  // misplayed?, so a hand logged without the tag could not reach the review
+  // from anywhere. The hand's own screen is where a player looks for it.
+  it('offers the review on any hand from a night that is over, tagged or not', async () => {
+    load([hand({ tags: [] })]);
+    await renderScreen(<LogHandScreen />);
+
+    expect(await screen.findByText('Review AKo in TiltProof')).toBeTruthy();
+  });
+
+  it('opens the review with what is on the form, and without the note', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    load([hand({ board: 'Kh7d2c', position: 'UTG1' })]);
+    await renderScreen(<LogHandScreen />);
+
+    await userEvent.press(await screen.findByText('Review AKo in TiltProof'));
+
+    expect(open).toHaveBeenCalledTimes(1);
+    const url = new URL(open.mock.calls[0][0] as string);
+    expect(url.origin + url.pathname).toBe('https://tiltproof.poker/app/review');
+    expect(url.searchParams.get('hand')).toBe('AsKd');
+    expect(url.searchParams.get('board')).toBe('Kh7d2c');
+    expect(url.searchParams.get('position')).toBe('UTG+1');
+    expect(url.search).not.toContain('aces');
+    open.mockRestore();
+  });
+
+  it('names no price', async () => {
+    load([hand()]);
+    await renderScreen(<LogHandScreen />);
+
+    // The pot swing's own currency sign is on this screen, so the card's copy
+    // is what is read, not the whole screen.
+    const copy = await screen.findByText(/TiltProof walks this hand back/);
+    expect(copy.props.children.join('')).not.toMatch(/\$|price|buy|pass|free/i);
+  });
+
+  it('but not while that session is still being played', async () => {
+    // HandRow's rule: sending a player to a training app mid-session is the
+    // last thing this app should do.
+    load([hand()], { activeSession: session('s1', { endedAt: null }) as never });
+    await renderScreen(<LogHandScreen />);
+
+    await screen.findByText('Save changes');
+    expect(screen.queryByText('Review AKo in TiltProof')).toBeNull();
   });
 });

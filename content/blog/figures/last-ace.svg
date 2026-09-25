@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 560" role="img"
+  aria-labelledby="last-ace-title last-ace-desc">
+  <title id="last-ace-title">Trip aces against trip aces, and a six on the river</title>
+  <desc id="last-ace-desc">My hand: the ace of spades and six of clubs. His: an ace and a king. His ace can only be the ace of diamonds, because the other three were mine and the board's; the king's suit I did not write down. The flop came the ace of hearts, ace of clubs and eight of spades, giving us both trip aces and him the better kicker. I bet $25, he raised to $50 and I called. The turn was the five of spades. I bet $100 and he moved all in for $121. The river was the six of hearts, which gave me aces full of sixes. Gold-edged cards are the five that made my hand.</desc>
+
+  <text x="121.8" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">MY HAND</text>
+  <g>
+    <title>Ace of spades</title>
+    <rect x="63.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="70.8" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#242b28">A</text>
+    <text x="90.8" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <g>
+    <title>6 of clubs</title>
+    <rect x="125.8" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="132.8" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#242b28">6</text>
+    <text x="152.8" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♣</text>
+  </g>
+  <text x="298.2" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">HIS HAND</text>
+  <g>
+    <title>Ace of diamonds</title>
+    <rect x="240.2" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="247.2" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">A</text>
+    <text x="267.2" y="84" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♦</text>
+  </g>
+  <g>
+    <title>The King, and I could not tell you the suit</title>
+    <rect x="302.2" y="26" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" stroke-dasharray="4 3" />
+    <text x="309.2" y="48" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#8f8a80">K</text>
+    <text x="329.2" y="84" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="27"
+      text-anchor="middle" fill="#8f8a80">?</text>
+  </g>
+  <text x="210" y="152" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">THE FLOP</text>
+  <g>
+    <title>Ace of hearts</title>
+    <rect x="121" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="128" y="184" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">A</text>
+    <text x="148" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♥</text>
+  </g>
+  <g>
+    <title>Ace of clubs</title>
+    <rect x="183" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="190" y="184" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#242b28">A</text>
+    <text x="210" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♣</text>
+  </g>
+  <g>
+    <title>8 of spades</title>
+    <rect x="245" y="162" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="252" y="184" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#242b28">8</text>
+    <text x="272" y="220" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <text x="210" y="260" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Trip aces, six kicker</text>
+  <text x="210" y="282" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>Trip aces, king kicker</text>
+  <text x="210" y="327" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">I BET $25. HE MADE IT $50. I CALLED.</text>
+  <text x="210" y="377" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">THE TURN AND THE RIVER</text>
+  <g>
+    <title>5 of spades</title>
+    <rect x="152" y="387" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#2e3a35" stroke-width="1" />
+    <text x="159" y="409" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#242b28">5</text>
+    <text x="179" y="445" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#242b28">♠</text>
+  </g>
+  <g>
+    <title>6 of hearts</title>
+    <rect x="214" y="387" width="54" height="76" rx="5"
+      fill="#e8e4da" stroke="#c9a86a" stroke-width="2" />
+    <text x="221" y="409" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="19"
+      fill="#b7343f">6</text>
+    <text x="241" y="445" font-family="'Segoe UI Symbol','Apple Symbols','Arial Unicode MS','DejaVu Sans',sans-serif" font-size="27"
+      text-anchor="middle" fill="#b7343f">♥</text>
+  </g>
+  <text x="210" y="485" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Aces full of sixes</text>
+  <text x="210" y="507" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>Trip aces, king kicker</text>
+  <text x="210" y="552" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">I BET $100. HE MOVED IN FOR $121.</text>
+</svg>

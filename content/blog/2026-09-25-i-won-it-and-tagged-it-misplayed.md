@@ -1,7 +1,6 @@
 ---
 title: I won the hand. I still tagged it misplayed.
-description: Ace-six against ace-king on an ace-ace-eight board. He min-raised my $25 flop bet, I bet into him on the turn, called $21 more with three outs, and a six on the river gave me the pot. The question mark on the tag is the most useful thing in the note.
-next: tiltproof
+description: Ace-six against ace-king on an ace-ace-eight board, with a short stack, a $25 bet min-raised to $50, and a six on the river. I tagged it misplayed? because I had won it. Counting it answered the question, and not the way I expected.
 ---
 
 A six came on the river and I won the pot. Then I opened the app, logged the hand, and tagged it *misplayed?*
@@ -14,9 +13,9 @@ He showed his ace-king when he moved in. I never wrote down the king's suit, and
 
 ## What happened
 
-The big blind had the shorter stack. The flop came ace, ace, eight, and I had the ace and six. He checked, I bet $25, and he check-raised to $50. I called.
+The big blind had the shorter stack, and I was first to act after the flop. The flop came ace, ace, eight, and I had the ace and six. I bet $25, he raised to $50, and I called.
 
-The turn was the five of spades. He checked again, I bet again, and he moved all in. It cost me $21 more to call, so I called, and he turned over ace-king straight away, the way you do when you are sure. I left mine face down, the way you do when you are not.
+The turn was the five of spades. I bet $100. He had $121 left and moved all of it in, so it cost me $21 more to call, into a pot of about $550. I called, and he turned over ace-king straight away, the way you do when you are sure. I left mine face down, the way you do when you are not.
 
 The river was the six. Aces full of sixes, and his trip aces with the best kicker in the deck were no good.
 
@@ -24,48 +23,44 @@ The river was the six. Aces full of sixes, and his trip aces with the best kicke
 
 Count the aces. I had the ace of spades. The board had the ace of hearts and the ace of clubs. That leaves one ace anywhere in the deck, the ace of diamonds, and for him to have trips he needed exactly that card.
 
-That feels like it should make me comfortable. It is the opposite. When he check-raised the flop, the question was not "does he have an ace", it was "does he have *the* ace, with a kicker above a six". And most kickers are above a six: the seven through the king beat me, and an eight made him a full house.
+That feels like it should make me comfortable. It is the opposite. When he raised the flop, the question was not "does he have an ace", it was "does he have *the* ace, with a kicker above a six". And most kickers are above a six: the seven through the king beat me, and an eight made him a full house.
 
 On the flop, against the hand he actually held, I was winning outright about one time in nine and splitting it nearly one time in five. That is 20% of the pot, for a hand that felt like trips.
 
-Trip aces with a six is not really trip aces. It is a kicker battle, and on this board the only kickers I beat are the two, three, four and five.
-
 ## Did he raise too small?
 
-This is the question I asked first, and it is a fair one. I bet $25 and he made it $50, which is the smallest raise the rules allow. It let me call $25 into a pot that already held $75 plus whatever went in before the flop. If that was $25 or more, I needed 20% to call, and 20% is exactly what I had against his hand. Against the hands that check-raise there and lose to me, I had better than that.
+This is the question I asked first. I bet $25 and he made it $50, which is the smallest raise the rules allow.
 
-So the min-raise gave me a price, and I took it. But it did not cost him anything.
+It gave me a price, but it did not cost him anything. After the flop there was about $330 in the middle and he had $121 left. With that little behind and that much in the pot, the rest of his money was going in on the turn whatever either of us did. A shove on the flop would have put me all in with two cards to come and 20%. His line put me all in with one card to come and 13.6%. That is a better deal for him, not a worse one.
 
-He was the short stack. Once I called the flop, the rest of his money was going in on the turn whatever either of us did, and it went in when I was worse off than on the flop, not better. A shove on the flop would have put me all in with two cards to come and 20%. His line put me all in with one card to come and 13.6%. That is a better deal for him, not a worse one.
+A player who is an 80% favorite wants you to keep going, and a small raise is how you ask. He did not raise too small. Then a six came.
 
-A man who is an 80% favorite wants you to keep going. A small raise is how you ask. He did not raise too small. He raised exactly as small as somebody that far ahead should, and then a six came.
+## So did I misplay it?
 
-## The word "extra"
+I was ready to say the turn bet. Betting $100 into a man who has just raised you, with a hand that only beats his bluffs, is the sort of thing I would circle on anybody else's hand.
 
-My note says it only cost me $21 extra to call. That word is doing a lot of work.
+The numbers say otherwise. With $121 behind in a $330 pot, nothing on the turn was really a decision. If I check, he moves in and I am calling $121 into $450 with the same cards. If I bet, he moves in and I call $21. Either way the same money ends up in the middle, and the river is still coming. My $100 just went in a few seconds earlier.
 
-::: stat Three sixes
-The cards left in the deck that won me the pot on the river: 3 in 44, or 6.8%. Three eights and three fives would have split it. The other 35 cards were his. Counting half for a split, I had 13.6% of the pot when I called.
+::: stat 3.7%
+What I needed to win to call the last $21, with about $550 already in the pot. Three sixes win it on the river, and three eights and three fives split it, which is 13.6% of the pot against the exact hand he had.
 :::
 
-There was about $550 in the pot before I put the $21 in. At that price I needed to win 3.7% of the time, and I had 13.6%. The call is not close, and it is not where this hand went wrong.
+So the only real decision was the flop, and there the question is whether to call $25 more knowing the rest was coming. That is $146 to win a pot that ends up around $570, so I needed about 26%.
 
-The $21 was cheap because I had already paid for it. The flop put $100 in the middle. Most of the rest of that $550 was my turn bet and his shove on top of it, and his shove was only $21 bigger than my bet. Unless a lot more went in before the flop than I think, I bet something close to $200 on the turn, into a player who had about $220 left.
+Against ace-king I had 20%, and calling would lose me about $30 on average. But I did not know it was ace-king. A short stack who min-raises that flop does it with the last ace and any kicker, and with eights full. That is 49 hands, 16 of them worse than mine, and against all of them together I had 35%. Against the hand I was actually facing, I was behind. Against the hands I could have been facing, the call was right.
 
-**That turn bet is the misplay.** He had just check-raised me, then checked. The hands that call or raise a bet there are the hands that beat me, and the hands I beat were never putting another dollar in. Checking behind would have shown me the river for free, and if the six still came, a man holding trip aces and $220 was going to put it in for me. If it did not come, I could have let his river bet go and kept most of that $200.
+The answer to the question mark is no. I played it fine, I was behind, and I got lucky.
 
-Instead I bet into the one player at the table who had just told me he had it, and let him decide when the rest of the money went in. The river bailed me out of that. The river does not do it often.
+## The numbers I skipped
 
-## The number I skipped
+The app has a line for the pot swing, and it tells you to skip it unless the number is the point of the hand. I skipped it. The $25, the $50, the $100 and the $121 only came back to me afterwards, when somebody asked.
 
-The app has a line for the pot swing, and it tells you to skip it unless the number is the point of the hand. I skipped it. The $25, the $50 and the $550 only came back to me afterwards, when somebody asked, and the size of my turn bet I can only work out backwards from them.
-
-It turns out those numbers are the whole argument. Without them this hand reads as a close call that got lucky. With them it reads as an easy call that I made expensive myself, a street earlier. But a number is the point of the hand more often than it feels like at the table, and it is usually the one you remember least. Next time it goes in the note.
+Without them, I had this hand down as a bad turn bet that got bailed out. With them, the turn was never a decision at all. The numbers were the whole answer, and I was one question away from not having them.
 
 ## Why the question mark
 
-He will remember this hand as a bad beat, and he is right. I will remember it as a win, and if the note just said "won with a boat" I would be right too, and I would learn nothing.
+He will remember this hand as a bad beat, and he is right. I will remember it as a win, and that is right too. Neither of those tells me anything about how I played it.
 
-The tag is there because the result and the decision are different objects, and the result shouts. A question mark keeps the decision open long enough to count it. When I did, the answer was the turn bet: not his raise, not the river and not the call. Next time a player check-raises me and then checks, I would like to be the one checking behind.
+The tag is there because the result and the decision are different objects, and the result shouts. A question mark keeps the decision open long enough to count it. This time the count came back clean, which is worth knowing as well: the next time I have top trips with a weak kicker and a short stack raises me, I call, and I do not let one six convince me it was clever.
 
-[Log is free, all of it, and works offline with no account](/app). Tag the hands you won as well as the ones you lost, and put a question mark on the ones where you are not sure.
+[Log is free, all of it, and works offline with no account](/app). Tag the hands you won as well as the ones you lost, put a question mark on the ones where you are not sure, and write the numbers in while you still have them.

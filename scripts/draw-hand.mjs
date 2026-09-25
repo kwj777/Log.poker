@@ -226,9 +226,9 @@ export const FIGURES = {
     desc: `My hand: the ace of spades and six of clubs. His: an ace and a king. His ace
     can only be the ace of diamonds, because the other three were mine and the board's;
     the king's suit I did not write down. The flop came the ace of hearts, ace of clubs
-    and eight of spades, giving us both trip aces and him the better kicker. He
-    check-raised and I called. The turn was the five of spades, and he moved all in for
-    $21 more when I bet. The river was the six of hearts, which gave me aces full of
+    and eight of spades, giving us both trip aces and him the better kicker. I bet $25,
+    he raised to $50 and I called. The turn was the five of spades. I bet $100 and he
+    moved all in for $121. The river was the six of hearts, which gave me aces full of
     sixes. Gold-edged cards are the five that made my hand.`,
     rows: [
       {
@@ -246,7 +246,7 @@ export const FIGURES = {
           ['HIM', 'Trip aces, king kicker', 'muted'],
         ],
       },
-      { type: 'note', text: 'HE CHECK-RAISED. I CALLED.' },
+      { type: 'note', text: 'I BET $25. HE MADE IT $50. I CALLED.' },
       {
         label: 'THE TURN AND THE RIVER',
         cards: ['5s', '6h!'],
@@ -255,7 +255,7 @@ export const FIGURES = {
           ['HIM', 'Trip aces, king kicker', 'muted'],
         ],
       },
-      { type: 'note', text: 'HE MOVED IN ON THE TURN. I CALLED $21.' },
+      { type: 'note', text: 'I BET $100. HE MOVED IN FOR $121.' },
     ],
   },
 

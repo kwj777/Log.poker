@@ -510,11 +510,20 @@ export default function DashboardScreen() {
         />
       </Card>
 
-      <SectionHeader
-        title="Where the money comes from"
-        action={
-          <ChipGroup options={breakdownOptions} value={active} onChange={setBreakdown} />
-        }
+      {/*
+        The chips sit on their own row rather than in the header's action slot.
+        Up there they shared a line with a long overline, so a cash player's
+        three (Stakes, Venue, Game) ran into the title and the last one was
+        cut off at the screen edge, and a player with both formats has five.
+        Scrolling keeps them to one row however many apply.
+      */}
+      <SectionHeader title="Where the money comes from" />
+      <ChipGroup
+        options={breakdownOptions}
+        value={active}
+        onChange={setBreakdown}
+        scroll
+        style={styles.breakdownChips}
       />
       <Card>
         <BarBreakdown groups={groups} currency={currency} />
@@ -568,6 +577,9 @@ const ResumeButton = ({ startedAt }: { startedAt: number }) => {
 };
 
 const styles = StyleSheet.create({
+  breakdownChips: {
+    paddingBottom: spacing.md,
+  },
   brandHeader: {
     paddingTop: spacing.xl,
     gap: spacing.xs,

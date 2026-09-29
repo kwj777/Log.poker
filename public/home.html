@@ -18,6 +18,12 @@
   Carrying no number is not the same as implying the whole family is free. Two
   of the three are paid past a point, so every card says how much of its own app
   is free and the creed below says where the line falls. That is tested too.
+  Log is in the App Store as of 2026-09-29, so the page carries Safari's smart
+  banner and Apple's badge, both addressing the app by its App Store ID
+  (scripts/pages.mjs has the number and why it waited for approval). The badge
+  is Apple's own artwork, unaltered, served from /badges rather than inlined
+  so the blog uses the same file. It is a download link to a free app and
+  names no price, so the rule above still holds.
 -->
 <html lang="en">
   <head>
@@ -31,6 +37,7 @@
     <link rel="canonical" href="https://log.poker/" />
     <meta name="theme-color" content="#1c211f" />
     <meta name="color-scheme" content="dark" />
+    <meta name="apple-itunes-app" content="app-id=6814843842" />
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta property="og:type" content="website" />
@@ -108,6 +115,8 @@
         padding: .85rem 2.1rem; border-radius: 3px;
       }
       .btn:hover, .btn:focus-visible { background: #d8ba80; }
+      .store { display: block; line-height: 0; }
+      .store img { display: block; width: 144px; height: 48px; }
       .cta .sub { font-family: var(--serif); color: var(--muted); font-size: 1.02rem; }
       .creed { border-left: 2px solid var(--forest); padding-left: 1.15rem; display: flex; flex-direction: column; gap: .7rem; }
       .creed p { font-family: var(--serif); font-size: 1.02rem; color: var(--muted); line-height: 1.55; }
@@ -181,7 +190,10 @@
 
       <div class="cta">
         <a class="btn" href="/app">Get the log</a>
-        <p class="sub">Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
+        <a class="store" href="https://apps.apple.com/app/id6814843842">
+          <img src="/badges/app-store.svg" width="144" height="48" alt="Download on the App Store" />
+        </a>
+        <p class="sub">On the web or on an iPhone. Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
       </div>
 
       <section id="reading">

@@ -292,9 +292,14 @@ file reads back.
 
    That number is also what the marketing site wants the day the app is
    approved: an `apple-itunes-app` smart banner and the App Store badge link
-   both address the app by it. Neither goes live before approval, because App
+   both address the app by it. Neither went live before approval, because App
    Review opens the marketing URL and a download link that goes nowhere is an
-   easy rejection.
+   easy rejection. **Log 1.0 was approved on 2026-09-29 and both are now up**:
+   the banner on the front door, the guides, the privacy page and the blog,
+   and Apple's badge beside "Get the log" on the front door and the blog index.
+   The number lives once in `scripts/pages.mjs`, and `site.test.ts` holds it
+   to `ascAppId`. The banner is deliberately not on the app under `/app`,
+   where `/claim` spends a single-use pass code that an Open tap would strand.
 
 ---
 

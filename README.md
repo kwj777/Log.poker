@@ -1096,12 +1096,12 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2427 passed
+Tests:       2433 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
+  site                   73   the marketing/app split, the PWA, the sitemap
   bundle                 72   the server-side merge: two devices and one bundle
-  site                   68   the marketing/app split, the PWA, the sitemap
   sessionImport          67   reading a session-summary export
   tournaments            67   ROI, its interval, cash rate, dry runs, finishes
   handOffs               61   where a hand-off goes, and what the four offer cards say
@@ -1114,8 +1114,8 @@ Tests:       2427 passed
   endpoint               49   the sync endpoint, end to end
   values                 47   money, dates, durations, stakes, formats, counts
   variance               46   win rate, σ, confidence bands, verdicts
+  blog                   41   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
-  blog                   40   the post grammar, the share cards, and what it refuses
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins

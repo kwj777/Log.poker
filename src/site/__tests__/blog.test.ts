@@ -96,6 +96,16 @@ describe('what a post becomes', () => {
     }
   });
 
+  it('offers the App Store app the way the front door does', () => {
+    const eas = JSON.parse(read('eas.json'));
+    const id: string = eas.submit.production.ios.ascAppId;
+    for (const page of [index, ...published.map((slug) => readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8'))]) {
+      expect(page).toContain(`<meta name="apple-itunes-app" content="app-id=${id}" />`);
+    }
+    expect(index).toContain(`<a class="store" href="https://apps.apple.com/app/id${id}">`);
+    expect(index).toContain('<img src="/badges/app-store.svg"');
+  });
+
   it('renders with nothing fetched, not even a font', () => {
     // The same promise the front door makes, for the same reason: this is read
     // in a card room, on one bar of signal, on somebody else's phone.

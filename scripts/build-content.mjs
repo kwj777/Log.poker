@@ -36,7 +36,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { GUIDES } from './pages.mjs';
+import { APP_STORE_BANNER, GUIDES } from './pages.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
@@ -311,6 +311,7 @@ const render = ({ slug, title, description, updated, body, type = 'Article' }) =
     <link rel="canonical" href="${url}" />
     <meta name="theme-color" content="#1c211f" />
     <meta name="color-scheme" content="dark" />
+    ${APP_STORE_BANNER}
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta property="og:type" content="${type === 'Article' ? 'article' : 'website'}" />

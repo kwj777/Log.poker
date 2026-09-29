@@ -34,6 +34,8 @@ const manifest = JSON.parse(read('public', 'manifest.webmanifest'));
  */
 const DASHES = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
 const buildScript = read('scripts', 'build-web.mjs');
+/** The four guides, as the files build-content.mjs writes into public/. */
+const GUIDES_ON_DISK = ['running-bad', 'bankroll', 'pot-odds', 'tilt'];
 
 /**
  * Ways of promising that nothing is sent anywhere, which sync made false.
@@ -351,6 +353,47 @@ describe('the worker caches the app and not the marketing site', () => {
     const paths = [...declared, ...routed];
     expect(paths.length).toBeGreaterThan(3);
     for (const path of paths) expect(path.startsWith('/api/')).toBe(true);
+  });
+});
+
+describe('the App Store listing, since approval', () => {
+  // Log 1.0 was approved on 2026-09-29. Before that neither of these could go
+  // up, because App Review opens this site and a download link to an app not
+  // yet in the store is an easy rejection. See scripts/pages.mjs.
+  const eas = JSON.parse(read('eas.json'));
+  const id: string = eas.submit.production.ios.ascAppId;
+  const banner = `<meta name="apple-itunes-app" content="app-id=${id}" />`;
+  const generated = [...GUIDES_ON_DISK, 'privacy'].map((name) => read('public', `${name}.html`));
+
+  it('addresses the app by the ID it is submitted under', () => {
+    expect(id).toMatch(/^\d{10}$/);
+    expect(read('scripts', 'pages.mjs')).toContain(`export const APP_STORE_ID = '${id}';`);
+  });
+
+  it('offers the app in a Safari banner on the front door and every guide', () => {
+    expect(home).toContain(banner);
+    expect(generated.length).toBeGreaterThan(4);
+    for (const page of generated) expect(page).toContain(banner);
+  });
+
+  it('but never inside the app, where /claim spends a handoff code', () => {
+    // A banner's Open button leaves the page for the native app, which would
+    // strand a single-use pass code the web app was about to spend.
+    expect(read('app', '+html.tsx')).not.toMatch(/apple-itunes-app/);
+  });
+
+  it('links the badge to the listing, beside the button to the web app', () => {
+    const cta = home.slice(home.indexOf('<div class="cta">'), home.indexOf('</div>', home.indexOf('<div class="cta">')));
+    expect(cta).toContain('<a class="btn" href="/app">');
+    expect(cta).toContain(`<a class="store" href="https://apps.apple.com/app/id${id}">`);
+    expect(cta).toContain('alt="Download on the App Store"');
+  });
+
+  it("uses Apple's badge from this origin, so the page still fetches nothing elsewhere", () => {
+    expect(home).toContain('<img src="/badges/app-store.svg"');
+    const badge = read('public', 'badges', 'app-store.svg');
+    expect(badge).toContain('Download_on_the_App_Store_Badge');
+    expect(badge).not.toMatch(/<script|href=/i);
   });
 });
 

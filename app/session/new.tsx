@@ -38,6 +38,7 @@ import {
   type SessionFormat,
   type Stakes,
 } from '../../src/domain/types';
+import { CarryOverOffer } from '../../src/features/sessions/CarryOverOffer';
 import { PreSessionWarmUp } from '../../src/features/sessions/PreSessionWarmUp';
 import { StakesPicker } from '../../src/features/sessions/StakesPicker';
 import { VenuePicker } from '../../src/features/sessions/VenuePicker';
@@ -46,6 +47,7 @@ import {
   buyInPresets,
   deriveDefaults,
 } from '../../src/features/sessions/defaults';
+import { carryOver } from '../../src/domain/carryOver';
 import { useLogStore } from '../../src/store/useLogStore';
 import { colors, spacing } from '../../src/theme';
 import { PageMeta } from '../../src/components/PageMeta';
@@ -67,6 +69,16 @@ export default function NewSessionScreen() {
   const refresh = useLogStore((state) => state.refresh);
 
   const defaults = useMemo(() => deriveDefaults(sessions), [sessions]);
+
+  /**
+   * What the last night left behind, if anything. See `carryOver`.
+   *
+   * Read once on mount rather than on a timer: the window is three days wide,
+   * so nothing it decides can change while somebody fills in a buy-in, and a
+   * card that appeared halfway through typing would be the one thing this
+   * screen must never do.
+   */
+  const carried = useMemo(() => carryOver(sessions), [sessions]);
 
   const [venueId, setVenueId] = useState<string | null>(
     defaults.venueId ?? venues[0]?.id ?? null,
@@ -230,6 +242,20 @@ export default function NewSessionScreen() {
             : 'Everything below is set to a common live game. Change what’s different, then start.'}
         </Text>
       </View>
+
+      {/*
+        At the top, because it is about arriving rather than about any field
+        below it, and because a card nobody scrolls to is a card that does not
+        exist: the mood picker it would otherwise sit beside is below the fold
+        on a phone.
+
+        Start is in the footer, so nothing here delays it, and this is nowhere
+        near the picker -- which is the stronger version of the rule
+        `PreSessionWarmUp` states, since it cannot make one score costlier to
+        tap than another even by accident. It draws nothing on an ordinary
+        night, which is most of them.
+      */}
+      <CarryOverOffer carried={carried?.direction ?? null} mood={mood} />
 
       <SectionHeader title="Where" />
       <VenuePicker

@@ -1095,8 +1095,8 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 113 passed
-Tests:       2433 passed
+Test Suites: 114 passed
+Tests:       2436 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1202,6 +1202,7 @@ Tests:       2433 passed
   nativeModules           4   the two native modules nothing imports and every build compiles
   transactionQueue        4   two writes at once, on a database with no queue of its own
   amountField             3   the money field's box, against the font it has to hold
+  dashboardVerdict        3   whether the verdict reaches the dashboard, and when it stays off
   midSessionCheckIn       3   whether a check-in that failed says it was logged
   notFound                3   where a link that names nothing lands
   pageMeta                3   the document head, kept off the phone it alerts on

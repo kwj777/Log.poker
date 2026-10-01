@@ -23,6 +23,8 @@ import { Text } from '../../src/components/Text';
 import { BarBreakdown } from '../../src/components/chart/BarBreakdown';
 import { LineChart } from '../../src/components/chart/LineChart';
 import { GUIDES } from '../../src/config';
+import { StretchVerdictCard } from '../../src/features/variance/StretchVerdictCard';
+import { recentStretchFrom } from '../../src/features/variance/recentStretch';
 import { currencyLabel, formatMoney, formatMoneyCompact } from '../../src/domain/money';
 import {
   bankrollCurve,
@@ -82,6 +84,18 @@ export default function DashboardScreen() {
   );
 
   const summary = useMemo(() => totals(sessions), [sessions]);
+
+  /**
+   * The one sentence this whole app is for, on the screen everybody opens.
+   *
+   * It lived only on the Variance tab, one tap away, and nobody opens a
+   * tracker to go and look at a chart: they open it to log a session, and the
+   * moment they most want to know whether a bad run means anything is right
+   * after one. Scoped to `sessions` rather than `all` for the reason the
+   * Variance tab gives at length -- a standard deviation over two currencies is
+   * a number about nothing.
+   */
+  const stretch = useMemo(() => recentStretchFrom(sessions), [sessions]);
   const winRate = useMemo(() => cashWinRate(sessions), [sessions]);
   const tourneys = useMemo(() => tournamentTotals(sessions), [sessions]);
   /**
@@ -414,6 +428,23 @@ export default function DashboardScreen() {
       </View>
 
       {/*
+        Directly under the figure, because it is what the figure means.
+        "Bankroll $4,200" and "down 1,000 over eleven hours, which is inside
+        your normal range" are one thought, and splitting them across two tabs
+        is what made the second one optional.
+
+        Draws nothing until there is a sample, rather than opening the app on
+        an apology: the Variance tab answers that case properly, with an empty
+        state, the explanation and the guide. A tap goes there for the working.
+      */}
+      <StretchVerdictCard
+        assessment={stretch}
+        hideWhenUnreadable
+        onPress={() => router.push('/variance')}
+        style={styles.verdict}
+      />
+
+      {/*
         Above the graph because it is the one thing on this screen with
         something to do in it, and below the bankroll because that is what the
         player opened the app for. Renders nothing at all in the ordinary case;
@@ -592,6 +623,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     marginHorizontal: -spacing.lg,
     paddingHorizontal: spacing.lg,
+  },
+  /** The figure above it is the subject; this sits close enough to read as its answer. */
+  verdict: {
+    marginTop: spacing.lg,
   },
   chartCard: {
     marginTop: spacing.lg,

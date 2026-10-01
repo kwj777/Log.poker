@@ -58,12 +58,11 @@ import { STAT_HELP } from '../../src/domain/glossary';
 import { startMoodComparison } from '../../src/domain/mood';
 import { openLink } from '../../src/features/family/hooks';
 import { untiltHandOff } from '../../src/features/family/links';
+import { StretchVerdictCard } from '../../src/features/variance/StretchVerdictCard';
+import { RECENT_SESSIONS } from '../../src/features/variance/recentStretch';
 import { useAllHands, useLogStore } from '../../src/store/useLogStore';
 import { colors, resultColor, spacing } from '../../src/theme';
-import type { StretchVerdict } from '../../src/domain/variance';
 import { PageMeta } from '../../src/components/PageMeta';
-
-const RECENT_SESSIONS = 10;
 
 /**
  * The same restraint as the cash verdicts: only a range that has actually
@@ -76,20 +75,6 @@ const ROI_COLORS: Record<RoiAssessment['verdict'], string> = {
   undetermined: colors.text,
   winning: colors.profit,
   losing: colors.loss,
-};
-
-/**
- * Only the true outliers get a color. A stretch inside the normal band is
- * shown in plain text on purpose -- painting an ordinary bad week red is exactly
- * the reflex this screen exists to interrupt.
- */
-const VERDICT_COLORS: Record<StretchVerdict, string> = {
-  insufficient_data: colors.text,
-  running_bad: colors.loss,
-  below_expectation: colors.text,
-  normal: colors.text,
-  above_expectation: colors.text,
-  running_hot: colors.profit,
 };
 
 export default function VarianceScreen() {
@@ -346,14 +331,7 @@ export default function VarianceScreen() {
         </Text>
       </View>
 
-      <Card style={styles.verdict}>
-        <Text variant="heading" color={VERDICT_COLORS[assessment.verdict]}>
-          {assessment.headline}
-        </Text>
-        <Text color={colors.textSecondary} style={styles.verdictBody}>
-          {assessment.body}
-        </Text>
-      </Card>
+      <StretchVerdictCard assessment={assessment} style={styles.verdict} />
 
       {tournaments.entries > 0 ? (
         <TournamentCard
@@ -651,8 +629,12 @@ const styles = StyleSheet.create({
   },
   verdict: {
     marginTop: spacing.xl,
-    borderColor: colors.accentDim,
   },
+  /**
+   * Still here for the two tournament cards below, which are the same shape
+   * and not the same component: the cash verdict moved to
+   * `StretchVerdictCard`, which carries this spacing itself.
+   */
   verdictBody: {
     marginTop: spacing.sm,
     lineHeight: 23,

@@ -1,5 +1,5 @@
 ---
-title: The law of averages came the next day
+title: I fought the law and the law won
 description: After the best night I had had in months, I went back the next day to play my normal game and leave my average alone. The average had other plans, and it did not need a bad day to carry them out.
 next: untilt
 ---
@@ -30,7 +30,7 @@ What happens is plainer and somehow worse. The next session is drawn from the sa
 
 For the example player, an ordinary six hour session ends in a loss 40% of the time. It gives back $250 or more, half of the great day, about one time in ten. That is not a cold streak. That is one session in ten, with nothing wrong.
 
-So when the law of averages showed up the very next day, it was not catching up with me. It was just Wednesday.
+So when the law of averages showed up the very next day, it was not catching up with me. It was just Wednesday. I fought the law, and the law did not even have to try.
 
 ## Even a normal day lowers the number
 

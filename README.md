@@ -329,12 +329,23 @@ mistake of the author's to drill and no tilt to walk back from, and the honest
 answer for those is Log. The copy in each block is the guides' copy word for
 word, which is also how it goes on saying how much of each app is free.
 
+### On the front door
+
+`public/home.html` has a "Latest from the blog" section holding one card that
+points at `/blog`, between two `latest-posts` markers. When `build-blog.mjs`
+runs over the export, where home.html has just become `index.html`, it swaps
+that card for the three newest posts, so a post reaches the home page on the
+deploy that publishes it. A preview build has no `index.html` and skips it.
+
 ### Share links
 
 Under every post, above its call to action, is a row of plain share links
 (X, Facebook, Reddit and email) that work with no script. On a phone that
 has a share sheet, one more button appears that opens it, from a few lines of
-inline script: nothing is fetched until somebody taps something.
+inline script: nothing is fetched until somebody taps something. Under the row, a line
+points at the newsletter (Buttondown, which mails each post from the feed) and
+the RSS feed, so following the blog is one tap from every post. The newsletter
+is a link rather than a signup form so the CSP's `form-action 'self'` holds.
 
 ### Share cards
 
@@ -1105,7 +1116,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2434 passed
+Tests:       2436 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1123,7 +1134,7 @@ Tests:       2434 passed
   endpoint               49   the sync endpoint, end to end
   values                 47   money, dates, durations, stakes, formats, counts
   variance               46   win rate, σ, confidence bands, verdicts
-  blog                   42   the post grammar, the share cards, and what it refuses
+  blog                   44   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand

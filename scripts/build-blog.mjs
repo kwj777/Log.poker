@@ -447,6 +447,13 @@ const handoff = (post) => {
  * It is the only script on the page and it is inline, so the promise above
  * that nothing is fetched to render still holds.
  */
+/**
+ * The newsletter, on Buttondown, which mails each new post from the feed.
+ * A link rather than a form on purpose: the site's CSP allows forms to post
+ * only to itself, and a link keeps it that way.
+ */
+const NEWSLETTER = 'https://buttondown.com/logPoker';
+
 const shareRow = (post) => {
   const url = encodeURIComponent(post.url);
   const title = encodeURIComponent(post.title);
@@ -474,7 +481,7 @@ const shareRow = (post) => {
             });
           })();
         </script>
-        <p class="follow">New posts most weeks. <a href="/blog/feed.xml">Follow the blog by RSS</a>.</p>
+        <p class="follow">New posts most weeks. <a href="${NEWSLETTER}">Get them by email</a>, or <a href="/blog/feed.xml">follow the blog by RSS</a>.</p>
       </section>`;
 };
 

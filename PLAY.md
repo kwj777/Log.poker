@@ -39,10 +39,14 @@ app. There is a one-time $25 fee and an identity check.
 
 **Personal or organization matters more than it looks.** A personal account
 created after November 2023 cannot publish to production until it has run a
-closed test with at least 12 testers opted in for 14 days in a row (step 6). An
+closed test with at least 12 testers opted in for 14 days in a row (step 7). An
 organization account skips that, but needs a D-U-N-S number for the business.
-If there is a company behind these apps, the organization route is faster
-overall.
+
+**Log is going the organization route** (Kevin, 2026-10-01: the business has a
+D-U-N-S number). Enter the legal name and address exactly as Dun & Bradstreet
+holds them, because Google checks them against the D-U-N-S record and a
+mismatch is the usual cause of a stalled verification. The organization name
+is also the developer name the Play listing shows.
 
 ## 2. The app record
 
@@ -156,7 +160,8 @@ otherwise "my app doesn't provide any financial features".
 
 ## 7. Closed testing, then production
 
-For a personal account (see step 1): Testing, Closed testing, create a track,
+**Not needed for Log**, which has an organization account (see step 1). For a
+personal account: Testing, Closed testing, create a track,
 add at least 12 testers by email or Google Group, and give them the opt-in
 link. All 12 have to stay opted in for 14 days in a row. Internal testing does
 not count toward this. When the 14 days are up, the Dashboard offers "Apply for

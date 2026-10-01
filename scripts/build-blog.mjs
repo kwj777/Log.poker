@@ -790,6 +790,30 @@ const agree = (xml, page) => {
   }
 };
 
+/**
+ * The front door's "Latest from the blog" cards, filled in from the posts.
+ *
+ * `public/home.html` holds one card between two markers, pointing at /blog, so
+ * the page reads fine on its own. When this build runs over a real export,
+ * where home.html has just become index.html, the markers get the newest
+ * three posts instead. A scheduled post therefore reaches the front page on
+ * the deploy that publishes it, with nothing else to edit. Run over a preview
+ * directory with no index.html, it has nothing to fill and does nothing.
+ */
+const LATEST = /<!-- latest-posts:[^>]*-->[\s\S]*?<!-- \/latest-posts -->/;
+const latestOnHome = (posts) => {
+  const home = join(OUT, 'index.html');
+  if (!existsSync(home) || !posts.length) return;
+  const page = readFileSync(home, 'utf8');
+  if (!LATEST.test(page)) throw new Error('index.html has lost its latest-posts markers');
+  const cards = posts.slice(0, 3).map((post) => `<a class="app l" href="/blog/${post.slug}">
+            <span class="verb">${longDate(post.date)}</span>
+            <span class="name">${escapeHtml(post.title)}</span>
+            <span class="what">${escapeHtml(post.description)}</span>
+          </a>`).join('\n          ');
+  writeFileSync(home, page.replace(LATEST, () => cards));
+};
+
 const write = (relative, contents) => {
   const target = join(OUT, relative);
   mkdirSync(dirname(target), { recursive: true });
@@ -808,6 +832,7 @@ const xml = sitemap(posts);
 const page = sitemapPage(posts);
 agree(xml, page);
 write('sitemap.xml', xml);
+latestOnHome(posts);
 write(join('sitemap', 'index.html'), page);
 
 console.log(

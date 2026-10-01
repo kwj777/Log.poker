@@ -158,6 +158,26 @@ describe('what a post becomes', () => {
   });
 });
 
+describe('the front door', () => {
+  it('lists the three newest posts once the export has made home.html the index', () => {
+    // build-web renames home.html to index.html and then runs this build over
+    // dist, so that is the shape reproduced here rather than a fixture of it.
+    const out = temporary();
+    writeFileSync(join(out, 'index.html'), read('public', 'home.html'));
+    execFileSync('node', [SCRIPT, out], { encoding: 'utf8' });
+    const home = readFileSync(join(out, 'index.html'), 'utf8');
+    for (const slug of published.slice(0, 3)) expect(home).toContain(`<a class="app l" href="/blog/${slug}">`);
+    if (published[3]) expect(home).not.toContain(`href="/blog/${published[3]}"`);
+    expect(home).not.toContain('latest-posts');
+  });
+
+  it('reads on its own before the build has filled it in', () => {
+    const home = read('public', 'home.html');
+    expect(home).toContain('<section id="blog">');
+    expect(home).toMatch(/<!-- latest-posts:[^>]*-->[\s\S]*href="\/blog"[\s\S]*<!-- \/latest-posts -->/);
+  });
+});
+
 describe('the share card', () => {
   /** Width and height out of a PNG's header, which also proves it is one. */
   const pngSize = (...parts: string[]) => {

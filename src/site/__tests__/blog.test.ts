@@ -146,6 +146,15 @@ describe('what a post becomes', () => {
       expect(button + handoff).toBe(1);
     }
   });
+  it('offers every post to share, by link, with nothing fetched until a tap', () => {
+    for (const slug of published) {
+      const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
+      const url = encodeURIComponent(`https://log.poker/blog/${slug}`);
+      expect(page).toContain('<section class="share"');
+      expect(page).toContain(`https://www.facebook.com/sharer/sharer.php?u=${url}`);
+      expect(page).toContain(`mailto:?subject=`);
+    }
+  });
 });
 
 describe('the share card', () => {

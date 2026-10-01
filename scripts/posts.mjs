@@ -152,3 +152,6 @@ export const readPosts = (dir, render) => {
 
 /** The figure a post inlines, which is also the hand its share card opens on. */
 export const figureOf = (post) => /^:::\s*figure\s+(\S+)\s*$/m.exec(post.markdown)?.[1] ?? null;
+
+/** The first stat a post sets, which is what a card with no hand opens on instead. */
+export const statOf = (post) => /^:::\s*stat\s+(.+?)\s*$/m.exec(post.markdown)?.[1] ?? null;

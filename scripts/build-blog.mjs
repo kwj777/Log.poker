@@ -331,6 +331,14 @@ const STYLE = `      :root {
       .cta .sub { font-family: var(--serif); color: var(--muted); font-size: 1.02rem; margin: 0; }
       a { color: var(--gold); text-underline-offset: 2px; }
       :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      .share { display: flex; flex-direction: column; gap: .5rem; }
+      .share .verb { font-size: .67rem; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+      .share p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1.1rem; font-size: .93rem; }
+      .share .native {
+        font: inherit; color: var(--gold); background: none;
+        border: 1px solid var(--gold); border-radius: 3px; padding: .3rem .9rem; cursor: pointer;
+      }
+      .share .native[hidden] { display: none; }
       footer {
         border-top: 1px solid var(--rim); padding-top: 1.5rem;
         color: var(--dim); font-size: .8rem; line-height: 1.55;
@@ -426,6 +434,45 @@ const handoff = (post) => {
           <p>${escapeHtml(next.what)}</p>
           <p><a href="${next.href}">${next.href.replace('https://', '')}</a></p>
         </div>
+      </section>`;
+};
+
+/**
+ * A row of share links under every post. Plain links, so they work with no
+ * script at all and fetch nothing until somebody taps one; the four targets
+ * are the ones that take a URL and a line of text in the query string. On a
+ * phone with a share sheet, one more button appears that opens it, which is
+ * how most posts actually get passed on: to a group chat, not to a timeline.
+ * It is the only script on the page and it is inline, so the promise above
+ * that nothing is fetched to render still holds.
+ */
+const shareRow = (post) => {
+  const url = encodeURIComponent(post.url);
+  const title = encodeURIComponent(post.title);
+  const links = [
+    ['X', `https://x.com/intent/post?text=${title}&url=${url}`],
+    ['Facebook', `https://www.facebook.com/sharer/sharer.php?u=${url}`],
+    ['Reddit', `https://www.reddit.com/submit?url=${url}&title=${title}`],
+    ['Email', `mailto:?subject=${title}&body=${url}`],
+  ];
+  return `      <section class="share" aria-label="Share this post">
+        <span class="verb">Share this post</span>
+        <p>
+          <button type="button" class="native" hidden>Share</button>
+          ${links.map(([name, href]) => `<a href="${escapeHtml(href)}"${name === 'Email' ? '' : ' target="_blank" rel="noopener"'}>${name}</a>`).join('\n          ')}
+        </p>
+        <script>
+          (() => {
+            const button = document.querySelector('.share .native');
+            if (!navigator.share) return;
+            button.hidden = false;
+            button.addEventListener('click', () => {
+              const title = document.querySelector('h1').textContent;
+              const url = document.querySelector('link[rel=canonical]').href;
+              navigator.share({ title, url }).catch(() => {});
+            });
+          })();
+        </script>
       </section>`;
 };
 
@@ -541,6 +588,8 @@ ${head({
         ${post.body}
         </div>
       </article>
+
+${shareRow(post)}
 
 ${handoff(post)}
 

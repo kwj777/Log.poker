@@ -44,7 +44,11 @@ The money is not lost by standing up. It was lost in the hands. Standing up is t
 
 I count in buy-ins, not dollars, because it scales with the game and because it matches the physical moment: reaching for more money.
 
-For the example player, losing two full buy-ins over a six hour session happens about one session in 33. Losing three happens about one session in 280. A genuine winner hits those numbers sometimes, so reaching the stop is not proof that I played badly. But it is rare enough that when it happens, something besides ordinary bad luck is worth suspecting, and the decision about what to do next should be made by somebody calm.
+::: stat 1 in 33
+How often the example player finishes a six hour session two full buy-ins down. Three buy-ins down is about one session in 280.
+:::
+
+A genuine winner hits those numbers sometimes, so reaching the stop is not proof that I played badly. But it is rare enough that when it happens, something besides ordinary bad luck is worth suspecting, and the decision about what to do next should be made by somebody calm.
 
 Two buy-ins or three is a personal choice, and it should fit your bankroll. If a single day can take a big bite out of your roll, the [bankroll guide](/bankroll) is the better place to start than this post.
 

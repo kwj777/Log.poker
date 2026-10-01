@@ -344,7 +344,9 @@ npm run build:og            # public/og/<slug>.png, and og/blog.png for the inde
 
 The card opens on the hand the post is about: the cards its figure marks as
 played, the two that were mine and then what the board gave, drawn by the same
-code as the diagram in the post. A post with no figure gets its title alone.
+code as the diagram in the post, with the post's first `::: stat` in gold
+beside it. A post with no figure opens on that stat alone, under the title, and
+a post with neither gets its title alone.
 
 Run it after adding a post and commit the PNG. It needs `@resvg/resvg-js`,
 which is a dev dependency and deliberately nothing the deploy touches.
@@ -1103,7 +1105,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2433 passed
+Tests:       2434 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1121,7 +1123,7 @@ Tests:       2433 passed
   endpoint               49   the sync endpoint, end to end
   values                 47   money, dates, durations, stakes, formats, counts
   variance               46   win rate, σ, confidence bands, verdicts
-  blog                   41   the post grammar, the share cards, and what it refuses
+  blog                   42   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand

@@ -374,6 +374,11 @@ const OUTPUTS = [
   ['public/icons/icon-512.png', { size: 512, inset: 0.68, cornerRadius: 0.22, lit: LOG, palette: ON_TILE }],
   ['public/icons/icon-maskable-512.png', { size: 512, inset: 0.56, cornerRadius: 0, lit: LOG, palette: ON_TILE }],
   ['public/icons/apple-touch-icon.png', { size: 180, inset: 0.68, cornerRadius: 0, lit: LOG, palette: ON_TILE }],
+
+  // The Play Store listing icon. Play wants exactly 512 square and rounds the
+  // corners itself, so this is the app icon at listing size. Uploaded by hand
+  // in Play Console, never bundled; see PLAY.md.
+  ['design/play-icon-512.png', { size: 512, inset: 0.66, cornerRadius: 0, lit: LOG, palette: ON_TILE }],
 ];
 
 for (const [path, options] of OUTPUTS) {

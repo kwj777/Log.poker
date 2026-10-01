@@ -329,6 +329,13 @@ mistake of the author's to drill and no tilt to walk back from, and the honest
 answer for those is Log. The copy in each block is the guides' copy word for
 word, which is also how it goes on saying how much of each app is free.
 
+### Share links
+
+Under every post, above its call to action, is a row of plain share links
+(X, Facebook, Reddit and email) that work with no script. On a phone that
+has a share sheet, one more button appears that opens it, from a few lines of
+inline script: nothing is fetched until somebody taps something.
+
 ### Share cards
 
 ```bash

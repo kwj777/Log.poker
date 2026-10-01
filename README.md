@@ -334,7 +334,8 @@ word, which is also how it goes on saying how much of each app is free.
 Under every post, above its call to action, is a row of plain share links
 (X, Facebook, Reddit and email) that work with no script. On a phone that
 has a share sheet, one more button appears that opens it, from a few lines of
-inline script: nothing is fetched until somebody taps something.
+inline script: nothing is fetched until somebody taps something. Under the row, a line
+points at the RSS feed, so following the blog is one tap from every post.
 
 ### Share cards
 

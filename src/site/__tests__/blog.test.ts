@@ -153,6 +153,7 @@ describe('what a post becomes', () => {
       expect(page).toContain('<section class="share"');
       expect(page).toContain(`https://www.facebook.com/sharer/sharer.php?u=${url}`);
       expect(page).toContain(`mailto:?subject=`);
+      expect(page).toContain('<a href="/blog/feed.xml">Follow the blog by RSS</a>');
     }
   });
 });

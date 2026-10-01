@@ -339,6 +339,7 @@ const STYLE = `      :root {
         border: 1px solid var(--gold); border-radius: 3px; padding: .3rem .9rem; cursor: pointer;
       }
       .share .native[hidden] { display: none; }
+      .share .follow { color: var(--dim); font-size: .85rem; margin-top: .3rem; }
       footer {
         border-top: 1px solid var(--rim); padding-top: 1.5rem;
         color: var(--dim); font-size: .8rem; line-height: 1.55;
@@ -473,6 +474,7 @@ const shareRow = (post) => {
             });
           })();
         </script>
+        <p class="follow">New posts most weeks. <a href="/blog/feed.xml">Follow the blog by RSS</a>.</p>
       </section>`;
 };
 

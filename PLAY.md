@@ -16,6 +16,7 @@ both stores this file points there rather than repeating it.
 | Version code | `android.versionCode` in `app.json` |
 | Adaptive icon | `assets/android-icon-foreground.png` on the cream tile `#e8e4da`, with a monochrome layer for themed icons |
 | Play listing icon, 512 square | `design/play-icon-512.png` (drawn by `scripts/generate-icons.mjs`) |
+| Feature graphic, 1024 by 500 | `design/play-feature-graphic.png` (drawn by `npm run build:play`) |
 | Permissions | Internet and vibrate only. Storage and "draw over other apps" are blocked in `app.json`. |
 | Store build | `production` profile in `eas.json` builds an Android App Bundle |
 | Build to install by hand | `preview` profile builds an APK |
@@ -153,7 +154,7 @@ otherwise "my app doesn't provide any financial features".
 | Short description | 80 characters. The promotional text in `SUBMISSION.md` trimmed to fit. |
 | Full description | The App Store description works as written. |
 | App icon | `design/play-icon-512.png` |
-| Feature graphic | 1024 by 500. Required, and not made yet. |
+| Feature graphic | `design/play-feature-graphic.png` |
 | Phone screenshots | At least 2, taken from the Android build in step 3 |
 | Contact email | `support@log.poker` |
 | Website | `https://log.poker` |

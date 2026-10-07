@@ -46,6 +46,13 @@
           "resizeMode": "contain",
           "backgroundColor": "#1c211f"
         }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "style": "light",
+          "enforceContrast": false
+        }
       ]
     ],
     "experiments": {

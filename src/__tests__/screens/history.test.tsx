@@ -81,6 +81,18 @@ describe('the session list', () => {
     expect(screen.getByText('Nothing logged yet')).toBeTruthy();
   });
 
+  it('shows no search, filters or totals before anything is logged', async () => {
+    // Found on a phone: with nothing logged they were all controls for a list
+    // that did not exist, and between them they pushed "Import from a
+    // spreadsheet" under the tab bar on a 780pt Android screen.
+    await renderScreen(<HistoryScreen />);
+    expect(screen.queryByLabelText('Search sessions')).toBeNull();
+    expect(screen.queryByText('All time')).toBeNull();
+    expect(screen.queryByText('Profit')).toBeNull();
+    expect(screen.queryByText('0 sessions')).toBeNull();
+    expect(screen.getByText('Import from a spreadsheet')).toBeTruthy();
+  });
+
   it('and says something different when the filters are what emptied it', async () => {
     // The distinction is the whole point of the two messages: "go play some
     // poker" is wrong advice for somebody with a year of sessions behind a
@@ -91,6 +103,9 @@ describe('the session list', () => {
     await userEvent.press(screen.getByText('PLO'));
     expect(screen.getByText('No sessions match')).toBeTruthy();
     expect(screen.queryByText('Nothing logged yet')).toBeNull();
+    // And the controls stay, since they are the way back out.
+    expect(screen.getByLabelText('Search sessions')).toBeTruthy();
+    expect(screen.getByText('Clear filters')).toBeTruthy();
   });
 
   it('narrows to the game that was picked', async () => {
@@ -284,6 +299,8 @@ describe('what the period chips filter by', () => {
   const ago = (days: number) => session(`s${days}`, { startedAt: Date.now() - days * DAY });
 
   it('names the window rather than a calendar', async () => {
+    // With a session, because an empty log draws no filters at all.
+    load({ sessions: [ago(10)] });
     await renderScreen(<HistoryScreen />);
     expect(screen.getByText('365 days')).toBeTruthy();
     expect(screen.queryByText('This year')).toBeNull();

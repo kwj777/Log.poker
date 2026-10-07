@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { NavigationBar } from 'expo-navigation-bar';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -133,6 +134,16 @@ export default function RootLayout() {
       */}
       <PageMeta title="Log: the session log that keeps you off tilt" description={APP_DESCRIPTION} />
       <StatusBar style="light" />
+      {/*
+        Light buttons on Android's three-button bar, said again at runtime.
+        The `expo-navigation-bar` plugin in app.json puts it in the theme, which
+        is enough on Android 10 and later. Below that, React Native's
+        edge-to-edge setup picks the buttons' shade itself after the theme is
+        applied and before the app's dark mode has taken hold, so on Android 8
+        and 9 it chose dark buttons, and with the scrim switched off they sat
+        on the dark app close to invisible. A no-op on iOS and the web.
+      */}
+      <NavigationBar style="light" />
       <StaleDataNote />
       {status === 'ready' ? (
         <Stack

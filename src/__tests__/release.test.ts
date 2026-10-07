@@ -110,6 +110,23 @@ describe('the Android build, which Google Play reads before anyone does', () => 
     );
   });
 
+  it('draws the navigation bar dark, under light buttons, with no scrim', () => {
+    // Found on the first Android phone: three-button navigation sat on a pale
+    // gray band under a dark app. React Native's edge-to-edge setup gives the
+    // bar a scrim and picks its shade from whether the window starts in night
+    // mode, which on that phone it did not, so the bottom of every screen got
+    // a white wash. With the scrim off, the tab bar's surface shows through
+    // behind the buttons, and `style: light` keeps them readable on it from
+    // Android 10 up. Android 8 and 9 need the same thing said at runtime,
+    // which the root layout does; see `app/_layout.tsx`.
+    const plugin = app.plugins.find(
+      (entry) => Array.isArray(entry) && entry[0] === 'expo-navigation-bar',
+    ) as [string, Record<string, unknown>] | undefined;
+    expect(plugin?.[1]).toEqual({ style: 'light', enforceContrast: false });
+    expect(pkg.dependencies['expo-navigation-bar']).toBeDefined();
+    expect(read('app', '_layout.tsx')).toContain('<NavigationBar style="light" />');
+  });
+
   it('and carries no edge to edge switch, which Android 16 took away', () => {
     // SDK 57's prebuild warns that the key is no longer read: edge to edge is
     // mandatory now. Left in, it reads as a choice somebody could turn off.

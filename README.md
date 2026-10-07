@@ -1116,7 +1116,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2440 passed
+Tests:       2442 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1136,8 +1136,8 @@ Tests:       2440 passed
   variance               46   win rate, σ, confidence bands, verdicts
   blog                   44   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
+  release                36   app.json, eas.json and the icon a store refuses over
   mood                   35   what tilt costs, and when to say nothing
-  release                35   app.json, eas.json and the icon a store refuses over
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins
   palette                32   the theme matches BRAND.md
@@ -1148,10 +1148,10 @@ Tests:       2440 passed
   editSession            28   correcting a session, including the one nobody cashed out
   sessionExport          28   the log written out, and read back by the importer
   money                  27   cents arithmetic, parsing, formatting
+  history                24   the session list, its filters, and how much of it mounts
   writeFailures          24   what the player sees when a write does not work
   chip                   23   /chip resolves, offline, and never quotes a price
   compose                23   which repository a device gets, and the unsafe sweep
-  history                23   the session list, its filters, and how much of it mounts
   glossary               22   the shorthand on screen still matches its explanation
   useLogStore            21   what a write reads back, and what it leaves alone
   clock                  20   a typed date, a typed length, and what neither will accept

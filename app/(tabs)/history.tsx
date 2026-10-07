@@ -193,72 +193,84 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      <View style={styles.search}>
-        <SearchField
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search rooms and notes"
-          accessibilityLabel="Search sessions"
-        />
-      </View>
-
-      <View style={styles.filters}>
-        <ChipGroup options={PERIOD_OPTIONS} value={period} onChange={setPeriod} scroll />
-        <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} scroll />
-        {mixedFormats ? (
-          <ChipGroup options={FORMAT_OPTIONS} value={format} onChange={setFormat} scroll />
-        ) : null}
-        {venues.length > 1 ? (
-          <ChipGroup options={venueOptions} value={venueId} onChange={setVenueId} scroll />
-        ) : null}
-        {currencies.length > 1 ? (
-          <ChipGroup
-            options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
-            value={currency}
-            onChange={setPicked}
-            scroll
-          />
-        ) : null}
-      </View>
-
-      <View style={styles.tiles}>
-        <StatTile
-          label="Profit"
-          value={formatMoney(summary.net, { currency, signed: true })}
-          valueColor={resultColor(summary.net)}
-        />
-        <StatTile
-          label="Hourly"
-          value={
-            summary.hourly === null
-              ? '--'
-              : formatMoney(summary.hourly, { currency, signed: true })
-          }
-          valueColor={resultColor(summary.hourly)}
-        />
-        <StatTile label="Hours" value={String(Math.round(summary.hours))} />
-      </View>
-
-      <SectionHeader
-        title={`${filtered.length} session${filtered.length === 1 ? '' : 's'}`}
-        action={
-          filtersActive ? (
-            <Button
-              label="Clear filters"
-              variant="ghost"
-              size="small"
-              onPress={() => {
-                setPeriod('all');
-                setGameType(null);
-                setFormat(null);
-                setVenueId(null);
-                setQuery('');
-              }}
+      {/*
+        Nothing to search, filter or total until something is logged. A search
+        box, two rows of filters, three empty totals and "0 sessions" stood
+        between the title and the empty state, and pushed the last of its three
+        ways in under the tab bar on an Android phone with 780pt between the
+        status bar and the tab bar: the first thing a new player saw was
+        controls for a list they did not have. With sessions but none matching,
+        they all stay, because the filters are what emptied it.
+      */}
+      {all.length > 0 ? (
+        <>
+          <View style={styles.search}>
+            <SearchField
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search rooms and notes"
+              accessibilityLabel="Search sessions"
             />
-          ) : undefined
-        }
-      />
+          </View>
 
+          <View style={styles.filters}>
+            <ChipGroup options={PERIOD_OPTIONS} value={period} onChange={setPeriod} scroll />
+            <ChipGroup options={GAME_OPTIONS} value={gameType} onChange={setGameType} scroll />
+            {mixedFormats ? (
+              <ChipGroup options={FORMAT_OPTIONS} value={format} onChange={setFormat} scroll />
+            ) : null}
+            {venues.length > 1 ? (
+              <ChipGroup options={venueOptions} value={venueId} onChange={setVenueId} scroll />
+            ) : null}
+            {currencies.length > 1 ? (
+              <ChipGroup
+                options={currencies.map((code) => ({ value: code, label: currencyLabel(code) }))}
+                value={currency}
+                onChange={setPicked}
+                scroll
+              />
+            ) : null}
+          </View>
+
+          <View style={styles.tiles}>
+            <StatTile
+              label="Profit"
+              value={formatMoney(summary.net, { currency, signed: true })}
+              valueColor={resultColor(summary.net)}
+            />
+            <StatTile
+              label="Hourly"
+              value={
+                summary.hourly === null
+                  ? '--'
+                  : formatMoney(summary.hourly, { currency, signed: true })
+              }
+              valueColor={resultColor(summary.hourly)}
+            />
+            <StatTile label="Hours" value={String(Math.round(summary.hours))} />
+          </View>
+
+          <SectionHeader
+            title={`${filtered.length} session${filtered.length === 1 ? '' : 's'}`}
+            action={
+              filtersActive ? (
+                <Button
+                  label="Clear filters"
+                  variant="ghost"
+                  size="small"
+                  onPress={() => {
+                    setPeriod('all');
+                    setGameType(null);
+                    setFormat(null);
+                    setVenueId(null);
+                    setQuery('');
+                  }}
+                />
+              ) : undefined
+            }
+          />
+        </>
+      ) : null}
     </>
   );
 

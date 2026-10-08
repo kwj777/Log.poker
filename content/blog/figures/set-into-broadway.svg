@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 448" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 515" role="img"
   aria-labelledby="set-into-broadway-title set-into-broadway-desc">
   <title id="set-into-broadway-title">My set of queens against his flopped Broadway</title>
-  <desc id="set-into-broadway-desc">My hand: two queens. His hand: an ace and a king. I do not have the suits of either, so they are drawn dashed. The flop came a queen, a jack and a ten, which gave me top set and gave him the nut straight, ace to ten. The turn and the river are drawn face down. From the flop I needed the board to pair to make a full house, which happens about 34 percent of the time.</desc>
+  <desc id="set-into-broadway-desc">My hand: two queens. His hand: an ace and a king. I do not have the suits of either, so they are drawn dashed. The flop came a queen, a jack and a ten, which gave me top set and gave him the nut straight, ace to ten. The turn and the river are drawn face down, because I do not remember them, only that neither paired the board. From the flop I needed the board to pair to make a full house, which happens about 34 percent of the time. He bet $200, I called, and his straight held.</desc>
 
   <text x="121.8" y="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
     text-anchor="middle" fill="#828e89">MY HAND</text>
@@ -100,5 +100,8 @@
       <path d="M78 125 L100 96 L122 125" stroke="#55665e" stroke-width="6" />
     </g>
   </g>
-  <text x="210" y="440" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>Needed the board to pair</text>
+  <text x="210" y="440" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#b7c0ba"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">ME </tspan>The board never paired</text>
+  <text x="210" y="462" text-anchor="middle" font-family="Georgia,'Times New Roman','Liberation Serif','Nimbus Roman',serif" font-size="14" fill="#c9a86a"><tspan font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="10" letter-spacing="1.8" fill="#828e89">HIM </tspan>The straight held</text>
+  <text x="210" y="507" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif" font-size="11" letter-spacing="2.2"
+    text-anchor="middle" fill="#828e89">HE BET $200. I CALLED.</text>
 </svg>

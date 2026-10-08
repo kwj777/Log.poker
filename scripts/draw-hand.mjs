@@ -404,8 +404,9 @@ export const FIGURES = {
     desc: `My hand: two queens. His hand: an ace and a king. I do not have the suits of
     either, so they are drawn dashed. The flop came a queen, a jack and a ten, which gave
     me top set and gave him the nut straight, ace to ten. The turn and the river are
-    drawn face down. From the flop I needed the board to pair to make a full house,
-    which happens about 34 percent of the time.`,
+    drawn face down, because I do not remember them, only that neither paired the board.
+    From the flop I needed the board to pair to make a full house, which happens about
+    34 percent of the time. He bet $200, I called, and his straight held.`,
     rows: [
       {
         type: 'hands',
@@ -422,8 +423,9 @@ export const FIGURES = {
       {
         label: 'THE TURN AND THE RIVER',
         cards: ['??', '??'],
-        outcomes: [['ME', 'Needed the board to pair', 'muted']],
+        outcomes: [['ME', 'The board never paired', 'muted'], ['HIM', 'The straight held', 'gold']],
       },
+      { type: 'note', text: 'HE BET $200. I CALLED.' },
     ],
   },
 };

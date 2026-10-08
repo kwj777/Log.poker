@@ -1,16 +1,18 @@
 ---
 title: I flopped a set of queens. He flopped Broadway.
-description: Queens against ace king on a queen, jack, ten flop. I asked how rare that is, checked the math, and found the more useful number was the one about what happens next.
+description: Queens against ace king on a queen, jack, ten flop. He bet $200, I called, and the board never paired. I checked how rare that is, and the more useful number was the one about what happens next.
 next: untilt
 draft: true
 ---
 
 I looked down at two queens. One player had ace king. The flop came queen, jack, ten.
 
-I had top set. He had the nut straight. If you play, you already know there was no folding this one for either of us. If you do not, this is what a cooler looks like: two very good hands, one slightly better, and all the chips going in the middle.
+I had top set. He had the nut straight. He bet $200, I was last to act, and I called. The board never paired, and his straight held.
+
+If you play, you already know there was no folding this one for either of us. If you do not, this is what a cooler looks like: two very good hands, one slightly better, and the chips going the wrong way.
 
 ::: figure set-into-broadway
-I have the ranks but not the suits, so those are dashed. The turn and river are face down, because the post is about the flop.
+I have the ranks but not the suits, so those are dashed. I do not remember the turn and river, only that neither one paired the board.
 :::
 
 Afterward I wanted to know how rare it was. So I asked, and then I checked the answer card by card.
@@ -63,8 +65,8 @@ That is about 34 percent. Roughly one time in three, the hand that looked like a
 
 ## What I am taking from it
 
-A cooler does not need a lesson, and I do not think this one has one about how I played it. Nobody is folding a set or the nuts on that flop, and nobody should.
+A cooler does not need a lesson, and I do not think this one has one about how I played it. Nobody is folding a set or the nuts on that flop, and nobody should. I called the $200, I was a little better than one in three to win, and I lost. That is a cooler, not a mistake.
 
-What it does have is a reminder about which number to listen to. The 1 in 9 million is a good story. The 34 percent is the truth about the hand. One of them makes you feel unlucky, and the other tells you that you were still very much in it, and that losing it is the ordinary result two times out of three.
+What it does have is a reminder about which number to listen to. The 1 in 9 million is a good story. The 34 percent is the truth about the hand. One of them makes you feel unlucky. The other tells you that you were still very much in it, and that losing it, the way I did, is the ordinary result two times out of three.
 
 [Log is free, all of it, and works offline with no account](/app). When the next cooler comes, write it down with the cards. Months from now you will want to know how often it really happens, and the honest answer is in your own sessions, not in the number that felt biggest at the table.

@@ -107,6 +107,9 @@ iOS never exercised:
 
 ## 4. The first store build, on internal testing
 
+**Done** (Kevin, 2026-10-08): version code 2 on internal testing, installed
+from Play on his Moto G Play.
+
 ```
 npx eas build --platform android --profile production
 ```
@@ -150,6 +153,8 @@ arrives the way a player's will.
 
 ## 5. App content
 
+**Done** (Kevin, 2026-10-08), with the answers below.
+
 Monitor and improve, Policy and programs, App content (older help pages say
 Policy, App content; it is the same page). Every answer below is what the code
 does; the reasoning is the same as the App Privacy section of `SUBMISSION.md`.
@@ -178,10 +183,10 @@ for. If review comes back asking for them, the fix is a reviewer bypass in
 code, which is a decision to make then rather than now.
 
 **Content rating** (the IARC questionnaire). The first screen asks for an email
-address IARC will write to; use `support@log.poker`. Pick the category that
-fits a utility or reference app, then answer each question as written. The
-App Store's answers carry over for the same reason (see Age rating in
-`SUBMISSION.md`):
+address IARC will write to; use `support@log.poker`. The category is **All
+Other App Types** (the other two are Game, and Social or Communication); then
+answer each question as written. The App Store's answers carry over for the
+same reason (see Age rating in `SUBMISSION.md`):
 
 | Question | Answer |
 | --- | --- |
@@ -193,6 +198,11 @@ App Store's answers carry over for the same reason (see Age rating in
 | Digital purchases | No |
 
 To change an answer later, Content rating, Start new questionnaire.
+
+**Advertising ID:** No. Log has no ads or analytics, and no library in it
+requests `com.google.android.gms.permission.AD_ID`; adding one that does means
+changing this answer. Play blocks any rollout targeting Android 13 or later
+until it is answered, so it can also turn up from Publishing overview.
 
 **Target audience:** 18 and over only, and tick Restrict Minor Access, which
 keeps the app from users Google identifies as under 18. It is optional for Log,
@@ -234,6 +244,8 @@ category, so Log is not.
 
 ## 6. The store listing
 
+**Done** (Kevin, 2026-10-08).
+
 Two pages, both under Grow users, Store presence, and both need saving.
 
 **Main store listing:**
@@ -260,8 +272,28 @@ run it on the emulator rather than a phone with a real log, and sign out
 first. Take the same five screens as on iOS. Play refuses any screenshot whose
 long side is more than twice its short side, and every current phone is
 taller than that (1080 by 2400 is 2.22 to 1), so each one has to be cropped or
-padded to fit before upload, as RGB with no alpha channel. Give each one alt
-text that does not start with "image of".
+padded to fit before upload, as RGB with no alpha channel. Padding by
+repeating the edge pixels leaves no visible border, because every screen's
+edges are flat bands of the background and tab bar (ImageMagick 7):
+
+```
+magick shot.png -alpha off -set option:distort:viewport 1200x2400-60+0 \
+  -virtual-pixel edge -filter point -distort SRT 0 +repage \
+  -define png:color-type=2 shot-play.png
+```
+
+The 1080 pixels in the middle come out unchanged. Give each one alt text that
+does not start with "image of".
+
+**AI asset declaration**, on the listing's Review step: **Don't label assets**.
+Google asks for a label on images and video "you deem to be in scope for the
+regulations" (Play Console Help, Declaring AI-generated content). The icon and
+feature graphic are drawn by scripts in this repository and no generative
+model made their pixels, the screenshots are real captures, and listing copy
+is outside the EU AI Act's rule on AI text. A label would put an AI mark on
+them for players in the EU and India. Any asset that ever passes through an
+image generator, AI upscaling or Play Console's own Gemini tools needs
+reassessing.
 
 **Store settings:**
 
@@ -277,6 +309,9 @@ Saving publishes nothing. Listing and settings changes wait on Publishing
 overview until Send for review.
 
 ## 7. Production
+
+**Sent for review** (Kevin, 2026-10-08): version code 2, all countries and
+regions.
 
 An organization account goes from internal testing straight to production.
 If the Dashboard ever asks for a closed test or offers Apply for production,

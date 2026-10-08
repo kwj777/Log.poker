@@ -321,7 +321,7 @@ edit to it rather than a first entry.
 
 | Field | Value | Limit |
 | --- | --- | --- |
-| Name | `Log: Poker Bankroll Tracker` | 30, this is 27 |
+| Name | `Log: Poker Session Tracker` | 30, this is 26 |
 | Subtitle | `Running bad, or playing bad?` | 30, this is 28 |
 
 **The app is called Log and that is unsearchable.** The name on the home screen
@@ -332,7 +332,7 @@ anybody typing "poker tracker". The name above keeps the brand and buys the
 three words that matter.
 
 The subtitle is indexed too, so spending it on a slogan is a real trade. It is
-worth making here: the name already carries poker, bankroll and tracker, the
+worth making here: the name already carries poker, session and tracker, the
 keyword field below carries the rest, and every competitor's subtitle on a
 search results page says some arrangement of the same three words. The line
 above is the question the app exists to answer and it is the app's own copy,
@@ -381,9 +381,15 @@ session,variance,winrate,downswing,tournament,hourly,journal,cash,game,live,stak
 93 of the 100 characters. Three rules are load bearing and easy to get wrong:
 the field is comma separated with **no space after the comma**, because a space
 costs a character; Apple indexes the name and the keyword field together, so
-repeating `poker`, `bankroll`, `tracker` or `log` here would spend characters on
+repeating `poker`, `session`, `tracker` or `log` here would spend characters on
 words already covered; and singulars match plurals, so nothing on that list
 needs an `s`.
+
+The list above was written for a name that said bankroll rather than session,
+and Log tracks sessions rather than a bankroll (Kevin, 2026-10-08), so the name
+is the one in the table. That leaves `session` repeating it: its eight
+characters, comma included, can go to another word in a later metadata edit,
+which needs no build.
 
 `downswing` is on it deliberately. It is what a player types into a search box
 on the night they most want this app, and no competitor's listing is written

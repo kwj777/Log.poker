@@ -55,8 +55,9 @@ Play Console, Create app:
 
 | Field | Value |
 | --- | --- |
-| App name | `Log: Poker Bankroll Tracker` (30 character limit, same as iOS) |
+| App name | `Log: Poker Session Tracker`, the same name as the App Store (26 of Play's 30 characters). Log tracks sessions, not a bankroll, so the name says so. |
 | Default language | English (United States) |
+| Package name | `poker.log.app`, if the form asks for it. It must match `android.package` in `app.json`, and it can never change. |
 | App or game | App |
 | Free or paid | Free. This cannot be changed to paid later. |
 

@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { CODE_TTL_MS } from '../../auth/signinEndpoint';
 import { TOKEN_TTL_MS } from '../../sync/verify';
-import { PRIVACY_POLICY, SUPPORT_EMAIL } from '../../config';
+import { ALLOW_SIGN_IN, PRIVACY_POLICY, SUPPORT_EMAIL } from '../../config';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 'utf8');
@@ -178,6 +178,17 @@ describe('how the page says to delete it', () => {
 
   it('says there is nothing else left afterwards, which is why there is no second step', () => {
     expect(text).toMatch(/no account record left behind/i);
+  });
+  it('gives a way to do it from a browser, without the app', () => {
+    // Google Play wants a web page where a player who has uninstalled can
+    // still ask for deletion, naming the app as its listing does, ideally
+    // reached by an anchor. The web build renders the same Settings card, so
+    // the browser route is real as long as sign-in is on and the route exists.
+    expect(page).toContain('<section id="delete">');
+    expect(page).toContain('href="/app/settings"');
+    expect(existsSync(join(ROOT, 'app', '(tabs)', 'settings.tsx'))).toBe(true);
+    expect(ALLOW_SIGN_IN).toBe(true);
+    expect(text).toContain('Log: Poker Session Tracker');
   });
 });
 

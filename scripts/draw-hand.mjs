@@ -379,6 +379,25 @@ export const FIGURES = {
       },
     ],
   },
+
+  /** The winner I folded: a hand nobody wrote down, so every card is face down. */
+  'folded-the-winner': {
+    title: 'The winner I folded on the river',
+    desc: `Every card in this hand is drawn face down, because I never logged it: not my
+    two cards and not the board. What I do remember is when it happened, not long after
+    one of the three coolers, and how it ended. I faced a bet on the river, folded, and
+    had the best hand.`,
+    rows: [
+      { type: 'hands', groups: [{ label: 'MY HAND', cards: ['??!', '??!'] }] },
+      { type: 'note', text: 'NOT LONG AFTER A COOLER' },
+      { label: 'THE FLOP', cards: ['??', '??', '??'] },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['??', '??'],
+        outcomes: [['ME', 'Folded to a bet', 'muted'], ['HAD I CALLED', 'The winner', 'gold']],
+      },
+    ],
+  },
 };
 
 /**

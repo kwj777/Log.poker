@@ -967,13 +967,13 @@ const privacy = {
   title: 'Privacy policy for Log',
   description:
     'What Log stores, where it stores it, what leaves your device and when, who else can see it, and how to delete all of it. The short version is that almost nothing leaves.',
-  updated: '2026-09-19',
+  updated: '2026-10-08',
   type: 'WebPage',
   body: `      <header>
         <p class="eyebrow">Legal</p>
         <h1>Privacy policy for Log</h1>
         <p class="lede">
-          Last updated 19 September 2026. Log is a session log for poker
+          Last updated 8 October 2026. Log is a session log for poker
           players. This page says what it stores, what leaves your device, and
           how to delete all of it.
         </p>
@@ -1073,8 +1073,12 @@ const privacy = {
         </p>
       </section>
 
-      <section>
+      <section id="delete">
         <h2>Deleting it</h2>
+        <p>
+          This covers Log: Poker Session Tracker, from the App Store, from
+          Google Play, and at log.poker/app.
+        </p>
         <p>
           <strong>On your device.</strong> Settings has a control that clears
           every session, hand, mood entry and venue. Deleting the app does the
@@ -1087,10 +1091,30 @@ const privacy = {
           no device will put it back.
         </p>
         <p>
+          <strong>Without the app.</strong> If Log is no longer on your phone,
+          the same control works from any browser:
+        </p>
+        <ol>
+          <li>Open <a href="/app/settings">log.poker/app/settings</a>.</li>
+          <li>
+            Under "Your other devices", sign in with the address you used
+            before, and type the code it mails you.
+          </li>
+          <li>Choose "Delete your account and its data".</li>
+        </ol>
+        <p>
+          Signing in brings your log into that browser first, as it would onto
+          any device, so clear it afterwards with the first control above or by
+          clearing the site's data.
+        </p>
+        <p>
           There is no account record left behind, because there was never one
           to begin with: no name, no profile and no stored address, only the
           bucket that control deletes. That is the whole of what is held, so
-          deleting it is the whole of the deletion.
+          deleting it is the whole of the deletion, and nothing is kept for a
+          period afterwards. The one thing outside it is Netlify's ordinary
+          server log of requests, described above, which holds no part of
+          your log.
         </p>
       </section>
 

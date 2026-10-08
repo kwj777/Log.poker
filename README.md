@@ -1116,7 +1116,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 113 passed
-Tests:       2442 passed
+Tests:       2444 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1136,7 +1136,7 @@ Tests:       2442 passed
   variance               46   win rate, σ, confidence bands, verdicts
   blog                   44   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
-  release                36   app.json, eas.json and the icon a store refuses over
+  release                37   app.json, eas.json and the icon a store refuses over
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins
@@ -1153,9 +1153,9 @@ Tests:       2442 passed
   chip                   23   /chip resolves, offline, and never quotes a price
   compose                23   which repository a device gets, and the unsafe sweep
   glossary               22   the shorthand on screen still matches its explanation
+  privacy                21   the policy page, held to the code it describes
   useLogStore            21   what a write reads back, and what it leaves alone
   clock                  20   a typed date, a typed length, and what neither will accept
-  privacy                20   the policy page, held to the code it describes
   selectors              20   store reads and filters
   batch                  19   a backlog split into requests, without orphaning a child
   csv                    19   quoting, delimiters, line endings

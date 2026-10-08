@@ -463,6 +463,17 @@ describe('the app icon', () => {
       expect(ihdr(path).colorType).toBe(6);
     }
   });
+
+  it('and the Play feature graphic is the size and format Play Console takes', () => {
+    // 1024 by 500 exactly, and a 24-bit PNG: Play refuses one with an alpha
+    // channel, and resvg, which draws it, writes one unless told otherwise.
+    expect(ihdr('design/play-feature-graphic.png')).toEqual({
+      width: 1024,
+      height: 500,
+      colorType: 2,
+    });
+    expect(read('PLAY.md')).toContain('design/play-feature-graphic.png');
+  });
 });
 
 /**

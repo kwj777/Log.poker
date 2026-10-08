@@ -13,6 +13,7 @@
     "build:content": "node scripts/build-content.mjs",
     "chip": "node scripts/make-chip.mjs",
     "build:og": "node scripts/build-og.mjs",
+    "build:play": "node scripts/build-play-graphic.mjs",
     "test": "npm run check:prose && jest",
     "test:watch": "jest --watch",
     "test:table": "node scripts/build-test-table.mjs",

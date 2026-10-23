@@ -2,7 +2,6 @@
 title: I flopped a set of queens. He flopped Broadway.
 description: Queens against ace king on a queen, jack, ten flop. He bet $200, I called, and the board never paired. I checked how rare that is, and the more useful number was the one about what happens next.
 next: untilt
-draft: true
 ---
 
 I looked down at two queens. One player had ace king. The flop came queen, jack, ten.

@@ -19,7 +19,9 @@
  *
  * A card opens on the hand the post is about: the cards its figure marks as
  * played, which for these two posts is exactly the straight flush and the
- * flush that never arrived. A post with no figure gets the title alone.
+ * flush that never arrived, with the post's first stat in gold beside it. A
+ * post with no hand in it opens on that stat alone, under the title, so a link to an essay still unfurls
+ * as a picture with something in it. A post with neither gets the title alone.
  *
  * Fonts are the one thing here that is not fully in the repository's hands.
  * The card asks for the same stack the site does, Georgia first, and a Linux
@@ -33,7 +35,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CARD, PALETTE, SANS, SERIF, card, playedHand } from './draw-hand.mjs';
-import { TAGLINE, TITLE, figureOf, longDate, readPosts } from './posts.mjs';
+import { TAGLINE, TITLE, figureOf, longDate, readPosts, statOf } from './posts.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(process.argv[2] ?? join(ROOT, 'public', 'og'));
@@ -52,6 +54,14 @@ const HAND_SCALE = 1.25;
 const HAND_CARDS = 5;
 /** The break between the two that were mine and what the board gave. */
 const HOLE_GAP = 24;
+/** A post's first stat, for a card with no hand to draw. */
+const STAT_SIZE = 112;
+const STAT_BASELINE = 500;
+/** The stat beside a hand: right-aligned, bottom level with the cards. */
+const BESIDE_SIZE = 80;
+const BESIDE_BASELINE = 494;
+/** The widest a hand can draw: five cards and the break, at card scale. */
+const HAND_SPAN = (HAND_CARDS * (CARD.w + 10) + HOLE_GAP) * HAND_SCALE;
 
 /** Hole cards, a break, then the board, up to what fits across the card. */
 const layout = ({ hole, board }) => {
@@ -140,10 +150,10 @@ const label = (x, y, text, { size = 22, fill = PALETTE.DIM, anchor = 'start' } =
  * The card. Title bottom-anchored above the hand, so a one-line title and a
  * three-line one both sit where the eye lands rather than drifting up the page.
  */
-const shareCard = ({ title, subtitle, footer, cards }) => {
+const shareCard = ({ title, subtitle, footer, cards, stat = null }) => {
   const { size, lines } = fitTitle(title);
   const leading = Math.round(size * 1.2);
-  const lastBaseline = cards.length ? 344 : 380;
+  const lastBaseline = cards.length || stat ? 344 : 380;
   const parts = [];
 
   parts.push(`  <rect width="${W}" height="${H}" fill="${PALETTE.GROUND}" />`);
@@ -168,6 +178,22 @@ const shareCard = ({ title, subtitle, footer, cards }) => {
     parts.push(`  <g transform="translate(${PAD} 408) scale(${HAND_SCALE})">
 ${cards.map(({ spec, x }) => card(x, 0, spec)).join('\n')}
   </g>`);
+  }
+
+  if (cards.length && stat) {
+    // Beside the hand rather than under it: the right half of a hand card is
+    // empty, and the number is what the hand cost or meant.
+    const room = W - PAD - (PAD + HAND_SPAN) - 60;
+    const besideSize = Math.min(BESIDE_SIZE, Math.floor(BESIDE_SIZE * room / measure(stat, BESIDE_SIZE)));
+    parts.push(`  <text x="${W - PAD}" y="${BESIDE_BASELINE}" font-family="${SERIF}" font-size="${besideSize}"
+    text-anchor="end" fill="${PALETTE.GOLD}">${escapeXml(stat)}</text>`);
+  }
+
+  if (!cards.length && stat) {
+    const statSize = Math.min(STAT_SIZE, Math.floor(STAT_SIZE * TITLE_WIDTH / measure(stat, STAT_SIZE)));
+    parts.push(`  <rect x="${PAD}" y="${STAT_BASELINE - statSize * 0.78}" width="4" height="${statSize * 0.86}" fill="${PALETTE.GOLD}" />`);
+    parts.push(`  <text x="${PAD + 28}" y="${STAT_BASELINE}" font-family="${SERIF}" font-size="${statSize}"
+    fill="${PALETTE.GOLD}">${escapeXml(stat)}</text>`);
   }
 
   parts.push(label(PAD, H - 46, 'log.poker/blog', { size: 24, fill: PALETTE.DIM }));
@@ -197,5 +223,6 @@ for (const post of posts) {
     subtitle: null,
     footer: longDate(post.date),
     cards: layout(playedHand(figureOf(post) ?? '')),
+    stat: statOf(post),
   }));
 }

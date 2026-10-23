@@ -331,6 +331,15 @@ const STYLE = `      :root {
       .cta .sub { font-family: var(--serif); color: var(--muted); font-size: 1.02rem; margin: 0; }
       a { color: var(--gold); text-underline-offset: 2px; }
       :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+      .share { display: flex; flex-direction: column; gap: .5rem; }
+      .share .verb { font-size: .67rem; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+      .share p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1.1rem; font-size: .93rem; }
+      .share .native {
+        font: inherit; color: var(--gold); background: none;
+        border: 1px solid var(--gold); border-radius: 3px; padding: .3rem .9rem; cursor: pointer;
+      }
+      .share .native[hidden] { display: none; }
+      .share .follow { color: var(--dim); font-size: .85rem; margin-top: .3rem; }
       footer {
         border-top: 1px solid var(--rim); padding-top: 1.5rem;
         color: var(--dim); font-size: .8rem; line-height: 1.55;
@@ -426,6 +435,53 @@ const handoff = (post) => {
           <p>${escapeHtml(next.what)}</p>
           <p><a href="${next.href}">${next.href.replace('https://', '')}</a></p>
         </div>
+      </section>`;
+};
+
+/**
+ * A row of share links under every post. Plain links, so they work with no
+ * script at all and fetch nothing until somebody taps one; the four targets
+ * are the ones that take a URL and a line of text in the query string. On a
+ * phone with a share sheet, one more button appears that opens it, which is
+ * how most posts actually get passed on: to a group chat, not to a timeline.
+ * It is the only script on the page and it is inline, so the promise above
+ * that nothing is fetched to render still holds.
+ */
+/**
+ * The newsletter, on Buttondown, which mails each new post from the feed.
+ * A link rather than a form on purpose: the site's CSP allows forms to post
+ * only to itself, and a link keeps it that way.
+ */
+const NEWSLETTER = 'https://buttondown.com/logPoker';
+
+const shareRow = (post) => {
+  const url = encodeURIComponent(post.url);
+  const title = encodeURIComponent(post.title);
+  const links = [
+    ['X', `https://x.com/intent/post?text=${title}&url=${url}`],
+    ['Facebook', `https://www.facebook.com/sharer/sharer.php?u=${url}`],
+    ['Reddit', `https://www.reddit.com/submit?url=${url}&title=${title}`],
+    ['Email', `mailto:?subject=${title}&body=${url}`],
+  ];
+  return `      <section class="share" aria-label="Share this post">
+        <span class="verb">Share this post</span>
+        <p>
+          <button type="button" class="native" hidden>Share</button>
+          ${links.map(([name, href]) => `<a href="${escapeHtml(href)}"${name === 'Email' ? '' : ' target="_blank" rel="noopener"'}>${name}</a>`).join('\n          ')}
+        </p>
+        <script>
+          (() => {
+            const button = document.querySelector('.share .native');
+            if (!navigator.share) return;
+            button.hidden = false;
+            button.addEventListener('click', () => {
+              const title = document.querySelector('h1').textContent;
+              const url = document.querySelector('link[rel=canonical]').href;
+              navigator.share({ title, url }).catch(() => {});
+            });
+          })();
+        </script>
+        <p class="follow">New posts most weeks. <a href="${NEWSLETTER}">Get them by email</a>, or <a href="/blog/feed.xml">follow the blog by RSS</a>.</p>
       </section>`;
 };
 
@@ -541,6 +597,8 @@ ${head({
         ${post.body}
         </div>
       </article>
+
+${shareRow(post)}
 
 ${handoff(post)}
 
@@ -739,6 +797,30 @@ const agree = (xml, page) => {
   }
 };
 
+/**
+ * The front door's "Latest from the blog" cards, filled in from the posts.
+ *
+ * `public/home.html` holds one card between two markers, pointing at /blog, so
+ * the page reads fine on its own. When this build runs over a real export,
+ * where home.html has just become index.html, the markers get the newest
+ * three posts instead. A scheduled post therefore reaches the front page on
+ * the deploy that publishes it, with nothing else to edit. Run over a preview
+ * directory with no index.html, it has nothing to fill and does nothing.
+ */
+const LATEST = /<!-- latest-posts:[^>]*-->[\s\S]*?<!-- \/latest-posts -->/;
+const latestOnHome = (posts) => {
+  const home = join(OUT, 'index.html');
+  if (!existsSync(home) || !posts.length) return;
+  const page = readFileSync(home, 'utf8');
+  if (!LATEST.test(page)) throw new Error('index.html has lost its latest-posts markers');
+  const cards = posts.slice(0, 3).map((post) => `<a class="app l" href="/blog/${post.slug}">
+            <span class="verb">${longDate(post.date)}</span>
+            <span class="name">${escapeHtml(post.title)}</span>
+            <span class="what">${escapeHtml(post.description)}</span>
+          </a>`).join('\n          ');
+  writeFileSync(home, page.replace(LATEST, () => cards));
+};
+
 const write = (relative, contents) => {
   const target = join(OUT, relative);
   mkdirSync(dirname(target), { recursive: true });
@@ -757,6 +839,7 @@ const xml = sitemap(posts);
 const page = sitemapPage(posts);
 agree(xml, page);
 write('sitemap.xml', xml);
+latestOnHome(posts);
 write(join('sitemap', 'index.html'), page);
 
 console.log(

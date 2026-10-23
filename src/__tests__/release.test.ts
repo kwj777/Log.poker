@@ -31,7 +31,12 @@ interface AppConfig {
       supportsTablet: boolean;
       config?: { usesNonExemptEncryption?: boolean };
     };
-    android: { package: string; versionCode: number };
+    android: {
+      package: string;
+      versionCode: number;
+      blockedPermissions?: string[];
+      edgeToEdgeEnabled?: unknown;
+    };
     web: Record<string, unknown>;
     plugins: (string | [string, Record<string, unknown>])[];
     experiments: Record<string, unknown>;
@@ -85,6 +90,47 @@ describe('what the stores identify this build by', () => {
     // sign-in token. Both are the exempt kind, so the answer is settled here
     // instead of being a question asked again on every TestFlight build.
     expect(app.ios.config?.usesNonExemptEncryption).toBe(false);
+  });
+});
+
+describe('the Android build, which Google Play reads before anyone does', () => {
+  it('declines the permissions the Expo template asks for and Log never uses', () => {
+    // A bare `expo prebuild` writes storage read and write and "draw over other
+    // apps" into the manifest. Log reads a CSV through the system picker and
+    // writes one through the share sheet, neither of which needs storage, and
+    // it draws nothing outside itself. Each permission left in is a line the
+    // Play listing shows and a question the Data safety form makes somebody
+    // answer, for a capability the app does not have.
+    expect(app.android.blockedPermissions).toEqual(
+      expect.arrayContaining([
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.SYSTEM_ALERT_WINDOW',
+      ]),
+    );
+  });
+
+  it('draws the navigation bar dark, under light buttons, with no scrim', () => {
+    // Found on the first Android phone: three-button navigation sat on a pale
+    // gray band under a dark app. React Native's edge-to-edge setup gives the
+    // bar a scrim and picks its shade from whether the window starts in night
+    // mode, which on that phone it did not, so the bottom of every screen got
+    // a white wash. With the scrim off, the tab bar's surface shows through
+    // behind the buttons, and `style: light` keeps them readable on it from
+    // Android 10 up. Android 8 and 9 need the same thing said at runtime,
+    // which the root layout does; see `app/_layout.tsx`.
+    const plugin = app.plugins.find(
+      (entry) => Array.isArray(entry) && entry[0] === 'expo-navigation-bar',
+    ) as [string, Record<string, unknown>] | undefined;
+    expect(plugin?.[1]).toEqual({ style: 'light', enforceContrast: false });
+    expect(pkg.dependencies['expo-navigation-bar']).toBeDefined();
+    expect(read('app', '_layout.tsx')).toContain('<NavigationBar style="light" />');
+  });
+
+  it('and carries no edge to edge switch, which Android 16 took away', () => {
+    // SDK 57's prebuild warns that the key is no longer read: edge to edge is
+    // mandatory now. Left in, it reads as a choice somebody could turn off.
+    expect(app.android.edgeToEdgeEnabled).toBeUndefined();
   });
 });
 
@@ -258,10 +304,14 @@ describe('the build profiles', () => {
         extends?: string;
         developmentClient?: boolean;
         ios?: { simulator?: boolean; image?: string };
+        android?: { buildType?: string };
         env?: Record<string, string>;
       }
     >;
-    submit: Record<string, { ios?: { ascAppId?: string } }>;
+    submit: Record<
+      string,
+      { ios?: { ascAppId?: string }; android?: { track?: string; releaseStatus?: string } }
+    >;
   }
   const eas = json<Eas>('eas.json');
 
@@ -303,6 +353,22 @@ describe('the build profiles', () => {
     // submitting, so those stay out and `eas submit` goes on asking for them.
     expect(eas.submit.production?.ios?.ascAppId).toBe('6814843842');
     expect(read('eas.json')).not.toMatch(/appleTeamId|appleId/);
+  });
+
+  it('builds an Android App Bundle for the store and an APK to install by hand', () => {
+    // Play takes only a bundle for a new app. A bundle cannot be installed on a
+    // phone directly, so the preview profile builds an APK instead: that is the
+    // build to sideload and open before anything goes to Play.
+    expect(eas.build.production?.android?.buildType).toBe('app-bundle');
+    expect(eas.build.preview?.android?.buildType).toBe('apk');
+  });
+
+  it('submits to Play as a draft on the internal track, and holds no key for it', () => {
+    // An app Play has never reviewed refuses any release that is not a draft,
+    // and internal testing is the track a build can reach without review. The
+    // service account key is a credential, so it lives in EAS rather than here.
+    expect(eas.submit.production?.android).toEqual({ track: 'internal', releaseStatus: 'draft' });
+    expect(read('eas.json')).not.toMatch(/serviceAccountKey/);
   });
 
   it('has a profile for screenshots, which neither of the other two could take', () => {
@@ -396,6 +462,17 @@ describe('the app icon', () => {
     ]) {
       expect(ihdr(path).colorType).toBe(6);
     }
+  });
+
+  it('and the Play feature graphic is the size and format Play Console takes', () => {
+    // 1024 by 500 exactly, and a 24-bit PNG: Play refuses one with an alpha
+    // channel, and resvg, which draws it, writes one unless told otherwise.
+    expect(ihdr('design/play-feature-graphic.png')).toEqual({
+      width: 1024,
+      height: 500,
+      colorType: 2,
+    });
+    expect(read('PLAY.md')).toContain('design/play-feature-graphic.png');
   });
 });
 

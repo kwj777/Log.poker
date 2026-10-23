@@ -330,6 +330,24 @@ mistake of the author's to drill and no tilt to walk back from, and the honest
 answer for those is Log. The copy in each block is the guides' copy word for
 word, which is also how it goes on saying how much of each app is free.
 
+### On the front door
+
+`public/home.html` has a "Latest from the blog" section holding one card that
+points at `/blog`, between two `latest-posts` markers. When `build-blog.mjs`
+runs over the export, where home.html has just become `index.html`, it swaps
+that card for the three newest posts, so a post reaches the home page on the
+deploy that publishes it. A preview build has no `index.html` and skips it.
+
+### Share links
+
+Under every post, above its call to action, is a row of plain share links
+(X, Facebook, Reddit and email) that work with no script. On a phone that
+has a share sheet, one more button appears that opens it, from a few lines of
+inline script: nothing is fetched until somebody taps something. Under the row, a line
+points at the newsletter (Buttondown, which mails each post from the feed) and
+the RSS feed, so following the blog is one tap from every post. The newsletter
+is a link rather than a signup form so the CSP's `form-action 'self'` holds.
+
 ### Share cards
 
 ```bash
@@ -338,7 +356,9 @@ npm run build:og            # public/og/<slug>.png, and og/blog.png for the inde
 
 The card opens on the hand the post is about: the cards its figure marks as
 played, the two that were mine and then what the board gave, drawn by the same
-code as the diagram in the post. A post with no figure gets its title alone.
+code as the diagram in the post, with the post's first `::: stat` in gold
+beside it. A post with no figure opens on that stat alone, under the title, and
+a post with neither gets its title alone.
 
 Run it after adding a post and commit the PNG. It needs `@resvg/resvg-js`,
 which is a dev dependency and deliberately nothing the deploy touches.
@@ -1097,7 +1117,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2461 passed
+Tests:       2472 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1115,13 +1135,13 @@ Tests:       2461 passed
   endpoint               49   the sync endpoint, end to end
   values                 47   money, dates, durations, stakes, formats, counts
   variance               46   win rate, σ, confidence bands, verdicts
-  blog                   41   the post grammar, the share cards, and what it refuses
+  blog                   44   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
+  release                37   app.json, eas.json and the icon a store refuses over
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins
   palette                32   the theme matches BRAND.md
-  release                31   app.json, eas.json and the icon a store refuses over
   signinSweep            31   what the sign-in store may collect, and what it must not
   token                  31   the family token grammar, against signed fixtures
   session                30   holding a token, and stores that fail as real ones do
@@ -1129,14 +1149,14 @@ Tests:       2461 passed
   editSession            28   correcting a session, including the one nobody cashed out
   sessionExport          28   the log written out, and read back by the importer
   money                  27   cents arithmetic, parsing, formatting
+  history                24   the session list, its filters, and how much of it mounts
   writeFailures          24   what the player sees when a write does not work
   chip                   23   /chip resolves, offline, and never quotes a price
   compose                23   which repository a device gets, and the unsafe sweep
-  history                23   the session list, its filters, and how much of it mounts
   glossary               22   the shorthand on screen still matches its explanation
+  privacy                21   the policy page, held to the code it describes
   useLogStore            21   what a write reads back, and what it leaves alone
   clock                  20   a typed date, a typed length, and what neither will accept
-  privacy                20   the policy page, held to the code it describes
   selectors              20   store reads and filters
   batch                  19   a backlog split into requests, without orphaning a child
   csv                    19   quoting, delimiters, line endings

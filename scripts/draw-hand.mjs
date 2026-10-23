@@ -379,6 +379,55 @@ export const FIGURES = {
       },
     ],
   },
+
+  /** The winner I folded: a hand nobody wrote down, so every card is face down. */
+  'folded-the-winner': {
+    title: 'The winner I folded on the river',
+    desc: `Every card in this hand is drawn face down, because I never logged it: not my
+    two cards and not the board. What I do remember is when it happened, not long after
+    one of the three coolers, and how it ended. I faced a bet on the river, folded, and
+    had the best hand.`,
+    rows: [
+      { type: 'hands', groups: [{ label: 'MY HAND', cards: ['??!', '??!'] }] },
+      { type: 'note', text: 'NOT LONG AFTER A COOLER' },
+      { label: 'THE FLOP', cards: ['??', '??', '??'] },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['??', '??'],
+        outcomes: [['ME', 'Folded to a bet', 'muted'], ['HAD I CALLED', 'The winner', 'gold']],
+      },
+    ],
+  },
+  /** The set and the straight: both hands known, the suits and the runout not yet. */
+  'set-into-broadway': {
+    title: 'My set of queens against his flopped Broadway',
+    desc: `My hand: two queens. His hand: an ace and a king. I do not have the suits of
+    either, so they are drawn dashed. The flop came a queen, a jack and a ten, which gave
+    me top set and gave him the nut straight, ace to ten. The turn and the river are
+    drawn face down, because I do not remember them, only that neither paired the board.
+    From the flop I needed the board to pair to make a full house, which happens about
+    34 percent of the time. He bet $200, I called, and his straight held.`,
+    rows: [
+      {
+        type: 'hands',
+        groups: [
+          { label: 'MY HAND', cards: ['Q?!', 'Q?!'] },
+          { label: 'HIS HAND', cards: ['A?', 'K?'] },
+        ],
+      },
+      {
+        label: 'THE FLOP',
+        cards: ['Q?!', 'J?!', 'T?!'],
+        outcomes: [['ME', 'Top set', 'gold'], ['HIM', 'The nut straight', 'muted']],
+      },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['??', '??'],
+        outcomes: [['ME', 'The board never paired', 'muted'], ['HIM', 'The straight held', 'gold']],
+      },
+      { type: 'note', text: 'HE BET $200. I CALLED.' },
+    ],
+  },
 };
 
 /**

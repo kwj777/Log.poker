@@ -30,7 +30,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BLOG, HANDOFFS, SITE, TAGLINE, TITLE, feedDate, longDate, readPosts } from './posts.mjs';
-import { APP_STORE_BANNER, APP_STORE_URL, GUIDES, TOP } from './pages.mjs';
+import { APP_STORE_BANNER, GUIDES, STORE_BADGES, TOP } from './pages.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
@@ -326,8 +326,9 @@ const STYLE = `      :root {
         padding: .85rem 2.1rem; border-radius: 3px;
       }
       .btn:hover, .btn:focus-visible { background: #d8ba80; }
+      .stores { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 0; }
       .store { display: block; line-height: 0; }
-      .store img { display: block; width: 144px; height: 48px; }
+      .store img { display: block; width: auto; height: 48px; }
       .cta .sub { font-family: var(--serif); color: var(--muted); font-size: 1.02rem; margin: 0; }
       a { color: var(--gold); text-underline-offset: 2px; }
       :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
@@ -534,10 +535,8 @@ ${posts.map((post) => `        <li>
 
       <div class="cta">
         <a class="btn" href="/app">Get the log</a>
-        <a class="store" href="${APP_STORE_URL}">
-          <img src="/badges/app-store.svg" width="144" height="48" alt="Download on the App Store" />
-        </a>
-        <p class="sub">On the web or on an iPhone. Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
+        ${STORE_BADGES}
+        <p class="sub">On the web, an iPhone or an Android phone. Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
       </div>
 
       <footer>

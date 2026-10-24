@@ -313,6 +313,15 @@ overview until Send for review.
 **Sent for review** (Kevin, 2026-10-08): version code 2, all countries and
 regions.
 
+**Live in production** (confirmed by Kevin, 2026-10-24). That same day
+Google's "Get it on Google Play" badge went up beside Apple's under "Get the
+log" on the front door and the blog index, linking to
+`https://play.google.com/store/apps/details?id=poker.log.app`. The package
+lives once in `scripts/pages.mjs`, and `site.test.ts` holds it to `app.json`.
+There is no Android counterpart to Safari's smart banner: Chrome's
+`related_applications` lives in the web manifest, which belongs to the app
+under `/app`.
+
 An organization account goes from internal testing straight to production.
 If the Dashboard ever asks for a closed test or offers Apply for production,
 the account has been set up as personal; stop and check it rather than work

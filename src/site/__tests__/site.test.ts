@@ -397,6 +397,43 @@ describe('the App Store listing, since approval', () => {
   });
 });
 
+describe('the Google Play listing, since going live', () => {
+  // Log went live in production on Google Play on 2026-10-24.
+  const pkg: string = JSON.parse(read('app.json')).expo.android.package;
+  const url = `https://play.google.com/store/apps/details?id=${pkg}`;
+
+  it('addresses the app by the package it is published under', () => {
+    expect(pkg).toBe('poker.log.app');
+    expect(read('scripts', 'pages.mjs')).toContain(`export const PLAY_PACKAGE = '${pkg}';`);
+  });
+
+  it('links the badge to the listing, beside the App Store badge', () => {
+    const cta = home.slice(home.indexOf('<div class="cta">'), home.indexOf('</div>', home.indexOf('<div class="cta">')));
+    expect(cta).toContain(`<a class="store" href="${url}">`);
+    expect(cta).toContain('alt="Get it on Google Play"');
+    expect(cta.indexOf('app-store.svg')).toBeLessThan(cta.indexOf('google-play.svg'));
+  });
+
+  it('shows both badges at the same height, as Google asks', () => {
+    for (const img of home.match(/<img src="\/badges\/[^"]+"[^>]*>/g) ?? []) expect(img).toContain('height="48"');
+    expect(home).toMatch(/\.store img \{[^}]*height: 48px/);
+  });
+
+  it("uses Google's badge from this origin, so the page still fetches nothing elsewhere", () => {
+    expect(home).toContain('<img src="/badges/google-play.svg"');
+    const badge = read('public', 'badges', 'google-play.svg');
+    expect(badge).toContain('Get_it_on_Google_Play_Badge');
+    expect(badge).not.toMatch(/<script|href=/i);
+  });
+
+  it('adds no Android install hint to the manifest, which belongs to /app', () => {
+    // prefer_related_applications would trade the app's own install prompt for
+    // a trip to Play, from the page where /claim spends a handoff code.
+    expect(manifest.related_applications).toBeUndefined();
+    expect(manifest.prefer_related_applications).toBeUndefined();
+  });
+});
+
 describe('the site is findable', () => {
   const robots = read('public', 'robots.txt');
   const sitemap = read('public', 'sitemap.xml');

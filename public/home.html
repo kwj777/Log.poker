@@ -23,7 +23,9 @@
   (scripts/pages.mjs has the number and why it waited for approval). The badge
   is Apple's own artwork, unaltered, served from /badges rather than inlined
   so the blog uses the same file. It is a download link to a free app and
-  names no price, so the rule above still holds.
+  names no price, so the rule above still holds. Log went live on Google Play
+  on 2026-10-24, and Google's badge sits beside Apple's on the same terms: its
+  own artwork from /badges, linked by the package name in scripts/pages.mjs.
 -->
 <html lang="en">
   <head>
@@ -116,8 +118,9 @@
         padding: .85rem 2.1rem; border-radius: 3px;
       }
       .btn:hover, .btn:focus-visible { background: #d8ba80; }
+      .stores { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 0; }
       .store { display: block; line-height: 0; }
-      .store img { display: block; width: 144px; height: 48px; }
+      .store img { display: block; width: auto; height: 48px; }
       .cta .sub { font-family: var(--serif); color: var(--muted); font-size: 1.02rem; }
       .creed { border-left: 2px solid var(--forest); padding-left: 1.15rem; display: flex; flex-direction: column; gap: .7rem; }
       .creed p { font-family: var(--serif); font-size: 1.02rem; color: var(--muted); line-height: 1.55; }
@@ -191,10 +194,15 @@
 
       <div class="cta">
         <a class="btn" href="/app">Get the log</a>
-        <a class="store" href="https://apps.apple.com/app/id6814843842">
-          <img src="/badges/app-store.svg" width="144" height="48" alt="Download on the App Store" />
-        </a>
-        <p class="sub">On the web or on an iPhone. Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
+        <p class="stores">
+          <a class="store" href="https://apps.apple.com/app/id6814843842">
+            <img src="/badges/app-store.svg" width="144" height="48" alt="Download on the App Store" />
+          </a>
+          <a class="store" href="https://play.google.com/store/apps/details?id=poker.log.app">
+            <img src="/badges/google-play.svg" width="162" height="48" alt="Get it on Google Play" />
+          </a>
+        </p>
+        <p class="sub">On the web, an iPhone or an Android phone. Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
       </div>
 
       <section id="reading">

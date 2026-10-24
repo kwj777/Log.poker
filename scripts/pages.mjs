@@ -66,3 +66,38 @@ export const APP_STORE_URL = `https://apps.apple.com/app/id${APP_STORE_ID}`;
  * code unspent and the pass on the web.
  */
 export const APP_STORE_BANNER = `<meta name="apple-itunes-app" content="app-id=${APP_STORE_ID}" />`;
+
+/**
+ * Log's Google Play package, which is also its address on Play.
+ *
+ * It is `expo.android.package` in `app.json`, and a test holds the two
+ * together. Play never lets a package name change, so this is permanent.
+ *
+ * It went on the site once Log was live in production on Google Play
+ * (2026-10-24), for the same reason the App Store ID waited for approval.
+ *
+ * There is no Android counterpart to the Safari banner here. Chrome's nearest
+ * thing is `related_applications` with `prefer_related_applications` in the web
+ * manifest, and that manifest belongs to the app under `/app`: it would swap
+ * the app's own install prompt for a trip to Play, the same stranding the
+ * banner is kept off `/app` to avoid.
+ */
+export const PLAY_PACKAGE = 'poker.log.app';
+
+/** The listing itself. */
+export const PLAY_URL = `https://play.google.com/store/apps/details?id=${PLAY_PACKAGE}`;
+
+/**
+ * The two store badges, side by side under "Get the log". Each is the store's
+ * own artwork, unaltered, served from /badges so the page fetches nothing from
+ * anywhere else. They render at the same height, as Google's badge guidelines
+ * ask, and the gap between them is the clear space both guidelines want.
+ */
+export const STORE_BADGES = `<p class="stores">
+          <a class="store" href="${APP_STORE_URL}">
+            <img src="/badges/app-store.svg" width="144" height="48" alt="Download on the App Store" />
+          </a>
+          <a class="store" href="${PLAY_URL}">
+            <img src="/badges/google-play.svg" width="162" height="48" alt="Get it on Google Play" />
+          </a>
+        </p>`;

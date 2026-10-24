@@ -106,6 +106,12 @@ describe('what a post becomes', () => {
     expect(index).toContain('<img src="/badges/app-store.svg"');
   });
 
+  it('offers the Google Play app beside it', () => {
+    const pkg: string = JSON.parse(read('app.json')).expo.android.package;
+    expect(index).toContain(`<a class="store" href="https://play.google.com/store/apps/details?id=${pkg}">`);
+    expect(index).toContain('<img src="/badges/google-play.svg"');
+  });
+
   it('renders with nothing fetched, not even a font', () => {
     // The same promise the front door makes, for the same reason: this is read
     // in a card room, on one bar of signal, on somebody else's phone.

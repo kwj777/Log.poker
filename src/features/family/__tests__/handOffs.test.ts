@@ -435,6 +435,51 @@ describe('what the before-the-session card says', () => {
   });
 });
 
+describe('what the carry-over card says', () => {
+  const card = source('src', 'features', 'sessions', 'CarryOverOffer.tsx');
+  const copy = card.slice(
+    card.indexOf('export const carryOverCopy'),
+    card.indexOf('interface CarryOverOfferProps'),
+  );
+
+  it('says the material is inside the pass rather than pretending it is free', () => {
+    expect(copy).toMatch(/\bpass\b/);
+  });
+
+  it('and still tells an unpaid player what they can actually play there', () => {
+    // The same fact about Untilt the before-the-session card carries, because
+    // it is the same lane: `preflightFallback` puts the free between-hands
+    // reset on that screen for somebody without the pass.
+    expect(copy).toMatch(/free between-hands reset/);
+  });
+
+  it('and names no price, no checkout and no purchase', () => {
+    expect(copy).not.toMatch(/\$\s*\d/);
+    expect(copy).not.toMatch(/\b(buy|purchase|upgrade|subscribe|trial|checkout|sign up)\b/i);
+  });
+
+  it('does not sell the pass to somebody who already has it', () => {
+    expect(copy).toContain('Your pass');
+  });
+
+  it('never implies a result is due, in either direction', () => {
+    // The one rule this card would be easiest to break. `variance.ts` has a
+    // test asserting none of its verdicts imply the player is broken or owed
+    // anything, and a card that fires the night after a heater is exactly
+    // where "due" would creep in. What this describes is what the player is
+    // bringing to the table, never what the cards will do with it.
+    expect(copy).not.toMatch(/\b(due|owed|bounce back|make it back|evens? out|correct itself)\b/i);
+    expect(copy).not.toMatch(/\b(luck|lucky|unlucky) (will|should|has to)\b/i);
+  });
+
+  it('and says the same thing about both directions, which is that neither predicts anything', () => {
+    // Both branches talk about the night coming back to the table with the
+    // player. Neither talks about the next one.
+    expect(copy).toContain('comes back to the table');
+    expect(copy).toContain('come back to the table');
+  });
+});
+
 describe('when the before-the-session card is allowed on screen', () => {
   const card = source('src', 'features', 'sessions', 'PreSessionWarmUp.tsx');
   const screen = source('app', 'session', 'new.tsx');

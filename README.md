@@ -52,9 +52,10 @@ for this repo: **Log is free in its entirety and has no standalone price.** See
   [Importing an online history](#importing-an-online-history).
 - **Family cross-promo** -- a shared "More from the family" card, plus
   contextual hand-offs at the moments Log already knows something: sitting down
-  rattled, a hand tagged as a bad beat or a cooler, two hours into a session, a
-  rough stretch on the variance view and the night just closed out all offer
-  Untilt, and a hand tagged *misplayed?* offers to drill the spot in TiltProof.
+  rattled, sitting down the day after a night at either end of your own range,
+  a hand tagged as a bad beat or a cooler, two hours into a session, a rough
+  stretch on the variance view and the night just closed out all offer Untilt,
+  and a hand tagged *misplayed?* offers to drill the spot in TiltProof.
 
 Offline throughout, and that is the default rather than the limit: no account,
 no network call, nothing leaving the device. Signing in is optional and is the
@@ -1115,16 +1116,16 @@ One conformance suite, `src/data/__tests__/repositoryContract.ts`, runs against
 errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
-Test Suites: 113 passed
-Tests:       2444 passed
+Test Suites: 116 passed
+Tests:       2472 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
   site                   73   the marketing/app split, the PWA, the sitemap
   bundle                 72   the server-side merge: two devices and one bundle
+  handOffs               67   where a hand-off goes, and what the four offer cards say
   sessionImport          67   reading a session-summary export
   tournaments            67   ROI, its interval, cash rate, dry runs, finishes
-  handOffs               61   where a hand-off goes, and what the four offer cards say
   signinEndpoint         61   the free door, and every bound on it
   stats                  60   P/L, rebuys, duration, win rate, groupings
   syncingRepository      59   two devices and one server, no fakes in between
@@ -1178,6 +1179,7 @@ Tests:       2444 passed
   logHand                13   logging a hand, the optional board, and the reset after a bad one
   rateLimit              13   how often one person may ask, and what a refusal costs
   columns                12   header matching
+  carryOver              11   how often the night before is worth mentioning, in both directions
   csvWriter              11   writing CSV, and reading back exactly what was written
   tableOffer             11   which tags mean the game did it to you, and what to say about it
   pastHand               10   adding a hand to a session that is not running
@@ -1188,6 +1190,7 @@ Tests:       2444 passed
   preSessionWarmUp        9   the offer to somebody who says they are rattled before they sit
   settingsVenues          9   renaming a venue, and merging two that are one room
   varianceHands           9   the hand breakdown, and the sentence that must precede it
+  carryOverOffer          8   the carry-over card, and what it gives way to
   lintReach               8   which files npm run lint actually looks at
   plan                    8   what an import will write, before it writes it
   postSessionReset        8   the offer after cash-out, and who it is talking to
@@ -1222,6 +1225,7 @@ Tests:       2444 passed
   nativeModules           4   the two native modules nothing imports and every build compiles
   transactionQueue        4   two writes at once, on a database with no queue of its own
   amountField             3   the money field's box, against the font it has to hold
+  dashboardVerdict        3   whether the verdict reaches the dashboard, and when it stays off
   midSessionCheckIn       3   whether a check-in that failed says it was logged
   notFound                3   where a link that names nothing lands
   pageMeta                3   the document head, kept off the phone it alerts on
@@ -1443,6 +1447,60 @@ screen's own source, and the entries are held to the exact strings the pickers
 show, question mark on `misplayed?` included. That anchoring rule is also why
 this is not a general poker glossary: an entry explaining a word the app never
 displays is one nobody would notice going stale.
+
+### The night after
+
+Four of the offers above wait for the player to say something. The tilt check
+is a self-report, and so is the 4 or a 5 on the way in, and that leaves the
+case this one is for.
+
+A player who took three bad beats on Tuesday, two of them holding a full
+house, lost a thousand, and came back on Wednesday may well tap **3** on the
+way in and then spend the night folding top pair. The carry-over is real and
+the self-report misses it, because what a bad night does to the next one is
+not reliably available to the person it is happening to. **The record is**, so
+`src/domain/carryOver.ts` reads the record instead and the card goes at the
+top of the start-a-session screen rather than beside the picker it has nothing
+to do with.
+
+**Both directions, which is the part that is easy to get wrong.** Nobody
+arrives after their best night in a year playing the way they did the week
+before, and the leak that comes out of a win -- calling too wide because the
+stack feels like the house's money -- costs the same as the one that comes out
+of a loss. So a heater opens the same card.
+
+Neither direction says anything about what happens next, and the copy is
+tested for it. A win does not make a loss due. What is being described is a
+state of mind the player is carrying in, which is a fact about them rather
+than a prediction about the cards, and `handOffs.test.ts` asserts the wording
+of both branches stays on the right side of that line.
+
+**The threshold is the player's own swing, not a number somebody picked.**
+`CARRY_OVER_SIGMAS` is 1.5 standard deviations of their own distribution over
+the hours they actually played, which is roughly one session in eight across
+both tails. One sigma happens to everybody about a third of the time, and a
+card that appeared after one session in three would be furniture inside a
+month -- the failure `MidSessionCheckIn` spends its own header guarding
+against. A fixed dollar figure has the same problem from the other end: two
+hundred dollars is a quiet Tuesday for one player and the worst night of the
+year for another.
+
+Three days is how long a night goes on being the last night, so Friday still
+counts on Sunday and a fortnight ago does not. A fortnight ago is a statistic,
+and the variance view is where statistics are answered.
+
+**With nothing to scale by it falls back rather than going silent.** A new
+player, a tournament, or a session with no blinds recorded has no sigma, and
+refusing to speak at all would mean the card never appeared in the weeks when
+somebody is least practiced at losing. The fallback is the plainest reading of
+the same two events: the session lost money, or it more than doubled what went
+into it. It fires more readily than the measured rule, which is the right way
+round.
+
+It stands aside when the mood picker says 4 or 5, because that card makes the
+same offer about the same Untilt lane and two of them stacked is the clutter
+this app promises it does not do. The player's answer about right now beats an
+inference about Tuesday.
 
 ### The mid-session reset
 

@@ -593,14 +593,17 @@ answers a question this app reliably raises.
 > tiltproof.poker. The card appears only when the user tagged a hand
 > themselves, never during a session, and it goes away on its own.
 >
-> Two more cards name Untilt in the same way. If the user picks a 4 or a 5 on
+> Three more cards name Untilt in the same way. If the user picks a 4 or a 5 on
 > the optional mood scale on the start-a-session screen, Log says Untilt has
 > material for the minutes before you sit down, that it is inside Untilt's
-> pass, and that a free reset is on the same screen. And after the user logs a
-> hand tagged "bad beat" or "cooler", once per session, Log offers Untilt's
-> between-hands resets, which are free. Both are statements about the other
-> app: no price, no purchase, no checkout, and the button opens untilt.poker.
-> Neither changes anything in Log, and ignoring either costs the user nothing.
+> pass, and that a free reset is on the same screen. If the user's last
+> recorded session was an unusually large win or loss for them, and it was
+> within the last three days, the start-a-session screen says the same thing
+> about the same material. And after the user logs a hand tagged "bad beat" or
+> "cooler", once per session, Log offers Untilt's between-hands resets, which
+> are free. All three are statements about the other app: no price, no
+> purchase, no checkout, and the button opens untilt.poker. None of them
+> changes anything in Log, and ignoring any of them costs the user nothing.
 
 ---
 

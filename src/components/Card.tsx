@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 
@@ -7,7 +7,11 @@ interface CardProps {
   children: ReactNode;
   /** Makes the whole card a tap target. */
   onPress?: () => void;
-  style?: ViewStyle;
+  /**
+   * `StyleProp` rather than a bare `ViewStyle`, so a component that takes a
+   * `style` of its own can pass an array straight through instead of casting.
+   */
+  style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 }
 

@@ -4,7 +4,7 @@ description: Two kings against five six suited, all in preflop. A nine on the fl
 next: untilt
 ---
 
-I looked down at two kings and went all in before the flop. Everybody folded but one player, who called.
+I was short stacked. I looked down at two kings and went all in before the flop. Everybody folded but one player, who called.
 
 He turned over a five and a six of the same suit.
 
@@ -37,6 +37,16 @@ After the flop, with a nine on the board and two cards that I will assume did no
 16 out of 990 is about 1.6 percent, or roughly 1 in 62.
 
 That is what runner runner means. Not one good card, two of them in a row, both from a short list. It happens. It happened. It is still a 1 in 62 shot from the flop, against a hand that was already a big underdog before the flop came down.
+
+## Would he have folded?
+
+He sort of apologized afterward. Five six suited, he said, is one of his favorite hands.
+
+I have wondered since whether I should have kept him in a smaller pot and made him decide after the flop. With a nine and two cards that missed him, he had no pair and no real draw. I tried a few flops like that one, and from there he wins about 5 to 9 percent of the time. Facing an all in bet, he folds, and he should.
+
+But that is the outcome I would have been choosing. If he folds on the flop, I win the little pot from before the flop. Going all in first is what got his whole stack in the middle while I was a 77 percent favorite, and you do not do much better than that with kings. With a stack as short as mine, a smaller raise would only have left a flop bet that was nearly all in anyway, and handed him the easy fold.
+
+"One of my favorite hands" is not a reason to call an all in with five six. It is the reason I want him calling. He will win it about 22 times in 100, and he just did. The rest are why I would make the same move tomorrow.
 
 ## What I am taking from it
 

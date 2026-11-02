@@ -428,6 +428,33 @@ export const FIGURES = {
       { type: 'note', text: 'HE BET $200. I CALLED.' },
     ],
   },
+  'kings-into-a-runner-runner-straight': {
+    title: 'My kings against his five six suited, all in before the flop',
+    desc: `My hand: two kings. His hand: a five and a six of the same suit. I do not
+    have the suits of any of them, so they are drawn dashed. We were all in before the
+    flop, where I was about a 77 percent favorite. The flop had a nine on it; the other
+    two cards I do not remember. The turn was a seven and the river was an eight, which
+    gave him a straight from five to nine.`,
+    rows: [
+      {
+        type: 'hands',
+        groups: [
+          { label: 'MY HAND', cards: ['K?', 'K?'] },
+          { label: 'HIS HAND', cards: ['5?!', '6?!'] },
+        ],
+      },
+      { type: 'note', text: 'ALL IN BEFORE THE FLOP. HE CALLED.' },
+      {
+        label: 'THE FLOP',
+        cards: ['??', '??', '9?!'],
+      },
+      {
+        label: 'THE TURN AND THE RIVER',
+        cards: ['7?!', '8?!'],
+        outcomes: [['ME', 'Two kings', 'muted'], ['HIM', 'A straight, five to nine', 'gold']],
+      },
+    ],
+  },
 };
 
 /**

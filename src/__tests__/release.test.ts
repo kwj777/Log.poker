@@ -132,6 +132,32 @@ describe('the Android build, which Google Play reads before anyone does', () => 
     // mandatory now. Left in, it reads as a choice somebody could turn off.
     expect(app.android.edgeToEdgeEnabled).toBeUndefined();
   });
+
+  it('shrinks and obfuscates the release build, which Play grades', () => {
+    // Android vitals flagged release 2 (1.0.0) at 1% obfuscation against a 25%
+    // floor, with a deadline of February 2027. That number is R8 being off, and
+    // Expo leaves it off unless asked. The JavaScript bundle is not touched by
+    // it, so neither sign-in nor the pass is; the risk is a native class R8
+    // strips that something looks up by name, which only a device shows.
+    const plugin = app.plugins.find(
+      (entry) => Array.isArray(entry) && entry[0] === 'expo-build-properties',
+    ) as [string, { android?: Record<string, unknown> }] | undefined;
+    expect(plugin?.[1].android).toMatchObject({
+      enableMinifyInReleaseBuilds: true,
+      enableShrinkResourcesInReleaseBuilds: true,
+    });
+    expect(pkg.dependencies['expo-build-properties']).toBeDefined();
+  });
+
+  it('locks phones upright at runtime rather than in the manifest', () => {
+    // A manifest orientation lock is what Play's "remove orientation
+    // restrictions" names, and Android 16 ignores it on large screens. The
+    // plugin strips it from Android only, and the root layout locks phones.
+    expect(app.plugins).toContain('./plugins/withAndroidAnyOrientation');
+    expect(existsSync(join(ROOT, 'plugins', 'withAndroidAnyOrientation.js'))).toBe(true);
+    expect(pkg.dependencies['expo-screen-orientation']).toBeDefined();
+    expect(read('app', '_layout.tsx')).toContain('usePhonePortrait();');
+  });
 });
 
 describe('the splash screen, which moved out from under the app', () => {

@@ -383,6 +383,32 @@ Console, since `eas submit` has no field for them) or switch to
 Either way, update the assertion in `release.test.ts`. Never run a submit while
 a review is in progress: it cancels the review and starts it again.
 
+## 10. Android vitals
+
+What Play Console's Android vitals said about release 2 (1.0.0) in November
+2026, and what was done about each.
+
+- **DEX code optimization below threshold (1% obfuscation, fix by February
+  2027).** R8 was off, which is Expo's default. `expo-build-properties` now
+  turns on `enableMinifyInReleaseBuilds` and
+  `enableShrinkResourcesInReleaseBuilds`. It touches only the Java and Kotlin
+  side; the JavaScript bundle, and with it sign-in and the pass, is unchanged.
+  The mapping file travels inside the App Bundle, so crash reports stay
+  readable. What R8 can break is a native class looked up by name, which only
+  shows on a device: open every tab, log a session, import and export a CSV,
+  and sign in, on the release build, before it goes to production.
+- **Orientation and resizability restrictions.** The manifest's portrait lock
+  is gone on Android (`plugins/withAndroidAnyOrientation.js`). Phones are
+  still locked upright at runtime by `src/orientation.android.ts`; tablets,
+  open foldables and Chromebooks turn. iOS is unchanged.
+- **Deprecated edge-to-edge APIs.** Nothing in Log calls them. The calls Play
+  finds are inside React Native's own edge-to-edge setup (`WindowUtil`,
+  `StatusBarModule`) and `expo-navigation-bar`, which set the bars
+  transparent so Android 14 and older draw like Android 15 does. On Android
+  15 and later they do nothing. It is a recommendation, not a requirement,
+  and it clears when those libraries drop them; patching React Native for it
+  is not worth what it would risk.
+
 ## What must stay true
 
 Log sells nothing on Android either. Play's payments policy reads the same way

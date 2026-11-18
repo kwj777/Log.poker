@@ -1117,7 +1117,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2478 passed
+Tests:       2480 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1137,7 +1137,7 @@ Tests:       2478 passed
   variance               46   win rate, σ, confidence bands, verdicts
   blog                   45   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
-  release                37   app.json, eas.json and the icon a store refuses over
+  release                39   app.json, eas.json and the icon a store refuses over
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins

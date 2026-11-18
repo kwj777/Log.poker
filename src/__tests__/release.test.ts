@@ -46,6 +46,7 @@ interface AppConfig {
 
 const app = json<AppConfig>('app.json').expo;
 const pkg = json<{ dependencies: Record<string, string> }>('package.json');
+const pkgExpo = json<{ expo: { autolinking: { ios: { exclude: string[] } } } }>('package.json').expo;
 
 describe('what the stores identify this build by', () => {
   it('has a version that is a release rather than a placeholder', () => {
@@ -149,13 +150,60 @@ describe('the Android build, which Google Play reads before anyone does', () => 
     expect(pkg.dependencies['expo-build-properties']).toBeDefined();
   });
 
-  it('locks phones upright at runtime rather than in the manifest', () => {
+  it('locks phones upright in code rather than in the manifest', () => {
     // A manifest orientation lock is what Play's "remove orientation
     // restrictions" names, and Android 16 ignores it on large screens. The
-    // plugin strips it from Android only, and the root layout locks phones.
+    // plugin strips it from Android, has MainActivity lock phones before the
+    // first frame, and the root layout keeps the lock as a foldable folds.
+    // iOS keeps portrait from app.json and does not link the module.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const plugin = require('../../plugins/withAndroidAnyOrientation') as {
+      addPhoneLock: (source: string) => string;
+      removeManifestLock: (manifest: unknown) => {
+        manifest: { application: { activity: { $: Record<string, string> }[] }[] };
+      };
+    };
     expect(app.plugins).toContain('./plugins/withAndroidAnyOrientation');
-    expect(existsSync(join(ROOT, 'plugins', 'withAndroidAnyOrientation.js'))).toBe(true);
+    expect((app as unknown as { orientation: string }).orientation).toBe('portrait');
+
+    const manifest = plugin.removeManifestLock({
+      manifest: {
+        $: {},
+        application: [
+          {
+            $: {},
+            activity: [
+              {
+                $: { 'android:name': '.MainActivity', 'android:screenOrientation': 'portrait' },
+                'intent-filter': [
+                  {
+                    action: [{ $: { 'android:name': 'android.intent.action.MAIN' } }],
+                    category: [{ $: { 'android:name': 'android.intent.category.LAUNCHER' } }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(manifest.manifest.application[0].activity[0].$['android:screenOrientation']).toBeUndefined();
+
+    const activity = [
+      'class MainActivity : ReactActivity() {',
+      '  override fun onCreate(savedInstanceState: Bundle?) {',
+      '    super.onCreate(null)',
+      '  }',
+      '}',
+    ].join('\n');
+    const locked = plugin.addPhoneLock(activity);
+    expect(locked.indexOf('smallestScreenWidthDp < 600')).toBeGreaterThan(-1);
+    expect(locked.indexOf('SCREEN_ORIENTATION_PORTRAIT')).toBeLessThan(locked.indexOf('super.onCreate'));
+    expect(plugin.addPhoneLock(locked)).toBe(locked);
+
     expect(pkg.dependencies['expo-screen-orientation']).toBeDefined();
+    expect(pkgExpo.autolinking.ios.exclude).toContain('expo-screen-orientation');
+    expect(read('src', 'orientation.android.ts')).toContain('OrientationLock.PORTRAIT_UP');
     expect(read('app', '_layout.tsx')).toContain('usePhonePortrait();');
   });
 });

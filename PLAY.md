@@ -399,15 +399,17 @@ What Play Console's Android vitals said about release 2 (1.0.0) in November
   and sign in, on the release build, before it goes to production.
 - **Orientation and resizability restrictions.** The manifest's portrait lock
   is gone on Android (`plugins/withAndroidAnyOrientation.js`). Phones are
-  still locked upright at runtime by `src/orientation.android.ts`; tablets,
-  open foldables and Chromebooks turn. iOS is unchanged.
+  still upright from the first frame: the same plugin has MainActivity ask
+  for portrait in code when the smallest width is under 600dp, and
+  `src/orientation.android.ts` keeps that true as a foldable opens and
+  closes. Tablets, open foldables and Chromebooks turn. iOS is unchanged.
 - **Deprecated edge-to-edge APIs.** Nothing in Log calls them. The calls Play
-  finds are inside React Native's own edge-to-edge setup (`WindowUtil`,
-  `StatusBarModule`) and `expo-navigation-bar`, which set the bars
-  transparent so Android 14 and older draw like Android 15 does. On Android
-  15 and later they do nothing. It is a recommendation, not a requirement,
-  and it clears when those libraries drop them; patching React Native for it
-  is not worth what it would risk.
+  finds are in libraries Log links: React Native's own edge-to-edge setup
+  (`WindowUtil`, `StatusBarModule`), `expo-navigation-bar` (below Android 10
+  only), and AndroidX and Material Components, which React Native Screens
+  and Expo Router bring in. On Android 15 and later those calls do nothing.
+  It is a recommendation, not a requirement, and it will not clear while
+  those libraries are linked; nothing on Log's side is worth changing for it.
 
 ## What must stay true
 

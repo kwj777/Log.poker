@@ -1117,7 +1117,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2480 passed
+Tests:       2481 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1201,11 +1201,11 @@ Tests:       2480 passed
   claimHandoff            7   what a hand-off link may do without asking
   cursorStore             7   which cursors survive a launch, and what a lost one costs
   mergeVenues             7   folding one room into another, and the order it does it in
+  platformTwins           7   whether the files Metro swaps still export the same names
   settingsBankroll        7   entering what you had behind you before the log started
   settingsHelp            7   the privacy link, the support address, the build
   venues                  7   which spellings of a room name are the same room
   importWarnings          6   what the import screen says about a file it could not use
-  platformTwins           6   whether the files Metro swaps still export the same names
   returnFocus             6   who the keyboard goes back to when a sheet closes
   scale                   6   how much of the plot the data actually gets
   serviceWorker           6   what the worker answers a navigation with, run rather than read

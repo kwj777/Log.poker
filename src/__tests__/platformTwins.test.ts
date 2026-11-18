@@ -1,8 +1,9 @@
 /**
  * The files Metro swaps, and whether they still agree.
  *
- * Five modules ship twice: a `.web.ts` half for the browser bundle and a
- * plain one for iOS and Android. Metro picks between them by filename, so
+ * Six modules ship twice. Five have a `.web.ts` half for the browser bundle
+ * and a plain one for iOS and Android; `orientation` has an `.android.ts`
+ * half and a plain one for iOS and the web. Metro picks between them by filename, so
  * every importer writes one path and gets whichever half the platform build
  * chose. That makes the pair a single module with two implementations, and
  * the thing a caller depends on is that both implement the same names.
@@ -33,20 +34,21 @@ const VALUE_EXPORT = /^export (?:const|function|class|enum) (\w+)/gm;
 const valuesIn = (path: string): string[] =>
   [...readFileSync(join(ROOT, path), 'utf8').matchAll(VALUE_EXPORT)].map(([, name]) => name).sort();
 
-/** Every `.web` half in `src`, paired with the file it stands in for. */
+/** Every platform half in `src`, paired with the file it stands in for. */
 const twins = (): [string, string][] =>
   execFileSync('git', ['ls-files', 'src'], { cwd: ROOT, encoding: 'utf8' })
     .split('\n')
-    .filter((path) => /\.web\.tsx?$/.test(path))
-    .map((web) => [web, web.replace(/\.web\.(tsx?)$/, '.$1')]);
+    .filter((path) => /\.(web|android|ios)\.tsx?$/.test(path))
+    .map((half) => [half, half.replace(/\.(web|android|ios)\.(tsx?)$/, '.$2')]);
 
 describe('a module that ships twice', () => {
-  it('is these five, so a sixth arrives here rather than unnoticed', () => {
-    expect(twins().map(([web]) => web)).toEqual([
+  it('is these six, so a seventh arrives here rather than unnoticed', () => {
+    expect(twins().map(([half]) => half)).toEqual([
       'src/auth/tokenStore.web.ts',
       'src/data/repositoryFactory.web.ts',
       'src/features/export/saveCsv.web.ts',
       'src/features/import/pickCsvFile.web.ts',
+      'src/orientation.android.ts',
       'src/sync/cursorStore.web.ts',
     ]);
   });

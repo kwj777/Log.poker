@@ -1117,7 +1117,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2478 passed
+Tests:       2481 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1137,7 +1137,7 @@ Tests:       2478 passed
   variance               46   win rate, σ, confidence bands, verdicts
   blog                   45   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
-  release                37   app.json, eas.json and the icon a store refuses over
+  release                39   app.json, eas.json and the icon a store refuses over
   mood                   35   what tilt costs, and when to say nothing
   handHistory            33   reading six sites' hand histories, the money worked out by hand
   merge                  33   two devices disagreeing, and who wins
@@ -1201,11 +1201,11 @@ Tests:       2478 passed
   claimHandoff            7   what a hand-off link may do without asking
   cursorStore             7   which cursors survive a launch, and what a lost one costs
   mergeVenues             7   folding one room into another, and the order it does it in
+  platformTwins           7   whether the files Metro swaps still export the same names
   settingsBankroll        7   entering what you had behind you before the log started
   settingsHelp            7   the privacy link, the support address, the build
   venues                  7   which spellings of a room name are the same room
   importWarnings          6   what the import screen says about a file it could not use
-  platformTwins           6   whether the files Metro swaps still export the same names
   returnFocus             6   who the keyboard goes back to when a sheet closes
   scale                   6   how much of the plot the data actually gets
   serviceWorker           6   what the worker answers a navigation with, run rather than read

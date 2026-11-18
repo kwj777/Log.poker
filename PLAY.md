@@ -383,6 +383,34 @@ Console, since `eas submit` has no field for them) or switch to
 Either way, update the assertion in `release.test.ts`. Never run a submit while
 a review is in progress: it cancels the review and starts it again.
 
+## 10. Android vitals
+
+What Play Console's Android vitals said about release 2 (1.0.0) in November
+2026, and what was done about each.
+
+- **DEX code optimization below threshold (1% obfuscation, fix by February
+  2027).** R8 was off, which is Expo's default. `expo-build-properties` now
+  turns on `enableMinifyInReleaseBuilds` and
+  `enableShrinkResourcesInReleaseBuilds`. It touches only the Java and Kotlin
+  side; the JavaScript bundle, and with it sign-in and the pass, is unchanged.
+  The mapping file travels inside the App Bundle, so crash reports stay
+  readable. What R8 can break is a native class looked up by name, which only
+  shows on a device: open every tab, log a session, import and export a CSV,
+  and sign in, on the release build, before it goes to production.
+- **Orientation and resizability restrictions.** The manifest's portrait lock
+  is gone on Android (`plugins/withAndroidAnyOrientation.js`). Phones are
+  still upright from the first frame: the same plugin has MainActivity ask
+  for portrait in code when the smallest width is under 600dp, and
+  `src/orientation.android.ts` keeps that true as a foldable opens and
+  closes. Tablets, open foldables and Chromebooks turn. iOS is unchanged.
+- **Deprecated edge-to-edge APIs.** Nothing in Log calls them. The calls Play
+  finds are in libraries Log links: React Native's own edge-to-edge setup
+  (`WindowUtil`, `StatusBarModule`), `expo-navigation-bar` (below Android 10
+  only), and AndroidX and Material Components, which React Native Screens
+  and Expo Router bring in. On Android 15 and later those calls do nothing.
+  It is a recommendation, not a requirement, and it will not clear while
+  those libraries are linked; nothing on Log's side is worth changing for it.
+
 ## What must stay true
 
 Log sells nothing on Android either. Play's payments policy reads the same way

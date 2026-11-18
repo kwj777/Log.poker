@@ -17,6 +17,7 @@ import { ErrorNote } from '../src/components/ErrorNote';
 import { ErrorScreen } from '../src/components/ErrorScreen';
 import { APP_DESCRIPTION, PageMeta } from '../src/components/PageMeta';
 import { syncOnResume } from '../src/data';
+import { usePhonePortrait } from '../src/orientation';
 import { useLogStore } from '../src/store/useLogStore';
 import { colors, spacing } from '../src/theme';
 
@@ -92,6 +93,9 @@ export default function RootLayout() {
   const status = useLogStore((state) => state.status);
   const error = useLogStore((state) => state.error);
   const hydrate = useLogStore((state) => state.hydrate);
+
+  // Android phones stay upright; tablets and open foldables turn. See the file.
+  usePhonePortrait();
 
   useEffect(() => {
     void hydrate();

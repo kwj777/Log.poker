@@ -19,6 +19,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 import { keyboardBehavior } from '../keyboardBehavior';
+import { REVEAL_MARGIN, revealDistance } from '../revealFocusedInput';
 import { Screen } from '../Screen';
 import { Text } from '../Text';
 
@@ -109,5 +110,19 @@ describe('which platforms get out of the keyboard\'s way', () => {
       const source = readFileSync(join(__dirname, '..', file), 'utf8');
       expect(source).toContain('behavior={keyboardBehavior()}');
     }
+  });
+});
+
+describe('scrolling the focused field back above the keyboard on Android', () => {
+  it('scrolls by how far the field ends below the shortened scroll area, plus a margin', () => {
+    // Found on a Moto G: the sign-in email low on Settings stayed under the
+    // keyboard. The area now ends at 500; a field ending at 620 needs 120 more,
+    // and the margin keeps it off the keyboard's edge.
+    expect(revealDistance(620, 500)).toBe(120 + REVEAL_MARGIN);
+  });
+
+  it('and does not scroll a field that is already clear', () => {
+    expect(revealDistance(300, 500)).toBe(0);
+    expect(revealDistance(500 - REVEAL_MARGIN, 500)).toBe(0);
   });
 });

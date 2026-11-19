@@ -38,9 +38,10 @@
  * inset for. What remains is the part that was missing.
  */
 
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -50,6 +51,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, layout, spacing } from '../theme';
 import { keyboardBehavior } from './keyboardBehavior';
+import { revealFocusedInput } from './revealFocusedInput';
 import { useHasTabBar } from './TabBar';
 
 interface ScreenProps {
@@ -81,6 +83,15 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
 
   const body = <View style={[styles.column, contentStyle]}>{children}</View>;
 
+  // Android's half of scrolling the focused field into view; iOS has
+  // `automaticallyAdjustKeyboardInsets` below. When the scroll area gets
+  // shorter, the frame has just been lifted for the keyboard, so that is when
+  // to look. See `revealFocusedInput`.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const scrollHeight = useRef(0);
+  const android = Platform.OS === 'android';
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
@@ -89,7 +100,26 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
       >
         {scroll ? (
           <ScrollView
+            ref={scrollRef}
             style={styles.scroll}
+            onScroll={
+              android
+                ? (event) => {
+                    scrollY.current = event.nativeEvent.contentOffset.y;
+                  }
+                : undefined
+            }
+            scrollEventThrottle={android ? 16 : undefined}
+            onLayout={
+              android
+                ? (event) => {
+                    const height = event.nativeEvent.layout.height;
+                    const shrank = height < scrollHeight.current;
+                    scrollHeight.current = height;
+                    if (shrank) revealFocusedInput(scrollRef.current, scrollY.current);
+                  }
+                : undefined
+            }
             contentContainerStyle={[
               styles.scrollContent,
               { paddingBottom: spacing.xxl + footerInset },

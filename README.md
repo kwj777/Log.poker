@@ -1136,7 +1136,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2481 passed
+Tests:       2484 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1232,6 +1232,7 @@ Tests:       2481 passed
   crossPromo              5   the family card as drawn, and the link a refusing device gives back
   dashboardFirstRun       5   labels on the dashboard with nothing under them yet
   errorBoundary           5   a render that throws, and the way back from it
+  keyboardAvoidance       5   both halves of getting out of the keyboard's way
   lineChart               5   what a chart says before it has been measured
   roiInterval             5   the ROI bootstrap runs once per result set, not per render
   stakesPicker            5   whether the blinds on screen are the blinds saved
@@ -1250,7 +1251,6 @@ Tests:       2481 passed
   pageMeta                3   the document head, kept off the phone it alerts on
   allHands                2   who pays for a read of the whole journal
   deadExports             2   API nothing uses: dead exports and props nothing passes
-  keyboardAvoidance       2   both halves of getting out of the keyboard's way
   leaveLiveSession        2   leaving a running session without ending it
   newSessionDefaults      2   where the pre-filled session says its numbers came from
   safeArea                2   the top inset, on a phone with a notch and without

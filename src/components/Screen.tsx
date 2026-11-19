@@ -14,10 +14,10 @@
  * app exists to make take fifteen seconds. The same held for the buy-in on
  * "New session" and the paste box on Import.
  *
- * Invisible on web, where the browser resizes the viewport itself, and on
- * Android, where `adjustResize` does: `behavior` is undefined on both and
- * `KeyboardAvoidingView` then does nothing. So this is an iOS fix that costs
- * the other two platforms one wrapper view.
+ * Android needs it too, though it was once thought not to: an edge-to-edge
+ * window is not resized for the keyboard, and React Native makes every window
+ * edge to edge. Only the web, where the browser resizes the viewport itself,
+ * goes without. `keyboardBehavior` has the details.
  *
  * `Sheet` has done this since it was written. This is the same thing, on the
  * frame the rest of the app uses.
@@ -41,7 +41,6 @@
 import type { ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -50,6 +49,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, layout, spacing } from '../theme';
+import { keyboardBehavior } from './keyboardBehavior';
 import { useHasTabBar } from './TabBar';
 
 interface ScreenProps {
@@ -84,7 +84,7 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={keyboardBehavior()}
         style={styles.center}
       >
         {scroll ? (

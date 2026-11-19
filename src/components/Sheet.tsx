@@ -10,6 +10,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, layout, radius, spacing } from '../theme';
+import { keyboardBehavior } from './keyboardBehavior';
 import { focusHost, focusedIn, returnFocusTo, type Focusable } from './returnFocus';
 import { Text } from './Text';
 
@@ -93,7 +94,7 @@ export const Sheet = ({ visible, onClose, title, children }: SheetProps) => {
           accessibilityLabel="Close"
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={keyboardBehavior()}
           style={styles.sheetWrapper}
         >
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}>

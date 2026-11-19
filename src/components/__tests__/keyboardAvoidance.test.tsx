@@ -18,6 +18,7 @@ import { render } from '@testing-library/react-native';
 import { Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
+import { keyboardBehavior } from '../keyboardBehavior';
 import { Screen } from '../Screen';
 import { Text } from '../Text';
 
@@ -59,8 +60,8 @@ const screen = async (): Promise<[Node, Node]> => {
 
 describe('a screen with something to type into', () => {
   it('scrolls the focused field out from under the keyboard', async () => {
-    // Jest renders as iOS, which is the only platform either half is for: a
-    // browser resizes its own viewport, and Android has `adjustResize`.
+    // Jest renders as iOS, which is the only platform this half is for:
+    // `automaticallyAdjustKeyboardInsets` does nothing anywhere else.
     expect(Platform.OS).toBe('ios');
 
     const [scroll] = await screen();
@@ -83,5 +84,30 @@ describe('a screen with something to type into', () => {
     // and the frame carries only its stylesheet, which sets no bottom padding,
     // and this reads `undefined`.
     expect(style.paddingBottom).toBe(0);
+  });
+});
+
+describe('which platforms get out of the keyboard\'s way', () => {
+  it('includes Android, whose edge-to-edge windows the keyboard draws over', () => {
+    // Found on a Moto G: the cash-out sheet's amount sat under the keyboard.
+    // Android was left out on the theory that `adjustResize` shrank the window,
+    // which an edge-to-edge window, and a modal made edge to edge, never is.
+    expect(keyboardBehavior('android')).toBe('padding');
+    expect(keyboardBehavior('ios')).toBe('padding');
+  });
+
+  it('but not the web, where the browser resizes its own viewport', () => {
+    expect(keyboardBehavior('web')).toBeUndefined();
+  });
+
+  it('and both frames ask the one helper, rather than each testing the platform', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { join } = require('node:path') as typeof import('node:path');
+    for (const file of ['Screen.tsx', 'Sheet.tsx']) {
+      const source = readFileSync(join(__dirname, '..', file), 'utf8');
+      expect(source).toContain('behavior={keyboardBehavior()}');
+    }
   });
 });

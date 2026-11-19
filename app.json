@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "poker.log.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#e8e4da",
         "foregroundImage": "./assets/android-icon-foreground.png",

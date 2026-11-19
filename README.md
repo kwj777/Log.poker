@@ -1136,7 +1136,7 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2481 passed
+Tests:       2486 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
@@ -1219,6 +1219,7 @@ Tests:       2481 passed
   venuePicker             8   typing a room you already have, rather than adding a second
   claimHandoff            7   what a hand-off link may do without asking
   cursorStore             7   which cursors survive a launch, and what a lost one costs
+  keyboardAvoidance       7   both halves of getting out of the keyboard's way
   mergeVenues             7   folding one room into another, and the order it does it in
   platformTwins           7   whether the files Metro swaps still export the same names
   settingsBankroll        7   entering what you had behind you before the log started
@@ -1250,7 +1251,6 @@ Tests:       2481 passed
   pageMeta                3   the document head, kept off the phone it alerts on
   allHands                2   who pays for a read of the whole journal
   deadExports             2   API nothing uses: dead exports and props nothing passes
-  keyboardAvoidance       2   both halves of getting out of the keyboard's way
   leaveLiveSession        2   leaving a running session without ending it
   newSessionDefaults      2   where the pre-filled session says its numbers came from
   safeArea                2   the top inset, on a phone with a notch and without

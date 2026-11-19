@@ -14,10 +14,10 @@
  * app exists to make take fifteen seconds. The same held for the buy-in on
  * "New session" and the paste box on Import.
  *
- * Invisible on web, where the browser resizes the viewport itself, and on
- * Android, where `adjustResize` does: `behavior` is undefined on both and
- * `KeyboardAvoidingView` then does nothing. So this is an iOS fix that costs
- * the other two platforms one wrapper view.
+ * Android needs it too, though it was once thought not to: an edge-to-edge
+ * window is not resized for the keyboard, and React Native makes every window
+ * edge to edge. Only the web, where the browser resizes the viewport itself,
+ * goes without. `keyboardBehavior` has the details.
  *
  * `Sheet` has done this since it was written. This is the same thing, on the
  * frame the rest of the app uses.
@@ -38,7 +38,7 @@
  * inset for. What remains is the part that was missing.
  */
 
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -50,6 +50,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, layout, spacing } from '../theme';
+import { keyboardBehavior } from './keyboardBehavior';
+import { revealFocusedInput } from './revealFocusedInput';
 import { useHasTabBar } from './TabBar';
 
 interface ScreenProps {
@@ -81,15 +83,43 @@ export const Screen = ({ children, scroll = true, footer, contentStyle }: Screen
 
   const body = <View style={[styles.column, contentStyle]}>{children}</View>;
 
+  // Android's half of scrolling the focused field into view; iOS has
+  // `automaticallyAdjustKeyboardInsets` below. When the scroll area gets
+  // shorter, the frame has just been lifted for the keyboard, so that is when
+  // to look. See `revealFocusedInput`.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const scrollHeight = useRef(0);
+  const android = Platform.OS === 'android';
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={keyboardBehavior()}
         style={styles.center}
       >
         {scroll ? (
           <ScrollView
+            ref={scrollRef}
             style={styles.scroll}
+            onScroll={
+              android
+                ? (event) => {
+                    scrollY.current = event.nativeEvent.contentOffset.y;
+                  }
+                : undefined
+            }
+            scrollEventThrottle={android ? 16 : undefined}
+            onLayout={
+              android
+                ? (event) => {
+                    const height = event.nativeEvent.layout.height;
+                    const shrank = height < scrollHeight.current;
+                    scrollHeight.current = height;
+                    if (shrank) revealFocusedInput(scrollRef.current, scrollY.current);
+                  }
+                : undefined
+            }
             contentContainerStyle={[
               styles.scrollContent,
               { paddingBottom: spacing.xxl + footerInset },

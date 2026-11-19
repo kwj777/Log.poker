@@ -7,6 +7,25 @@ players. Log a session in under ten seconds, log a hand in under fifteen, and
 get an honest answer to the question every downswing provokes: *am I running
 bad, or am I playing bad?*
 
+Live at [log.poker](https://log.poker).
+
+**Built with:** React Native and Expo (Expo Router), TypeScript, Dexie over
+IndexedDB for offline storage, an installable PWA for the web, Netlify
+(functions and Blobs) for optional cross-device sync, Jest, and GitHub Actions
+CI.
+
+**Highlights**
+
+- **Offline first.** Everything works with no account and no network. Signing
+  in is optional and only syncs your own log to your own devices.
+- **Real statistics, not vibes.** The variance view places a recent stretch
+  inside the confidence band your own win rate and standard deviation predict,
+  and tournament ROI carries a bootstrapped confidence interval.
+- **One codebase, three targets.** iOS, Android and the web from the same
+  source.
+- **Tested and checked in CI.** 2,481 tests across 116 suites, plus
+  typechecking, linting and a house style check on every change to main.
+
 Log is the hub of a three-app family:
 
 | App | What it's for |

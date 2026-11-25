@@ -307,11 +307,21 @@ What a build produces:
 
 | | |
 |---|---|
-| `/blog` | The index, newest first. |
-| `/blog/<slug>` | A post. Written as `blog/<slug>/index.html`, so the URL carries no `.html` and needs no redirect rule. |
+| `/blog/` | The index, newest first. |
+| `/blog/<slug>/` | A post. Written as `blog/<slug>/index.html`, so the URL carries no `.html` and needs no redirect rule. |
 | `/blog/feed.xml` | RSS 2.0, with the full post in `content:encoded`. |
 | `/sitemap.xml` | `public/sitemap.xml`, which stays the hand-written truth for the front door and the app, plus one entry per post. |
-| `/sitemap` | The same list with the names on, for people rather than crawlers. |
+| `/sitemap/` | The same list with the names on, for people rather than crawlers. |
+
+The trailing slashes are the addresses, not decoration. Each of those pages is
+a directory with an `index.html` in it, and Netlify answers the bare form of a
+directory (`/blog`, `/blog/<slug>`, `/sitemap`, and `/app` too) with a 301 to
+the slashed one before it reads any rule. So canonicals, the sitemap and every
+link name the slashed form, and a crawler never starts at a redirect. The one
+exception is the feed: each item's `<link>` and `<guid>` keep the address
+without the slash, because the guid is how a reader and the Buttondown
+newsletter tell a post they have seen from a new one, and moving it would mail
+every post again.
 
 Three things are worth knowing before changing any of it:
 
@@ -352,7 +362,7 @@ word, which is also how it goes on saying how much of each app is free.
 ### On the front door
 
 `public/home.html` has a "Latest from the blog" section holding one card that
-points at `/blog`, between two `latest-posts` markers. When `build-blog.mjs`
+points at `/blog/`, between two `latest-posts` markers. When `build-blog.mjs`
 runs over the export, where home.html has just become `index.html`, it swaps
 that card for the three newest posts, so a post reaches the home page on the
 deploy that publishes it. A preview build has no `index.html` and skips it.
@@ -370,7 +380,7 @@ is a link rather than a signup form so the CSP's `form-action 'self'` holds.
 ### Share cards
 
 ```bash
-npm run build:og            # public/og/<slug>.png, and og/blog.png for the index
+npm run build:og            # public/og/<slug>.png, og/blog.png for the index, og/home.png for the rest
 ```
 
 The card opens on the hand the post is about: the cards its figure marks as
@@ -378,6 +388,11 @@ played, the two that were mine and then what the board gave, drawn by the same
 code as the diagram in the post, with the post's first `::: stat` in gold
 beside it. A post with no figure opens on that stat alone, under the title, and
 a post with neither gets its title alone.
+
+`og/home.png` is the card for every page outside the blog: the front door,
+the four guides and the privacy notice. Its words are `HOME_CARD` in
+`scripts/pages.mjs`, which `build-content.mjs` also reads for the guides'
+`og:image`.
 
 Run it after adding a post and commit the PNG. It needs `@resvg/resvg-js`,
 which is a dev dependency and deliberately nothing the deploy touches.
@@ -422,9 +437,11 @@ npx serve dist      # or any static server with a single-page fallback
   root: an unknown address gets `404.html` rather than quietly resolving to the
   app.
 - **Extensionless addresses** -- each guide is served from its `.html` file at
-  the address its canonical names, and `/sitemap` from `sitemap/index.html`.
-  Netlify would usually do both on its own, and usually is a setting rather
-  than a guarantee. The sitemap needs it more than the guides do, because it
+  the address its canonical names, and the sitemap page from
+  `sitemap/index.html`. Netlify would usually do the guides on its own, and
+  usually is a setting rather than a guarantee. The sitemap page is a
+  directory, so its address is `/sitemap/`: Netlify 301s `/sitemap` there
+  before reading any rule. The `/sitemap` rule stays anyway, because the page
   has a sibling: `/sitemap.xml` is a real file, so "which of these does
   `/sitemap` mean" is worth answering in configuration. The rule matches that
   one path exactly and leaves the XML alone, which the site tests assert in
@@ -1136,25 +1153,25 @@ errors are asserted once, so a bug cannot reproduce on only one platform.
 
 ```
 Test Suites: 116 passed
-Tests:       2486 passed
+Tests:       2498 passed
 
   dexieRepository       153   the IndexedDB path, against real IndexedDB
   sqlRepository         150   the SQLite path, against real SQLite
-  site                   78   the marketing/app split, the PWA, the sitemap
+  site                   81   the marketing/app split, the PWA, the sitemap
   bundle                 72   the server-side merge: two devices and one bundle
   handOffs               67   where a hand-off goes, and what the four offer cards say
   sessionImport          67   reading a session-summary export
   tournaments            67   ROI, its interval, cash rate, dry runs, finishes
+  content                63   every figure in the guides, re-derived and read back
   signinEndpoint         61   the free door, and every bound on it
   stats                  60   P/L, rebuys, duration, win rate, groupings
   syncingRepository      59   two devices and one server, no fakes in between
-  content                55   every figure in the guides, re-derived and read back
   copy                   54   what the sign-in and the sync are allowed to say
   verify                 54   checking a token, and every way past it that must not work
   endpoint               49   the sync endpoint, end to end
   values                 47   money, dates, durations, stakes, formats, counts
+  blog                   46   the post grammar, the share cards, and what it refuses
   variance               46   win rate, σ, confidence bands, verdicts
-  blog                   45   the post grammar, the share cards, and what it refuses
   migrations             41   a filled v2 database walked forward, both engines
   release                39   app.json, eas.json and the icon a store refuses over
   mood                   35   what tilt costs, and when to say nothing

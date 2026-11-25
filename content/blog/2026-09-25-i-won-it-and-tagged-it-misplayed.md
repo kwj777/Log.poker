@@ -63,4 +63,4 @@ He will remember this hand as a bad beat, and he is right. I will remember it as
 
 The tag is there because the result and the decision are different objects, and the result shouts. A question mark keeps the decision open long enough to count it. This time the count came back clean, which is worth knowing as well: the next time I have top trips with a weak kicker and a short stack raises me, I call, and I do not let one six convince me it was clever.
 
-[Log is free, all of it, and works offline with no account](/app). Tag the hands you won as well as the ones you lost, put a question mark on the ones where you are not sure, and write the numbers in while you still have them.
+[Log is free, all of it, and works offline with no account](/app/). Tag the hands you won as well as the ones you lost, put a question mark on the ones where you are not sure, and write the numbers in while you still have them.

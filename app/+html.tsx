@@ -139,8 +139,10 @@ export default function Root({ children }: { children: ReactNode }) {
         {/* Every route under /app is the same document with the same
             description, so they collapse onto one URL rather than competing as
             near-duplicates. This is also why robots.txt disallows nothing: a
-            crawler blocked from the bundle cannot render the app at all. */}
-        <link rel="canonical" href="https://log.poker/app" />
+            crawler blocked from the bundle cannot render the app at all.
+            The URL is /app/ with the slash: /app is a directory, and Netlify
+            answers the bare form with a 301 to it before any rule applies. */}
+        <link rel="canonical" href="https://log.poker/app/" />
 
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="theme-color" content="#1c211f" />
@@ -158,7 +160,7 @@ export default function Root({ children }: { children: ReactNode }) {
           content="Poker session tracking and a hand journal for live cash players, with a variance view that tells you when a downswing is just variance."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://log.poker/app" />
+        <meta property="og:url" content="https://log.poker/app/" />
 
         {/* Disables body scrolling on web so `ScrollView` behaves as it does on
             native, which is what expo-router recommends for a full-screen app. */}

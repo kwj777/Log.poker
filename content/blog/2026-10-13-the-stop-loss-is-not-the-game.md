@@ -4,7 +4,7 @@ description: A stop loss is meant to protect your money, not take the fun out of
 draft: true
 ---
 
-After I wrote about [setting a stop loss](/blog/the-loss-is-complete), I noticed something I had not expected. The rule worked. I left when I hit the number. But some nights it changed how I played long before I got anywhere near it.
+After I wrote about [setting a stop loss](/blog/the-loss-is-complete/), I noticed something I had not expected. The rule worked. I left when I hit the number. But some nights it changed how I played long before I got anywhere near it.
 
 I like playing poker. That is most of why I am at the table. And a stop loss, if you hold it the wrong way, turns every losing hand into a step toward the moment the fun ends. You stop playing to win and start playing not to get sent home.
 
@@ -60,4 +60,4 @@ The whole point of deciding the stop ahead of time was to take a decision off my
 
 Set it once. Make it big enough to forget. Check it only when you reach for your wallet. Then go back to the reason you sat down.
 
-[Log is free, all of it, and works offline with no account](/app). Log your sessions for a month and look at how many ever came close to your stop. It is usually far fewer than it feels like at the table, and knowing that is half of what lets you stop thinking about it.
+[Log is free, all of it, and works offline with no account](/app/). Log your sessions for a month and look at how many ever came close to your stop. It is usually far fewer than it feels like at the table, and knowing that is half of what lets you stop thinking about it.

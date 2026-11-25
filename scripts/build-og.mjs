@@ -35,6 +35,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { CARD, PALETTE, SANS, SERIF, card, playedHand } from './draw-hand.mjs';
+import { HOME_CARD } from './pages.mjs';
 import { TAGLINE, TITLE, figureOf, longDate, readPosts, statOf } from './posts.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -149,8 +150,11 @@ const label = (x, y, text, { size = 22, fill = PALETTE.DIM, anchor = 'start' } =
 /**
  * The card. Title bottom-anchored above the hand, so a one-line title and a
  * three-line one both sit where the eye lands rather than drifting up the page.
+ *
+ * `eyebrow` and `where` are the two labels, top and bottom left. They default
+ * to the blog's, which is every card but the front door's.
  */
-const shareCard = ({ title, subtitle, footer, cards, stat = null }) => {
+const shareCard = ({ title, subtitle, footer, cards, stat = null, eyebrow = TITLE, where = 'log.poker/blog' }) => {
   const { size, lines } = fitTitle(title);
   const leading = Math.round(size * 1.2);
   const lastBaseline = cards.length || stat ? 344 : 380;
@@ -159,7 +163,7 @@ const shareCard = ({ title, subtitle, footer, cards, stat = null }) => {
   parts.push(`  <rect width="${W}" height="${H}" fill="${PALETTE.GROUND}" />`);
   parts.push(`  <rect y="${H - 8}" width="${W}" height="8" fill="${PALETTE.GOLD}" />`);
   parts.push(mark(PAD, 48, 60));
-  parts.push(label(PAD + 78, 92, TITLE.toUpperCase(), { fill: PALETTE.MUTED }));
+  parts.push(label(PAD + 78, 92, eyebrow.toUpperCase(), { fill: PALETTE.MUTED }));
 
   lines.forEach((line, index) => {
     const baseline = lastBaseline - (lines.length - 1 - index) * leading;
@@ -196,7 +200,7 @@ ${cards.map(({ spec, x }) => card(x, 0, spec)).join('\n')}
     fill="${PALETTE.GOLD}">${escapeXml(stat)}</text>`);
   }
 
-  parts.push(label(PAD, H - 46, 'log.poker/blog', { size: 24, fill: PALETTE.DIM }));
+  parts.push(label(PAD, H - 46, where, { size: 24, fill: PALETTE.DIM }));
   if (footer) parts.push(label(W - PAD, H - 46, footer, { size: 24, fill: PALETTE.DIM, anchor: 'end' }));
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -216,6 +220,16 @@ mkdirSync(OUT, { recursive: true });
 
 // The blog itself, for a link to the index rather than to a post.
 write('blog', shareCard({ title: TITLE, subtitle: TAGLINE, footer: null, cards: [] }));
+
+// The front door, which the guides and the privacy notice share.
+write(HOME_CARD.name, shareCard({
+  title: HOME_CARD.title,
+  subtitle: HOME_CARD.subtitle,
+  footer: null,
+  cards: [],
+  eyebrow: 'Log',
+  where: 'log.poker',
+}));
 
 for (const post of posts) {
   write(post.slug, shareCard({

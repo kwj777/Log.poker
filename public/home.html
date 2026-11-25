@@ -50,6 +50,40 @@
       content="Three poker apps for the part that is not the cards: the odds, the record, and the tilt."
     />
     <meta property="og:url" content="https://log.poker/" />
+    <meta property="og:image" content="https://log.poker/og/home.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Log: three poker apps for the part that is not the cards" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!--
+      Who publishes the site and what it is called, for search engines. The
+      name is the one og:site_name already gives; "log.poker" is offered as the
+      alternate so a result can show either. Nothing here that the page does
+      not say itself.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://log.poker/#organization",
+            "name": "Log",
+            "url": "https://log.poker/",
+            "logo": "https://log.poker/icons/icon-512.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://log.poker/#website",
+            "name": "Log",
+            "alternateName": "log.poker",
+            "url": "https://log.poker/",
+            "inLanguage": "en",
+            "publisher": { "@id": "https://log.poker/#organization" }
+          }
+        ]
+      }
+    </script>
     <style>
       :root {
         --ground: #1c211f; --raised: #232a27; --rim: #2e3a35; --ring: #333f39;
@@ -171,7 +205,7 @@
               free.
             </span>
           </a>
-          <a class="app o" href="/app">
+          <a class="app o" href="/app/">
             <span class="verb">Observe</span>
             <span class="name">Log<span class="host">this one</span></span>
             <span class="what">
@@ -193,7 +227,7 @@
       </section>
 
       <div class="cta">
-        <a class="btn" href="/app">Get the log</a>
+        <a class="btn" href="/app/">Get the log</a>
         <p class="stores">
           <a class="store" href="https://apps.apple.com/app/id6814843842">
             <img src="/badges/app-store.svg" width="144" height="48" alt="Download on the App Store" />
@@ -214,7 +248,7 @@
           Four guides with the arithmetic shown. Each one answers its question
           in full on the page, because a page that withholds the answer to make
           you install something is not worth writing. One-off hands and the
-          numbers behind them go on <a href="/blog">the blog</a> instead.
+          numbers behind them go on <a href="/blog/">the blog</a> instead.
         </p>
         <div class="apps">
           <a class="app o" href="/running-bad">
@@ -262,14 +296,14 @@
         </div>
         <div class="apps">
           <!-- latest-posts: scripts/build-blog.mjs replaces this with the newest posts -->
-          <a class="app l" href="/blog">
+          <a class="app l" href="/blog/">
             <span class="verb">Read</span>
             <span class="name">The Log Blog</span>
             <span class="what">Hands, numbers, and the part of the game that is not the cards.</span>
           </a>
           <!-- /latest-posts -->
         </div>
-        <p class="more"><a href="/blog">Every post</a> &middot; <a href="https://buttondown.com/logPoker">Get them by email</a> &middot; <a href="/blog/feed.xml">Follow by RSS</a></p>
+        <p class="more"><a href="/blog/">Every post</a> &middot; <a href="https://buttondown.com/logPoker">Get them by email</a> &middot; <a href="/blog/feed.xml">Follow by RSS</a></p>
       </section>
 
       <section>
@@ -313,11 +347,11 @@
 
       <footer>
         <p>
-          <a href="/blog">The Log Blog</a> &middot; hands, numbers, and the
+          <a href="/blog/">The Log Blog</a> &middot; hands, numbers, and the
           part of the game that is not the cards.
         </p>
         <p>
-          <a href="/sitemap">Everything on this site</a>, on one page.
+          <a href="/sitemap/">Everything on this site</a>, on one page.
           <a href="/privacy">Privacy policy</a>: what is stored, and what
           leaves your device.
         </p>

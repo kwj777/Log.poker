@@ -73,7 +73,7 @@ const sitemap = readFileSync(join(site, 'sitemap.xml'), 'utf8');
  * only, not the footer, which links the feed at a /blog path of its own. */
 const sitemapPage = readFileSync(join(site, 'sitemap', 'index.html'), 'utf8');
 const listing = index.slice(index.indexOf('<ul class="posts">'), index.indexOf('</ul>'));
-const published = [...listing.matchAll(/<a href="\/blog\/([^"]+)">/g)].map((match) => match[1]);
+const published = [...listing.matchAll(/<a href="\/blog\/([^"/]+)\/">/g)].map((match) => match[1]);
 
 afterAll(() => {
   for (const directory of scratch) rmSync(directory, { recursive: true, force: true });
@@ -88,12 +88,30 @@ describe('what a post becomes', () => {
   });
 
   it('gives each one a directory, so the URL carries no .html', () => {
-    // Which is also what makes /blog/<slug> resolve on any static host without
+    // Which is also what makes /blog/<slug>/ resolve on any static host without
     // a redirect rule, and netlify.toml therefore says nothing about the blog.
     for (const slug of published) {
       expect(readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8'))
-        .toContain(`<link rel="canonical" href="https://log.poker/blog/${slug}" />`);
+        .toContain(`<link rel="canonical" href="https://log.poker/blog/${slug}/" />`);
     }
+  });
+
+  it('names each post by the address that serves it, with the trailing slash', () => {
+    // A directory's bare address is a 301 to the slashed one on Netlify, so a
+    // canonical or a link without the slash sends every crawler through a
+    // redirect first.
+    for (const slug of published) {
+      const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
+      expect(page).toContain(`<meta property="og:url" content="https://log.poker/blog/${slug}/" />`);
+      expect(page).toContain(`"url": "https://log.poker/blog/${slug}/"`);
+      expect(page).toContain('<a href="/blog/">');
+      expect(page).not.toMatch(/href="\/(app|blog|sitemap)"/);
+      expect(page).not.toMatch(/href="\/blog\/[a-z0-9-]+"/);
+    }
+    expect(index).toContain('<link rel="canonical" href="https://log.poker/blog/" />');
+    expect(index).not.toMatch(/href="\/(app|blog|sitemap)"/);
+    expect(sitemapPage).toContain('<link rel="canonical" href="https://log.poker/sitemap/" />');
+    expect(sitemapPage).not.toMatch(/href="\/(app|blog|sitemap)"/);
   });
 
   it('offers the App Store app the way the front door does', () => {
@@ -147,7 +165,7 @@ describe('what a post becomes', () => {
     // rather than which: one, never two, never none.
     for (const slug of published) {
       const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
-      const button = page.includes('<a class="btn" href="/app">') ? 1 : 0;
+      const button = page.includes('<a class="btn" href="/app/">') ? 1 : 0;
       const handoff = [...page.matchAll(/class="next"/g)].length;
       expect(button + handoff).toBe(1);
     }
@@ -155,7 +173,7 @@ describe('what a post becomes', () => {
   it('offers every post to share, by link, with nothing fetched until a tap', () => {
     for (const slug of published) {
       const page = readFileSync(join(site, 'blog', slug, 'index.html'), 'utf8');
-      const url = encodeURIComponent(`https://log.poker/blog/${slug}`);
+      const url = encodeURIComponent(`https://log.poker/blog/${slug}/`);
       expect(page).toContain('<section class="share"');
       expect(page).toContain(`https://www.facebook.com/sharer/sharer.php?u=${url}`);
       expect(page).toContain(`mailto:?subject=`);
@@ -173,15 +191,15 @@ describe('the front door', () => {
     writeFileSync(join(out, 'index.html'), read('public', 'home.html'));
     execFileSync('node', [SCRIPT, out], { encoding: 'utf8' });
     const home = readFileSync(join(out, 'index.html'), 'utf8');
-    for (const slug of published.slice(0, 3)) expect(home).toContain(`<a class="app l" href="/blog/${slug}">`);
-    if (published[3]) expect(home).not.toContain(`href="/blog/${published[3]}"`);
+    for (const slug of published.slice(0, 3)) expect(home).toContain(`<a class="app l" href="/blog/${slug}/">`);
+    if (published[3]) expect(home).not.toContain(`href="/blog/${published[3]}/"`);
     expect(home).not.toContain('latest-posts');
   });
 
   it('reads on its own before the build has filled it in', () => {
     const home = read('public', 'home.html');
     expect(home).toContain('<section id="blog">');
-    expect(home).toMatch(/<!-- latest-posts:[^>]*-->[\s\S]*href="\/blog"[\s\S]*<!-- \/latest-posts -->/);
+    expect(home).toMatch(/<!-- latest-posts:[^>]*-->[\s\S]*href="\/blog\/"[\s\S]*<!-- \/latest-posts -->/);
   });
 });
 
@@ -238,7 +256,7 @@ describe('where a post sends you next', () => {
     // the thing to press, and the post has just spent a thousand words on it.
     const out = build(fixture({ '2026-01-02-plain.md': post('No hand-off declared.') }));
     const page = readFileSync(join(out, 'blog', 'plain', 'index.html'), 'utf8');
-    expect(page).toContain('<a class="btn" href="/app">Get the log');
+    expect(page).toContain('<a class="btn" href="/app/">Get the log');
     expect(page).not.toContain('class="next"');
   });
 
@@ -269,8 +287,9 @@ describe('where a post sends you next', () => {
     // click, so the two outbound ones are pinned to the app's own config.
     expect(model).toContain(`href: '${FAMILY_LINKS.tiltproof}'`);
     expect(model).toContain(`href: '${FAMILY_LINKS.untilt}'`);
-    // Log's is relative, because the blog is served from the same site.
-    expect(model).toContain("href: '/app'");
+    // Log's is relative, because the blog is served from the same site, and
+    // it carries the slash because /app is a directory: the bare form is a 301.
+    expect(model).toContain("href: '/app/'");
   });
 
   it('says how much of each app is free, wherever it sends you', () => {
@@ -294,16 +313,19 @@ describe('where a post sends you next', () => {
 
 describe('the blog is findable', () => {
   it('is linked from the front door, which is the only way in', () => {
-    expect(read('public', 'home.html')).toContain('<a href="/blog">');
+    expect(read('public', 'home.html')).toContain('<a href="/blog/">');
   });
 
   it('adds itself and its posts to the one sitemap robots.txt names', () => {
     const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
     // The hand-written public/sitemap.xml first -- the front door, the app and
     // the four guides -- then the blog.
-    expect(locs.slice(0, 2)).toEqual(['https://log.poker/', 'https://log.poker/app']);
-    expect(locs).toContain('https://log.poker/blog');
-    for (const slug of published) expect(locs).toContain(`https://log.poker/blog/${slug}`);
+    expect(locs.slice(0, 2)).toEqual(['https://log.poker/', 'https://log.poker/app/']);
+    expect(locs).toContain('https://log.poker/blog/');
+    for (const slug of published) expect(locs).toContain(`https://log.poker/blog/${slug}/`);
+    // Nothing listed at an address that only redirects: every directory by
+    // its slashed form.
+    for (const loc of locs) expect(loc).not.toMatch(/^https:\/\/log\.poker\/(app|blog|blog\/[a-z0-9-]+)$/);
   });
 
   it('and counts them honestly in the line it prints', () => {
@@ -334,15 +356,15 @@ describe('the blog is findable', () => {
     expect(sitemapPage).toContain('How big a bankroll');
     expect(sitemapPage).toContain('Pot odds and outs');
     expect(sitemapPage).toContain('Tilt');
-    for (const slug of published) expect(sitemapPage).toContain(`/blog/${slug}`);
+    for (const slug of published) expect(sitemapPage).toContain(`/blog/${slug}/`);
   });
 
   it('is reachable from the pages it lists, or nobody will ever see it', () => {
-    expect(read('public', 'home.html')).toContain('href="/sitemap"');
-    expect(read('public', 'running-bad.html')).toContain('href="/sitemap"');
-    expect(index).toContain('href="/sitemap"');
+    expect(read('public', 'home.html')).toContain('href="/sitemap/"');
+    expect(read('public', 'running-bad.html')).toContain('href="/sitemap/"');
+    expect(index).toContain('href="/sitemap/"');
     expect(readFileSync(join(site, 'blog', published[0], 'index.html'), 'utf8')).toContain(
-      'href="/sitemap"',
+      'href="/sitemap/"',
     );
   });
 
@@ -370,7 +392,11 @@ describe('the blog is findable', () => {
     expect(feed).toContain('<atom:link href="https://log.poker/blog/feed.xml" rel="self"');
     expect([...feed.matchAll(/<item>/g)]).toHaveLength(published.length);
     for (const slug of published) {
+      // Without the slash the pages now carry, on purpose: the guid is how a
+      // reader and the Buttondown newsletter tell a post they have seen from a
+      // new one, so moving it would mail every post ever published again.
       expect(feed).toContain(`<guid isPermaLink="true">https://log.poker/blog/${slug}</guid>`);
+      expect(feed).toContain(`<link>https://log.poker/blog/${slug}</link>`);
     }
     for (const date of [...feed.matchAll(/<pubDate>([^<]+)<\/pubDate>/g)].map((match) => match[1])) {
       expect(date).toMatch(/^[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT$/);
@@ -388,7 +414,7 @@ describe('the blog is findable', () => {
     expect(feed).not.toMatch(/(href|src)="\/(?!\/)/);
     // And the ones that matter are really there, absolutely, rather than the
     // assertion above passing because nothing links anywhere.
-    expect(feed).toContain('href="https://log.poker/app"');
+    expect(feed).toContain('href="https://log.poker/app/"');
   });
 
   it('rebuilds to the same bytes, so nobody is told a post changed when it did not', () => {

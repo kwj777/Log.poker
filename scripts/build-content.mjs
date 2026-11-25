@@ -36,7 +36,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { APP_STORE_BANNER, GUIDES } from './pages.mjs';
+import { APP_STORE_BANNER, GUIDES, HOME_CARD } from './pages.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
@@ -319,6 +319,11 @@ const render = ({ slug, title, description, updated, body, type = 'Article' }) =
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
     <meta property="og:url" content="${url}" />
+    <meta property="og:image" content="${SITE}/og/${HOME_CARD.name}.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${HOME_CARD.alt}" />
+    <meta name="twitter:card" content="summary_large_image" />
     <script type="application/ld+json">
 ${JSON.stringify(
   {
@@ -356,8 +361,8 @@ ${body}
         <nav>
           <a href="/">The three apps</a>
 ${others.map(([href, label]) => `          <a href="${href}">${label}</a>`).join('\n')}
-          <a href="/blog">The Log Blog</a>
-          <a href="/sitemap">Sitemap</a>
+          <a href="/blog/">The Log Blog</a>
+          <a href="/sitemap/">Sitemap</a>
 ${slug === '/privacy' ? '' : '          <a href="/privacy">Privacy</a>\n'}        </nav>
         ${HELPLINE}
       </footer>
@@ -373,7 +378,7 @@ const next = ({ verb, name, href, what }) => `      <section>
           <span class="verb">${verb}</span>
           <span class="name">${name}</span>
           <p>${what}</p>
-          <p><a href="${href}">${href.startsWith('/') ? `log.poker${href}` : href.replace('https://', '')}</a></p>
+          <p><a href="${href}">${href.startsWith('/') ? `log.poker${href.replace(/\/$/, '')}` : href.replace('https://', '')}</a></p>
         </div>
       </section>`;
 
@@ -518,7 +523,7 @@ ${VARIANCE_ROWS.map(
 ${next({
   verb: 'Observe',
   name: 'Log',
-  href: '/app',
+  href: '/app/',
   what:
     'Log estimates both numbers from your own completed sessions, draws the band around your real curve, and answers the question at the top of this page in a sentence. A session takes under ten seconds to record. All of it is free, it works offline, and it needs no account: nothing leaves your device unless you sign in to carry it to another one.',
 })}
@@ -665,7 +670,7 @@ ${RUIN_BUY_INS.map((n) => {
 ${next({
   verb: 'Observe',
   name: 'Log',
-  href: '/app',
+  href: '/app/',
   what:
     'Both inputs to the formula come out of a session log and nowhere else. Log estimates your win rate and your standard deviation from your own completed sessions, in big blinds, so sessions at different stakes pool into one answer instead of three guesses.',
 })}

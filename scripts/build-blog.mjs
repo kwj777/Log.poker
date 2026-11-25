@@ -1,5 +1,5 @@
 /**
- * The Log Blog: Markdown in `content/blog`, static HTML at /blog.
+ * The Log Blog: Markdown in `content/blog`, static HTML at /blog/.
  *
  * There is no back office and no database, because a blog that publishes a few
  * times a month needs neither and both would outlive their usefulness. A post
@@ -534,15 +534,15 @@ ${posts.map((post) => `        <li>
     : '<p class="lede">Nothing published yet.</p>'}
 
       <div class="cta">
-        <a class="btn" href="/app">Get the log</a>
+        <a class="btn" href="/app/">Get the log</a>
         ${STORE_BADGES}
         <p class="sub">On the web, an iPhone or an Android phone. Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.</p>
       </div>
 
       <footer>
         <p>
-          <a href="/">The three apps</a> &middot; <a href="/app">Log</a> &middot;
-          <a href="/blog/feed.xml">RSS</a> &middot; <a href="/sitemap">Sitemap</a>
+          <a href="/">The three apps</a> &middot; <a href="/app/">Log</a> &middot;
+          <a href="/blog/feed.xml">RSS</a> &middot; <a href="/sitemap/">Sitemap</a>
         </p>
 ${HELPLINE}
       </footer>
@@ -583,7 +583,7 @@ ${head({
     <div class="wrap">
       <nav class="top">
         ${MARK}
-        <a href="/blog">${TITLE}</a>
+        <a href="/blog/">${TITLE}</a>
       </nav>
 
       <article>
@@ -603,8 +603,8 @@ ${handoff(post)}
 
       <footer>
         <p>
-          <a href="/blog">${TITLE}</a> &middot; <a href="/">The three apps</a> &middot;
-          <a href="/blog/feed.xml">RSS</a> &middot; <a href="/sitemap">Sitemap</a>
+          <a href="/blog/">${TITLE}</a> &middot; <a href="/">The three apps</a> &middot;
+          <a href="/blog/feed.xml">RSS</a> &middot; <a href="/sitemap/">Sitemap</a>
         </p>
 ${HELPLINE}
       </footer>
@@ -622,7 +622,7 @@ ${HELPLINE}
  * The same HTML, with its links pointing somewhere a reader can follow.
  *
  * The page pipeline keeps hrefs exactly as the Markdown wrote them, which for
- * these posts means root-relative: `/app`, `/running-bad`, `/blog/<slug>`.
+ * these posts means root-relative: `/app/`, `/running-bad`, `/blog/<slug>/`.
  * That is right on the site and wrong in a feed. RSS has no base URL and
  * `content:encoded` carries no `xml:base`, so a reader resolves them against
  * its own origin or against nothing at all, and the call to action every post
@@ -634,19 +634,33 @@ ${HELPLINE}
  */
 const absolute = (html) => html.replace(/(href|src)="\/(?!\/)/g, `$1="${SITE}/`);
 
+/**
+ * The address a feed item has always gone by, without the trailing slash the
+ * pages now carry.
+ *
+ * Readers and the Buttondown newsletter tell one item from another by its
+ * guid, and an RSS-to-email service mails what it has not seen before. A guid
+ * moved to the slashed address would be a new item for every post ever
+ * published, and could be a newsletter of all of them at once. So the guid and the item's link stay
+ * exactly what they were; the link still lands on the post, by one 301, and
+ * everything a crawler reads (canonical, sitemap, links) names the slashed
+ * address directly.
+ */
+const feedAddress = (post) => `${SITE}/blog/${post.slug}`;
+
 const feed = (posts) => `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>${escapeHtml(TITLE)}</title>
     <link>${BLOG}</link>
-    <atom:link href="${BLOG}/feed.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="${BLOG}feed.xml" rel="self" type="application/rss+xml" />
     <description>${escapeHtml(TAGLINE)}</description>
     <language>en</language>${posts.length ? `
     <lastBuildDate>${feedDate(posts[0].updated ?? posts[0].date)}</lastBuildDate>` : ''}
 ${posts.map((post) => `    <item>
       <title>${escapeHtml(post.title)}</title>
-      <link>${post.url}</link>
-      <guid isPermaLink="true">${post.url}</guid>
+      <link>${feedAddress(post)}</link>
+      <guid isPermaLink="true">${feedAddress(post)}</guid>
       <pubDate>${feedDate(post.date)}</pubDate>
       <description>${escapeHtml(post.description)}</description>
       <content:encoded><![CDATA[${absolute(post.body).replace(/]]>/g, ']]]]><![CDATA[>')}]]></content:encoded>
@@ -682,7 +696,7 @@ const sitemap = (posts) => {
 };
 
 /**
- * The sitemap a person can read, at /sitemap.
+ * The sitemap a person can read, at /sitemap/.
  *
  * The XML one is for crawlers and says nothing a reader would want: a list of
  * addresses, no titles, no order that means anything. This is the same list
@@ -736,7 +750,7 @@ ${rows.join('\n')}
 ${head({
   title: 'Everything on log.poker',
   description: 'Every page on log.poker: the app, the four guides, and every post.',
-  canonical: `${SITE}/sitemap`,
+  canonical: `${SITE}/sitemap/`,
   ogType: 'website',
   share: shareCard('blog'),
 })}
@@ -757,8 +771,8 @@ ${body}
 
       <footer>
         <p>
-          <a href="/">The three apps</a> &middot; <a href="/app">Log</a> &middot;
-          <a href="/blog">Writing</a> &middot; <a href="/blog/feed.xml">RSS</a>
+          <a href="/">The three apps</a> &middot; <a href="/app/">Log</a> &middot;
+          <a href="/blog/">Writing</a> &middot; <a href="/blog/feed.xml">RSS</a>
         </p>
 ${HELPLINE}
       </footer>
@@ -799,7 +813,7 @@ const agree = (xml, page) => {
 /**
  * The front door's "Latest from the blog" cards, filled in from the posts.
  *
- * `public/home.html` holds one card between two markers, pointing at /blog, so
+ * `public/home.html` holds one card between two markers, pointing at /blog/, so
  * the page reads fine on its own. When this build runs over a real export,
  * where home.html has just become index.html, the markers get the newest
  * three posts instead. A scheduled post therefore reaches the front page on
@@ -812,7 +826,7 @@ const latestOnHome = (posts) => {
   if (!existsSync(home) || !posts.length) return;
   const page = readFileSync(home, 'utf8');
   if (!LATEST.test(page)) throw new Error('index.html has lost its latest-posts markers');
-  const cards = posts.slice(0, 3).map((post) => `<a class="app l" href="/blog/${post.slug}">
+  const cards = posts.slice(0, 3).map((post) => `<a class="app l" href="${post.path}">
             <span class="verb">${longDate(post.date)}</span>
             <span class="name">${escapeHtml(post.title)}</span>
             <span class="what">${escapeHtml(post.description)}</span>
@@ -842,7 +856,7 @@ latestOnHome(posts);
 write(join('sitemap', 'index.html'), page);
 
 console.log(
-  `${TITLE}: ${posts.length} post${posts.length === 1 ? '' : 's'} at /blog` +
+  `${TITLE}: ${posts.length} post${posts.length === 1 ? '' : 's'} at /blog/` +
   `${posts.length ? `, newest ${posts[0].slug}` : ''}, a feed, and ` +
   // Counted out of the file rather than worked out again. This said
   // `posts.length + 2`, which was the arithmetic when `public/sitemap.xml`

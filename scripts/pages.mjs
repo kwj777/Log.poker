@@ -11,16 +11,22 @@
  * **What is here is what a person can be sent to.** The addresses that exist
  * and are not pages stay out, on the same reasoning `public/sitemap.xml`
  * gives for leaving them out of the XML: `/chip` is noindex, `/apps` is a 301,
- * and the prerendered routes under `/app` are one document canonicalizing onto
- * `/app`. The blog is not here either, because its posts are read from
+ * and the prerendered routes under `/app/` are one document canonicalizing onto
+ * `/app/`. The blog is not here either, because its posts are read from
  * `content/blog` at build time and a list of them typed here would be stale
  * the next time somebody published one.
  */
 
-/** The front door and the app, in the order somebody arriving wants them. */
+/**
+ * The front door and the app, in the order somebody arriving wants them.
+ *
+ * The app's address carries its trailing slash because the app is a directory:
+ * Netlify answers `/app` with a 301 to `/app/` before netlify.toml is read, so
+ * `/app/` is the page and `/app` only a way to it.
+ */
 export const TOP = [
   ['/', 'The three apps'],
-  ['/app', 'Log, the session log'],
+  ['/app/', 'Log, the session log'],
 ];
 
 /**
@@ -101,3 +107,20 @@ export const STORE_BADGES = `<p class="stores">
             <img src="/badges/google-play.svg" width="162" height="48" alt="Get it on Google Play" />
           </a>
         </p>`;
+
+/**
+ * The share card for the pages outside the blog: the front door, the four
+ * guides and the privacy notice.
+ *
+ * The blog index and every post have a card of their own. These pages had
+ * none, so a link to the front door or to a guide unfurled with no picture at
+ * all. `scripts/build-og.mjs` draws this one from the words below, and the PNG
+ * is committed under `public/og` like the others, for the same reason: a
+ * deploy never depends on a rasterizer.
+ */
+export const HOME_CARD = {
+  name: 'home',
+  title: 'Be the LOG. Learn, Observe, Ground.',
+  subtitle: 'Three poker apps for the part that is not the cards: the odds, the record, and the tilt.',
+  alt: 'Log: three poker apps for the part that is not the cards',
+};

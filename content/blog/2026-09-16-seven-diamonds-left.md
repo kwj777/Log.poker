@@ -71,4 +71,4 @@ What I wrote instead was the boring version. Board went three diamonds on the tu
 
 That note is worth something, because the next time a board goes three to a suit with connectivity in it, I have a hand to think about rather than a shrug. The verdict and the record are not the same object, and only one of them is any use later.
 
-[Log is free, all of it, and works offline with no account](/app). The tags are there and they are quick, but the line underneath them is the part that pays, and it takes about fifteen seconds. Write the street where it actually went wrong, not the one where it hurt.
+[Log is free, all of it, and works offline with no account](/app/). The tags are there and they are quick, but the line underneath them is the part that pays, and it takes about fifteen seconds. Write the street where it actually went wrong, not the one where it hurt.

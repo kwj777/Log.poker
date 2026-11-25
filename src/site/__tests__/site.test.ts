@@ -78,7 +78,57 @@ describe('the front door', () => {
   });
 
   it('sends people to the app rather than to itself', () => {
-    expect(home).toContain('<a class="btn" href="/app">');
+    expect(home).toContain('<a class="btn" href="/app/">');
+  });
+
+  it('links each directory by its slashed address, never the redirect in front of it', () => {
+    // /app, /blog and /sitemap are directories, and Netlify answers the bare
+    // form of a directory with a 301 to the slashed one. A link to the bare
+    // form is a link to a redirect.
+    for (const page of [home, read('public', 'chip.html'), read('public', '404.html')]) {
+      expect(page).not.toMatch(/href="\/(app|blog|sitemap)"/);
+    }
+    expect(home).toContain('href="/blog/"');
+    expect(home).toContain('href="/sitemap/"');
+  });
+
+  it('has a share card of its own, at the size it says', () => {
+    // The guides and the privacy notice point at the same card. Its name and
+    // alt text are read out of scripts/pages.mjs, where build-og.mjs and
+    // build-content.mjs get them, so the hand-written page cannot drift.
+    const pages = read('scripts', 'pages.mjs');
+    const declared = pages.slice(pages.indexOf('export const HOME_CARD'));
+    const HOME_CARD = {
+      name: declared.match(/name: '([^']+)'/)?.[1] ?? '',
+      alt: declared.match(/alt: '([^']+)'/)?.[1] ?? '',
+    };
+    expect(HOME_CARD.name).not.toBe('');
+    expect(HOME_CARD.alt).not.toBe('');
+    expect(home).toContain(`<meta property="og:image" content="https://log.poker/og/${HOME_CARD.name}.png" />`);
+    expect(home).toContain('<meta property="og:image:width" content="1200" />');
+    expect(home).toContain('<meta property="og:image:height" content="630" />');
+    expect(home).toContain(`<meta property="og:image:alt" content="${HOME_CARD.alt}" />`);
+    expect(home).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    const png = readFileSync(join(ROOT, 'public', 'og', `${HOME_CARD.name}.png`));
+    expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) }).toEqual({ width: 1200, height: 630 });
+  });
+
+  it('says who publishes it and what it is called, in data that parses', () => {
+    const blocks = [...home.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((match) => JSON.parse(match[1] ?? ''));
+    expect(blocks).toHaveLength(1);
+    const graph: Record<string, unknown>[] = blocks[0]['@graph'];
+    const organization = graph.find((node) => node['@type'] === 'Organization');
+    const website = graph.find((node) => node['@type'] === 'WebSite');
+    // The same name og:site_name gives, and the same URL the canonical does.
+    expect(organization).toMatchObject({ name: 'Log', url: 'https://log.poker/' });
+    expect(website).toMatchObject({ name: 'Log', url: 'https://log.poker/' });
+    expect(home).toContain('<meta property="og:site_name" content="Log" />');
+    expect(home).toContain('<link rel="canonical" href="https://log.poker/" />');
+    // The logo is a file the site actually serves.
+    expect(organization?.logo).toBe('https://log.poker/icons/icon-512.png');
+    expect(existsSync(join(ROOT, 'public', 'icons', 'icon-512.png'))).toBe(true);
   });
 
   it('quotes no price', () => {
@@ -224,7 +274,9 @@ describe('the two sitemaps, at two addresses', () => {
     expect(netlify).toContain('to = "/sitemap/index.html"');
   });
 
-  it('and the trailing slash somebody will type', () => {
+  it('and the slashed address, which is the one the site links to', () => {
+    // Netlify 301s /sitemap to /sitemap/ before reading any rule, so the
+    // canonical and every link name /sitemap/ and this is the rule that serves.
     expect(ruleAt('/sitemap/')).toBeGreaterThan(-1);
   });
 
@@ -384,7 +436,7 @@ describe('the App Store listing, since approval', () => {
 
   it('links the badge to the listing, beside the button to the web app', () => {
     const cta = home.slice(home.indexOf('<div class="cta">'), home.indexOf('</div>', home.indexOf('<div class="cta">')));
-    expect(cta).toContain('<a class="btn" href="/app">');
+    expect(cta).toContain('<a class="btn" href="/app/">');
     expect(cta).toContain(`<a class="store" href="https://apps.apple.com/app/id${id}">`);
     expect(cta).toContain('alt="Download on the App Store"');
   });
@@ -458,7 +510,7 @@ describe('the site is findable', () => {
     // and no /chip, /apps or per-route /app page.
     expect(locs).toEqual([
       'https://log.poker/',
-      'https://log.poker/app',
+      'https://log.poker/app/',
       'https://log.poker/running-bad',
       'https://log.poker/bankroll',
       'https://log.poker/pot-odds',
@@ -477,8 +529,9 @@ describe('the site is findable', () => {
 
   it('collapses the app routes onto one URL instead of competing with itself', () => {
     // The prerendered routes are one document with one description repeated.
-    expect(shell).toContain('<link rel="canonical" href="https://log.poker/app" />');
-    expect(shell).toContain('content="https://log.poker/app"');
+    // With the slash: /app is a directory, and the bare form is a 301 to it.
+    expect(shell).toContain('<link rel="canonical" href="https://log.poker/app/" />');
+    expect(shell).toContain('content="https://log.poker/app/"');
     expect(shell).not.toContain('content="https://log.poker"');
   });
 

@@ -44,7 +44,7 @@ At a full nine handed table, any of my eight opponents could be the one with ace
 
 Here is the thing I keep coming back to. Nine million sounds like a lightning strike, but almost any hand is that rare if you describe it precisely enough. Two specific hands and three specific ranks on the flop are always going to multiply out to a huge number.
 
-What is not rare is the shape of it. Flopping a set into a straight, a flush into a bigger flush, a full house into a better full house: some version of that happens to everyone who plays enough. I wrote about [three of them in one session](/blog/three-coolers-and-a-fold) just last week. The exact cards were a long shot. Getting coolered was not.
+What is not rare is the shape of it. Flopping a set into a straight, a flush into a bigger flush, a full house into a better full house: some version of that happens to everyone who plays enough. I wrote about [three of them in one session](/blog/three-coolers-and-a-fold/) just last week. The exact cards were a long shot. Getting coolered was not.
 
 That matters, because "one in nine million" is the kind of number that makes a hand feel like it was aimed at you. It was not. It was a common kind of bad luck wearing a rare set of clothes.
 
@@ -68,4 +68,4 @@ A cooler does not need a lesson, and I do not think this one has one about how I
 
 What it does have is a reminder about which number to listen to. The 1 in 9 million is a good story. The 34 percent is the truth about the hand. One of them makes you feel unlucky. The other tells you that you were still very much in it, and that losing it, the way I did, is the ordinary result two times out of three.
 
-[Log is free, all of it, and works offline with no account](/app). When the next cooler comes, write it down with the cards. Months from now you will want to know how often it really happens, and the honest answer is in your own sessions, not in the number that felt biggest at the table.
+[Log is free, all of it, and works offline with no account](/app/). When the next cooler comes, write it down with the cards. Months from now you will want to know how often it really happens, and the honest answer is in your own sessions, not in the number that felt biggest at the table.

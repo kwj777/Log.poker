@@ -88,12 +88,14 @@
 
 # The sitemap page, which needs a rule more than the guides do.
 #
-# It is a directory index -- dist/sitemap/index.html -- and Netlify would
-# usually serve it at /sitemap on its own, the same "usually" the guides above
-# do not rely on. The difference here is that /sitemap has a sibling: the XML
-# sitemap is a real file at /sitemap.xml, and "which of these does /sitemap
-# mean" is a question worth answering in configuration rather than leaving to
-# whichever rule fires first.
+# It is a directory index -- dist/sitemap/index.html -- and its address is
+# /sitemap/, with the slash. Netlify answers /sitemap with a 301 to /sitemap/
+# before it reads these rules (checked live in November 2026; /app, /blog and
+# every /blog/<slug> behave the same way), so the canonical, the sitemap and
+# every link name the slashed form. The /sitemap rule stays for the reason it
+# was written: /sitemap has a sibling, the XML sitemap is a real file at
+# /sitemap.xml, and "which of these does /sitemap mean" is a question worth
+# answering in configuration rather than leaving to whichever rule fires first.
 #
 # It does not shadow the XML. Netlify matches this path exactly, and
 # /sitemap.xml is not /sitemap; `src/site/__tests__/site.test.ts` asserts both,

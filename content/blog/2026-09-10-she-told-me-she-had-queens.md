@@ -5,7 +5,7 @@ description: She made it $12 with pocket queens, under-bet a flop that had alrea
 
 I know exactly one thing about her hand, and she is the only reason I know it.
 
-She made it twelve dollars before the flop. I called from later position with the eight and nine of one suit, which is a hand I have been more careful with since [the last time I wrote about one](/blog/the-2-dollar-limp-that-cost-400): there was a raise in front of me and I called it, in position, which is the version of that hand that actually works.
+She made it twelve dollars before the flop. I called from later position with the eight and nine of one suit, which is a hand I have been more careful with since [the last time I wrote about one](/blog/the-2-dollar-limp-that-cost-400/): there was a raise in front of me and I called it, in position, which is the version of that hand that actually works.
 
 The flop came with two eights in it.
 
@@ -84,4 +84,4 @@ Four characters, and it is the entire difference: one of them is something I wat
 
 It costs nothing to write the hand down the way it actually reached me. It costs a surprising amount to find out, a year later, that half of what I know about the regulars in my game came from things they told me while stacking their chips.
 
-[Log is free, all of it, and works offline with no account](/app). A hand takes fifteen seconds, and there is a line for the note, which is where the word *said* goes.
+[Log is free, all of it, and works offline with no account](/app/). A hand takes fifteen seconds, and there is a line for the note, which is where the word *said* goes.

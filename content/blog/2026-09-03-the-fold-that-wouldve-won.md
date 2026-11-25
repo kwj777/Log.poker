@@ -74,7 +74,7 @@ The thing at risk was the next hand.
 
 Tilt, for me, has never looked like throwing cards. It looks like a small adjustment I do not notice making. It looks like calling a $50 bet with ace high two orbits later, because some part of my brain is still holding a receipt that says *last time it got there.* That is the entire mechanism. One lost pot does not cost you a session. One lost pot that quietly rewrites your calling standards costs you the session, and possibly the next one.
 
-The other post on here is [the opposite version of this test](/blog/1-in-34700-bomb-pot-straight-flush): a hand so absurdly good I was shaking, could not write anything down, and nearly lost the details of the best hand I have ever been dealt. Euphoria on one side, injustice on the other, and the same brain in the middle making the same mistake in two directions: letting the result decide how to play the next one.
+The other post on here is [the opposite version of this test](/blog/1-in-34700-bomb-pot-straight-flush/): a hand so absurdly good I was shaking, could not write anything down, and nearly lost the details of the best hand I have ever been dealt. Euphoria on one side, injustice on the other, and the same brain in the middle making the same mistake in two directions: letting the result decide how to play the next one.
 
 Process over results is easy to say when the process is winning. The test is a night like this one, where the process was right and the result was a spade, and then another spade.
 
@@ -84,4 +84,4 @@ If that walk is the part you find hard, and it is the part most people find hard
 
 And log the hand. Not because a bad beat needs commemorating, but because "I folded correctly and the runner-runner came" is a sentence you can only trust about yourself if you wrote it down at the time. Three months from now, when you are trying to work out whether you have been running bad or playing bad, this hand is one honest data point instead of one vivid memory. Vivid memories are exactly the ones that lie.
 
-[Log is free, all of it, and works with no signal and no account](/app). Fifteen seconds, and the fold is on the record as a fold rather than as a grudge.
+[Log is free, all of it, and works with no signal and no account](/app/). Fifteen seconds, and the fold is on the record as a fold rather than as a grudge.

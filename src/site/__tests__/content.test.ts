@@ -231,6 +231,20 @@ describe('every guide is a page this site can serve', () => {
     expect(netlify).toContain(`to = "${slug}.html"`);
   });
 
+  it.each(SLUGS)('%s has a share card, the front door\'s, at its real size', (slug) => {
+    // A link to a guide used to unfurl with no picture at all.
+    expect(pages[slug]).toContain('<meta property="og:image" content="https://log.poker/og/home.png" />');
+    expect(pages[slug]).toContain('<meta property="og:image:width" content="1200" />');
+    expect(pages[slug]).toContain('<meta name="twitter:card" content="summary_large_image" />');
+  });
+
+  it.each(SLUGS)('%s links the blog and the sitemap by their slashed addresses', (slug) => {
+    // Both are directories, so the bare address is a 301 to the slashed one.
+    expect(pages[slug]).toContain('href="/blog/"');
+    expect(pages[slug]).toContain('href="/sitemap/"');
+    expect(pages[slug]).not.toMatch(/href="\/(app|blog|sitemap)"/);
+  });
+
   it.each(SLUGS)('%s says the same thing in its structured data as in its head', (slug) => {
     const page = pages[slug];
     const block = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(page);
@@ -264,15 +278,15 @@ describe('every guide is a page this site can serve', () => {
     const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
     expect(locs).toEqual([
       'https://log.poker/',
-      'https://log.poker/app',
+      'https://log.poker/app/',
       ...SLUGS.map((slug) => `https://log.poker${slug}`),
     ]);
   });
 
   it('and each one sends the reader to exactly one app at the end', () => {
     const target: Record<Slug, string> = {
-      '/running-bad': '/app',
-      '/bankroll': '/app',
+      '/running-bad': '/app/',
+      '/bankroll': '/app/',
       '/pot-odds': 'https://tiltproof.poker',
       '/tilt': 'https://untilt.poker',
     };

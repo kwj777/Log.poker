@@ -60,4 +60,4 @@ I log the great day like any other session, the same way I log the bad ones, bec
 
 If the hard part for you is the day after a great one, the walk back from *I have figured this out* to a baseline where each decision gets made on its own, that is what [Untilt](https://untilt.poker) is for. Feeling invincible is a state too, and it is worth checking before you sit down.
 
-[Log is free, all of it, and works offline with no account](/app). It will tell you your real hourly rate, which after one great day is a smaller number than the one you were doing in your head on the drive home.
+[Log is free, all of it, and works offline with no account](/app/). It will tell you your real hourly rate, which after one great day is a smaller number than the one you were doing in your head on the drive home.

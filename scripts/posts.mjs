@@ -16,7 +16,16 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const SITE = 'https://log.poker';
-export const BLOG = `${SITE}/blog`;
+/**
+ * The blog index, with its trailing slash, and every post under it gets one
+ * too. Each is a directory with an index.html in it, and Netlify answers the
+ * bare form of a directory with a 301 to the slashed one before any rule in
+ * netlify.toml is read. So `/blog` and `/blog/<slug>` were never the pages,
+ * only redirects to them, and a canonical, a sitemap entry or a link naming
+ * them pointed every crawler at a redirect first. (In November 2026 Search
+ * Console listed every post as discovered but not yet crawled.)
+ */
+export const BLOG = `${SITE}/blog/`;
 export const TITLE = 'The Log Blog';
 export const TAGLINE =
   'Notes from the three apps: what the numbers can tell you, what they cannot, and the part of the game that is not the cards.';
@@ -45,7 +54,7 @@ export const HANDOFFS = {
   log: {
     verb: 'Observe',
     name: 'Log',
-    href: '/app',
+    href: '/app/',
     what:
       'Log is free, all of it, and works offline with no account. Nothing leaves your device unless you sign in to carry it to another one.',
   },
@@ -126,8 +135,8 @@ export const parsePost = (filename, source, render) => {
     description: fields.description,
     draft: fields.draft === 'true',
     next: fields.next ?? 'log',
-    url: `${BLOG}/${slug}`,
-    path: `/blog/${slug}`,
+    url: `${BLOG}${slug}/`,
+    path: `/blog/${slug}/`,
     markdown: split[2],
     body: render ? render(split[2], filename) : null,
   };

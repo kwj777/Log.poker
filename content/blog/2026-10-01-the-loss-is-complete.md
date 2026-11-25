@@ -36,7 +36,7 @@ So leaving costs a small, known amount. Staying risks a larger, unknown one, and
 
 This is the part that makes it hard to stand up. Walking away feels like making the loss permanent, as if staying keeps it open and leaving signs the papers.
 
-It does not work that way. I wrote about this [the last time](/blog/i-fought-the-law): the next session does not know about this one. Getting even tonight and getting even next Tuesday are the same thing in expectation. The only difference is which version of me is playing, and next Tuesday's version has slept.
+It does not work that way. I wrote about this [the last time](/blog/i-fought-the-law/): the next session does not know about this one. Getting even tonight and getting even next Tuesday are the same thing in expectation. The only difference is which version of me is playing, and next Tuesday's version has slept.
 
 The money is not lost by standing up. It was lost in the hands. Standing up is the only thing on the table that cannot lose any more of it.
 
@@ -71,4 +71,4 @@ The last one matters most to me. A loss that is still in your head feels open. A
 
 If the walk from *I need it back* to the parking lot is the part you find hard, [Untilt](https://untilt.poker) has short resets written for exactly that moment.
 
-[Log is free, all of it, and works offline with no account](/app). Close the session when the stop is hit, and you will see in a few months whether the stop ever cost you anything. I would bet it has not.
+[Log is free, all of it, and works offline with no account](/app/). Close the session when the stop is hit, and you will see in a few months whether the stop ever cost you anything. I would bet it has not.

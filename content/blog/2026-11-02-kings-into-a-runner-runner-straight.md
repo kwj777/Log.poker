@@ -56,4 +56,4 @@ What the river decided was the pot, not whether I played well. Those two things 
 
 The honest math is this: get it in with kings against five six a hundred times and you lose it about twenty two times. This was one of the twenty two. Over enough of them, the other seventy seven pay for it, and nobody remembers those.
 
-[Log is free, all of it, and works offline with no account](/app). Write the hand down with the cards when it happens. A bad beat feels like a pattern on the drive home. Months of your own sessions will tell you whether it was one.
+[Log is free, all of it, and works offline with no account](/app/). Write the hand down with the cards when it happens. A bad beat feels like a pattern on the drive home. Months of your own sessions will tell you whether it was one.

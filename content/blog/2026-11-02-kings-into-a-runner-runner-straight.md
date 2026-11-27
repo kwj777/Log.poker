@@ -1,6 +1,8 @@
 ---
 title: I got my kings all in before the flop. He had five six suited.
 description: Two kings against five six suited, all in preflop. A nine on the flop, a seven on the turn, an eight on the river, and his straight. How often that happens, and why it was still the hand I wanted.
+searchTitle: Pocket kings vs 5-6 suited all in preflop: how often do kings win?
+searchDescription: Two kings against five-six suited, all in before the flop, and a runner-runner straight. How often kings win that, and why it's still the spot you want.
 next: untilt
 ---
 

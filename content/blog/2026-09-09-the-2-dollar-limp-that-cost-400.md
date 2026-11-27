@@ -1,6 +1,8 @@
 ---
 title: The $2 mistake that cost me $400
 description: I limped the button with 7♠8♠ at $1/$2 instead of raising, flopped two pair, and lost to a bigger one. What the two dollars actually bought was four more opponents.
+searchTitle: Should you limp the button? The $2 limp that cost me $400
+searchDescription: Limping the button with 7♠8♠ at $1/$2 instead of raising let four more players in. What a raise does before the flop, with the numbers.
 next: tiltproof
 ---
 

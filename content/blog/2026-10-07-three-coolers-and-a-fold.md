@@ -1,6 +1,8 @@
 ---
 title: Three coolers and the winner I folded
 description: An overnight session at Choctaw Durant with three coolers in it. The coolers were bad luck. The river fold that came after one of them was me.
+searchTitle: Three coolers in one session, and the fold that was on me
+searchDescription: An overnight session at Choctaw Durant with three coolers. Telling bad luck from a bad decision: the river fold after one of them was the mistake.
 next: untilt
 ---
 

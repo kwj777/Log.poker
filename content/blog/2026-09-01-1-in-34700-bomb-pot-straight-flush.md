@@ -1,6 +1,8 @@
 ---
 title: I flopped a straight flush in a bomb pot. He had a boat.
 description: A double-board bomb pot in a Texas $1/$2 game: 2♦4♦ flopped a six-high straight flush, J6 rivered sixes full of jacks, and the simulation put it at 1 in 34,700.
+searchTitle: Straight flush in a bomb pot, and it lost: how rare is that?
+searchDescription: A double-board bomb pot at $1/$2: my flopped straight flush ran into a full house. How bomb pots work, both boards street by street, and the odds.
 ---
 
 The dealer spread the first flop and I stopped breathing.

@@ -1,6 +1,8 @@
 ---
 title: I flopped a set of queens. He flopped Broadway.
 description: Queens against ace king on a queen, jack, ten flop. He bet $200, I called, and the board never paired. I checked how rare that is, and the more useful number was the one about what happens next.
+searchTitle: Set vs a flopped straight: how rare is it, and can you fold?
+searchDescription: Queens against ace-king on a queen-jack-ten flop. How rare a set into a flopped straight is, why I wasn't drawing dead, and what to take from it.
 next: untilt
 ---
 

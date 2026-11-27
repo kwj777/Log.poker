@@ -1,6 +1,8 @@
 ---
 title: She told me she had queens
 description: She made it $12 with pocket queens, under-bet a flop that had already beaten her, chased a third queen to the river and folded. The only evidence she had queens is that she said so.
+searchTitle: Should you believe what players say about their cards?
+searchDescription: She said she had pocket queens: an under-bet flop, a two-outer chased to the river, a fold. What table talk is worth, and the rule I use now.
 ---
 
 I know exactly one thing about her hand, and she is the only reason I know it.

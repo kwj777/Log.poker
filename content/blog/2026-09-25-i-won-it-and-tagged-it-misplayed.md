@@ -1,6 +1,8 @@
 ---
 title: I won the hand. I still tagged it misplayed.
 description: Ace-six against ace-king on an ace-ace-eight board, with a short stack, a $25 bet min-raised to $50, and a six on the river. I tagged it misplayed? because I had won it. Counting it answered the question, and not the way I expected.
+searchTitle: Won the hand, but did I misplay it? A-6 vs A-K on A-A-8
+searchDescription: Ace-six against ace-king on an ace-ace-eight board, a min-raise and a river six. Counting the combinations to see whether winning hid a mistake.
 ---
 
 A six came on the river and I won the pot. Then I opened the app, logged the hand, and tagged it *misplayed?*

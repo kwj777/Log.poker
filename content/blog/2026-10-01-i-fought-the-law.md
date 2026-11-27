@@ -1,6 +1,8 @@
 ---
 title: I fought the law and the law won
 description: After the best night I had had in months, I went back the next day to play my normal game and leave my average alone. The average had other plans, and it did not need a bad day to carry them out.
+searchTitle: Regression to the mean in poker, the day after a big win
+searchDescription: After my best night in months I went back to play my normal game. Why a big win is mostly variance, and what an ordinary day does to your average.
 next: untilt
 ---
 

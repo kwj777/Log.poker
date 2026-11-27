@@ -1,6 +1,8 @@
 ---
 title: Seven diamonds left, and one of them beat me
 description: I called an all-in with the ace-high flush and lost to a straight flush, nine to king. Seven diamonds could have completed my flush. Six of them win the pot. I caught the seventh.
+searchTitle: Ace-high flush vs a straight flush: could I have folded?
+searchDescription: I called an all-in with the ace-high flush and lost to a straight flush. How many cards beat me, whether a fold was possible, and where the real decision was.
 next: tiltproof
 ---
 

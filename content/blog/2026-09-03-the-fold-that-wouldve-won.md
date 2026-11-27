@@ -1,6 +1,8 @@
 ---
 title: The fold that would have won everything
 description: I folded ace-high with a backdoor flush draw into a dry side pot. Runner-runner spades. The right fold, the worst reveal, and the reason I did not tilt.
+searchTitle: Folded and the river would have won: was it the right fold?
+searchDescription: I folded ace-high into a dry side pot and the board ran out runner-runner spades. Why it was still the right fold, the math, and how not to tilt over it.
 next: untilt
 ---
 

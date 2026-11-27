@@ -33,8 +33,16 @@ export const TAGLINE =
 /** `<YYYY-MM-DD>-<slug>.md`. The date orders the directory; the rest is the URL. */
 const FILENAME = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
-/** Every front matter key a post may set. An unknown one is a typo, and throws. */
-const FIELDS = new Set(['title', 'description', 'updated', 'draft', 'next']);
+/**
+ * Every front matter key a post may set. An unknown one is a typo, and throws.
+ *
+ * searchTitle and searchDescription are what a search result shows: the <title>,
+ * the meta description and the share card. A story title ("She told me she had
+ * queens") is the right h1 for somebody already reading and matches nothing
+ * anybody types, so a post can name the question the hand answers for search
+ * and keep the story on the page. Both fall back to title and description.
+ */
+const FIELDS = new Set(['title', 'description', 'searchTitle', 'searchDescription', 'updated', 'draft', 'next']);
 
 /**
  * The one app each post hands off to, after it has finished its argument.
@@ -112,7 +120,7 @@ export const parsePost = (filename, source, render) => {
   const fields = {};
   for (const line of split[1].split('\n')) {
     if (!line.trim()) continue;
-    const field = /^([a-z]+):\s*(.*)$/.exec(line);
+    const field = /^([a-zA-Z]+):\s*(.*)$/.exec(line);
     if (!field) throw new Error(`${filename}: cannot read front matter line "${line}"`);
     if (!FIELDS.has(field[1])) throw new Error(`${filename}: unknown front matter "${field[1]}"`);
     fields[field[1]] = field[2].trim().replace(/^(['"])([\s\S]*)\1$/, '$2');
@@ -133,6 +141,8 @@ export const parsePost = (filename, source, render) => {
     updated: fields.updated ?? null,
     title: fields.title,
     description: fields.description,
+    searchTitle: fields.searchTitle ?? null,
+    searchDescription: fields.searchDescription ?? null,
     draft: fields.draft === 'true',
     next: fields.next ?? 'log',
     url: `${BLOG}${slug}/`,

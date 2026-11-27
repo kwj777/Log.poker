@@ -562,8 +562,8 @@ const postPage = (post) => `<!doctype html>
 -->
 <html lang="en">
 ${head({
-  title: `${post.title} · ${TITLE}`,
-  description: post.description,
+  title: post.searchTitle ?? `${post.title} · ${TITLE}`,
+  description: post.searchDescription ?? post.description,
   canonical: post.url,
   ogType: 'article',
   share: shareCard(post.slug),

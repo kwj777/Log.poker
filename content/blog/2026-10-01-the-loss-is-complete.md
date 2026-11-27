@@ -1,6 +1,8 @@
 ---
 title: The loss is complete
 description: A stop loss does not change the odds of a single hand, and it is still the best decision I make all night. Why it works, how I pick the number, and how to make standing up feel like finishing rather than giving up.
+searchTitle: Does a stop loss work in poker? How to set one and keep it
+searchDescription: A stop loss doesn't change the odds of any hand, and it's still the best decision I make all night. Why it works, how I pick the number, and how to leave.
 next: untilt
 ---
 

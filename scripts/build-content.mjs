@@ -286,6 +286,13 @@ const HELPLINE = `<p>
         </p>`;
 
 /**
+ * Who built the site, the last line of every footer. The website only: the
+ * native apps never bundle these pages, so there is no store build to hide it
+ * from. The same words as the blog's footer and the hand-written pages.
+ */
+const CREDIT = `<p class="credit">Built by <a href="https://lunarwebstudio.com/">Lunar Web Studio</a></p>`;
+
+/**
  * One page.
  *
  * The JSON-LD is generated from the same title, description and slug as the
@@ -365,6 +372,7 @@ ${others.map(([href, label]) => `          <a href="${href}">${label}</a>`).join
           <a href="/sitemap/">Sitemap</a>
 ${slug === '/privacy' ? '' : '          <a href="/privacy">Privacy</a>\n'}        </nav>
         ${HELPLINE}
+        ${CREDIT}
       </footer>
     </div>
   </body>

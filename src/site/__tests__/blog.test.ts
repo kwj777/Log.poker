@@ -371,11 +371,14 @@ describe('the blog is findable', () => {
   it('fetches nothing to render, same as every other page here', () => {
     expect(sitemapPage).not.toMatch(/<script\b/);
     expect(sitemapPage).not.toMatch(/<link[^>]+stylesheet/);
-    // Every URL it reaches for is this site's own.
+    // Every URL it reaches for is this site's own, apart from the two links in
+    // the footer: the helpline and the credit. A link is not a fetch.
     for (const [, url] of sitemapPage.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)) {
-      expect(url.startsWith('https://log.poker') || url === 'https://gamblingtherapy.org').toBe(
-        true,
-      );
+      expect(
+        url.startsWith('https://log.poker') ||
+          url === 'https://gamblingtherapy.org' ||
+          url === 'https://lunarwebstudio.com/',
+      ).toBe(true);
     }
   });
 

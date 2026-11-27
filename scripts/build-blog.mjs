@@ -363,6 +363,9 @@ const HELPLINE = `        <p>
           answers in any language, and is not a phone call.
         </p>`;
 
+/** Who built the site, under the helpline. The same words as the guides. */
+const CREDIT = `        <p class="credit">Built by <a href="https://lunarwebstudio.com/">Lunar Web Studio</a></p>`;
+
 /**
  * Share cards, drawn by `scripts/build-og.mjs` and committed under
  * `public/og`. They have to be rasters, because no crawler renders SVG, so
@@ -545,6 +548,7 @@ ${posts.map((post) => `        <li>
           <a href="/blog/feed.xml">RSS</a> &middot; <a href="/sitemap/">Sitemap</a>
         </p>
 ${HELPLINE}
+${CREDIT}
       </footer>
     </div>
   </body>
@@ -607,6 +611,7 @@ ${handoff(post)}
           <a href="/blog/feed.xml">RSS</a> &middot; <a href="/sitemap/">Sitemap</a>
         </p>
 ${HELPLINE}
+${CREDIT}
       </footer>
     </div>
   </body>
@@ -775,6 +780,7 @@ ${body}
           <a href="/blog/">Writing</a> &middot; <a href="/blog/feed.xml">RSS</a>
         </p>
 ${HELPLINE}
+${CREDIT}
       </footer>
     </div>
   </body>
